@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
 interface Case {
   id: string;
-  title: string;
+  subject?: string;
   status: CaseStatus;
-  assignee: string;
+  name: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 const STATUS_STYLES: Record<CaseStatus, string> = {
@@ -19,17 +21,51 @@ const STATUS_STYLES: Record<CaseStatus, string> = {
 };
 
 const MOCK_CASES: Case[] = [
-  { id: "CASE-001", title: "Contract dispute review", status: "open", assignee: "Alice", createdAt: "2026-05-20" },
-  { id: "CASE-002", title: "Property transfer documents", status: "in-progress", assignee: "Bob", createdAt: "2026-05-18" },
-  { id: "CASE-003", title: "Tenant eviction notice", status: "closed", assignee: "Alice", createdAt: "2026-05-10" },
+  { id: "CASE-001", subject: "Contract dispute review", status: "open", name: "Alice", createdAt: "2026-05-20" },
+  { id: "CASE-002", subject: "Property transfer documents", status: "in-progress", name: "Bob", createdAt: "2026-05-18" },
+  { id: "CASE-003", subject: "Tenant eviction notice", status: "closed", name: "Alice", createdAt: "2026-05-10" },
 ];
 
 export default function CaseManagement() {
   const navigate = useNavigate();
   const [cases, setCases] = useState<Case[]>(MOCK_CASES);
   const [filter, setFilter] = useState<CaseStatus | "all">("all");
+  const [error, setError] = useState<string | null>(null);
+  const [dbPath, setDbPath] = useState<string>("");
+
+  useEffect(() => {
+    invoke<string>("get_db_path").then(setDbPath).catch(() => {});
+  }, []);
 
   const filtered = filter === "all" ? cases : cases.filter((c) => c.status === filter);
+
+  async function addDummyCase() {
+    setError(null);
+    try {
+      const newCase = await invoke<{ id: number; subject: string; status: string; name: string; created_at: string; updated_at?: string }>(
+        "add_case",
+        {
+          subject: "New dummy case",
+          status: "open",
+          name: "Alice",
+          createdAt: new Date().toISOString().split("T")[0],
+        }
+      );
+      setCases((prev) => [
+        ...prev,
+        {
+          id: String(newCase.id),
+          subject: newCase.subject,
+          status: newCase.status as CaseStatus,
+          name: newCase.name,
+          createdAt: newCase.created_at,
+          updatedAt: newCase.updated_at,
+        },
+      ]);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
 
   function closeCase(id: string) {
     setCases((prev) =>
@@ -48,8 +84,23 @@ export default function CaseManagement() {
       </Button>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Case Management</h1>
-        <span className="text-sm text-muted-foreground">{cases.length} total cases</span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-muted-foreground">{cases.length} total cases</span>
+          <Button onClick={addDummyCase}>+ Add Case</Button>
+        </div>
       </div>
+
+      {dbPath && (
+        <div className="mb-4 rounded-md bg-muted px-4 py-2 text-xs text-muted-foreground font-mono">
+          DB: {dbPath}
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 rounded-md border border-destructive px-4 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <div className="flex gap-2 mb-4">
         {(["all", "open", "in-progress", "closed"] as const).map((s) => (
@@ -70,10 +121,11 @@ export default function CaseManagement() {
           <thead className="bg-muted text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-3 font-medium">ID</th>
-              <th className="text-left px-4 py-3 font-medium">Title</th>
+              <th className="text-left px-4 py-3 font-medium">Subject</th>
               <th className="text-left px-4 py-3 font-medium">Status</th>
-              <th className="text-left px-4 py-3 font-medium">Assignee</th>
+              <th className="text-left px-4 py-3 font-medium">Name</th>
               <th className="text-left px-4 py-3 font-medium">Created</th>
+              <th className="text-left px-4 py-3 font-medium">Updated</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -84,14 +136,15 @@ export default function CaseManagement() {
                 className={`border-t border-border ${i % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
               >
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{c.id}</td>
-                <td className="px-4 py-3 font-medium">{c.title}</td>
+                <td className="px-4 py-3 font-medium">{c.subject}</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[c.status]}`}>
                     {c.status}
                   </span>
                 </td>
-                <td className="px-4 py-3">{c.assignee}</td>
+                <td className="px-4 py-3">{c.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{c.createdAt}</td>
+                <td className="px-4 py-3 text-muted-foreground">{c.updatedAt ?? "—"}</td>
                 <td className="px-4 py-3 text-right">
                   {c.status !== "closed" && (
                     <Button
@@ -108,7 +161,7 @@ export default function CaseManagement() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                   No cases found.
                 </td>
               </tr>
