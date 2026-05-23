@@ -5,11 +5,11 @@ use std::path::Path;
 
 pub fn extract_docx(path: &Path) -> Result<String, String> {
     let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let mut archive: zip::ZipArchive<std::fs::File> = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
 
-    let mut xml_content = String::new();
+    let mut xml_content: String = String::new();
     {
-        let mut doc_xml = archive
+        let mut doc_xml: zip::read::ZipFile<'_> = archive
             .by_name("word/document.xml")
             .map_err(|_| "word/document.xml not found in archive".to_string())?;
         doc_xml

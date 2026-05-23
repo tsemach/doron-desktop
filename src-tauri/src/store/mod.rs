@@ -1,5 +1,43 @@
 use chrono::Utc;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OpenFlags, params};
+use tauri::{AppHandle, Manager};
+
+// ── DB connection ─────────────────────────────────────────────────────────────
+
+pub fn db_path(app: &AppHandle) -> std::path::PathBuf {
+    app.path().app_data_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("documents.db")
+}
+
+pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
+    let path = db_path(app);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let uri = format!("file:{}?nolock=1", path.to_string_lossy());
+    let conn = Connection::open_with_flags(
+        uri,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_URI,
+    ).map_err(|e| e.to_string())?;
+    conn.execute_batch("
+        CREATE TABLE IF NOT EXISTS cases (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject     TEXT,
+            status      TEXT    NOT NULL DEFAULT 'open',
+            name        TEXT    NOT NULL,
+            created_at  TEXT    NOT NULL,
+            updated_at  TEXT
+        );
+    ").map_err(|e| e.to_string())?;
+    init_documents_schema(&conn).map_err(|e| format!("[documents schema] {e}"))?;
+    Ok(conn)
+}
+
+#[tauri::command]
+pub fn get_db_path(app: AppHandle) -> String {
+    db_path(&app).to_string_lossy().to_string()
+}
 
 const DOCUMENTS_SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS documents (

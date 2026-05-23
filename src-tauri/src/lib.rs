@@ -1,4 +1,4 @@
-use rusqlite::{Connection, OpenFlags, params};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -21,41 +21,6 @@ pub struct Case {
     pub updated_at: Option<String>,
 }
 
-fn db_path(app: &AppHandle) -> std::path::PathBuf {
-    app.path().app_data_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."))
-        .join("documents.db")
-}
-
-fn open_db(app: &AppHandle) -> Result<Connection, String> {
-    let path = db_path(app);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let uri = format!("file:{}?nolock=1", path.to_string_lossy());
-    let conn = Connection::open_with_flags(
-        uri,
-        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_URI,
-    ).map_err(|e| e.to_string())?;
-    conn.execute_batch("
-        PRAGMA journal_mode=WAL;
-        CREATE TABLE IF NOT EXISTS cases (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            subject     TEXT,
-            status      TEXT    NOT NULL DEFAULT 'open',
-            name        TEXT    NOT NULL,
-            created_at  TEXT    NOT NULL,
-            updated_at  TEXT
-        );
-    ").map_err(|e| e.to_string())?;
-    store::init_documents_schema(&conn).map_err(|e| e.to_string())?;
-    Ok(conn)
-}
-
-#[tauri::command]
-fn get_db_path(app: AppHandle) -> String {
-    db_path(&app).to_string_lossy().to_string()
-}
 
 #[derive(Serialize, Clone)]
 struct IndexProgress {
@@ -119,7 +84,7 @@ async fn index_folder(
 
         // skip check — conn dropped before any await
         if !reindex {
-            let conn = open_db(&app)?;
+            let conn = store::open_db(&app)?;
             if store::is_already_indexed(&conn, &path_str).map_err(|e| e.to_string())? {
                 skipped += 1;
                 let _ = app.emit("indexing-progress", IndexProgress {
@@ -198,7 +163,7 @@ async fn index_folder(
         };
 
         // insert — fresh conn after the await
-        let conn = open_db(&app)?;
+        let conn = store::open_db(&app)?;
         match store::insert_document(&conn, &record) {
             Ok(_) => {
                 indexed += 1;
@@ -230,11 +195,11 @@ fn add_case(
     name: String,
     created_at: String,
 ) -> Result<Case, String> {
-    let conn = open_db(&app)?;
+    let conn = store::open_db(&app)?;
     conn.execute(
         "INSERT INTO cases (subject, status, name, created_at) VALUES (?1, ?2, ?3, ?4)",
         params![subject, status, name, created_at],
-    ).map_err(|e| e.to_string())?;
+    ).map_err(|e| format!("[insert case] {e}"))?;
     let id = conn.last_insert_rowid();
     Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None })
 }
@@ -251,7 +216,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, get_db_path, add_case, index_folder])
+        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, index_folder])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
