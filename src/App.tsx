@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
  import { Button } from "@/components/ui/button";
-import CaseManagement from "@/components/CaseManagement";
+import CaseManagement from "@/components/CaseManagment/CaseManagement";
 
 function Home() {
   const navigate = useNavigate();
