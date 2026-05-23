@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
  import { Button } from "@/components/ui/button";
 import CaseManagement from "@/components/CaseManagment/CaseManagement";
+import DocsManagement from "./components/DocsManagment/DocsManagement";
 
 function Home() {
   const navigate = useNavigate();
@@ -21,6 +22,10 @@ function Home() {
   
   function handleCaseMagement() {
     navigate("/cases");
+  }
+
+  function handleDocsManagement() {
+    navigate("/docs");
   }
 
   return (
@@ -56,7 +61,7 @@ function Home() {
         <button type="button" onClick={handleCaseMagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
           Case Managment
         </button>
-        <button type="button" onClick={handleCaseMagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
+        <button type="button" onClick={handleDocsManagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
           Documents Managment
         </button>
       </div>
@@ -79,6 +84,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/cases" element={<CaseManagement />} />
+      <Route path="/docs" element={<DocsManagement />} />
     </Routes>
   );
 }
