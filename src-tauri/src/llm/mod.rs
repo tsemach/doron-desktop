@@ -8,7 +8,7 @@ Required JSON fields:
 {
   "doc_type": one of: "contract" | "report" | "invoice" | "memo" | "specification" | "presentation" | "spreadsheet" | "letter" | "policy" | "manual" | "other",
   "title": "the document title or best inferred title",
-  "summary": "2-3 sentence summary of what this document is about",
+  "summary": "2-3 sentence summary of what this document is about, written in the same language as the document",
   "authors": ["list of author names if found, else empty list"],
   "date": "YYYY-MM-DD if a clear document date exists, else null",
   "topics": ["up to 6 key topics or subject areas"],
