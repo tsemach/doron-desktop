@@ -1,14 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
  import { Button } from "@/components/ui/button";
 import CaseManagement from "@/components/CaseManagment/CaseManagement";
 import DocsManagement from "./components/DocsManagment/DocsManagement";
+import { getCurrentWindow  } from "@tauri-apps/api/window";
 
 function Home() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [greeting, setGreeting] = useState<string>("");
+
+  useEffect(() => {
+    const setupWindow = async () => {
+      const appWindow = getCurrentWindow();
+
+      await new Promise(r => setTimeout(r, 50));
+      await appWindow.center();
+      await appWindow.maximize();
+    };
+
+    setupWindow();
+  }, []);
+
 
   async function handleGreet() {
     try {

@@ -1,0 +1,144 @@
+use serde::{Deserialize, Serialize};
+
+const EXTRACTION_PROMPT: &str = r#"You are a document analyst. Read the document text below and extract metadata as a single JSON object. Be concise and precise. Use null for any field you cannot determine.
+
+IMPORTANT: Your response must be ONLY valid JSON. Do not include any explanatory text, markdown formatting, or code blocks. Start your response directly with { and end with }.
+
+Required JSON fields:
+{
+  "doc_type": one of: "contract" | "report" | "invoice" | "memo" | "specification" | "presentation" | "spreadsheet" | "letter" | "policy" | "manual" | "other",
+  "title": "the document title or best inferred title",
+  "summary": "2-3 sentence summary of what this document is about",
+  "authors": ["list of author names if found, else empty list"],
+  "date": "YYYY-MM-DD if a clear document date exists, else null",
+  "topics": ["up to 6 key topics or subject areas"],
+  "entities": ["notable companies, people, products, or places mentioned"],
+  "language": "ISO 639-1 code e.g. en, he, fr",
+  "keywords": ["up to 10 important keywords for search"],
+  "confidence": a float 0.0-1.0 reflecting how confident you are in the extraction
+}
+
+Document text (may be truncated):
+---
+{text}
+---"#;
+
+// ── request / response shapes ─────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct RequestMessage {
+    role: &'static str,
+    content: String,
+}
+
+#[derive(Serialize)]
+struct ClaudeRequest {
+    model: String,
+    max_tokens: u32,
+    messages: Vec<RequestMessage>,
+}
+
+#[derive(Deserialize)]
+struct ContentBlock {
+    text: String,
+}
+
+#[derive(Deserialize)]
+struct ClaudeResponse {
+    content: Vec<ContentBlock>,
+}
+
+// ── public types ──────────────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DocumentMetadata {
+    pub doc_type: Option<String>,
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub authors: Option<Vec<String>>,
+    pub date: Option<String>,
+    pub topics: Option<Vec<String>>,
+    pub entities: Option<Vec<String>>,
+    pub language: Option<String>,
+    pub keywords: Option<Vec<String>>,
+    pub confidence: Option<f64>,
+}
+
+// ── API call ──────────────────────────────────────────────────────────────────
+
+pub async fn call_claude(
+    text: &str,
+    api_key: &str,
+    model: &str,
+) -> Result<DocumentMetadata, String> {
+    let truncated = if text.len() > 12000 {
+        format!("{}\n[... document truncated ...]", &text[..12000])
+    } else {
+        text.to_string()
+    };
+
+    let prompt = EXTRACTION_PROMPT.replace("{text}", &truncated);
+
+    let body = ClaudeRequest {
+        model: model.to_string(),
+        max_tokens: 1024,
+        messages: vec![RequestMessage {
+            role: "user",
+            content: prompt,
+        }],
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Claude API error {status}: {body}"));
+    }
+
+    let resp: ClaudeResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse API response: {e}"))?;
+
+    let raw = resp
+        .content
+        .into_iter()
+        .next()
+        .map(|b| b.text)
+        .unwrap_or_default();
+
+    let json_str = clean_json(&raw);
+
+    serde_json::from_str::<DocumentMetadata>(&json_str)
+        .map_err(|e| format!("Failed to parse metadata JSON: {e}. Raw: {}", &json_str[..json_str.len().min(200)]))
+}
+
+// strips markdown code fences and finds the JSON object boundaries
+fn clean_json(raw: &str) -> String {
+    let s = raw.trim();
+
+    let s = if s.starts_with("```") {
+        s.splitn(3, "```")
+            .nth(1)
+            .unwrap_or(s)
+            .trim_start_matches("json")
+            .trim()
+    } else {
+        s
+    };
+
+    match (s.find('{'), s.rfind('}')) {
+        (Some(start), Some(end)) if end > start => s[start..=end].to_string(),
+        _ => s.to_string(),
+    }
+}

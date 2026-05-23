@@ -15,7 +15,8 @@
       {
         "title": "doron-desktop",
         "width": 1000,
-        "height": 800
+        "height": 800,
+        "visible": false
       }
     ],
     "security": {
