@@ -1,5 +1,6 @@
 use chrono::Utc;
 use rusqlite::{Connection, OpenFlags, params};
+use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 // ── DB connection ─────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
         );
     ").map_err(|e| e.to_string())?;
     init_documents_schema(&conn).map_err(|e| format!("[documents schema] {e}"))?;
+    init_templates_schema(&conn).map_err(|e| format!("[templates schema] {e}"))?;
     Ok(conn)
 }
 
@@ -113,6 +115,77 @@ pub fn is_already_indexed(conn: &Connection, file_path: &str) -> Result<bool, ru
     )?;
     Ok(count > 0)
 }
+
+// ── Templates ─────────────────────────────────────────────────────────────────
+
+const TEMPLATES_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS templates (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_name     TEXT NOT NULL,
+        original_path TEXT NOT NULL UNIQUE,
+        marked_path   TEXT NOT NULL,
+        file_ext      TEXT NOT NULL,
+        file_size_kb  INTEGER,
+        fields_found  TEXT,
+        uploaded_at   TEXT NOT NULL
+    );
+";
+
+pub struct TemplateRecord {
+    pub file_name: String,
+    pub original_path: String,
+    pub marked_path: String,
+    pub file_ext: String,
+    pub file_size_kb: i64,
+    pub fields_found: String,
+    pub uploaded_at: String,
+}
+
+#[derive(Serialize)]
+pub struct TemplateRow {
+    pub id: i64,
+    pub file_name: String,
+    pub original_path: String,
+    pub marked_path: String,
+    pub file_ext: String,
+    pub file_size_kb: i64,
+    pub fields_found: String,
+    pub uploaded_at: String,
+}
+
+pub fn init_templates_schema(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute_batch(TEMPLATES_SCHEMA)
+}
+
+pub fn insert_template(conn: &Connection, r: &TemplateRecord) -> Result<i64, rusqlite::Error> {
+    conn.execute(
+        "INSERT OR REPLACE INTO templates
+            (file_name, original_path, marked_path, file_ext, file_size_kb, fields_found, uploaded_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![r.file_name, r.original_path, r.marked_path, r.file_ext, r.file_size_kb, r.fields_found, r.uploaded_at],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn list_templates(conn: &Connection) -> Result<Vec<TemplateRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, file_name, original_path, marked_path, file_ext, file_size_kb, fields_found, uploaded_at
+         FROM templates ORDER BY uploaded_at DESC"
+    )?;
+    let rows = stmt.query_map([], |row| Ok(TemplateRow {
+        id:            row.get(0)?,
+        file_name:     row.get(1)?,
+        original_path: row.get(2)?,
+        marked_path:   row.get(3)?,
+        file_ext:      row.get(4)?,
+        file_size_kb:  row.get(5)?,
+        fields_found:  row.get(6).unwrap_or_default(),
+        uploaded_at:   row.get(7)?,
+    }))?.collect();
+    rows
+}
+
+// ── Documents ─────────────────────────────────────────────────────────────────
 
 pub fn insert_document(conn: &Connection, record: &DocumentRecord) -> Result<(), rusqlite::Error> {
     let indexed_at = Utc::now().to_rfc3339();

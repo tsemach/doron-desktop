@@ -33,6 +33,7 @@ pdf-extract = "0.7"
 lopdf       = "0.34"
 walkdir     = "2"
 chrono      = { version = "0.4", features = ["serde"] }
+regex       = "1"
 
 [dev-dependencies]
 dotenvy = "0.15"

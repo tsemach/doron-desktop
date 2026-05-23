@@ -6,6 +6,7 @@ pub mod store;
 pub mod extractor;
 pub mod llm;
 pub mod indexer;
+pub mod template;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -54,7 +55,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, indexer::index_folder, indexer::index_file])
+        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, indexer::index_folder, indexer::index_file, template::process_template, template::list_templates])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

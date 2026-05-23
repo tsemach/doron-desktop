@@ -123,6 +123,59 @@ pub async fn call_claude(
         .map_err(|e| format!("Failed to parse metadata JSON: {e}. Raw: {}", &json_str[..json_str.len().min(200)]))
 }
 
+pub async fn call_claude_raw(
+    text: &str,
+    api_key: &str,
+    model: &str,
+    system_prompt: &str,
+) -> Result<String, String> {
+    let truncated = if text.len() > 12000 {
+        format!("{}\n[... document truncated ...]", &text[..12000])
+    } else {
+        text.to_string()
+    };
+
+    let prompt = format!("{system_prompt}\n\nDocument:\n---\n{truncated}\n---");
+
+    let body = ClaudeRequest {
+        model: model.to_string(),
+        max_tokens: 4096,
+        messages: vec![RequestMessage {
+            role: "user",
+            content: prompt,
+        }],
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Claude API error {status}: {body}"));
+    }
+
+    let resp: ClaudeResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse API response: {e}"))?;
+
+    Ok(resp
+        .content
+        .into_iter()
+        .next()
+        .map(|b| b.text)
+        .unwrap_or_default())
+}
+
 // strips markdown code fences and finds the JSON object boundaries
 fn clean_json(raw: &str) -> String {
     let s = raw.trim();
