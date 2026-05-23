@@ -30,7 +30,7 @@ pub async fn index_folder(
     let model = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
     let reindex = reindex.unwrap_or(false);
 
-    let supported = ["docx", "pdf", "xlsx", "xls"];
+    let supported = ["docx", "pdf", "xlsx", "xls", "txt"];
     let files: Vec<std::path::PathBuf> = walkdir::WalkDir::new(&folder_path)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -62,6 +62,12 @@ pub async fn index_folder(
             .unwrap_or("unknown")
             .to_string();
         let path_str = path.to_string_lossy().to_string();
+
+        let _ = app.emit("indexing-progress", IndexProgress {
+            current, total, file_name: file_name.clone(),
+            status: "processing".to_string(),
+            message: "scanning...".to_string(),
+        });
 
         // skip check — conn dropped before any await
         if !reindex {
@@ -166,4 +172,120 @@ pub async fn index_folder(
     }
 
     Ok(IndexSummary { indexed, skipped, failed })
+}
+
+#[tauri::command]
+pub async fn index_file(
+    app: AppHandle,
+    file_path: String,
+    api_key: String,
+    model: Option<String>,
+    reindex: Option<bool>,
+) -> Result<IndexSummary, String> {
+    let model = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
+    let reindex = reindex.unwrap_or(false);
+
+    let path = std::path::Path::new(&file_path);
+    let supported = ["docx", "pdf", "xlsx", "xls", "txt"];
+
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
+
+    if !supported.contains(&ext.as_str()) {
+        return Err(format!("Unsupported file type: .{ext}"));
+    }
+
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let emit_progress = |status: &str, message: &str| {
+        let _ = app.emit("indexing-progress", IndexProgress {
+            current: 1,
+            total: 1,
+            file_name: file_name.clone(),
+            status: status.to_string(),
+            message: message.to_string(),
+        });
+    };
+
+    emit_progress("processing", "starting...");
+
+    // skip check
+    if !reindex {
+        let conn = store::open_db(&app)?;
+        if store::is_already_indexed(&conn, &file_path).map_err(|e| e.to_string())? {
+            emit_progress("skipped", "already indexed");
+            return Ok(IndexSummary { indexed: 0, skipped: 1, failed: 0 });
+        }
+    }
+
+    // extract text
+    emit_progress("processing", "extracting text...");
+    let extracted = match extractor::extract(path) {
+        Ok(e) if !e.text.trim().is_empty() => e,
+        Ok(_) => {
+            emit_progress("skipped", "no text extracted");
+            return Ok(IndexSummary { indexed: 0, skipped: 1, failed: 0 });
+        }
+        Err(e) => {
+            emit_progress("failed", &format!("extraction failed: {e}"));
+            return Ok(IndexSummary { indexed: 0, skipped: 0, failed: 1 });
+        }
+    };
+
+    // call Claude
+    emit_progress("processing", "analyzing with AI...");
+    let metadata = match llm::call_claude(&extracted.text, &api_key, &model).await {
+        Ok(m) => m,
+        Err(e) => {
+            emit_progress("failed", &format!("API error: {e}"));
+            return Ok(IndexSummary { indexed: 0, skipped: 0, failed: 1 });
+        }
+    };
+
+    // build record
+    let file_size_kb = std::fs::metadata(path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
+    let raw_metadata = serde_json::to_string(&metadata).unwrap_or_default();
+    let msg = format!(
+        "[{}] {}",
+        metadata.doc_type.as_deref().unwrap_or("?"),
+        metadata.title.as_deref().unwrap_or("(no title)")
+    );
+
+    let record = store::DocumentRecord {
+        file_path: file_path.clone(),
+        file_name: file_name.clone(),
+        file_ext: ext,
+        file_size_kb,
+        doc_type: metadata.doc_type,
+        title: metadata.title,
+        summary: metadata.summary,
+        authors:   serde_json::to_string(&metadata.authors.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+        doc_date:  metadata.date,
+        topics:    serde_json::to_string(&metadata.topics.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+        entities:  serde_json::to_string(&metadata.entities.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+        keywords:  serde_json::to_string(&metadata.keywords.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+        language:  metadata.language,
+        page_count: extracted.page_count,
+        confidence: metadata.confidence,
+        raw_metadata,
+    };
+
+    let conn = store::open_db(&app)?;
+    match store::insert_document(&conn, &record) {
+        Ok(_) => {
+            emit_progress("ok", &msg);
+            Ok(IndexSummary { indexed: 1, skipped: 0, failed: 0 })
+        }
+        Err(e) => {
+            emit_progress("failed", &format!("DB error: {e}"));
+            Ok(IndexSummary { indexed: 0, skipped: 0, failed: 1 })
+        }
+    }
 }

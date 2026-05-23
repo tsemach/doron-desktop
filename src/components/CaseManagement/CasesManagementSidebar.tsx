@@ -1,3 +1,4 @@
+import BackButton from "../ui/back-button";
 import { Button } from "../ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -6,13 +7,14 @@ export default function CaseManagement() {
 
   return (
     <aside className="w-35 shrink-0 flex flex-col py-4 px-3 border-r border-border">
-        <Button
+        {/* <Button
           variant="ghost"
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 justify-start"
         >
           ← Back
-        </Button>
+        </Button> */}
+        <BackButton navigateTo={-1} /> 
 
         <div className="border-t border-border -mx-3 mt-2" />
 

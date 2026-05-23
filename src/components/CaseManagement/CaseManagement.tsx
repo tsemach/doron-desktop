@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
-import CaseManagementSidebar from "./CaseManagmentSidebar";
+import CaseManagementSidebar from "./CasesManagementSidebar";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 

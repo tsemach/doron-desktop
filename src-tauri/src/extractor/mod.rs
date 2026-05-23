@@ -1,6 +1,7 @@
 pub mod docx;
 pub mod pdf;
 pub mod xlsx;
+pub mod txt;
 
 use std::path::Path;
 
@@ -29,6 +30,7 @@ pub fn extract(path: &Path) -> Result<ExtractedFile, String> {
             let text = xlsx::extract_xlsx(path)?;
             Ok(ExtractedFile { text, page_count: None })
         }
+        "txt" => Ok(ExtractedFile { text: txt::extract_txt(path)?, page_count: None }),
         _ => Err(format!("Unsupported file type: .{ext}")),
     }
 }

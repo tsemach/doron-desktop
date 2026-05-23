@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
  import { Button } from "@/components/ui/button";
-import CaseManagement from "@/components/CaseManagment/CaseManagement";
-import DocsManagement from "./components/DocsManagment/DocsManagement";
+import CaseManagement from "@/components/CaseManagement/CaseManagement";
+import DocsManagement from "./components/DocsManagement/DocsManagement";
+import Settings from "./components/Settings/Settings";
 import { getCurrentWindow  } from "@tauri-apps/api/window";
 
 function Home() {
@@ -42,6 +43,10 @@ function Home() {
     navigate("/docs");
   }
 
+  function handleSettings() {
+    navigate("/settings");
+  }
+
   return (
     <main className="flex flex-col items-center pt-[10vh] text-center">
       <h1 className="text-2xl font-semibold">Welcome to Tauri + React</h1>
@@ -73,10 +78,15 @@ function Home() {
       </div>
       <div className="flex justify-center gap-8 mt-4">
         <button type="button" onClick={handleCaseMagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
-          Case Managment
+          Case Management
         </button>
         <button type="button" onClick={handleDocsManagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
-          Documents Managment
+          Documents Management
+        </button>
+      </div>
+      <div className="flex justify-end w-full max-w-[1008px] mt-2">
+        <button type="button" onClick={handleSettings} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1">
+          ⚙ Settings
         </button>
       </div>
 
@@ -99,6 +109,7 @@ function App() {
       <Route path="/" element={<Home />} />
       <Route path="/cases" element={<CaseManagement />} />
       <Route path="/docs" element={<DocsManagement />} />
+      <Route path="/settings" element={<Settings />} />
     </Routes>
   );
 }

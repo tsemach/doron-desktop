@@ -53,7 +53,8 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, indexer::index_folder])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, indexer::index_folder, indexer::index_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
