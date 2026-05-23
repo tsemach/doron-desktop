@@ -52,9 +52,14 @@ function Home() {
           Greet
         </button>
       </div>
-      <button type="button" onClick={handleCaseMagement} className="border rounded px-4 py-2 text-sm font-medium hover:border-blue-500 transition-colors">
-        Case Managment
-      </button>
+      <div className="flex justify-center gap-8 mt-4">
+        <button type="button" onClick={handleCaseMagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
+          Case Managment
+        </button>
+        <button type="button" onClick={handleCaseMagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
+          Documents Managment
+        </button>
+      </div>
 
       <h1 className="text-3xl font-bold underline text-blue-500 mt-6">Hello world!</h1>
       <h2 className="text-3xl font-bold underline text-gray-400">Hello world!</h2>
