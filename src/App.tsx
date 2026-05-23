@@ -40,7 +40,7 @@ function Home() {
   }
 
   function handleDocsManagement() {
-    navigate("/docs");
+    navigate("/docs-management");
   }
 
   function handleSettings() {
@@ -108,7 +108,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/cases" element={<CaseManagement />} />
-      <Route path="/docs" element={<DocsManagement />} />
+      <Route path="/docs-management/*" element={<DocsManagement />} />
       <Route path="/settings" element={<Settings />} />
     </Routes>
   );

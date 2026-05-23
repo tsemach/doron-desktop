@@ -8,6 +8,7 @@ type Props = {
   onClosePicker: () => void;
   onSelect: (path: string, isFolder: boolean) => void;
   scanCount?: { current: number; total: number };
+  onTemplatesClick: () => void;
 };
 
 export default function DocsManagementMenu({
@@ -17,6 +18,7 @@ export default function DocsManagementMenu({
   onClosePicker,
   onSelect,
   scanCount,
+  onTemplatesClick,
 }: Props) {
   return (
     <>
@@ -41,7 +43,7 @@ export default function DocsManagementMenu({
         </span>
       )}      
 
-      <Button disabled={disabled} className="flex items-center gap-2">
+      <Button disabled={disabled} onClick={onTemplatesClick} className="flex items-center gap-2">
         Templates
       </Button>
 

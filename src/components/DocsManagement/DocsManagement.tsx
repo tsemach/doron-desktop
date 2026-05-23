@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Routes, Route } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
@@ -7,6 +7,7 @@ import BackButton from "../ui/back-button";
 import CheckApiKey from "../ui/check-api-key";
 import DocsManagementMenu from "./DocsManagementMenu";
 import DocsManagementScan, { type ProgressItem, type ProgressStatus, type IndexSummary } from "./DocsManagementScan";
+import DocsManagementTemplates from "./DocsManagementTemplates";
 
 type IndexProgressEvent = {
   file_name: string;
@@ -40,6 +41,7 @@ export default function DocsManagement() {
   }, []);
 
   async function startIndexing(path: string, folder: boolean) {
+    navigate("/docs-management/scan");
     setSelectedPath(path);
     setIsFolder(folder);
     setShowOutput(true);
@@ -101,6 +103,7 @@ export default function DocsManagement() {
           scanCount={isFolder && isProcessing && currentItem
             ? { current: currentItem.current, total: currentItem.total }
             : undefined}
+          onTemplatesClick={() => navigate("/docs-management/templates")}
         />
         {dbPath && (
           <p className="text-xs text-muted-foreground font-mono">DB: {dbPath}</p>
@@ -108,16 +111,21 @@ export default function DocsManagement() {
       </div>
       <hr className="my-4 border-border" />
 
-      <DocsManagementScan
-        show={showOutput}
-        isFolder={isFolder}
-        isProcessing={isProcessing}
-        selectedPath={selectedPath}
-        items={items}
-        currentItem={currentItem}
-        summary={summary}
-        error={error}
-      />
+      <Routes>
+        <Route path="scan" element={
+          <DocsManagementScan
+            show={showOutput}
+            isFolder={isFolder}
+            isProcessing={isProcessing}
+            selectedPath={selectedPath}
+            items={items}
+            currentItem={currentItem}
+            summary={summary}
+            error={error}
+          />
+        } />
+        <Route path="templates" element={<DocsManagementTemplates />} />
+      </Routes>
     </div>
   );
 }
