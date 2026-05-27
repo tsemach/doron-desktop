@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { Button } from "../ui/button";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
 
@@ -58,6 +58,12 @@ function StatusIcon({ status }: { status: "processing" | "ok" | "failed" }) {
 export default function DocsManagementTemplates() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [processing, setProcessing] = useState<ProcessingState>(null);
+  
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [generating, setGenerating] = useState(false);
+  const [genResult, setGenResult] = useState<{ status: "ok" | "failed"; message: string } | null>(null);
+
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const unlistenRef = useRef<UnlistenFn | null>(null);
 
@@ -106,6 +112,51 @@ export default function DocsManagementTemplates() {
     }
   }
 
+  function handleSelectTemplate(t: TemplateRow) {
+    setSelectedTemplate(t);
+    setGenResult(null);
+    try {
+      const fields = JSON.parse(t.fields_found) as string[];
+      const initialValues: Record<string, string> = {};
+      fields.forEach((f) => {
+        initialValues[f] = "";
+      });
+      setFieldValues(initialValues);
+    } catch {
+      setFieldValues({});
+    }
+  }
+
+  async function handleGenerate() {
+    if (!selectedTemplate) return;
+    setGenerating(true);
+    setGenResult(null);
+    try {
+      const ext = selectedTemplate.file_ext;
+      const defaultName = `filled_${selectedTemplate.file_name}`;
+      const selectedPath = await save({
+        defaultPath: defaultName,
+        filters: [{ name: "Document", extensions: [ext] }],
+      });
+      if (!selectedPath) {
+        setGenerating(false);
+        return;
+      }
+
+      await invoke("generate_document_from_template", {
+        templateId: selectedTemplate.id,
+        fieldValues,
+        outputPath: selectedPath,
+      });
+
+      setGenResult({ status: "ok", message: `Successfully generated document and saved to: ${selectedPath}` });
+    } catch (e) {
+      setGenResult({ status: "failed", message: String(e) });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   return (
     <div className="mt-4 space-y-4">
       <Button onClick={handleAddTemplate} disabled={processing?.status === "processing"}>
@@ -138,6 +189,7 @@ export default function DocsManagementTemplates() {
                 <th className="px-4 py-2 text-left font-medium">Type</th>
                 <th className="px-4 py-2 text-left font-medium">Fields Found</th>
                 <th className="px-4 py-2 text-left font-medium">Uploaded</th>
+                <th className="px-4 py-2 text-left font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -147,10 +199,69 @@ export default function DocsManagementTemplates() {
                   <td className="px-4 py-2 uppercase text-muted-foreground">{t.file_ext}</td>
                   <td className="px-4 py-2">{fieldCount(t.fields_found)} fields</td>
                   <td className="px-4 py-2 text-muted-foreground">{formatDate(t.uploaded_at)}</td>
+                  <td className="px-4 py-2">
+                    <Button variant="outline" size="sm" onClick={() => handleSelectTemplate(t)}>
+                      Fill Form
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {selectedTemplate && (
+        <div className="rounded-md border bg-card p-4 space-y-4 mt-6">
+          <div className="flex items-center justify-between border-b pb-2">
+            <div>
+              <h3 className="text-sm font-semibold">Fill Template: {selectedTemplate.file_name}</h3>
+              <p className="text-xs text-muted-foreground">Provide values to replace placeholders inside the document.</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedTemplate(null)}>
+              Close Form
+            </Button>
+          </div>
+
+          {Object.keys(fieldValues).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No placeholders found in this template.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2">
+              {Object.keys(fieldValues).map((field) => (
+                <div key={field} className="space-y-1">
+                  <label className="text-xs font-mono text-muted-foreground capitalize">
+                    {field.replace(/_/g, " ")}
+                  </label>
+                  <input
+                    type="text"
+                    value={fieldValues[field]}
+                    onChange={(e) => setFieldValues({ ...fieldValues, [field]: e.target.value })}
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder={`Enter ${field}`}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {genResult && (
+            <div className={`rounded-md border px-4 py-2 text-sm ${
+              genResult.status === "failed"
+                ? "border-red-400 bg-red-50 text-red-800"
+                : "border-green-400 bg-green-50 text-green-800"
+            }`}>
+              {genResult.message}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-2">
+            <Button onClick={handleGenerate} disabled={generating}>
+              {generating ? "Generating..." : "Generate & Save Document"}
+            </Button>
+            <Button variant="outline" onClick={() => setSelectedTemplate(null)}>
+              Cancel
+            </Button>
+          </div>
         </div>
       )}
     </div>

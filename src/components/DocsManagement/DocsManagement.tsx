@@ -8,6 +8,7 @@ import CheckApiKey from "../ui/check-api-key";
 import DocsManagementMenu from "./DocsManagementMenu";
 import DocsManagementScan, { type ProgressItem, type ProgressStatus, type IndexSummary } from "./DocsManagementScan";
 import DocsManagementTemplates from "./DocsManagementTemplates";
+import DocsManagementSearch from "./DocsManagementSearch";
 
 type IndexProgressEvent = {
   file_name: string;
@@ -104,6 +105,7 @@ export default function DocsManagement() {
             ? { current: currentItem.current, total: currentItem.total }
             : undefined}
           onTemplatesClick={() => navigate("/docs-management/templates")}
+          onSearchClick={() => navigate("/docs-management/search")}
         />
         {dbPath && (
           <p className="text-xs text-muted-foreground font-mono">DB: {dbPath}</p>
@@ -125,6 +127,7 @@ export default function DocsManagement() {
           />
         } />
         <Route path="templates" element={<DocsManagementTemplates />} />
+        <Route path="search" element={<DocsManagementSearch />} />
       </Routes>
     </div>
   );

@@ -1,7 +1,7 @@
 import { Button } from "../ui/button";
 import DocsManagementPicker from "./DocsManagementPicker";
 
-type Props = {
+type DocsManagementMenuProps = {
   disabled: boolean;
   showPicker: boolean;
   onTogglePicker: () => void;
@@ -9,6 +9,7 @@ type Props = {
   onSelect: (path: string, isFolder: boolean) => void;
   scanCount?: { current: number; total: number };
   onTemplatesClick: () => void;
+  onSearchClick: () => void;
 };
 
 export default function DocsManagementMenu({
@@ -19,7 +20,8 @@ export default function DocsManagementMenu({
   onSelect,
   scanCount,
   onTemplatesClick,
-}: Props) {
+  onSearchClick,
+}: DocsManagementMenuProps) {
   return (
     <>
       <div className="relative inline-block">
@@ -46,7 +48,10 @@ export default function DocsManagementMenu({
       <Button disabled={disabled} onClick={onTemplatesClick} className="flex items-center gap-2">
         Templates
       </Button>
-
+      
+      <Button disabled={disabled} onClick={onSearchClick} className="flex items-center gap-2">
+        Search
+      </Button>
     </>    
   );
 }

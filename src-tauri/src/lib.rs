@@ -7,6 +7,8 @@ pub mod extractor;
 pub mod llm;
 pub mod indexer;
 pub mod template;
+pub mod query;
+pub mod embeddings;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -51,11 +53,15 @@ pub fn run() {
                 window.maximize().ok();
                 window.show().ok();
             }
+            // Pre-warm the embedding model in a background thread on startup
+            tauri::async_runtime::spawn(async {
+                let _ = crate::embeddings::get_embedding_model();
+            });
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, indexer::index_folder, indexer::index_file, template::process_template, template::list_templates])
+        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, indexer::index_folder, indexer::index_file, template::process_template, template::list_templates, query::search_documents, template::generate_document_from_template])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

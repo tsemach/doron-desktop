@@ -392,3 +392,95 @@ pub fn list_templates(app: AppHandle) -> Result<Vec<store::TemplateRow>, String>
     let conn = store::open_db(&app)?;
     store::list_templates(&conn).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn generate_document_from_template(
+    app: AppHandle,
+    template_id: i64,
+    field_values: std::collections::HashMap<String, String>,
+    output_path: String,
+) -> Result<String, String> {
+    let conn = store::open_db(&app)?;
+    let mut stmt = conn
+        .prepare("SELECT marked_path, file_ext FROM templates WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
+    
+    let (marked_path_str, file_ext): (String, String) = stmt
+        .query_row(rusqlite::params![template_id], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .map_err(|e| format!("Failed to find template with ID {template_id}: {e}"))?;
+
+    let marked_path = std::path::Path::new(&marked_path_str);
+    if !marked_path.exists() {
+        return Err(format!("Marked template file not found at {marked_path_str}"));
+    }
+
+    if file_ext == "docx" {
+        let original_bytes = std::fs::read(marked_path)
+            .map_err(|e| format!("Failed to read marked template DOCX: {e}"))?;
+
+        let cursor = std::io::Cursor::new(original_bytes);
+        let mut archive = zip::ZipArchive::new(cursor)
+            .map_err(|e| format!("Cannot open template DOCX: {e}"))?;
+
+        let doc_xml = {
+            let mut f = archive
+                .by_name("word/document.xml")
+                .map_err(|_| "word/document.xml not found".to_string())?;
+            let mut s = String::new();
+            f.read_to_string(&mut s).map_err(|e| e.to_string())?;
+            s
+        };
+
+        let mut new_doc_xml = doc_xml;
+        for (key, val) in field_values {
+            let escaped_val = xml_escape(&val);
+            new_doc_xml = new_doc_xml.replace(&format!("<<{key}>>"), &escaped_val);
+        }
+
+        let out_buf: Vec<u8> = Vec::new();
+        let out_cursor = std::io::Cursor::new(out_buf);
+        let mut new_zip = zip::ZipWriter::new(out_cursor);
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+            let opts = zip::write::FileOptions::<()>::default()
+                .compression_method(file.compression());
+
+            if file.is_dir() {
+                new_zip.add_directory(&name, opts).map_err(|e| e.to_string())?;
+            } else {
+                new_zip.start_file(&name, opts).map_err(|e| e.to_string())?;
+                if name == "word/document.xml" {
+                    new_zip
+                        .write_all(new_doc_xml.as_bytes())
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    let mut content = Vec::new();
+                    file.read_to_end(&mut content).map_err(|e| e.to_string())?;
+                    new_zip.write_all(&content).map_err(|e| e.to_string())?;
+                }
+            }
+        }
+
+        let out_cursor = new_zip.finish().map_err(|e| e.to_string())?;
+        let output_bytes = out_cursor.into_inner();
+
+        std::fs::write(&output_path, &output_bytes)
+            .map_err(|e| format!("Failed to write generated DOCX: {e}"))?;
+    } else {
+        let mut text = std::fs::read_to_string(marked_path)
+            .map_err(|e| format!("Failed to read marked text template: {e}"))?;
+
+        for (key, val) in field_values {
+            text = text.replace(&format!("<<{key}>>"), &val);
+        }
+
+        std::fs::write(&output_path, text)
+            .map_err(|e| format!("Failed to write generated text: {e}"))?;
+    }
+
+    Ok(output_path)
+}

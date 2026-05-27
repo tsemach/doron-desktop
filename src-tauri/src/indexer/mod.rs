@@ -147,12 +147,25 @@ pub async fn index_folder(
             page_count: extracted.page_count,
             confidence: metadata.confidence,
             raw_metadata,
+            raw_text: extracted.text.clone(),
         };
 
         // insert — fresh conn after the await
         let conn = store::open_db(&app)?;
         match store::insert_document(&conn, &record) {
             Ok(_) => {
+                // Generate and save chunk embeddings
+                if let Ok(Some(doc_id)) = store::get_document_id_by_path(&conn, &record.file_path) {
+                    let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
+                    if !chunks.is_empty() {
+                        if let Ok(embeddings) = crate::embeddings::get_passage_embeddings(&chunks) {
+                            for (idx, (chunk, emb)) in chunks.iter().zip(embeddings.iter()).enumerate() {
+                                let emb_bytes = crate::embeddings::vec_to_bytes(emb);
+                                let _ = store::insert_document_chunk(&conn, doc_id, idx as i32, chunk, &emb_bytes);
+                            }
+                        }
+                    }
+                }
                 indexed += 1;
                 let _ = app.emit("indexing-progress", IndexProgress {
                     current, total, file_name,
@@ -275,11 +288,24 @@ pub async fn index_file(
         page_count: extracted.page_count,
         confidence: metadata.confidence,
         raw_metadata,
+        raw_text: extracted.text.clone(),
     };
 
     let conn = store::open_db(&app)?;
     match store::insert_document(&conn, &record) {
         Ok(_) => {
+            // Generate and save chunk embeddings
+            if let Ok(Some(doc_id)) = store::get_document_id_by_path(&conn, &record.file_path) {
+                let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
+                if !chunks.is_empty() {
+                    if let Ok(embeddings) = crate::embeddings::get_passage_embeddings(&chunks) {
+                        for (idx, (chunk, emb)) in chunks.iter().zip(embeddings.iter()).enumerate() {
+                            let emb_bytes = crate::embeddings::vec_to_bytes(emb);
+                            let _ = store::insert_document_chunk(&conn, doc_id, idx as i32, chunk, &emb_bytes);
+                        }
+                    }
+                }
+            }
             emit_progress("ok", &msg);
             Ok(IndexSummary { indexed: 1, skipped: 0, failed: 0 })
         }

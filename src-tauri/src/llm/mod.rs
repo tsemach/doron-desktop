@@ -66,26 +66,13 @@ pub struct DocumentMetadata {
 
 // ── API call ──────────────────────────────────────────────────────────────────
 
-pub async fn call_claude(
-    text: &str,
-    api_key: &str,
-    model: &str,
-) -> Result<DocumentMetadata, String> {
-    let truncated = if text.len() > 12000 {
-        format!("{}\n[... document truncated ...]", &text[..12000])
-    } else {
-        text.to_string()
-    };
+// ── Private HTTP helper ───────────────────────────────────────────────────────
 
-    let prompt = EXTRACTION_PROMPT.replace("{text}", &truncated);
-
+async fn post_message(prompt: String, api_key: &str, model: &str, max_tokens: u32) -> Result<String, String> {
     let body = ClaudeRequest {
         model: model.to_string(),
-        max_tokens: 1024,
-        messages: vec![RequestMessage {
-            role: "user",
-            content: prompt,
-        }],
+        max_tokens,
+        messages: vec![RequestMessage { role: "user", content: prompt }],
     };
 
     let client = reqwest::Client::new();
@@ -110,70 +97,39 @@ pub async fn call_claude(
         .await
         .map_err(|e| format!("Failed to parse API response: {e}"))?;
 
-    let raw = resp
-        .content
-        .into_iter()
-        .next()
-        .map(|b| b.text)
-        .unwrap_or_default();
+    Ok(resp.content.into_iter().next().map(|b| b.text).unwrap_or_default())
+}
 
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/// Analyze a document and return structured metadata (JSON parsed).
+pub async fn call_claude(text: &str, api_key: &str, model: &str) -> Result<DocumentMetadata, String> {
+    let truncated = if text.len() > 12000 {
+        format!("{}\n[... document truncated ...]", &text[..12000])
+    } else {
+        text.to_string()
+    };
+    let prompt = EXTRACTION_PROMPT.replace("{text}", &truncated);
+    let raw = post_message(prompt, api_key, model, 1024).await?;
     let json_str = clean_json(&raw);
-
     serde_json::from_str::<DocumentMetadata>(&json_str)
         .map_err(|e| format!("Failed to parse metadata JSON: {e}. Raw: {}", &json_str[..json_str.len().min(200)]))
 }
 
-pub async fn call_claude_raw(
-    text: &str,
-    api_key: &str,
-    model: &str,
-    system_prompt: &str,
-) -> Result<String, String> {
+/// Send a single user-turn message and return the raw text response.
+pub async fn call_claude_simple(prompt: &str, api_key: &str, model: &str) -> Result<String, String> {
+    post_message(prompt.to_string(), api_key, model, 512).await
+}
+
+/// Analyze a document with a custom prompt and return the raw text response.
+pub async fn call_claude_raw(text: &str, api_key: &str, model: &str, system_prompt: &str) -> Result<String, String> {
     let truncated = if text.len() > 12000 {
         format!("{}\n[... document truncated ...]", &text[..12000])
     } else {
         text.to_string()
     };
-
     let prompt = format!("{system_prompt}\n\nDocument:\n---\n{truncated}\n---");
-
-    let body = ClaudeRequest {
-        model: model.to_string(),
-        max_tokens: 4096,
-        messages: vec![RequestMessage {
-            role: "user",
-            content: prompt,
-        }],
-    };
-
-    let client = reqwest::Client::new();
-    let response = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {e}"))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Claude API error {status}: {body}"));
-    }
-
-    let resp: ClaudeResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse API response: {e}"))?;
-
-    Ok(resp
-        .content
-        .into_iter()
-        .next()
-        .map(|b| b.text)
-        .unwrap_or_default())
+    post_message(prompt, api_key, model, 4096).await
 }
 
 // strips markdown code fences and finds the JSON object boundaries

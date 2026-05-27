@@ -49,6 +49,7 @@ fn test_extract_docx_and_store() {
         page_count:   extracted.page_count,
         confidence:   None,
         raw_metadata: format!(r#"{{"chars": {}, "source": "integration_test"}}"#, extracted.text.len()),
+        raw_text:     extracted.text.clone(),
     };
 
     // --- store (INSERT OR REPLACE so the test is re-runnable) ---

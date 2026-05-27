@@ -79,6 +79,7 @@ async fn test_index_document() {
         page_count:   extracted.page_count,
         confidence:   metadata.confidence,
         raw_metadata: format!(r#"{{"chars": {}, "source": "indexer_test"}}"#, extracted.text.len()),
+        raw_text:     extracted.text.clone(),
     };
 
     store::insert_document(&conn, &record).expect("insert should succeed");
