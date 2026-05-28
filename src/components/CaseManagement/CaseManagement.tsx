@@ -1,82 +1,10 @@
-import { useState, useEffect } from "react";
-
-import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
 import CaseManagementSidebar from "./CasesManagementSidebar";
 import { Route, Routes, useNavigate } from "react-router-dom";
-import CasesManagementHader from "./CaseManagementHeader";
 import CaseManagementOpenCases from "./CaseManagementOpenCases";
 import CasesManagementTemplate from "./CasesManagementTemplate";
 
-type CaseStatus = "open" | "in-progress" | "closed";
-
-interface Case {
-  id: string;
-  subject?: string;
-  status: CaseStatus;
-  name: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-const STATUS_STYLES: Record<CaseStatus, string> = {
-  open: "bg-blue-100 text-blue-700",
-  "in-progress": "bg-yellow-100 text-yellow-700",
-  closed: "bg-gray-100 text-gray-500",
-};
-
-const MOCK_CASES: Case[] = [
-  { id: "CASE-001", subject: "Contract dispute review", status: "open", name: "Alice", createdAt: "2026-05-20" },
-  { id: "CASE-002", subject: "Property transfer documents", status: "in-progress", name: "Bob", createdAt: "2026-05-18" },
-  { id: "CASE-003", subject: "Tenant eviction notice", status: "closed", name: "Alice", createdAt: "2026-05-10" },
-];
-
 export default function CaseManagement() {
-  const [cases, setCases] = useState<Case[]>(MOCK_CASES);
-  const [filter, setFilter] = useState<CaseStatus | "all">("all");
-  const [error, setError] = useState<string | null>(null);
-  const [dbPath, setDbPath] = useState<string>("");
   const navigate = useNavigate();
-
-  useEffect(() => {
-    invoke<string>("get_db_path").then(setDbPath).catch(() => {});
-  }, []);
-
-  const filtered = filter === "all" ? cases : cases.filter((c) => c.status === filter);
-
-  async function addDummyCase() {
-    setError(null);
-    try {
-      const newCase = await invoke<{ id: number; subject: string; status: string; name: string; created_at: string; updated_at?: string }>(
-        "add_case",
-        {
-          subject: "New dummy case",
-          status: "open",
-          name: "Alice",
-          createdAt: new Date().toISOString().split("T")[0],
-        }
-      );
-      setCases((prev) => [
-        ...prev,
-        {
-          id: String(newCase.id),
-          subject: newCase.subject,
-          status: newCase.status as CaseStatus,
-          name: newCase.name,
-          createdAt: newCase.created_at,
-          updatedAt: newCase.updated_at,
-        },
-      ]);
-    } catch (err) {
-      setError(String(err));
-    }
-  }
-
-  function closeCase(id: string) {
-    setCases((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: "closed" } : c))
-    );
-  }
 
   function handleTemplate() {
     navigate("templates");

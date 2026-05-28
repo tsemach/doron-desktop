@@ -402,7 +402,7 @@ pub async fn generate_document_from_template(
 ) -> Result<String, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
-        .prepare("SELECT marked_path, file_ext FROM templates WHERE id = ?1")
+        .prepare("SELECT marked_path, file_ext FROM doc_templates WHERE id = ?1")
         .map_err(|e| e.to_string())?;
     
     let (marked_path_str, file_ext): (String, String) = stmt
@@ -484,3 +484,39 @@ pub async fn generate_document_from_template(
 
     Ok(output_path)
 }
+
+#[tauri::command]
+pub fn list_case_templates(app: AppHandle) -> Result<Vec<store::CaseTemplateRow>, String> {
+    let conn = store::open_db(&app)?;
+    store::list_case_templates(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_case_template(
+    app: AppHandle,
+    name: String,
+    fields: Vec<String>,
+    doc_template_ids: Vec<i64>,
+) -> Result<i64, String> {
+    let conn = store::open_db(&app)?;
+    store::create_case_template(&conn, &name, &fields, &doc_template_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_case_template(
+    app: AppHandle,
+    id: i64,
+    name: String,
+    fields: Vec<String>,
+    doc_template_ids: Vec<i64>,
+) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+    store::update_case_template(&conn, id, &name, &fields, &doc_template_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_case_template(app: AppHandle, id: i64) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+    store::delete_case_template(&conn, id).map_err(|e| e.to_string())
+}
+

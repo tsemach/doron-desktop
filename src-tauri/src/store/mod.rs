@@ -32,8 +32,27 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
             updated_at  TEXT
         );
     ").map_err(|e| e.to_string())?;
+
+    // Migrate templates to doc_templates if necessary
+    let templates_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='templates'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+
+    let doc_templates_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='doc_templates'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+
+    if templates_exists && !doc_templates_exists {
+        let _ = conn.execute("ALTER TABLE templates RENAME TO doc_templates;", []);
+    }
+
     init_documents_schema(&conn).map_err(|e| format!("[documents schema] {e}"))?;
     init_templates_schema(&conn).map_err(|e| format!("[templates schema] {e}"))?;
+    conn.execute_batch(CASE_TEMPLATES_SCHEMA).map_err(|e| format!("[case templates schema] {e}"))?;
     Ok(conn)
 }
 
@@ -132,7 +151,7 @@ pub fn is_already_indexed(conn: &Connection, file_path: &str) -> Result<bool, ru
 // ── Templates ─────────────────────────────────────────────────────────────────
 
 const TEMPLATES_SCHEMA: &str = "
-    CREATE TABLE IF NOT EXISTS templates (
+    CREATE TABLE IF NOT EXISTS doc_templates (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         file_name     TEXT NOT NULL,
         original_path TEXT NOT NULL UNIQUE,
@@ -172,7 +191,7 @@ pub fn init_templates_schema(conn: &Connection) -> Result<(), rusqlite::Error> {
 
 pub fn insert_template(conn: &Connection, r: &TemplateRecord) -> Result<i64, rusqlite::Error> {
     conn.execute(
-        "INSERT OR REPLACE INTO templates
+        "INSERT OR REPLACE INTO doc_templates
             (file_name, original_path, marked_path, file_ext, file_size_kb, fields_found, uploaded_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![r.file_name, r.original_path, r.marked_path, r.file_ext, r.file_size_kb, r.fields_found, r.uploaded_at],
@@ -183,7 +202,7 @@ pub fn insert_template(conn: &Connection, r: &TemplateRecord) -> Result<i64, rus
 pub fn list_templates(conn: &Connection) -> Result<Vec<TemplateRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(
         "SELECT id, file_name, original_path, marked_path, file_ext, file_size_kb, fields_found, uploaded_at
-         FROM templates ORDER BY uploaded_at DESC"
+         FROM doc_templates ORDER BY uploaded_at DESC"
     )?;
     let rows = stmt.query_map([], |row| Ok(TemplateRow {
         id:            row.get(0)?,
@@ -196,6 +215,128 @@ pub fn list_templates(conn: &Connection) -> Result<Vec<TemplateRow>, rusqlite::E
         uploaded_at:   row.get(7)?,
     }))?.collect();
     rows
+}
+
+// ── Case Templates ─────────────────────────────────────────────────────────────
+
+const CASE_TEMPLATES_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS case_templates (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT    NOT NULL UNIQUE,
+        fields      TEXT    NOT NULL, -- JSON array of field names
+        created_at  TEXT    NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS case_template_docs (
+        case_template_id  INTEGER NOT NULL,
+        template_id       INTEGER NOT NULL,
+        PRIMARY KEY (case_template_id, template_id),
+        FOREIGN KEY (case_template_id) REFERENCES case_templates(id) ON DELETE CASCADE,
+        FOREIGN KEY (template_id) REFERENCES doc_templates(id) ON DELETE CASCADE
+    );
+";
+
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct CaseTemplateRow {
+    pub id: i64,
+    pub name: String,
+    pub fields: String, // JSON array string
+    pub created_at: String,
+    pub doc_template_ids: Vec<i64>,
+}
+
+pub fn create_case_template(
+    conn: &Connection,
+    name: &str,
+    fields: &[String],
+    doc_template_ids: &[i64],
+) -> Result<i64, rusqlite::Error> {
+    let fields_json = serde_json::to_string(fields).unwrap_or_else(|_| "[]".to_string());
+    let created_at = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT INTO case_templates (name, fields, created_at) VALUES (?1, ?2, ?3)",
+        params![name, fields_json, created_at],
+    )?;
+    let case_template_id = conn.last_insert_rowid();
+
+    for &doc_id in doc_template_ids {
+        conn.execute(
+            "INSERT INTO case_template_docs (case_template_id, template_id) VALUES (?1, ?2)",
+            params![case_template_id, doc_id],
+        )?;
+    }
+
+    Ok(case_template_id)
+}
+
+pub fn list_case_templates(conn: &Connection) -> Result<Vec<CaseTemplateRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, fields, created_at FROM case_templates ORDER BY name ASC"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let id: i64 = row.get(0)?;
+        let name: String = row.get(1)?;
+        let fields: String = row.get(2)?;
+        let created_at: String = row.get(3)?;
+        Ok((id, name, fields, created_at))
+    })?;
+
+    let mut templates = Vec::new();
+    for r in rows {
+        let (id, name, fields, created_at) = r?;
+        let mut doc_stmt = conn.prepare(
+            "SELECT template_id FROM case_template_docs WHERE case_template_id = ?1"
+        )?;
+        let doc_ids: Vec<i64> = doc_stmt
+            .query_map(params![id], |row| row.get(0))?
+            .collect::<Result<Vec<i64>, _>>()?;
+        templates.push(CaseTemplateRow {
+            id,
+            name,
+            fields,
+            created_at,
+            doc_template_ids: doc_ids,
+        });
+    }
+
+    Ok(templates)
+}
+
+pub fn update_case_template(
+    conn: &Connection,
+    id: i64,
+    name: &str,
+    fields: &[String],
+    doc_template_ids: &[i64],
+) -> Result<(), rusqlite::Error> {
+    let fields_json = serde_json::to_string(fields).unwrap_or_else(|_| "[]".to_string());
+    conn.execute(
+        "UPDATE case_templates SET name = ?1, fields = ?2 WHERE id = ?3",
+        params![name, fields_json, id],
+    )?;
+
+    conn.execute(
+        "DELETE FROM case_template_docs WHERE case_template_id = ?1",
+        params![id],
+    )?;
+
+    for &doc_id in doc_template_ids {
+        conn.execute(
+            "INSERT INTO case_template_docs (case_template_id, template_id) VALUES (?1, ?2)",
+            params![id, doc_id],
+        )?;
+    }
+
+    Ok(())
+}
+
+pub fn delete_case_template(conn: &Connection, id: i64) -> Result<(), rusqlite::Error> {
+    conn.execute(
+        "DELETE FROM case_templates WHERE id = ?1",
+        params![id],
+    )?;
+    Ok(())
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────────

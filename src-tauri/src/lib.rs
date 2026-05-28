@@ -61,7 +61,21 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![greet, store::get_db_path, add_case, indexer::index_folder, indexer::index_file, template::process_template, template::list_templates, query::search_documents, template::generate_document_from_template])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            store::get_db_path,
+            add_case,
+            indexer::index_folder,
+            indexer::index_file,
+            template::process_template,
+            template::list_templates,
+            query::search_documents,
+            template::generate_document_from_template,
+            template::list_case_templates,
+            template::create_case_template,
+            template::update_case_template,
+            template::delete_case_template
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
