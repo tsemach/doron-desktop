@@ -183,6 +183,7 @@ pub struct TemplateRow {
     pub file_size_kb: i64,
     pub fields_found: String,
     pub uploaded_at: String,
+    pub title: Option<String>,
 }
 
 pub fn init_templates_schema(conn: &Connection) -> Result<(), rusqlite::Error> {
@@ -201,8 +202,18 @@ pub fn insert_template(conn: &Connection, r: &TemplateRecord) -> Result<i64, rus
 
 pub fn list_templates(conn: &Connection) -> Result<Vec<TemplateRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(
-        "SELECT id, file_name, original_path, marked_path, file_ext, file_size_kb, fields_found, uploaded_at
-         FROM doc_templates ORDER BY uploaded_at DESC"
+        "SELECT 
+            dt.id, 
+            dt.file_name, 
+            dt.original_path, 
+            dt.marked_path, 
+            dt.file_ext, 
+            dt.file_size_kb, 
+            dt.fields_found, 
+            dt.uploaded_at,
+            (SELECT title FROM documents WHERE file_name = dt.file_name LIMIT 1) AS title
+         FROM doc_templates dt
+         ORDER BY dt.uploaded_at DESC"
     )?;
     let rows = stmt.query_map([], |row| Ok(TemplateRow {
         id:            row.get(0)?,
@@ -213,6 +224,7 @@ pub fn list_templates(conn: &Connection) -> Result<Vec<TemplateRow>, rusqlite::E
         file_size_kb:  row.get(5)?,
         fields_found:  row.get(6).unwrap_or_default(),
         uploaded_at:   row.get(7)?,
+        title:         row.get(8).ok(),
     }))?.collect();
     rows
 }

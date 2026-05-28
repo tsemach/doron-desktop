@@ -8,6 +8,7 @@ interface DocTemplate {
   file_ext: string;
   fields_found: string; // JSON string of array
   uploaded_at: string;
+  title: string | null;
 }
 
 interface CaseTemplate {
@@ -26,14 +27,22 @@ export default function CasesManagementTemplate() {
 
   // Split-pane selection state
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Form State
+  // Creation Form State
   const [templateName, setTemplateName] = useState("");
   const [fields, setFields] = useState<string[]>([]);
   const [newField, setNewField] = useState("");
   const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
+
+  // Inline editing state for active template
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingNameValue, setEditingNameValue] = useState("");
+  const [showAddDocDropdown, setShowAddDocDropdown] = useState(false);
+  const [docFilterText, setDocFilterText] = useState("");
+  const [isAddingFieldInline, setIsAddingFieldInline] = useState(false);
+  const [newFieldInlineValue, setNewFieldInlineValue] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -65,7 +74,7 @@ export default function CasesManagementTemplate() {
   // Find active template object
   const activeTemplate = caseTemplates.find((ct) => ct.id === selectedTemplateId) || null;
 
-  // Handle Field Tag additions
+  // Handle Field Tag additions in CREATION form
   function handleAddField(e?: React.FormEvent) {
     if (e) e.preventDefault();
     const cleanField = newField.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
@@ -79,7 +88,7 @@ export default function CasesManagementTemplate() {
     setFields(fields.filter((f) => f !== fieldToRemove));
   }
 
-  // Handle doc template checkbox toggle
+  // Handle doc template checkbox toggle in CREATION form
   function handleToggleDoc(docId: number) {
     setSelectedDocs((prev) =>
       prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
@@ -91,73 +100,49 @@ export default function CasesManagementTemplate() {
     setTemplateName("");
     setFields([]);
     setSelectedDocs([]);
-    setIsEditing(false);
     setIsCreating(true);
   }
 
-  // Start editing active template
-  function handleStartEdit() {
-    if (!activeTemplate) return;
-    setTemplateName(activeTemplate.name);
-    setSelectedDocs(activeTemplate.doc_template_ids);
-    try {
-      setFields(JSON.parse(activeTemplate.fields));
-    } catch {
-      setFields([]);
-    }
-    setIsCreating(false);
-    setIsEditing(true);
-  }
-
-  // Handle Save (Create or Update)
-  async function handleSave() {
+  // Handle Save for CREATION Form
+  async function handleSaveNew() {
     if (!templateName.trim()) {
       alert("Please enter a template name.");
       return;
     }
 
     try {
-      if (isEditing && selectedTemplateId !== null) {
-        // Edit Mode
-        await invoke("update_case_template", {
-          id: selectedTemplateId,
-          name: templateName.trim(),
-          fields,
-          docTemplateIds: selectedDocs,
-        });
-        setIsEditing(false);
-      } else if (isCreating) {
-        // Create Mode
-        const newId = await invoke<number>("create_case_template", {
-          name: templateName.trim(),
-          fields,
-          docTemplateIds: selectedDocs,
-        });
-        setSelectedTemplateId(newId);
-        setIsCreating(false);
-      }
+      const newId = await invoke<number>("create_case_template", {
+        name: templateName.trim(),
+        fields,
+        docTemplateIds: selectedDocs,
+      });
+      setSelectedTemplateId(newId);
+      setIsCreating(false);
       await loadData();
     } catch (err) {
-      alert(`Error saving case template: ${err}`);
+      alert(`Error creating case template: ${err}`);
     }
   }
 
-  // Cancel form
-  function handleCancel() {
-    setIsEditing(false);
+  // Cancel creation form
+  function handleCancelCreate() {
     setIsCreating(false);
   }
 
-  // Handle Delete
-  async function handleDelete() {
+  // Handle Delete (opens custom warning modal)
+  function handleDelete() {
     if (!selectedTemplateId) return;
-    if (!confirm("Are you sure you want to delete this case template?")) return;
+    setShowDeleteConfirm(true);
+  }
+
+  // Actual execution of template deletion
+  async function confirmDeleteInline() {
+    if (!selectedTemplateId) return;
     try {
       await invoke("delete_case_template", { id: selectedTemplateId });
-      // Reset selection
       const remaining = caseTemplates.filter((ct) => ct.id !== selectedTemplateId);
       setSelectedTemplateId(remaining.length > 0 ? remaining[0].id : null);
-      setIsEditing(false);
+      setShowDeleteConfirm(false);
       setIsCreating(false);
       await loadData();
     } catch (err) {
@@ -165,11 +150,13 @@ export default function CasesManagementTemplate() {
     }
   }
 
-  // Select a template
+  // Select a template from list
   function handleSelectTemplate(id: number) {
     setSelectedTemplateId(id);
-    setIsEditing(false);
     setIsCreating(false);
+    setIsEditingName(false);
+    setShowAddDocDropdown(false);
+    setIsAddingFieldInline(false);
   }
 
   // Get human-friendly date
@@ -208,6 +195,118 @@ export default function CasesManagementTemplate() {
     }
   }
 
+  // --- INLINE EDITING ACTIONS ---
+
+  // Save template rename
+  async function handleSaveNameInline(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!activeTemplate || !editingNameValue.trim()) return;
+    try {
+      let fieldsArr = JSON.parse(activeTemplate.fields);
+      await invoke("update_case_template", {
+        id: activeTemplate.id,
+        name: editingNameValue.trim(),
+        fields: fieldsArr,
+        docTemplateIds: activeTemplate.doc_template_ids,
+      });
+      setIsEditingName(false);
+      await loadData();
+    } catch (err) {
+      alert(`Error renaming template: ${err}`);
+    }
+  }
+
+  // Remove document inline
+  async function handleRemoveDocInline(docIdToRemove: number) {
+    if (!activeTemplate) return;
+    try {
+      let fieldsArr = JSON.parse(activeTemplate.fields);
+      let updatedDocs = activeTemplate.doc_template_ids.filter(id => id !== docIdToRemove);
+      await invoke("update_case_template", {
+        id: activeTemplate.id,
+        name: activeTemplate.name,
+        fields: fieldsArr,
+        docTemplateIds: updatedDocs,
+      });
+      await loadData();
+    } catch (err) {
+      alert(`Error removing document: ${err}`);
+    }
+  }
+
+  // Add document inline
+  async function handleAddDocInline(docIdToAdd: number) {
+    if (!activeTemplate) return;
+    try {
+      let fieldsArr = JSON.parse(activeTemplate.fields);
+      let updatedDocs = [...activeTemplate.doc_template_ids, docIdToAdd];
+      await invoke("update_case_template", {
+        id: activeTemplate.id,
+        name: activeTemplate.name,
+        fields: fieldsArr,
+        docTemplateIds: updatedDocs,
+      });
+      setShowAddDocDropdown(false);
+      await loadData();
+    } catch (err) {
+      alert(`Error adding document: ${err}`);
+    }
+  }
+
+  // Remove required field inline
+  async function handleRemoveFieldInline(fieldToRemove: string) {
+    if (!activeTemplate) return;
+    try {
+      let fieldsArr = JSON.parse(activeTemplate.fields).filter((f: string) => f !== fieldToRemove);
+      await invoke("update_case_template", {
+        id: activeTemplate.id,
+        name: activeTemplate.name,
+        fields: fieldsArr,
+        docTemplateIds: activeTemplate.doc_template_ids,
+      });
+      await loadData();
+    } catch (err) {
+      alert(`Error removing field: ${err}`);
+    }
+  }
+
+  // Add required field inline
+  async function handleAddFieldInline(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeTemplate) return;
+    const cleanField = newFieldInlineValue.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    if (!cleanField) return;
+    try {
+      let fieldsArr = JSON.parse(activeTemplate.fields);
+      if (!fieldsArr.includes(cleanField)) {
+        fieldsArr.push(cleanField);
+        await invoke("update_case_template", {
+          id: activeTemplate.id,
+          name: activeTemplate.name,
+          fields: fieldsArr,
+          docTemplateIds: activeTemplate.doc_template_ids,
+        });
+      }
+      setNewFieldInlineValue("");
+      setIsAddingFieldInline(false);
+      await loadData();
+    } catch (err) {
+      alert(`Error adding field: ${err}`);
+    }
+  }
+
+  // Unassociated document templates for inline selector
+  const unassociatedDocs = docTemplates.filter(
+    (doc) => activeTemplate && !activeTemplate.doc_template_ids.includes(doc.id)
+  );
+
+  // Filtered unassociated docs based on search text
+  const filteredUnassociatedDocs = unassociatedDocs.filter(
+    (doc) =>
+      doc.file_name.toLowerCase().includes(docFilterText.toLowerCase()) ||
+      (doc.title && doc.title.toLowerCase().includes(docFilterText.toLowerCase()))
+  );
+
   return (
     <main className="flex-1 flex flex-col h-screen overflow-hidden bg-background">
       {/* Top Header */}
@@ -235,7 +334,7 @@ export default function CasesManagementTemplate() {
         /* Split-pane Workspace */
         <div className="flex-1 flex overflow-hidden">
           
-          {/* Left Column: Templates List */}
+          {/* Left Column: Templates List (1/3 width) */}
           <aside className="w-1/3 border-r border-border flex flex-col bg-muted/10 shrink-0 overflow-y-auto">
             <div className="p-4 border-b border-border flex items-center justify-between bg-card shrink-0">
               <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
@@ -266,7 +365,7 @@ export default function CasesManagementTemplate() {
                       onClick={() => handleSelectTemplate(ct.id)}
                       className={`p-4 cursor-pointer hover:bg-muted/40 transition-all border-l-4 ${
                         isSelected
-                          ? "bg-accent/40 border-primary"
+                          ? "bg-accent/40 border-primary border-b"
                           : "border-transparent bg-transparent"
                       }`}
                     >
@@ -288,14 +387,12 @@ export default function CasesManagementTemplate() {
 
           {/* Right Column: Detailed View / Forms (2/3 width) */}
           <section className="flex-1 flex flex-col overflow-y-auto bg-background p-6">
-            {isCreating || isEditing ? (
-              /* CREATE / EDIT FORM VIEW */
-              <div className="space-y-6 max-w-3xl">
+            {isCreating ? (
+              /* NEW CASE TEMPLATE CREATION FORM */
+              <div className="space-y-6 max-w-3xl animate-in slide-in-from-bottom duration-300">
                 <div className="flex items-center justify-between border-b border-border pb-3">
-                  <h3 className="text-lg font-bold text-foreground">
-                    {isCreating ? "Create New Case Template" : `Edit Case Template: ${templateName}`}
-                  </h3>
-                  <Button variant="ghost" size="sm" onClick={handleCancel} className="h-7 text-xs">
+                  <h3 className="text-lg font-bold text-foreground">Create New Case Template</h3>
+                  <Button variant="ghost" size="sm" onClick={handleCancelCreate} className="h-7 text-xs">
                     ✕ Cancel
                   </Button>
                 </div>
@@ -322,7 +419,7 @@ export default function CasesManagementTemplate() {
                       Required Fields / Dynamic Variables
                     </label>
                     <p className="text-xs text-muted-foreground">
-                      Define the exact field variables (e.g. <code>seller_name</code>, <code>price</code>) required for this case template.
+                      Define the field variables required for this case template.
                     </p>
 
                     {/* Tag Badges Box */}
@@ -410,35 +507,65 @@ export default function CasesManagementTemplate() {
                 </div>
 
                 <div className="flex justify-end gap-2 border-t border-border pt-4">
-                  <Button variant="outline" onClick={handleCancel}>
+                  <Button variant="outline" onClick={handleCancelCreate}>
                     Cancel
                   </Button>
-                  <Button onClick={handleSave}>
-                    {isEditing ? "Save Changes" : "Create Template"}
+                  <Button onClick={handleSaveNew}>
+                    Create Template
                   </Button>
                 </div>
               </div>
             ) : activeTemplate ? (
-              /* DETAILED DETAIL VIEW */
+              /* DETAILED VIEW - WITH INLINE EDITING */
               <div className="space-y-6 animate-in fade-in duration-300">
                 
                 {/* Detail View Title and Actions */}
                 <div className="flex items-start justify-between border-b border-border pb-4">
                   <div>
-                    <h3 className="text-xl font-bold text-foreground tracking-tight">{activeTemplate.name}</h3>
+                    {isEditingName ? (
+                      <form onSubmit={handleSaveNameInline} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editingNameValue}
+                          onChange={(e) => setEditingNameValue(e.target.value)}
+                          className="text-xl font-bold border-b border-primary bg-transparent focus:outline-none py-0.5 text-foreground"
+                          autoFocus
+                        />
+                        <button type="submit" className="text-green-600 hover:text-green-800 text-sm font-semibold p-1" title="Save name">
+                          ✓
+                        </button>
+                        <button type="button" onClick={() => setIsEditingName(false)} className="text-red-500 hover:text-red-700 text-sm font-semibold p-1" title="Cancel">
+                          ✕
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-foreground tracking-tight">{activeTemplate.name}</h3>
+                        <button
+                          onClick={() => {
+                            setIsEditingName(true);
+                            setEditingNameValue(activeTemplate.name);
+                          }}
+                          className="p-1 text-muted-foreground hover:text-foreground hover:scale-110 transition-transform"
+                          title="Rename case template"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1">
                       Created on {formatDate(activeTemplate.created_at)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleStartEdit}>
-                      Edit Template
-                    </Button>
+                  <div>
                     <button
                       onClick={handleDelete}
                       className="text-xs font-semibold text-muted-foreground hover:text-destructive hover:underline px-3 py-1.5 transition-colors"
                     >
-                      Delete
+                      Delete Template
                     </button>
                   </div>
                 </div>
@@ -448,9 +575,80 @@ export default function CasesManagementTemplate() {
                   
                   {/* Documents Section */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1">
-                      Document Templates ({activeTemplate.doc_template_ids.length})
-                    </h4>
+                    <div className="flex items-center justify-between border-b pb-1 relative">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Document Templates ({activeTemplate.doc_template_ids.length})
+                      </h4>
+
+                      {/* Dropdown Popover for adding document inline */}
+                      {showAddDocDropdown && (
+                        <div className="absolute right-0 top-6 z-20 w-[500px] bg-card border border-border rounded-lg shadow-xl p-3.5 space-y-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="flex items-center justify-between border-b pb-1.5">
+                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Document Template</span>
+                            <button 
+                              onClick={() => {
+                                setShowAddDocDropdown(false);
+                                setDocFilterText("");
+                              }} 
+                              className="text-muted-foreground hover:text-foreground font-semibold"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          {unassociatedDocs.length === 0 ? (
+                            <div className="text-xs text-muted-foreground italic p-2 text-center">All templates already added.</div>
+                          ) : (
+                            <>
+                              <input 
+                                type="text"
+                                placeholder="Search by filename or title..."
+                                value={docFilterText}
+                                onChange={(e) => setDocFilterText(e.target.value)}
+                                className="w-full rounded border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+                                autoFocus
+                              />
+                              <div className="max-h-[220px] overflow-y-auto divide-y divide-border border rounded bg-muted/5">
+                                {filteredUnassociatedDocs.length === 0 ? (
+                                  <div className="text-xs text-muted-foreground italic p-3 text-center">No matching templates found.</div>
+                                ) : (
+                                  filteredUnassociatedDocs.map((doc) => (
+                                    <div
+                                      key={doc.id}
+                                      onClick={() => {
+                                        handleAddDocInline(doc.id);
+                                        setDocFilterText("");
+                                      }}
+                                      className="flex items-center justify-between p-2.5 hover:bg-muted/50 cursor-pointer text-xs transition-colors gap-4"
+                                    >
+                                      <span className="font-mono text-foreground truncate max-w-[220px]" title={doc.file_name}>
+                                        {doc.file_name}
+                                      </span>
+                                      <span className="text-muted-foreground truncate max-w-[220px] text-right italic" title={doc.title || ""}>
+                                        {doc.title || "(No title indexed)"}
+                                      </span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {!showAddDocDropdown && (
+                        <button
+                          onClick={() => setShowAddDocDropdown(true)}
+                          className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline hover:text-primary/80 font-medium"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
+                            <path d="M5 12h14" />
+                            <path d="M12 5v14" />
+                          </svg>
+                          Add Document
+                        </button>
+                      )}
+                    </div>
+
                     {activeTemplate.doc_template_ids.length === 0 ? (
                       <p className="text-xs text-muted-foreground italic">No document templates associated with this case template.</p>
                     ) : (
@@ -458,19 +656,37 @@ export default function CasesManagementTemplate() {
                         {activeTemplate.doc_template_ids.map((id) => (
                           <div
                             key={id}
-                            className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20"
+                            className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20 hover:bg-muted/30 transition-colors"
                           >
                             <div className="min-w-0 flex-1">
                               <span className="block text-sm font-medium text-foreground truncate" title={getDocName(id)}>
                                 {getDocName(id)}
                               </span>
-                              <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-0.5">
+                              {(() => {
+                                const doc = docTemplates.find(d => d.id === id);
+                                return doc && doc.title ? (
+                                  <span className="block text-xs text-muted-foreground italic truncate mt-0.5" title={doc.title}>
+                                    {doc.title}
+                                  </span>
+                                ) : null;
+                              })()}
+                              <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-1">
                                 <span className="uppercase text-[8px] bg-muted px-1.5 py-0.2 rounded border">
                                   {getDocExt(id)}
                                 </span>
                                 <span>{getDocFieldCount(id)} fields found</span>
                               </span>
                             </div>
+                            <button
+                              onClick={() => handleRemoveDocInline(id)}
+                              className="p-1 text-muted-foreground hover:text-destructive hover:scale-110 transition-transform ml-2"
+                              title="Remove document from template"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                              </svg>
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -479,9 +695,48 @@ export default function CasesManagementTemplate() {
 
                   {/* Required Fields Section */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1">
-                      Required Fields ({JSON.parse(activeTemplate.fields).length})
-                    </h4>
+                    <div className="flex items-center justify-between border-b pb-1">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Required Fields ({(() => {
+                          try { return JSON.parse(activeTemplate.fields).length; } catch { return 0; }
+                        })()})
+                      </h4>
+
+                      {/* Inline Input to add fields */}
+                      {isAddingFieldInline ? (
+                        <form onSubmit={handleAddFieldInline} className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={newFieldInlineValue}
+                            onChange={(e) => setNewFieldInlineValue(e.target.value)}
+                            placeholder="new_field"
+                            className="rounded border border-input bg-background px-2 py-0.5 text-xs font-mono w-28 focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+                            autoFocus
+                          />
+                          <button type="submit" className="text-green-600 hover:text-green-800 text-xs font-bold" title="Confirm">
+                            ✓
+                          </button>
+                          <button type="button" onClick={() => setIsAddingFieldInline(false)} className="text-red-500 hover:text-red-700 text-xs font-bold" title="Cancel">
+                            ✕
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setIsAddingFieldInline(true);
+                            setNewFieldInlineValue("");
+                          }}
+                          className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline hover:text-primary/80 font-medium"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
+                            <path d="M5 12h14" />
+                            <path d="M12 5v14" />
+                          </svg>
+                          Add Field
+                        </button>
+                      )}
+                    </div>
+
                     {(() => {
                       let fieldArray: string[] = [];
                       try {
@@ -497,9 +752,16 @@ export default function CasesManagementTemplate() {
                           {fieldArray.map((field) => (
                             <span
                               key={field}
-                              className="text-xs font-mono bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full border border-border"
+                              className="text-xs font-mono bg-secondary text-secondary-foreground pl-2.5 pr-1.5 py-1 rounded-full border border-border inline-flex items-center gap-1.5"
                             >
                               {field}
+                              <button
+                                onClick={() => handleRemoveFieldInline(field)}
+                                className="text-muted-foreground hover:text-destructive hover:scale-110 transition-transform font-bold text-[10px]"
+                                title={`Remove field variable "${field}"`}
+                              >
+                                ✕
+                              </button>
                             </span>
                           ))}
                         </div>
@@ -530,6 +792,41 @@ export default function CasesManagementTemplate() {
             )}
           </section>
 
+        </div>
+      )}
+
+      {/* Delete Warning Confirmation Modal */}
+      {showDeleteConfirm && activeTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-card border border-border rounded-lg shadow-2xl p-6 space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center text-destructive shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                  <line x1="12" x2="12" y1="9" y2="13" />
+                  <line x1="12" x2="12.01" y1="17" y2="17" />
+                </svg>
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-bold text-foreground">Delete Case Template?</h3>
+                <p className="text-sm text-muted-foreground leading-normal">
+                  Are you sure you want to delete the case template <strong className="text-foreground">"{activeTemplate.name}"</strong>? 
+                  This will permanently delete this template configuration and cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-border pt-4">
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <button
+                onClick={confirmDeleteInline}
+                className="rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-2 text-sm font-medium transition-colors shadow-sm"
+              >
+                Delete Template
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>
