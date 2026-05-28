@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
+
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import CaseManagementSidebar from "./CasesManagementSidebar";
+import { Route, Routes, useNavigate } from "react-router-dom";
+import CasesManagementHader from "./CaseManagementHeader";
+import CaseManagementOpenCases from "./CaseManagementOpenCases";
+import CasesManagementTemplate from "./CasesManagementTemplate";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -31,6 +36,7 @@ export default function CaseManagement() {
   const [filter, setFilter] = useState<CaseStatus | "all">("all");
   const [error, setError] = useState<string | null>(null);
   const [dbPath, setDbPath] = useState<string>("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     invoke<string>("get_db_path").then(setDbPath).catch(() => {});
@@ -72,12 +78,20 @@ export default function CaseManagement() {
     );
   }
 
+  function handleTemplate() {
+    navigate("templates");
+  }
+
   return (
     <div className="flex h-screen">
-      <CaseManagementSidebar />    
+      <CaseManagementSidebar handleTemplate={handleTemplate} />
+      <Routes>
+        <Route path="/" element={<CaseManagementOpenCases />} />
+        <Route path="templates" element={<CasesManagementTemplate />} />
 
+      </Routes>
       {/* Main content */}
-      <main className="flex-1 overflow-auto p-6">
+      {/* <main className="flex-1 overflow-auto p-6">      
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-semibold">Case Management</h1>
           <div className="flex items-center gap-4">
@@ -164,7 +178,7 @@ export default function CaseManagement() {
             </tbody>
           </table>
         </div>
-      </main>
+      </main> */}
     </div>
   );
 }
