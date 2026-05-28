@@ -24,9 +24,12 @@ export default function CasesManagementTemplate() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Form State
+  // Split-pane selection state
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Form State
   const [templateName, setTemplateName] = useState("");
   const [fields, setFields] = useState<string[]>([]);
   const [newField, setNewField] = useState("");
@@ -46,6 +49,11 @@ export default function CasesManagementTemplate() {
       ]);
       setCaseTemplates(caseRows);
       setDocTemplates(docRows);
+
+      // Auto-select first template if list is not empty and none is selected
+      if (caseRows.length > 0 && selectedTemplateId === null) {
+        setSelectedTemplateId(caseRows[0].id);
+      }
     } catch (err) {
       console.error(err);
       setError("Failed to load templates from database.");
@@ -53,6 +61,9 @@ export default function CasesManagementTemplate() {
       setLoading(false);
     }
   }
+
+  // Find active template object
+  const activeTemplate = caseTemplates.find((ct) => ct.id === selectedTemplateId) || null;
 
   // Handle Field Tag additions
   function handleAddField(e?: React.FormEvent) {
@@ -80,24 +91,25 @@ export default function CasesManagementTemplate() {
     setTemplateName("");
     setFields([]);
     setSelectedDocs([]);
-    setEditingId(null);
-    setIsEditing(true);
+    setIsEditing(false);
+    setIsCreating(true);
   }
 
-  // Start editing existing template
-  function handleStartEdit(ct: CaseTemplate) {
-    setTemplateName(ct.name);
-    setEditingId(ct.id);
-    setSelectedDocs(ct.doc_template_ids);
+  // Start editing active template
+  function handleStartEdit() {
+    if (!activeTemplate) return;
+    setTemplateName(activeTemplate.name);
+    setSelectedDocs(activeTemplate.doc_template_ids);
     try {
-      setFields(JSON.parse(ct.fields));
+      setFields(JSON.parse(activeTemplate.fields));
     } catch {
       setFields([]);
     }
+    setIsCreating(false);
     setIsEditing(true);
   }
 
-  // Handle Save
+  // Handle Save (Create or Update)
   async function handleSave() {
     if (!templateName.trim()) {
       alert("Please enter a template name.");
@@ -105,38 +117,59 @@ export default function CasesManagementTemplate() {
     }
 
     try {
-      if (editingId !== null) {
+      if (isEditing && selectedTemplateId !== null) {
         // Edit Mode
         await invoke("update_case_template", {
-          id: editingId,
+          id: selectedTemplateId,
           name: templateName.trim(),
           fields,
           docTemplateIds: selectedDocs,
         });
-      } else {
+        setIsEditing(false);
+      } else if (isCreating) {
         // Create Mode
-        await invoke("create_case_template", {
+        const newId = await invoke<number>("create_case_template", {
           name: templateName.trim(),
           fields,
           docTemplateIds: selectedDocs,
         });
+        setSelectedTemplateId(newId);
+        setIsCreating(false);
       }
-      setIsEditing(false);
       await loadData();
     } catch (err) {
       alert(`Error saving case template: ${err}`);
     }
   }
 
+  // Cancel form
+  function handleCancel() {
+    setIsEditing(false);
+    setIsCreating(false);
+  }
+
   // Handle Delete
-  async function handleDelete(id: number) {
+  async function handleDelete() {
+    if (!selectedTemplateId) return;
     if (!confirm("Are you sure you want to delete this case template?")) return;
     try {
-      await invoke("delete_case_template", { id });
+      await invoke("delete_case_template", { id: selectedTemplateId });
+      // Reset selection
+      const remaining = caseTemplates.filter((ct) => ct.id !== selectedTemplateId);
+      setSelectedTemplateId(remaining.length > 0 ? remaining[0].id : null);
+      setIsEditing(false);
+      setIsCreating(false);
       await loadData();
     } catch (err) {
       alert(`Error deleting case template: ${err}`);
     }
+  }
+
+  // Select a template
+  function handleSelectTemplate(id: number) {
+    setSelectedTemplateId(id);
+    setIsEditing(false);
+    setIsCreating(false);
   }
 
   // Get human-friendly date
@@ -158,269 +191,345 @@ export default function CasesManagementTemplate() {
     return doc ? doc.file_name : `Unknown Doc (${id})`;
   }
 
+  // Map doc ID to file ext helper
+  function getDocExt(id: number): string {
+    const doc = docTemplates.find((d) => d.id === id);
+    return doc ? doc.file_ext : "";
+  }
+
+  // Map doc ID to fields count helper
+  function getDocFieldCount(id: number): number {
+    const doc = docTemplates.find((d) => d.id === id);
+    if (!doc) return 0;
+    try {
+      return JSON.parse(doc.fields_found).length;
+    } catch {
+      return 0;
+    }
+  }
+
   return (
-    <main className="flex-1 overflow-auto p-6 bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+    <main className="flex-1 flex flex-col h-screen overflow-hidden bg-background">
+      {/* Top Header */}
+      <div className="flex items-center justify-between p-6 border-b border-border bg-card shrink-0">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Case Templates</h2>
           <p className="text-sm text-muted-foreground">
-            Group document templates and configure custom field variables required for new cases.
+            Configure case workflows by grouping document templates and defining required field variables.
           </p>
         </div>
-        {!isEditing && (
-          <Button onClick={handleStartCreate} className="shadow-sm">
-            + Create Case Template
-          </Button>
-        )}
       </div>
 
       {error && (
-        <div className="mb-4 rounded-md border border-destructive bg-destructive/10 px-4 py-2 text-sm text-destructive animate-in fade-in duration-200">
+        <div className="mx-6 mt-4 rounded-md border border-destructive bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-2">
+        <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground space-y-2">
           <div className="animate-spin text-primary text-2xl font-bold">⟳</div>
           <p className="text-sm">Loading templates...</p>
         </div>
-      ) : isEditing ? (
-        /* Edit / Create Form */
-        <div className="max-w-3xl rounded-lg border border-border bg-card shadow-sm p-6 space-y-6 animate-in slide-in-from-bottom duration-300">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="text-lg font-semibold text-foreground">
-              {editingId !== null ? "Edit Case Template" : "New Case Template"}
-            </h3>
-            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
-              ✕ Cancel
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            {/* Template Name */}
-            <div className="space-y-1.5">
-              <label htmlFor="templateName" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Case Template Name
-              </label>
-              <input
-                id="templateName"
-                type="text"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="e.g. Selling a House, Tenant Dispute, Employment Agreement"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-              />
+      ) : (
+        /* Split-pane Workspace */
+        <div className="flex-1 flex overflow-hidden">
+          
+          {/* Left Column: Templates List */}
+          <aside className="w-1/3 border-r border-border flex flex-col bg-muted/10 shrink-0 overflow-y-auto">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-card shrink-0">
+              <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                Templates ({caseTemplates.length})
+              </span>
+              <Button size="sm" onClick={handleStartCreate} className="h-7 px-2.5 text-xs">
+                + New Template
+              </Button>
             </div>
-
-            {/* Dynamic Fields Editor */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                Fields / Variables
-              </label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Define the field variables (e.g. <code>buyer_name</code>) that the user must enter when opening a case from this template.
-              </p>
-
-              {/* Tags Display */}
-              <div className="flex flex-wrap gap-1.5 p-3 rounded-md border border-input bg-muted/20 min-h-[50px] mb-2">
-                {fields.length === 0 ? (
-                  <span className="text-xs text-muted-foreground italic my-auto">No custom fields defined yet.</span>
-                ) : (
-                  fields.map((field) => (
-                    <span
-                      key={field}
-                      className="inline-flex items-center gap-1 text-xs font-mono bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 border border-border"
-                    >
-                      {field}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveField(field)}
-                        className="text-muted-foreground hover:text-destructive focus:outline-none ml-0.5"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))
-                )}
-              </div>
-
-              {/* Tag Input */}
-              <form onSubmit={handleAddField} className="flex gap-2">
-                <input
-                  type="text"
-                  value={newField}
-                  onChange={(e) => setNewField(e.target.value)}
-                  placeholder="Type field name (e.g. property_price) and press Enter"
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                />
-                <Button type="submit" variant="secondary" size="sm">
-                  Add Field
-                </Button>
-              </form>
-            </div>
-
-            {/* Document Templates Selector */}
-            <div className="space-y-2.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                Associated Document Templates
-              </label>
-              <p className="text-xs text-muted-foreground">
-                Select which doc templates should be bundled into this case template.
-              </p>
-
-              {docTemplates.length === 0 ? (
-                <div className="rounded-md border border-dashed border-input p-6 text-center text-sm text-muted-foreground">
-                  No document templates found. Go to <strong>Documents Management &rarr; Templates</strong> to upload document templates (docx, pdf, etc.) first.
+            
+            <div className="flex-1 overflow-y-auto divide-y divide-border">
+              {caseTemplates.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground italic">
+                  No templates created. Click "+ New Template" to add one.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto border border-input rounded-md p-3 bg-muted/10">
-                  {docTemplates.map((doc) => {
-                    const isChecked = selectedDocs.includes(doc.id);
-                    let placeholderCount = 0;
-                    try {
-                      placeholderCount = JSON.parse(doc.fields_found).length;
-                    } catch {}
+                caseTemplates.map((ct) => {
+                  const isSelected = ct.id === selectedTemplateId && !isCreating;
+                  let docCount = ct.doc_template_ids.length;
+                  let fieldCount = 0;
+                  try {
+                    fieldCount = JSON.parse(ct.fields).length;
+                  } catch {}
 
-                    return (
-                      <label
-                        key={doc.id}
-                        className={`flex items-start gap-3 p-2.5 rounded-md border cursor-pointer hover:bg-muted/40 transition-all ${
-                          isChecked ? "bg-primary/5 border-primary/30" : "border-border bg-card"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleDoc(doc.id)}
-                          className="mt-1 rounded text-primary focus:ring-primary h-4 w-4"
-                        />
-                        <div className="min-w-0">
-                          <span className="block text-sm font-medium text-foreground truncate" title={doc.file_name}>
-                            {doc.file_name}
-                          </span>
-                          <span className="inline-flex items-center gap-2 mt-0.5 text-xs text-muted-foreground font-mono">
-                            <span className="uppercase text-[9px] bg-muted px-1.5 py-0.2 rounded border">
-                              {doc.file_ext}
-                            </span>
-                            <span>{placeholderCount} placeholders</span>
-                          </span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
+                  return (
+                    <div
+                      key={ct.id}
+                      onClick={() => handleSelectTemplate(ct.id)}
+                      className={`p-4 cursor-pointer hover:bg-muted/40 transition-all border-l-4 ${
+                        isSelected
+                          ? "bg-accent/40 border-primary"
+                          : "border-transparent bg-transparent"
+                      }`}
+                    >
+                      <h4 className="font-semibold text-sm text-foreground truncate" title={ct.name}>
+                        {ct.name}
+                      </h4>
+                      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground font-mono">
+                        <span>
+                          {docCount} {docCount === 1 ? "doc" : "docs"} &bull; {fieldCount} {fieldCount === 1 ? "field" : "fields"}
+                        </span>
+                        <span>{formatDate(ct.created_at)}</span>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
-          </div>
+          </aside>
 
-          <div className="flex justify-end gap-2 border-t border-border pt-4">
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              {editingId !== null ? "Save Changes" : "Create Template"}
-            </Button>
-          </div>
-        </div>
-      ) : caseTemplates.length === 0 ? (
-        /* Empty State */
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-12 text-center max-w-xl mx-auto mt-12 animate-in fade-in duration-300">
-          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4 text-muted-foreground">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-              <path d="M6 6h10" />
-              <path d="M6 10h10" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-foreground">No Case Templates</h3>
-          <p className="text-sm text-muted-foreground mt-1 mb-6">
-            Get started by creating your first case template. A case template groups multiple documents (like contracts, letters) and maps out fields required to create them.
-          </p>
-          <Button onClick={handleStartCreate}>+ Create First Case Template</Button>
-        </div>
-      ) : (
-        /* Case Templates List */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-300">
-          {caseTemplates.map((ct) => {
-            let fieldArray: string[] = [];
-            try {
-              fieldArray = JSON.parse(ct.fields);
-            } catch {}
+          {/* Right Column: Detailed View / Forms (2/3 width) */}
+          <section className="flex-1 flex flex-col overflow-y-auto bg-background p-6">
+            {isCreating || isEditing ? (
+              /* CREATE / EDIT FORM VIEW */
+              <div className="space-y-6 max-w-3xl">
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <h3 className="text-lg font-bold text-foreground">
+                    {isCreating ? "Create New Case Template" : `Edit Case Template: ${templateName}`}
+                  </h3>
+                  <Button variant="ghost" size="sm" onClick={handleCancel} className="h-7 text-xs">
+                    ✕ Cancel
+                  </Button>
+                </div>
 
-            return (
-              <div
-                key={ct.id}
-                className="flex flex-col rounded-lg border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all duration-200"
-              >
-                {/* Body */}
-                <div className="flex-1 p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-lg font-semibold text-foreground tracking-tight leading-none truncate" title={ct.name}>
-                      {ct.name}
-                    </h3>
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap bg-muted px-2 py-0.5 rounded-full">
-                      {formatDate(ct.created_at)}
-                    </span>
+                <div className="space-y-5">
+                  {/* Template Name */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="templateName" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Case Template Name
+                    </label>
+                    <input
+                      id="templateName"
+                      type="text"
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      placeholder="e.g. Selling a House, Tenant Eviction, Lawsuit File"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
+                    />
                   </div>
 
-                  {/* Associated Documents Section */}
+                  {/* Fields Editor */}
                   <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Document Templates ({ct.doc_template_ids.length})
-                    </span>
-                    {ct.doc_template_ids.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">No document templates associated.</p>
-                    ) : (
-                      <ul className="space-y-1 text-xs text-foreground max-h-[80px] overflow-y-auto pr-1">
-                        {ct.doc_template_ids.map((id) => (
-                          <li key={id} className="flex items-center gap-1.5 truncate text-muted-foreground" title={getDocName(id)}>
-                            <span className="text-[8px] text-primary/75">&#9679;</span>
-                            <span className="truncate">{getDocName(id)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Required Fields / Dynamic Variables
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Define the exact field variables (e.g. <code>seller_name</code>, <code>price</code>) required for this case template.
+                    </p>
 
-                  {/* Required Fields Section */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Required Fields ({fieldArray.length})
-                    </span>
-                    {fieldArray.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">No required fields defined.</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1 max-h-[60px] overflow-y-auto pr-1">
-                        {fieldArray.map((field) => (
+                    {/* Tag Badges Box */}
+                    <div className="flex flex-wrap gap-1.5 p-3 rounded-md border border-input bg-muted/20 min-h-[50px]">
+                      {fields.length === 0 ? (
+                        <span className="text-xs text-muted-foreground italic my-auto">No variables added yet.</span>
+                      ) : (
+                        fields.map((field) => (
                           <span
                             key={field}
-                            className="text-[10px] font-mono bg-muted text-muted-foreground px-2 py-0.5 rounded border border-border"
+                            className="inline-flex items-center gap-1 text-xs font-mono bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 border border-border"
                           >
                             {field}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveField(field)}
+                              className="text-muted-foreground hover:text-destructive focus:outline-none ml-0.5"
+                            >
+                              ✕
+                            </button>
                           </span>
-                        ))}
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add Field Inputs */}
+                    <form onSubmit={handleAddField} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newField}
+                        onChange={(e) => setNewField(e.target.value)}
+                        placeholder="Type field name (e.g. property_price) and press Enter"
+                        className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                      />
+                      <Button type="submit" variant="secondary" size="sm" className="h-8">
+                        Add Field
+                      </Button>
+                    </form>
+                  </div>
+
+                  {/* Document Association Checkbox Grid */}
+                  <div className="space-y-2.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Include Document Templates
+                    </label>
+                    
+                    {docTemplates.length === 0 ? (
+                      <div className="rounded-md border border-dashed border-input p-6 text-center text-xs text-muted-foreground">
+                        No document templates found. Go to <strong>Documents Management &rarr; Templates</strong> to upload doc templates first.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto border border-input rounded-md p-3 bg-muted/10">
+                        {docTemplates.map((doc) => {
+                          const isChecked = selectedDocs.includes(doc.id);
+                          return (
+                            <label
+                              key={doc.id}
+                              className={`flex items-start gap-2.5 p-2 rounded-md border cursor-pointer hover:bg-muted/40 transition-all ${
+                                isChecked ? "bg-primary/5 border-primary/30" : "border-border bg-card"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleDoc(doc.id)}
+                                className="mt-0.5 rounded text-primary focus:ring-primary h-3.5 w-3.5"
+                              />
+                              <div className="min-w-0">
+                                <span className="block text-xs font-medium text-foreground truncate" title={doc.file_name}>
+                                  {doc.file_name}
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground font-mono">
+                                  <span className="uppercase text-[8px] bg-muted px-1 py-0.2 rounded border">
+                                    {doc.file_ext}
+                                  </span>
+                                  <span>{getDocFieldCount(doc.id)} fields</span>
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="flex items-center justify-between border-t border-border px-5 py-3.5 bg-muted/10 rounded-b-lg">
-                  <button
-                    onClick={() => handleDelete(ct.id)}
-                    className="text-xs font-semibold text-muted-foreground hover:text-destructive hover:underline transition-colors"
-                  >
-                    Delete
-                  </button>
-                  <Button variant="outline" size="sm" onClick={() => handleStartEdit(ct)}>
-                    Edit / Manage
+                <div className="flex justify-end gap-2 border-t border-border pt-4">
+                  <Button variant="outline" onClick={handleCancel}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSave}>
+                    {isEditing ? "Save Changes" : "Create Template"}
                   </Button>
                 </div>
               </div>
-            );
-          })}
+            ) : activeTemplate ? (
+              /* DETAILED DETAIL VIEW */
+              <div className="space-y-6 animate-in fade-in duration-300">
+                
+                {/* Detail View Title and Actions */}
+                <div className="flex items-start justify-between border-b border-border pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground tracking-tight">{activeTemplate.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Created on {formatDate(activeTemplate.created_at)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleStartEdit}>
+                      Edit Template
+                    </Button>
+                    <button
+                      onClick={handleDelete}
+                      className="text-xs font-semibold text-muted-foreground hover:text-destructive hover:underline px-3 py-1.5 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                {/* Left/Right Split in Detail Column */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
+                  {/* Documents Section */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1">
+                      Document Templates ({activeTemplate.doc_template_ids.length})
+                    </h4>
+                    {activeTemplate.doc_template_ids.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">No document templates associated with this case template.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {activeTemplate.doc_template_ids.map((id) => (
+                          <div
+                            key={id}
+                            className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <span className="block text-sm font-medium text-foreground truncate" title={getDocName(id)}>
+                                {getDocName(id)}
+                              </span>
+                              <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-0.5">
+                                <span className="uppercase text-[8px] bg-muted px-1.5 py-0.2 rounded border">
+                                  {getDocExt(id)}
+                                </span>
+                                <span>{getDocFieldCount(id)} fields found</span>
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Required Fields Section */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1">
+                      Required Fields ({JSON.parse(activeTemplate.fields).length})
+                    </h4>
+                    {(() => {
+                      let fieldArray: string[] = [];
+                      try {
+                        fieldArray = JSON.parse(activeTemplate.fields);
+                      } catch {}
+
+                      if (fieldArray.length === 0) {
+                        return <p className="text-xs text-muted-foreground italic">No required fields defined.</p>;
+                      }
+
+                      return (
+                        <div className="flex flex-wrap gap-1.5">
+                          {fieldArray.map((field) => (
+                            <span
+                              key={field}
+                              className="text-xs font-mono bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full border border-border"
+                            >
+                              {field}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                </div>
+              </div>
+            ) : (
+              /* EMPTY STATE */
+              <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground space-y-4 py-20">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                    <path d="M7 8h10" />
+                    <path d="M7 12h10" />
+                    <path d="M7 16h10" />
+                  </svg>
+                </div>
+                <div className="text-center space-y-1">
+                  <h3 className="text-base font-semibold text-foreground">Select a Case Template</h3>
+                  <p className="text-sm max-w-sm">
+                    Select a case template from the list on the left to see its associated document templates and dynamic variables.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+
         </div>
       )}
     </main>
