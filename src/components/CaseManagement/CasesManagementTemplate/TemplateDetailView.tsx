@@ -31,6 +31,9 @@ export default function TemplateDetailView({
   const [isAddingFieldInline, setIsAddingFieldInline] = useState(false);
   const [newFieldInlineValue, setNewFieldInlineValue] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // State for filtering fields by selected document
+  const [selectedDocIdForFields, setSelectedDocIdForFields] = useState<number | null>(null);
 
   // Sync editing name if activeTemplate changes
   useEffect(() => {
@@ -38,6 +41,7 @@ export default function TemplateDetailView({
     setShowAddDocDropdown(false);
     setIsAddingFieldInline(false);
     setShowDeleteConfirm(false);
+    setSelectedDocIdForFields(null);
     setEditingNameValue(activeTemplate.name);
   }, [activeTemplate]);
 
@@ -82,6 +86,48 @@ export default function TemplateDetailView({
       return iso.slice(0, 10);
     }
   }
+
+  // Calculate automatically extracted fields versus manually added fields
+  const associatedDocs = docTemplates.filter((doc) =>
+    activeTemplate.doc_template_ids.includes(doc.id)
+  );
+
+  // Helper to parse document fields
+  const getDocFields = (doc: DocTemplate): string[] => {
+    try {
+      return JSON.parse(doc.fields_found) as string[];
+    } catch {
+      return [];
+    }
+  };
+
+  // Map each field to the documents containing it
+  const fieldToDocsMap: Record<string, DocTemplate[]> = {};
+  associatedDocs.forEach((doc) => {
+    getDocFields(doc).forEach((f) => {
+      if (!fieldToDocsMap[f]) {
+        fieldToDocsMap[f] = [];
+      }
+      fieldToDocsMap[f].push(doc);
+    });
+  });
+
+  const autoFields = Object.keys(fieldToDocsMap);
+
+  let totalStoredFields: string[] = [];
+  try {
+    totalStoredFields = JSON.parse(activeTemplate.fields) as string[];
+  } catch {}
+
+  const manualFields = totalStoredFields.filter((f) => !autoFields.includes(f));
+  const allCurrentFields = Array.from(new Set([...manualFields, ...autoFields]));
+
+  // Fields filtered based on selection
+  const filteredFields = allCurrentFields.filter((field) => {
+    if (selectedDocIdForFields === null) return true;
+    const docs = fieldToDocsMap[field] || [];
+    return docs.some((d) => d.id === selectedDocIdForFields);
+  });
 
   function getDocName(id: number): string {
     const doc = docTemplates.find((d) => d.id === id);
@@ -156,7 +202,7 @@ export default function TemplateDetailView({
           </button>
         </div>
       </div>
-
+ 
       {/* Main Details Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
@@ -166,7 +212,7 @@ export default function TemplateDetailView({
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Document Templates ({activeTemplate.doc_template_ids.length})
             </h4>
-
+ 
             {/* Floating popover to add unassociated documents */}
             {showAddDocDropdown && (
               <div className="absolute right-0 top-6 z-20 w-[500px] bg-card border border-border rounded-lg shadow-xl p-3.5 space-y-3 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -222,7 +268,7 @@ export default function TemplateDetailView({
                 )}
               </div>
             )}
-
+ 
             {!showAddDocDropdown && (
               <button
                 onClick={() => setShowAddDocDropdown(true)}
@@ -236,47 +282,58 @@ export default function TemplateDetailView({
               </button>
             )}
           </div>
-
+ 
           {activeTemplate.doc_template_ids.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No document templates associated with this case template.</p>
           ) : (
             <div className="space-y-2">
-              {activeTemplate.doc_template_ids.map((id) => (
-                <div
-                  key={id}
-                  className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20 hover:bg-muted/30 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-foreground truncate" title={getDocName(id)}>
-                      {getDocName(id)}
-                    </span>
-                    {(() => {
-                      const doc = docTemplates.find(d => d.id === id);
-                      return doc && doc.title ? (
-                        <span className="block text-xs text-muted-foreground italic truncate mt-0.5" title={doc.title}>
-                          {doc.title}
-                        </span>
-                      ) : null;
-                    })()}
-                    <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-1">
-                      <span className="uppercase text-[8px] bg-muted px-1.5 py-0.2 rounded border">
-                        {getDocExt(id)}
-                      </span>
-                      <span>{getDocFieldCount(id)} fields found</span>
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => onRemoveDoc(id)}
-                    className="p-1 text-muted-foreground hover:text-destructive hover:scale-110 transition-transform ml-2"
-                    title="Remove document from template"
+              {activeTemplate.doc_template_ids.map((id) => {
+                const isSelected = selectedDocIdForFields === id;
+                return (
+                  <div
+                    key={id}
+                    onClick={() => setSelectedDocIdForFields(isSelected ? null : id)}
+                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary/5 hover:bg-primary/10"
+                        : "border-border bg-muted/20 hover:bg-muted/30"
+                    }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-foreground truncate" title={getDocName(id)}>
+                        {getDocName(id)}
+                      </span>
+                      {(() => {
+                        const doc = docTemplates.find(d => d.id === id);
+                        return doc && doc.title ? (
+                          <span className="block text-xs text-muted-foreground italic truncate mt-0.5" title={doc.title}>
+                            {doc.title}
+                          </span>
+                        ) : null;
+                      })()}
+                      <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-1">
+                        <span className="uppercase text-[8px] bg-muted px-1.5 py-0.2 rounded border">
+                          {getDocExt(id)}
+                        </span>
+                        <span>{getDocFieldCount(id)} fields found</span>
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveDoc(id);
+                      }}
+                      className="p-1 text-muted-foreground hover:text-destructive hover:scale-110 transition-transform ml-2"
+                      title="Remove document from template"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -284,11 +341,19 @@ export default function TemplateDetailView({
         {/* Required Fields Column */}
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b pb-1">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Required Fields ({(() => {
-                try { return JSON.parse(activeTemplate.fields).length; } catch { return 0; }
-              })()})
-            </h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Required Fields {selectedDocIdForFields !== null ? `(Filtered)` : `(${allCurrentFields.length})`}
+              </h4>
+              {selectedDocIdForFields !== null && (
+                <button
+                  onClick={() => setSelectedDocIdForFields(null)}
+                  className="text-[10px] font-semibold text-primary hover:text-primary/80 hover:underline bg-primary/5 border border-primary/20 px-1.5 py-0.5 rounded cursor-pointer"
+                >
+                  Show All
+                </button>
+              )}
+            </div>
 
             {/* Inline add field tag input */}
             {isAddingFieldInline ? (
@@ -326,32 +391,60 @@ export default function TemplateDetailView({
           </div>
 
           {(() => {
-            let fieldArray: string[] = [];
-            try {
-              fieldArray = JSON.parse(activeTemplate.fields);
-            } catch {}
-
-            if (fieldArray.length === 0) {
-              return <p className="text-xs text-muted-foreground italic">No required fields defined.</p>;
+            if (filteredFields.length === 0) {
+              return <p className="text-xs text-muted-foreground italic">No required fields found.</p>;
             }
 
             return (
               <div className="flex flex-wrap gap-1.5">
-                {fieldArray.map((field) => (
-                  <span
-                    key={field}
-                    className="text-xs font-mono bg-secondary text-secondary-foreground pl-2.5 pr-1.5 py-1 rounded-full border border-border inline-flex items-center gap-1.5"
-                  >
-                    {field}
-                    <button
-                      onClick={() => onRemoveField(field)}
-                      className="text-muted-foreground hover:text-destructive hover:scale-110 transition-transform font-bold text-[10px]"
-                      title={`Remove field variable "${field}"`}
+                {filteredFields.map((field) => {
+                  const isAuto = autoFields.includes(field);
+                  const docsWithField = fieldToDocsMap[field] || [];
+                  
+                  return (
+                    <span
+                      key={field}
+                      className={`text-xs font-mono pl-2.5 pr-1.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${
+                        isAuto
+                          ? "bg-muted/80 text-muted-foreground border-border/80"
+                          : "bg-secondary text-secondary-foreground border-border"
+                      }`}
+                      title={
+                        isAuto
+                          ? `Required by: ${docsWithField.map((d) => d.file_name).join(", ")}`
+                          : "Manually added field"
+                      }
                     >
-                      ✕
-                    </button>
-                  </span>
-                ))}
+                      {isAuto && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-muted-foreground/75"
+                        >
+                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                          <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                        </svg>
+                      )}
+                      {field}
+                      {!isAuto && (
+                        <button
+                          onClick={() => onRemoveField(field)}
+                          className="text-muted-foreground hover:text-destructive hover:scale-110 transition-transform font-bold text-[10px]"
+                          title={`Remove field variable "${field}"`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
               </div>
             );
           })()}
