@@ -3,9 +3,8 @@ import { useNavigate, Routes, Route } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
-import BackButton from "../ui/back-button";
 import CheckApiKey from "../ui/check-api-key";
-import DocsManagementMenu from "./DocsManagementMenu";
+import DocsManagementHeader from "./DocsManagementHeader";
 import DocsManagementScan, { type ProgressItem, type ProgressStatus, type IndexSummary } from "./DocsManagementScan";
 import DocsManagementTemplates from "./DocsManagementTemplates";
 import DocsManagementSearch from "./DocsManagementSearch";
@@ -20,7 +19,6 @@ type IndexProgressEvent = {
 
 export default function DocsManagement() {
   const navigate = useNavigate();
-  const [showPicker, setShowPicker] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPath, setSelectedPath] = useState("");
@@ -38,7 +36,9 @@ export default function DocsManagement() {
   }, []);
 
   useEffect(() => {
-    return () => { unlistenRef.current?.(); };
+    return () => {
+      unlistenRef.current?.();
+    };
   }, []);
 
   async function startIndexing(path: string, folder: boolean) {
@@ -86,49 +86,43 @@ export default function DocsManagement() {
   const currentItem = items.find((i) => i.status === "processing");
 
   return (
-    <div className="flex-1 p-4">
-      <div className="relative flex items-center mb-4">
-        <BackButton navigateTo={-1} />
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-2xl font-bold">Documents Management</h1>
-      </div>
-
-      <CheckApiKey apiKey={apiKey} />
-
-      <div className="flex items-center gap-4">
-        <DocsManagementMenu
-          disabled={!apiKey || isProcessing}
-          showPicker={showPicker}
-          onTogglePicker={() => setShowPicker((v) => !v)}
-          onClosePicker={() => setShowPicker(false)}
-          onSelect={startIndexing}
-          scanCount={isFolder && isProcessing && currentItem
+    <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
+      <DocsManagementHeader
+        apiKey={apiKey}
+        dbPath={dbPath}
+        isProcessing={isProcessing}
+        scanCount={
+          isFolder && isProcessing && currentItem
             ? { current: currentItem.current, total: currentItem.total }
-            : undefined}
-          onTemplatesClick={() => navigate("/docs-management/templates")}
-          onSearchClick={() => navigate("/docs-management/search")}
-        />
-        {dbPath && (
-          <p className="text-xs text-muted-foreground font-mono">DB: {dbPath}</p>
-        )}
-      </div>
-      <hr className="my-4 border-border" />
+            : undefined
+        }
+      />
 
-      <Routes>
-        <Route path="scan" element={
-          <DocsManagementScan
-            show={showOutput}
-            isFolder={isFolder}
-            isProcessing={isProcessing}
-            selectedPath={selectedPath}
-            items={items}
-            currentItem={currentItem}
-            summary={summary}
-            error={error}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <CheckApiKey apiKey={apiKey} />
+
+        <Routes>
+          <Route path="/" element={<DocsManagementSearch />} />
+          <Route path="search" element={<DocsManagementSearch />} />
+          <Route
+            path="scan"
+            element={
+              <DocsManagementScan
+                show={showOutput}
+                isFolder={isFolder}
+                isProcessing={isProcessing}
+                selectedPath={selectedPath}
+                items={items}
+                currentItem={currentItem}
+                summary={summary}
+                error={error}
+                startIndexing={startIndexing}
+              />
+            }
           />
-        } />
-        <Route path="templates" element={<DocsManagementTemplates />} />
-        <Route path="search" element={<DocsManagementSearch />} />
-      </Routes>
+          <Route path="templates" element={<DocsManagementTemplates />} />
+        </Routes>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import CaseManagementSidebar from "./CasesManagementSidebar";
 import { Route, Routes, useNavigate } from "react-router-dom";
 import CaseManagementOpenCases from "./CaseManagementOpenCases";
-import CasesManagementTemplate from "./CasesManagementTemplate";
+import CasesManagementTemplate from "./CasesManagementTemplate/CasesManagementTemplate";
 
 export default function CaseManagement() {
   const navigate = useNavigate();
