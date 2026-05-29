@@ -292,11 +292,9 @@ fn apply_marks_to_docx(original_bytes: &[u8], marked_text: &str) -> Result<Vec<u
 pub async fn process_template(
     app: AppHandle,
     file_path: String,
-    api_key: String,
+    api_key: Option<String>,
     model: Option<String>,
 ) -> Result<TemplateResult, String> {
-    let model = model.unwrap_or_else(|| "claude-opus-4-5".to_string());
-
     let path = Path::new(&file_path);
     let ext = path
         .extension()
@@ -321,14 +319,13 @@ pub async fn process_template(
         .unwrap_or("template")
         .to_string();
 
-    emit_progress(&app, "processing", "extracting text...");
+    emit_progress(&app, "processing", "extracting fields...");
     let extracted = extractor::extract(path)?;
     let text = extracted.text;
+    let fields = extract_field_names(&text);
+    let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
 
-    emit_progress(&app, "processing", "calling AI...");
-    let marked_text = llm::call_claude_raw(&text, &api_key, &model, TEMPLATE_FIELD_PROMPT).await?;
-
-    emit_progress(&app, "processing", "saving files...");
+    emit_progress(&app, "processing", "copying template file...");
     let dir = templates_dir(&app);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
@@ -336,28 +333,12 @@ pub async fn process_template(
     let original_dest = dir.join(&file_name);
     std::fs::copy(path, &original_dest).map_err(|e| e.to_string())?;
 
-    // Save marked version
-    let marked_path = match ext.as_str() {
-        "docx" => {
-            let original_bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-            let marked_bytes = apply_marks_to_docx(&original_bytes, &marked_text)?;
-            let p = dir.join(format!("{stem}.marked.docx"));
-            std::fs::write(&p, &marked_bytes).map_err(|e| e.to_string())?;
-            p
-        }
-        _ => {
-            // For PDF / XLSX / XLS / TXT: save marked text as .txt
-            let p = dir.join(format!("{stem}.marked.txt"));
-            std::fs::write(&p, &marked_text).map_err(|e| e.to_string())?;
-            p
-        }
-    };
+    // Copy original directly as marked version (no LLM, manual edit flow)
+    let marked_path = dir.join(format!("{stem}.marked.{ext}"));
+    std::fs::copy(path, &marked_path).map_err(|e| e.to_string())?;
 
     let marked_path_str = marked_path.to_string_lossy().to_string();
     let original_path_str = original_dest.to_string_lossy().to_string();
-
-    let fields = extract_field_names(&marked_text);
-    let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
 
     let file_size_kb = std::fs::metadata(path)
         .map(|m| m.len() as i64 / 1024)
@@ -378,6 +359,11 @@ pub async fn process_template(
     let conn = store::open_db(&app)?;
     let id = store::insert_template(&conn, &record).map_err(|e| e.to_string())?;
 
+    emit_progress(&app, "processing", "opening template editor...");
+    if let Err(e) = open_template_file(marked_path_str.clone()) {
+        eprintln!("Failed to open template file: {e}");
+    }
+
     emit_progress(&app, "ok", "done");
 
     Ok(TemplateResult {
@@ -385,6 +371,35 @@ pub async fn process_template(
         marked_path: marked_path_str,
         fields_found: fields,
     })
+}
+
+#[tauri::command]
+pub fn sync_template_fields(app: AppHandle, template_id: i64) -> Result<Vec<String>, String> {
+    let conn = store::open_db(&app)?;
+    
+    let mut stmt = conn
+        .prepare("SELECT marked_path FROM doc_templates WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
+    
+    let marked_path_str: String = stmt
+        .query_row(rusqlite::params![template_id], |row| row.get(0))
+        .map_err(|e| format!("Failed to find template with ID {template_id}: {e}"))?;
+        
+    let marked_path = std::path::Path::new(&marked_path_str);
+    if !marked_path.exists() {
+        return Err(format!("Marked template file not found at {marked_path_str}"));
+    }
+    
+    let extracted = extractor::extract(marked_path)?;
+    let fields = extract_field_names(&extracted.text);
+    let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
+    
+    conn.execute(
+        "UPDATE doc_templates SET fields_found = ?1 WHERE id = ?2",
+        rusqlite::params![fields_json, template_id],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(fields)
 }
 
 #[tauri::command]
@@ -580,5 +595,32 @@ pub fn open_template_file(path: String) -> Result<(), String> {
     {
         Err("Unsupported operating system".to_string())
     }
+}
+
+#[tauri::command]
+pub fn delete_template(app: AppHandle, id: i64) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+
+    let mut stmt = conn
+        .prepare("SELECT original_path, marked_path FROM doc_templates WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let (original_path_str, marked_path_str): (String, String) = stmt
+        .query_row(rusqlite::params![id], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("Failed to find template with ID {id}: {e}"))?;
+
+    let orig_path = std::path::Path::new(&original_path_str);
+    if orig_path.exists() {
+        let _ = std::fs::remove_file(orig_path);
+    }
+    let marked_path = std::path::Path::new(&marked_path_str);
+    if marked_path.exists() {
+        let _ = std::fs::remove_file(marked_path);
+    }
+
+    conn.execute("DELETE FROM doc_templates WHERE id = ?1", rusqlite::params![id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 

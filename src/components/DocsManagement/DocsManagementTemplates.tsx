@@ -52,15 +52,7 @@ export default function DocsManagementTemplates() {
     });
     if (!selected || typeof selected !== "string") return;
 
-    if (!apiKey) {
-      setProcessing({
-        status: "failed",
-        message: "No API key set — go to Settings to add your Claude API key.",
-      });
-      return;
-    }
-
-    setProcessing({ status: "processing", message: "Starting template analysis..." });
+    setProcessing({ status: "processing", message: "Adding document template..." });
 
     unlistenRef.current = await listen<TemplateProgressEvent>("template-progress", (event) => {
       const { status, message } = event.payload;
@@ -68,10 +60,10 @@ export default function DocsManagementTemplates() {
     });
 
     try {
-      await invoke<TemplateResult>("process_template", { filePath: selected, apiKey });
+      await invoke<TemplateResult>("process_template", { filePath: selected, apiKey: apiKey || null });
       unlistenRef.current?.();
       unlistenRef.current = null;
-      setProcessing({ status: "ok", message: "Template uploaded and analyzed successfully!" });
+      setProcessing({ status: "ok", message: "Template uploaded and opened in editor!" });
       await loadTemplates();
       setTimeout(() => setProcessing(null), 4000);
     } catch (e) {
@@ -81,18 +73,52 @@ export default function DocsManagementTemplates() {
     }
   }
 
-  function handleSelectTemplate(t: TemplateRow) {
+  async function handleSelectTemplate(t: TemplateRow) {
     setSelectedTemplate(t);
     setGenResult(null);
     try {
-      const fields = JSON.parse(t.fields_found) as string[];
+      // Dynamically scan the template file to get latest placeholders
+      const fields = await invoke<string[]>("sync_template_fields", { templateId: t.id });
       const initialValues: Record<string, string> = {};
       fields.forEach((f) => {
         initialValues[f] = "";
       });
       setFieldValues(initialValues);
-    } catch {
-      setFieldValues({});
+    } catch (err) {
+      console.error("Failed to sync fields on selection, falling back to database fields:", err);
+      try {
+        const fields = JSON.parse(t.fields_found) as string[];
+        const initialValues: Record<string, string> = {};
+        fields.forEach((f) => {
+          initialValues[f] = "";
+        });
+        setFieldValues(initialValues);
+      } catch {
+        setFieldValues({});
+      }
+    }
+  }
+
+  async function handleSyncFields() {
+    if (!selectedTemplate) return;
+    setProcessing({ status: "processing", message: "Scanning template for variables..." });
+    try {
+      const fields = await invoke<string[]>("sync_template_fields", { templateId: selectedTemplate.id });
+      const initialValues: Record<string, string> = {};
+      fields.forEach((f) => {
+        initialValues[f] = "";
+      });
+      setFieldValues(initialValues);
+      setProcessing({ status: "ok", message: "Variables synchronized!" });
+      await loadTemplates();
+      // Keep selectedTemplate in sync
+      setSelectedTemplate((prev) =>
+        prev ? { ...prev, fields_found: JSON.stringify(fields) } : null
+      );
+      setTimeout(() => setProcessing(null), 3000);
+    } catch (e) {
+      setProcessing({ status: "failed", message: `Sync failed: ${String(e)}` });
+      setTimeout(() => setProcessing(null), 4000);
     }
   }
 
@@ -126,6 +152,26 @@ export default function DocsManagementTemplates() {
       setGenResult({ status: "failed", message: String(e) });
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleDeleteTemplate() {
+    if (!selectedTemplate) return;
+    const ok = window.confirm(
+      `Are you sure you want to delete "${selectedTemplate.file_name}"? This will also delete the physical template files.`
+    );
+    if (!ok) return;
+
+    setProcessing({ status: "processing", message: "Deleting template..." });
+    try {
+      await invoke("delete_template", { id: selectedTemplate.id });
+      setProcessing({ status: "ok", message: "Template deleted successfully!" });
+      setSelectedTemplate(null);
+      await loadTemplates();
+      setTimeout(() => setProcessing(null), 3000);
+    } catch (e) {
+      setProcessing({ status: "failed", message: `Delete failed: ${String(e)}` });
+      setTimeout(() => setProcessing(null), 4000);
     }
   }
 
@@ -186,6 +232,8 @@ export default function DocsManagementTemplates() {
             genResult={genResult}
             onGenerate={handleGenerate}
             onClearSelection={() => setSelectedTemplate(null)}
+            onSyncFields={handleSyncFields}
+            onDelete={handleDeleteTemplate}
           />
         ) : (
           /* Empty state */

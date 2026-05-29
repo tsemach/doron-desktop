@@ -9,16 +9,19 @@ interface DocsManagementTemplatesFormProps {
   genResult: { status: "ok" | "failed"; message: string } | null;
   onGenerate: () => void;
   onClearSelection: () => void;
+  onSyncFields: () => void;
+  onDelete: () => void;
 }
 
 export default function DocsManagementTemplatesForm({
   selectedTemplate,
   fieldValues,
-  setFieldValues,
   generating,
   genResult,
   onGenerate,
   onClearSelection,
+  onSyncFields,
+  onDelete,
 }: DocsManagementTemplatesFormProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -42,16 +45,41 @@ export default function DocsManagementTemplatesForm({
         </Button>
       </div>
 
-      {/* Variable form */}
+      {/* Variable viewer */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        <div>
-          <h4 className="text-xs font-bold text-foreground mb-1 uppercase tracking-wider">
-            Fill Document Variables
-          </h4>
-          <p className="text-xs text-muted-foreground">
-            Provide values for the parsed template placeholders. Blank variables will not be
-            replaced.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+              Template Variables
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              The following placeholder tags (e.g. `&lt;&lt;variable_name&gt;&gt;`) were identified in this document template. These tags will be automatically extracted and filled during document assembly.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSyncFields}
+            className="flex items-center gap-1.5 shrink-0 bg-background"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            Sync Fields
+          </Button>
         </div>
 
         {Object.keys(fieldValues).length === 0 ? (
@@ -59,52 +87,43 @@ export default function DocsManagementTemplatesForm({
             No placeholder tags (e.g. `[Variable]`) were identified in this document.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {Object.keys(fieldValues).map((field) => (
-              <div key={field} className="space-y-1.5">
-                <label className="text-[11px] font-mono font-bold text-muted-foreground uppercase tracking-wide">
-                  {field.replace(/_/g, " ")}
-                </label>
-                <input
-                  type="text"
-                  value={fieldValues[field]}
-                  onChange={(e) =>
-                    setFieldValues({ ...fieldValues, [field]: e.target.value })
-                  }
-                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  placeholder={`Enter value for ${field}...`}
-                />
+              <div
+                key={field}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/40 font-mono text-xs text-foreground/80 shadow-xs"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-primary/70 shrink-0"
+                >
+                  <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                  <path d="M7 7h.01" />
+                </svg>
+                <span className="truncate font-semibold" title={field}>
+                  {field}
+                </span>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* Gen results message */}
-        {genResult && (
-          <div
-            className={`rounded-lg border p-4 text-xs font-medium ${
-              genResult.status === "failed"
-                ? "border-red-200 bg-red-50 text-red-800"
-                : "border-green-200 bg-green-50 text-green-800"
-            }`}
-          >
-            <p className="font-bold">
-              {genResult.status === "ok" ? "Success!" : "Generation Failed"}
-            </p>
-            <p className="mt-1 font-mono text-[11px] leading-relaxed break-all">
-              {genResult.message}
-            </p>
           </div>
         )}
       </div>
 
       {/* Action footer */}
-      <div className="p-4 border-t border-border bg-muted/10 shrink-0 flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={onClearSelection}>
-          Cancel
+      <div className="p-4 border-t border-border bg-muted/10 shrink-0 flex items-center justify-between">
+        <Button variant="destructive" size="sm" onClick={onDelete}>
+          Delete Template
         </Button>
-        <Button size="sm" onClick={onGenerate} disabled={generating}>
-          {generating ? "Generating Document..." : "Generate & Save Document"}
+        <Button size="sm" onClick={onClearSelection}>
+          Close
         </Button>
       </div>
     </div>

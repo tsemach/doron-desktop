@@ -69,12 +69,14 @@ pub fn run() {
             indexer::index_file,
             template::process_template,
             template::list_templates,
+            template::sync_template_fields,
             query::search_documents,
             template::generate_document_from_template,
             template::list_case_templates,
             template::create_case_template,
             template::update_case_template,
             template::delete_case_template,
+            template::delete_template,
             template::open_template_file
         ])
         .run(tauri::generate_context!())
