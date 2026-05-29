@@ -520,3 +520,65 @@ pub fn delete_case_template(app: AppHandle, id: i64) -> Result<(), String> {
     store::delete_case_template(&conn, id).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn open_template_file(path: String) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        // Check if running in WSL
+        let is_wsl = std::path::Path::new("/proc/sys/fs/binfmt_misc/WSLInterop").exists()
+            || std::env::var("WSL_DISTRO_NAME").is_ok();
+
+        if is_wsl {
+            let status = std::process::Command::new("wslview")
+                .arg(&path)
+                .status();
+            if let Ok(s) = status {
+                if s.success() {
+                    return Ok(());
+                }
+            }
+        }
+
+        let status = std::process::Command::new("xdg-open")
+            .arg(&path)
+            .status();
+        if let Ok(s) = status {
+            if s.success() {
+                return Ok(());
+            }
+        }
+        Err("Failed to open template file via wslview or xdg-open".to_string())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let status = std::process::Command::new("cmd")
+            .args(&["/C", "start", "", &path])
+            .status();
+        if let Ok(s) = status {
+            if s.success() {
+                return Ok(());
+            }
+        }
+        Err("Failed to open template file via cmd.exe".to_string())
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("open")
+            .arg(&path)
+            .status();
+        if let Ok(s) = status {
+            if s.success() {
+                return Ok(());
+            }
+        }
+        Err("Failed to open template file via open".to_string())
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        Err("Unsupported operating system".to_string())
+    }
+}
+

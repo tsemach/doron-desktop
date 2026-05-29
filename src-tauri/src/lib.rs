@@ -74,7 +74,8 @@ pub fn run() {
             template::list_case_templates,
             template::create_case_template,
             template::update_case_template,
-            template::delete_case_template
+            template::delete_case_template,
+            template::open_template_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { TemplateRow } from "./DocsManagementTemplates.types";
 
 interface DocsManagementTemplatesListItemProps {
@@ -24,6 +25,15 @@ export default function DocsManagementTemplatesListItem({
   isSelected,
   onClick,
 }: DocsManagementTemplatesListItemProps) {
+  const handleOpenDoc = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await invoke("open_template_file", { path: template.marked_path });
+    } catch (err) {
+      console.error("Failed to open template document:", err);
+    }
+  };
+
   return (
     <div
       onClick={onClick}
@@ -37,9 +47,32 @@ export default function DocsManagementTemplatesListItem({
         <span className="font-mono text-xs font-semibold truncate text-foreground flex-1">
           {template.file_name}
         </span>
-        <span className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/40">
-          {template.file_ext}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={handleOpenDoc}
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Open in default application (e.g. Word, PDF viewer)"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </button>
+          <span className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/40">
+            {template.file_ext}
+          </span>
+        </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
         <span>{formatDate(template.uploaded_at)}</span>
