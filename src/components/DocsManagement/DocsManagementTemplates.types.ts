@@ -7,6 +7,7 @@ export type TemplateRow = {
   uploaded_at: string;
   original_path: string;
   marked_path: string;
+  title?: string | null;
 };
 
 export type TemplateResult = {

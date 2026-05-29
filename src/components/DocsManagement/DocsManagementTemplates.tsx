@@ -15,6 +15,8 @@ import DocsManagementTemplatesListItem from "./DocsManagementTemplatesListItem";
 import DocsManagementTemplatesProcessingStatus from "./DocsManagementTemplatesProcessingStatus";
 import DocsManagementTemplatesForm from "./DocsManagementTemplatesForm";
 import DocsManagementTemplatesEmptyState from "./DocsManagementTemplatesEmptyState";
+import TemplateTitlePromptModal from "./TemplateTitlePromptModal";
+import TemplateDeleteWarningModal from "./TemplateDeleteWarningModal";
 
 export default function DocsManagementTemplates() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -25,9 +27,44 @@ export default function DocsManagementTemplates() {
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<{ status: "ok" | "failed"; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [pendingImport, setPendingImport] = useState<{ filePath: string; fileName: string } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const unlistenRef = useRef<UnlistenFn | null>(null);
+
+  // Sidebar resizing states
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = (mouseDownEvent: React.MouseEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !containerRef.current) return;
+      const containerLeft = containerRef.current.getBoundingClientRect().left;
+      const newWidth = Math.max(200, Math.min(600, e.clientX - containerLeft));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     loadTemplates();
@@ -52,6 +89,12 @@ export default function DocsManagementTemplates() {
     });
     if (!selected || typeof selected !== "string") return;
 
+    const path = selected;
+    const fileName = path.split(/[/\\]/).pop() || "document";
+    setPendingImport({ filePath: selected, fileName });
+  }
+
+  async function handleConfirmImport(filePath: string, title: string) {
     setProcessing({ status: "processing", message: "Adding document template..." });
 
     unlistenRef.current = await listen<TemplateProgressEvent>("template-progress", (event) => {
@@ -60,7 +103,11 @@ export default function DocsManagementTemplates() {
     });
 
     try {
-      await invoke<TemplateResult>("process_template", { filePath: selected, apiKey: apiKey || null });
+      await invoke<TemplateResult>("process_template", { 
+        filePath, 
+        apiKey: apiKey || null,
+        title: title || null
+      });
       unlistenRef.current?.();
       unlistenRef.current = null;
       setProcessing({ status: "ok", message: "Template uploaded and opened in editor!" });
@@ -155,22 +202,19 @@ export default function DocsManagementTemplates() {
     }
   }
 
-  async function handleDeleteTemplate() {
+  async function handleConfirmDelete() {
     if (!selectedTemplate) return;
-    const ok = window.confirm(
-      `Are you sure you want to delete "${selectedTemplate.file_name}"? This will also delete the physical template files.`
-    );
-    if (!ok) return;
-
     setProcessing({ status: "processing", message: "Deleting template..." });
     try {
       await invoke("delete_template", { id: selectedTemplate.id });
       setProcessing({ status: "ok", message: "Template deleted successfully!" });
       setSelectedTemplate(null);
+      setShowDeleteConfirm(false);
       await loadTemplates();
       setTimeout(() => setProcessing(null), 3000);
     } catch (e) {
       setProcessing({ status: "failed", message: `Delete failed: ${String(e)}` });
+      setShowDeleteConfirm(false);
       setTimeout(() => setProcessing(null), 4000);
     }
   }
@@ -181,9 +225,9 @@ export default function DocsManagementTemplates() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-9.5rem)] rounded-xl border border-border bg-card overflow-hidden shadow-sm animate-fade-in">
+    <div ref={containerRef} className="flex h-[calc(100vh-9.5rem)] rounded-xl border border-border bg-card overflow-hidden shadow-sm animate-fade-in">
       {/* Left Pane: Templates List */}
-      <aside className="w-1/3 border-r border-border flex flex-col bg-muted/10 h-full">
+      <aside style={{ width: sidebarWidth }} className="flex flex-col bg-muted/10 h-full shrink-0 overflow-y-auto">
         {/* List Header */}
         <div className="p-4 border-b border-border/80 bg-background/50 flex flex-col gap-3 shrink-0">
           <div className="flex items-center justify-between">
@@ -218,6 +262,16 @@ export default function DocsManagementTemplates() {
         </div>
       </aside>
 
+      {/* Draggable Resizable Divider */}
+      <div
+        onMouseDown={startResizing}
+        className={`w-[1px] bg-border shrink-0 h-full relative cursor-col-resize select-none group transition-colors duration-150 ${
+          isResizing ? "bg-primary" : "hover:bg-primary"
+        }`}
+      >
+        <div className="absolute top-0 bottom-0 -left-1.5 -right-1.5 cursor-col-resize z-10" />
+      </div>
+
       {/* Right Pane: Workspace */}
       <section className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
         {/* Processing Notification */}
@@ -233,7 +287,7 @@ export default function DocsManagementTemplates() {
             onGenerate={handleGenerate}
             onClearSelection={() => setSelectedTemplate(null)}
             onSyncFields={handleSyncFields}
-            onDelete={handleDeleteTemplate}
+            onDelete={() => setShowDeleteConfirm(true)}
           />
         ) : (
           /* Empty state */
@@ -243,6 +297,25 @@ export default function DocsManagementTemplates() {
           />
         )}
       </section>
+
+      {pendingImport && (
+        <TemplateTitlePromptModal
+          fileName={pendingImport.fileName}
+          onConfirm={(title) => {
+            handleConfirmImport(pendingImport.filePath, title);
+            setPendingImport(null);
+          }}
+          onCancel={() => setPendingImport(null)}
+        />
+      )}
+
+      {showDeleteConfirm && selectedTemplate && (
+        <TemplateDeleteWarningModal
+          fileName={selectedTemplate.file_name}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }

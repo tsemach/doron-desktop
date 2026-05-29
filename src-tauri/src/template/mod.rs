@@ -294,6 +294,7 @@ pub async fn process_template(
     file_path: String,
     api_key: Option<String>,
     model: Option<String>,
+    title: Option<String>,
 ) -> Result<TemplateResult, String> {
     let path = Path::new(&file_path);
     let ext = path
@@ -354,6 +355,7 @@ pub async fn process_template(
         file_size_kb,
         fields_found: fields_json,
         uploaded_at,
+        title,
     };
 
     let conn = store::open_db(&app)?;

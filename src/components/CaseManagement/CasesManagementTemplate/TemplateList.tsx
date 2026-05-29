@@ -7,6 +7,7 @@ interface TemplateListProps {
   isCreating: boolean;
   onSelectTemplate: (id: number) => void;
   onStartCreate: () => void;
+  width?: number;
 }
 
 export default function TemplateList({
@@ -15,6 +16,7 @@ export default function TemplateList({
   isCreating,
   onSelectTemplate,
   onStartCreate,
+  width,
 }: TemplateListProps) {
   function formatDate(iso: string): string {
     try {
@@ -29,7 +31,10 @@ export default function TemplateList({
   }
 
   return (
-    <aside className="w-1/3 border-r border-border flex flex-col bg-muted/10 shrink-0 overflow-y-auto">
+    <aside 
+      style={width ? { width } : undefined}
+      className={`${width ? "" : "w-1/3"} flex flex-col bg-muted/10 shrink-0 overflow-y-auto`}
+    >
       <div className="p-4 border-b border-border flex items-center justify-between bg-card shrink-0">
         <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
           Templates ({caseTemplates.length})

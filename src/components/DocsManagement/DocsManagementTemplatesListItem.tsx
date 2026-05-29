@@ -44,9 +44,16 @@ export default function DocsManagementTemplatesListItem({
       }`}
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
-        <span className="font-mono text-xs font-semibold truncate text-foreground flex-1">
-          {template.file_name}
-        </span>
+        <div className="min-w-0 flex-1">
+          <span className="font-mono text-xs font-semibold truncate text-foreground block">
+            {template.file_name}
+          </span>
+          {template.title && (
+            <span className="text-[10px] text-muted-foreground italic truncate block mt-0.5" title={template.title}>
+              {template.title}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={handleOpenDoc}

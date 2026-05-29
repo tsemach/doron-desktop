@@ -24,7 +24,7 @@ export default function DocsManagementTemplatesForm({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header Details */}
       <div className="p-6 border-b border-border/60 bg-muted/10 shrink-0 flex items-center justify-between">
-        <div className="space-y-1.5 min-w-0">
+        <div className="space-y-1.5 min-w-0 flex-1 mr-4">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-foreground truncate">
               {selectedTemplate.file_name}
@@ -33,6 +33,11 @@ export default function DocsManagementTemplatesForm({
               {selectedTemplate.file_ext}
             </span>
           </div>
+          {selectedTemplate.title && (
+            <p className="text-xs text-muted-foreground italic truncate" title={selectedTemplate.title}>
+              Description: {selectedTemplate.title}
+            </p>
+          )}
           <p className="text-[11px] text-muted-foreground truncate font-mono">
             Path: {selectedTemplate.original_path}
           </p>

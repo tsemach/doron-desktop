@@ -52,6 +52,17 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
 
     init_documents_schema(&conn).map_err(|e| format!("[documents schema] {e}"))?;
     init_templates_schema(&conn).map_err(|e| format!("[templates schema] {e}"))?;
+
+    // Ensure 'title' column exists in 'doc_templates'
+    let title_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('doc_templates') WHERE name='title'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !title_exists {
+        let _ = conn.execute("ALTER TABLE doc_templates ADD COLUMN title TEXT;", []);
+    }
+
     conn.execute_batch(CASE_TEMPLATES_SCHEMA).map_err(|e| format!("[case templates schema] {e}"))?;
     Ok(conn)
 }
@@ -159,7 +170,8 @@ const TEMPLATES_SCHEMA: &str = "
         file_ext      TEXT NOT NULL,
         file_size_kb  INTEGER,
         fields_found  TEXT,
-        uploaded_at   TEXT NOT NULL
+        uploaded_at   TEXT NOT NULL,
+        title         TEXT
     );
 ";
 
@@ -171,6 +183,7 @@ pub struct TemplateRecord {
     pub file_size_kb: i64,
     pub fields_found: String,
     pub uploaded_at: String,
+    pub title: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -193,9 +206,9 @@ pub fn init_templates_schema(conn: &Connection) -> Result<(), rusqlite::Error> {
 pub fn insert_template(conn: &Connection, r: &TemplateRecord) -> Result<i64, rusqlite::Error> {
     conn.execute(
         "INSERT OR REPLACE INTO doc_templates
-            (file_name, original_path, marked_path, file_ext, file_size_kb, fields_found, uploaded_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![r.file_name, r.original_path, r.marked_path, r.file_ext, r.file_size_kb, r.fields_found, r.uploaded_at],
+            (file_name, original_path, marked_path, file_ext, file_size_kb, fields_found, uploaded_at, title)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![r.file_name, r.original_path, r.marked_path, r.file_ext, r.file_size_kb, r.fields_found, r.uploaded_at, r.title],
     )?;
     Ok(conn.last_insert_rowid())
 }
@@ -211,7 +224,7 @@ pub fn list_templates(conn: &Connection) -> Result<Vec<TemplateRow>, rusqlite::E
             dt.file_size_kb, 
             dt.fields_found, 
             dt.uploaded_at,
-            (SELECT title FROM documents WHERE file_name = dt.file_name LIMIT 1) AS title
+            dt.title
          FROM doc_templates dt
          ORDER BY dt.uploaded_at DESC"
     )?;

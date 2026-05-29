@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DocTemplate, CaseTemplate } from "./types";
 import TemplateList from "./TemplateList";
@@ -15,6 +15,39 @@ export default function CasesManagementTemplate() {
   // Selection states
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Sidebar resizing states
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = (mouseDownEvent: React.MouseEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !containerRef.current) return;
+      const containerLeft = containerRef.current.getBoundingClientRect().left;
+      const newWidth = Math.max(200, Math.min(600, e.clientX - containerLeft));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     loadData();
@@ -279,7 +312,7 @@ export default function CasesManagementTemplate() {
         </div>
       ) : (
         /* Split-pane Workspace */
-        <div className="flex-1 flex overflow-hidden">
+        <div ref={containerRef} className="flex-1 flex overflow-hidden">
           
           {/* Left Column: Templates List */}
           <TemplateList
@@ -291,7 +324,18 @@ export default function CasesManagementTemplate() {
               setIsCreating(false);
             }}
             onStartCreate={() => setIsCreating(true)}
+            width={sidebarWidth}
           />
+
+          {/* Draggable Resizable Divider */}
+          <div
+            onMouseDown={startResizing}
+            className={`w-[1px] bg-border shrink-0 h-full relative cursor-col-resize select-none group transition-colors duration-150 ${
+              isResizing ? "bg-primary" : "hover:bg-primary"
+            }`}
+          >
+            <div className="absolute top-0 bottom-0 -left-1.5 -right-1.5 cursor-col-resize z-10" />
+          </div>
 
           {/* Right Column: Detailed View / Forms */}
           <section className="flex-1 flex flex-col overflow-y-auto bg-background p-6">
