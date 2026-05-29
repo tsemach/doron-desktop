@@ -16,9 +16,6 @@ interface DocsManagementTemplatesFormProps {
 export default function DocsManagementTemplatesForm({
   selectedTemplate,
   fieldValues,
-  generating,
-  genResult,
-  onGenerate,
   onClearSelection,
   onSyncFields,
   onDelete,
