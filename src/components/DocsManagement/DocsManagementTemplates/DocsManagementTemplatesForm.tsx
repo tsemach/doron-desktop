@@ -1,5 +1,5 @@
 import { TemplateRow } from "./DocsManagementTemplates.types";
-import { Button } from "../ui/button";
+import { Button } from "../../ui/button";
 
 interface DocsManagementTemplatesFormProps {
   selectedTemplate: TemplateRow;

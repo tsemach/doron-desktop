@@ -6,7 +6,7 @@ import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
 import CheckApiKey from "../ui/check-api-key";
 import DocsManagementHeader from "./DocsManagementHeader";
 import DocsManagementScan, { type ProgressItem, type ProgressStatus, type IndexSummary } from "./DocsManagementScan";
-import DocsManagementTemplates from "./DocsManagementTemplates";
+import DocsManagementTemplates from "./DocsManagementTemplates/DocsManagementTemplates";
 import DocsManagementSearch from "./DocsManagementSearch";
 
 type IndexProgressEvent = {
@@ -32,7 +32,7 @@ export default function DocsManagement() {
   const [dbPath, setDbPath] = useState("");
 
   useEffect(() => {
-    invoke<string>("get_db_path").then(setDbPath).catch(() => {});
+    invoke<string>("get_db_path").then(setDbPath).catch(() => { });
   }, []);
 
   useEffect(() => {

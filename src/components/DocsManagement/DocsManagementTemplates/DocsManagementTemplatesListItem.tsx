@@ -37,11 +37,10 @@ export default function DocsManagementTemplatesListItem({
   return (
     <div
       onClick={onClick}
-      className={`p-3 rounded-lg border cursor-pointer transition-all duration-150 flex flex-col gap-1.5 ${
-        isSelected
-          ? "border-primary bg-primary/5 shadow-sm"
-          : "border-border/50 bg-background hover:bg-muted/40 hover:border-border"
-      }`}
+      className={`p-3 rounded-lg border cursor-pointer transition-all duration-150 flex flex-col gap-1.5 ${isSelected
+        ? "border-primary bg-primary/5 shadow-sm"
+        : "border-border/50 bg-background hover:bg-muted/40 hover:border-border"
+        }`}
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
         <div className="min-w-0 flex-1">

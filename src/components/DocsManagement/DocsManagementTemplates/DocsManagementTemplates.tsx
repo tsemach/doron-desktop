@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Button } from "../ui/button";
-import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
+import { Button } from "../../ui/button";
+import { API_KEY_STORAGE_KEY } from "../../Settings/Settings";
 import {
   TemplateRow,
   TemplateResult,
@@ -15,8 +15,8 @@ import DocsManagementTemplatesListItem from "./DocsManagementTemplatesListItem";
 import DocsManagementTemplatesProcessingStatus from "./DocsManagementTemplatesProcessingStatus";
 import DocsManagementTemplatesForm from "./DocsManagementTemplatesForm";
 import DocsManagementTemplatesEmptyState from "./DocsManagementTemplatesEmptyState";
-import TemplateTitlePromptModal from "./TemplateTitlePromptModal";
-import TemplateDeleteWarningModal from "./TemplateDeleteWarningModal";
+import TemplateTitlePromptModal from "../TemplateTitlePromptModal";
+import TemplateDeleteWarningModal from "../TemplateDeleteWarningModal";
 
 export default function DocsManagementTemplates() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -103,8 +103,8 @@ export default function DocsManagementTemplates() {
     });
 
     try {
-      await invoke<TemplateResult>("process_template", { 
-        filePath, 
+      await invoke<TemplateResult>("process_template", {
+        filePath,
         apiKey: apiKey || null,
         title: title || null
       });
@@ -265,9 +265,8 @@ export default function DocsManagementTemplates() {
       {/* Draggable Resizable Divider */}
       <div
         onMouseDown={startResizing}
-        className={`w-[1px] bg-border shrink-0 h-full relative cursor-col-resize select-none group transition-colors duration-150 ${
-          isResizing ? "bg-primary" : "hover:bg-primary"
-        }`}
+        className={`w-[1px] bg-border shrink-0 h-full relative cursor-col-resize select-none group transition-colors duration-150 ${isResizing ? "bg-primary" : "hover:bg-primary"
+          }`}
       >
         <div className="absolute top-0 bottom-0 -left-1.5 -right-1.5 cursor-col-resize z-10" />
       </div>
