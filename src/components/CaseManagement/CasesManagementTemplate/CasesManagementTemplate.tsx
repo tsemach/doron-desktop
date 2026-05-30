@@ -224,10 +224,15 @@ export default function CasesManagementTemplate() {
     }
   }
 
-  // Inline Sync Document Fields
-  async function handleSyncDocFields(docId: number) {
+  // Inline Sync All Fields
+  async function handleSyncAllFields() {
+    if (!activeTemplate) return;
     try {
-      await invoke<string[]>("sync_template_fields", { templateId: docId });
+      await Promise.all(
+        activeTemplate.doc_template_ids.map((docId) =>
+          invoke("sync_template_fields", { templateId: docId })
+        )
+      );
       await loadData();
     } catch (err) {
       alert(`Error syncing document fields: ${err}`);
@@ -302,7 +307,7 @@ export default function CasesManagementTemplate() {
                 onRemoveDoc={handleRemoveDoc}
                 onAddField={handleAddField}
                 onRemoveField={handleRemoveField}
-                onSyncDocFields={handleSyncDocFields}
+                onSyncAllFields={handleSyncAllFields}
               />
             ) : (
               <TemplateEmptyState />
