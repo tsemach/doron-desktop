@@ -255,8 +255,8 @@ pub fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFi
                     .unwrap_or("unknown")
                     .to_string();
                 
-                // Skip hidden files
-                if name.starts_with('.') {
+                // Skip hidden files and Microsoft Word temporary files
+                if name.starts_with('.') || name.starts_with("~$") {
                     continue;
                 }
 
