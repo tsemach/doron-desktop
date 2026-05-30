@@ -147,7 +147,7 @@ export default function CaseCreate() {
 
   return (
     <main className="flex-1 overflow-auto p-4 bg-background">
-      <div className={`mx-auto space-y-4 ${hasFields ? "max-w-none w-full" : "max-w-2xl"} transition-all duration-300`}>
+      <div className={`space-y-4 ${hasFields ? "max-w-none w-full" : "max-w-2xl"} transition-all duration-300`}>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create New Case</h1>
           <p className="text-sm text-muted-foreground mt-1">
