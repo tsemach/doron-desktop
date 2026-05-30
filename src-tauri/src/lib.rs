@@ -58,7 +58,9 @@ pub fn run() {
             case::list_cases,
             case::add_case,
             case::create_new_case,
-            case::delete_case
+            case::delete_case,
+            case::list_case_files,
+            case::verify_folder_in_use
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

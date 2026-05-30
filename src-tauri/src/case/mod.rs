@@ -71,13 +71,24 @@ pub async fn create_new_case(
     case_template_id: Option<i64>,
     field_values: std::collections::HashMap<String, String>,
 ) -> Result<Case, String> {
-    // 1. Create case directory first
+    // 1. Open DB first and verify that this folder path is not already in use by another active case
+    let conn = store::open_db(&app)?;
+    let folder_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM cases WHERE folder = ?1 AND (deleted = 0 OR deleted IS NULL)",
+        params![folder],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+
+    if folder_exists {
+        return Err("A case with this storage directory path already exists.".to_string());
+    }
+
+    // 2. Create case directory
     let case_path = Path::new(&folder);
     std::fs::create_dir_all(case_path)
         .map_err(|e| format!("Failed to create case directory: {e}"))?;
 
-    // 2. Open DB and insert case record
-    let conn = store::open_db(&app)?;
+    // 3. Insert case record
     let created_at = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO cases (subject, status, name, created_at, folder) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -207,4 +218,112 @@ pub fn delete_case(app: AppHandle, id: i64) -> Result<(), String> {
         params![id],
     ).map_err(|e| format!("[delete case] {e}"))?;
     Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CaseFile {
+    pub name: String,
+    pub path: String,
+    pub ext: String,
+    pub size_kb: i64,
+    pub title: Option<String>,
+}
+
+#[tauri::command]
+pub fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFile>, String> {
+    let path = Path::new(&folder_path);
+    if !path.exists() {
+        return Err("Directory does not exist".to_string());
+    }
+    if !path.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+
+    let conn = store::open_db(&app)?;
+
+    let entries = std::fs::read_dir(path)
+        .map_err(|e| format!("Failed to read directory: {e}"))?;
+
+    let mut files = Vec::new();
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let p = entry.path();
+            if p.is_file() {
+                let name = p.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                
+                // Skip hidden files
+                if name.starts_with('.') {
+                    continue;
+                }
+
+                let ext = p.extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+                
+                let size_kb = std::fs::metadata(&p)
+                    .map(|m| m.len() as i64 / 1024)
+                    .unwrap_or(0);
+
+                let path_str = p.to_string_lossy().to_string();
+                let normalized_path = path_str.replace('\\', "/");
+                
+                // 1. Try to find the title in the indexed documents (supporting slash normalization and suffix matches)
+                let mut title: Option<String> = conn.query_row(
+                    "SELECT title FROM documents 
+                     WHERE REPLACE(file_path, '\\', '/') = ?1 
+                        OR (REPLACE(file_path, '\\', '/') LIKE '%' || ?1 AND length(file_path) > 10)
+                        OR (?1 LIKE '%' || REPLACE(file_path, '\\', '/') AND length(?1) > 10)",
+                    params![normalized_path],
+                    |row| row.get(0)
+                ).ok();
+
+                // 2. Fall back to matching template name in doc_templates
+                if title.is_none() || title.as_deref().unwrap_or("").trim().is_empty() {
+                    let temp_title: Option<String> = conn.query_row(
+                        "SELECT title FROM doc_templates WHERE file_name = ?1",
+                        params![name],
+                        |row| row.get(0)
+                    ).ok();
+                    if temp_title.is_some() && !temp_title.as_deref().unwrap_or("").trim().is_empty() {
+                        title = temp_title;
+                    }
+                }
+
+                files.push(CaseFile {
+                    name,
+                    path: path_str,
+                    ext,
+                    size_kb,
+                    title,
+                });
+            }
+        }
+    }
+    
+    // Sort files by name
+    files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    
+    Ok(files)
+}
+
+#[tauri::command]
+pub fn verify_folder_in_use(app: AppHandle, folder_path: String) -> Result<bool, String> {
+    let conn = store::open_db(&app)?;
+    let normalized = folder_path.replace('\\', "/");
+    let folder_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM cases 
+         WHERE (deleted = 0 OR deleted IS NULL) 
+           AND (
+               REPLACE(folder, '\\', '/') = ?1
+               OR REPLACE(folder, '\\', '/') = ?1 || '/'
+               OR ?1 = REPLACE(folder, '\\', '/') || '/'
+           )",
+        params![normalized],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    Ok(folder_exists)
 }

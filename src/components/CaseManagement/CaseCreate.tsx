@@ -47,6 +47,34 @@ export default function CaseCreate() {
     setFieldValues(initialValues);
   }, [selectedTemplateId]);
 
+  // Verify if case storage folder is already in use by another case
+  useEffect(() => {
+    if (!folder.trim()) {
+      setError((prev) => 
+        prev === "A case with this storage directory path already exists." ? null : prev
+      );
+      return;
+    }
+
+    const checkFolder = async () => {
+      try {
+        const inUse = await invoke<boolean>("verify_folder_in_use", { folderPath: folder.trim() });
+        if (inUse) {
+          setError("A case with this storage directory path already exists.");
+        } else {
+          setError((prev) => 
+            prev === "A case with this storage directory path already exists." ? null : prev
+          );
+        }
+      } catch (err) {
+        console.error("verify_folder_in_use failed:", err);
+      }
+    };
+
+    const timer = setTimeout(checkFolder, 300);
+    return () => clearTimeout(timer);
+  }, [folder]);
+
   // Browse Directory Dialog
   async function handleBrowse() {
     setError(null);
@@ -85,6 +113,14 @@ export default function CaseCreate() {
 
     setLoading(true);
     try {
+      // Proactively check if the folder is in use one last time before creating
+      const inUse = await invoke<boolean>("verify_folder_in_use", { folderPath: folder.trim() });
+      if (inUse) {
+        setError("A case with this storage directory path already exists.");
+        setLoading(false);
+        return;
+      }
+
       const isTemplate = selectedTemplateId !== "empty";
       const templateIdNum = isTemplate ? Number(selectedTemplateId) : null;
 
