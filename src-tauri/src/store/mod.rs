@@ -86,6 +86,16 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
     }
 
     conn.execute_batch(CASE_TEMPLATES_SCHEMA).map_err(|e| format!("[case templates schema] {e}"))?;
+
+    conn.execute_batch("
+        CREATE TABLE IF NOT EXISTS document_annotations (
+            file_path   TEXT PRIMARY KEY,
+            notes       TEXT,
+            tags        TEXT, -- JSON array of strings
+            updated_at  TEXT  NOT NULL
+        );
+    ").map_err(|e| format!("[annotations schema] {e}"))?;
+
     Ok(conn)
 }
 

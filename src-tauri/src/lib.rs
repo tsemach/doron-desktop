@@ -1,6 +1,4 @@
-use rusqlite::params;
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::Manager;
 
 pub mod store;
 pub mod extractor;
@@ -60,7 +58,11 @@ pub fn run() {
             case::create_new_case,
             case::delete_case,
             case::list_case_files,
-            case::verify_folder_in_use
+            case::verify_folder_in_use,
+            case::get_document_annotations,
+            case::set_document_annotations,
+            case::delete_document_annotations,
+            case::list_all_annotation_tags
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

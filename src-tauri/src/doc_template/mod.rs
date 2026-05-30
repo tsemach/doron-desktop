@@ -236,94 +236,10 @@ pub fn replace_docx_placeholders(xml: &str, field_values: &std::collections::Has
     result
 }
 
-/// Apply the LLM-marked text to the XML by replacing paragraph runs in-place.
-fn mark_document_xml(xml: &str, marked_text: &str) -> String {
-    let paras = collect_paragraphs(xml);
-
-    // Non-empty marked lines (preserving order, but skipping blank lines so
-    // the LLM's paragraph count matches our non-empty paragraph count).
-    let marked_lines: Vec<&str> = marked_text
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .collect();
-
-    // Pair each non-empty original paragraph with a marked line.
-    let replacements: Vec<(usize, usize, String)> = paras
-        .iter()
-        .filter(|(_, _, text)| !text.trim().is_empty())
-        .zip(marked_lines.iter())
-        .filter_map(|((start, end, _), &line)| {
-            let para_xml = &xml[*start..*end];
-            if has_drawing(para_xml) {
-                None // leave image paragraphs untouched
-            } else {
-                Some((*start, *end, replace_para_runs(para_xml, line)))
-            }
-        })
-        .collect();
-
-    // Apply in reverse order so earlier byte positions stay valid.
-    let mut result = xml.to_string();
-    for (start, end, new_para) in replacements.iter().rev() {
-        result.replace_range(start..end, new_para);
-    }
-    result
-}
-
-/// Read the original DOCX bytes, update only `word/document.xml` with the
-/// marked text, and return the new DOCX bytes. All other ZIP entries
-/// (styles, images, relationships, …) are copied verbatim.
-fn apply_marks_to_docx(original_bytes: &[u8], marked_text: &str) -> Result<Vec<u8>, String> {
-    let cursor = std::io::Cursor::new(original_bytes);
-    let mut archive =
-        zip::ZipArchive::new(cursor).map_err(|e| format!("Cannot open DOCX ZIP: {e}"))?;
-
-    // Read word/document.xml
-    let doc_xml = {
-        let mut f = archive
-            .by_name("word/document.xml")
-            .map_err(|_| "word/document.xml not found".to_string())?;
-        let mut s = String::new();
-        f.read_to_string(&mut s).map_err(|e| e.to_string())?;
-        s
-    };
-
-    let new_doc_xml = mark_document_xml(&doc_xml, marked_text);
-
-    // Write new ZIP
-    let out_buf: Vec<u8> = Vec::new();
-    let out_cursor = std::io::Cursor::new(out_buf);
-    let mut new_zip = zip::ZipWriter::new(out_cursor);
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let name = file.name().to_string();
-        let opts = zip::write::FileOptions::<()>::default()
-            .compression_method(file.compression());
-
-        if file.is_dir() {
-            new_zip.add_directory(&name, opts).map_err(|e| e.to_string())?;
-        } else {
-            new_zip.start_file(&name, opts).map_err(|e| e.to_string())?;
-            if name == "word/document.xml" {
-                new_zip
-                    .write_all(new_doc_xml.as_bytes())
-                    .map_err(|e| e.to_string())?;
-            } else {
-                let mut content = Vec::new();
-                file.read_to_end(&mut content).map_err(|e| e.to_string())?;
-                new_zip.write_all(&content).map_err(|e| e.to_string())?;
-            }
-        }
-    }
-
-    let out_cursor = new_zip.finish().map_err(|e| e.to_string())?;
-    Ok(out_cursor.into_inner())
-}
-
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn process_template(
     app: AppHandle,
     file_path: String,

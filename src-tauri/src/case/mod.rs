@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::store;
-use crate::doc_template::xml_escape;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Case {
@@ -227,6 +226,8 @@ pub struct CaseFile {
     pub ext: String,
     pub size_kb: i64,
     pub title: Option<String>,
+    pub notes: Option<String>,
+    pub tags: Vec<String>,
 }
 
 #[tauri::command]
@@ -293,12 +294,32 @@ pub fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFi
                     }
                 }
 
+                // 3. Query notes and tags from document_annotations
+                let (notes, tags): (Option<String>, Vec<String>) = conn.query_row(
+                    "SELECT notes, tags FROM document_annotations 
+                     WHERE file_path = ?1 
+                        OR REPLACE(file_path, '\\', '/') = ?2
+                        OR (REPLACE(file_path, '\\', '/') LIKE '%' || ?2 AND length(file_path) > 10)
+                        OR (?2 LIKE '%' || REPLACE(file_path, '\\', '/') AND length(?2) > 10)",
+                    params![path_str, normalized_path],
+                    |row| {
+                        let notes: Option<String> = row.get(0)?;
+                        let tags_str: Option<String> = row.get(1)?;
+                        let tags = tags_str
+                            .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
+                            .unwrap_or_default();
+                        Ok((notes, tags))
+                    }
+                ).unwrap_or((None, Vec::new()));
+
                 files.push(CaseFile {
                     name,
                     path: path_str,
                     ext,
                     size_kb,
                     title,
+                    notes,
+                    tags,
                 });
             }
         }
@@ -322,8 +343,111 @@ pub fn verify_folder_in_use(app: AppHandle, folder_path: String) -> Result<bool,
                OR REPLACE(folder, '\\', '/') = ?1 || '/'
                OR ?1 = REPLACE(folder, '\\', '/') || '/'
            )",
-        params![normalized],
-        |row| row.get(0)
+         params![normalized],
+         |row| row.get(0)
     ).unwrap_or(0) > 0;
     Ok(folder_exists)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DocumentAnnotations {
+    pub file_path: String,
+    pub notes: Option<String>,
+    pub tags: Vec<String>,
+    pub updated_at: String,
+}
+
+#[tauri::command]
+pub fn get_document_annotations(app: AppHandle, file_path: String) -> Result<Option<DocumentAnnotations>, String> {
+    let conn = store::open_db(&app)?;
+    let normalized = file_path.replace('\\', "/");
+    let mut stmt = conn.prepare(
+        "SELECT notes, tags, updated_at FROM document_annotations 
+         WHERE file_path = ?1 OR REPLACE(file_path, '\\', '/') = ?2"
+    ).map_err(|e| e.to_string())?;
+    
+    let mut rows = stmt.query(params![file_path, normalized]).map_err(|e| e.to_string())?;
+    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let notes: Option<String> = row.get(0).map_err(|e| e.to_string())?;
+        let tags_str: Option<String> = row.get(1).map_err(|e| e.to_string())?;
+        let updated_at: String = row.get(2).map_err(|e| e.to_string())?;
+        
+        let tags = tags_str
+            .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
+            .unwrap_or_default();
+            
+        Ok(Some(DocumentAnnotations {
+            file_path,
+            notes,
+            tags,
+            updated_at,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub fn set_document_annotations(
+    app: AppHandle,
+    file_path: String,
+    notes: Option<String>,
+    tags: Vec<String>,
+) -> Result<DocumentAnnotations, String> {
+    let conn = store::open_db(&app)?;
+    let tags_str = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
+    let updated_at = chrono::Utc::now().to_rfc3339();
+    
+    conn.execute(
+        "INSERT OR REPLACE INTO document_annotations (file_path, notes, tags, updated_at) 
+         VALUES (?1, ?2, ?3, ?4)",
+        params![file_path, notes, tags_str, updated_at],
+    ).map_err(|e| format!("[set_document_annotations] {e}"))?;
+    
+    Ok(DocumentAnnotations {
+        file_path,
+        notes,
+        tags,
+        updated_at,
+    })
+}
+
+#[tauri::command]
+pub fn delete_document_annotations(app: AppHandle, file_path: String) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+    let normalized = file_path.replace('\\', "/");
+    conn.execute(
+        "DELETE FROM document_annotations 
+         WHERE file_path = ?1 OR REPLACE(file_path, '\\', '/') = ?2",
+        params![file_path, normalized],
+    ).map_err(|e| format!("[delete_document_annotations] {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_all_annotation_tags(app: AppHandle) -> Result<Vec<String>, String> {
+    let conn = store::open_db(&app)?;
+    let mut stmt = conn.prepare("SELECT tags FROM document_annotations")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |row| {
+        let tags_str: Option<String> = row.get(0)?;
+        Ok(tags_str)
+    }).map_err(|e| e.to_string())?;
+    
+    let mut all_tags = std::collections::HashSet::new();
+    for r in rows {
+        if let Ok(Some(tags_str)) = r {
+            if let Ok(tags) = serde_json::from_str::<Vec<String>>(&tags_str) {
+                for tag in tags {
+                    if !tag.trim().is_empty() {
+                        all_tags.insert(tag);
+                    }
+                }
+            }
+        }
+    }
+    
+    let mut sorted_tags: Vec<String> = all_tags.into_iter().collect();
+    sorted_tags.sort();
+    Ok(sorted_tags)
 }

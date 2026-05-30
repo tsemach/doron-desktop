@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
+import DocumentAnnotationsModal from "./DocumentAnnotationsModal";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -22,6 +23,8 @@ interface CaseFile {
   ext: string;
   size_kb: number;
   title?: string;
+  notes?: string;
+  tags: string[];
 }
 
 const STATUS_STYLES: Record<CaseStatus, string> = {
@@ -73,6 +76,8 @@ export default function CaseManagementOpenCases() {
   const [documents, setDocuments] = useState<CaseFile[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
   const [docsError, setDocsError] = useState<string | null>(null);
+  const [docSearchQuery, setDocSearchQuery] = useState("");
+  const [editingDoc, setEditingDoc] = useState<CaseFile | null>(null);
 
   // General loading/error
   const [error, setError] = useState<string | null>(null);
@@ -473,6 +478,55 @@ export default function CaseManagementOpenCases() {
                   <p className="text-xs text-muted-foreground mt-0.5">Customer: {selectedCase.name}</p>
                 </div>
 
+                {/* Case File Search Bar */}
+                {documents.length > 0 && (
+                  <div className="relative flex items-center">
+                    <span className="absolute left-2.5 text-muted-foreground">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                      </svg>
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Filter files by name, tags, or notes..."
+                      value={docSearchQuery}
+                      onChange={(e) => setDocSearchQuery(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background pl-8 pr-7 py-1.5 text-xs placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring transition-all"
+                    />
+                    {docSearchQuery && (
+                      <button
+                        onClick={() => setDocSearchQuery("")}
+                        className="absolute right-2 text-muted-foreground hover:text-foreground p-0.5"
+                        title="Clear filter"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M18 6 6 18" />
+                          <path d="m6 6 12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Documents List */}
                 <div className="space-y-2">
                   <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-2">
@@ -496,63 +550,155 @@ export default function CaseManagementOpenCases() {
                         Any Word, PDF, Excel or text documents placed in the directory will show up here.
                       </p>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2.5">
-                      {documents.map((doc) => (
-                        <div
-                          key={doc.path}
-                          onClick={() => handleOpenFile(doc.path)}
-                          className="rounded-lg border border-border bg-card p-3 hover:shadow-xs hover:border-primary/40 dark:hover:border-primary/45 transition-all duration-150 flex items-center justify-between gap-4 group cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            {/* Visual file-type icon */}
-                            <FileIcon ext={doc.ext} />
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors pr-2 leading-tight" title={doc.title || doc.name}>
-                                {doc.title || doc.name}
-                              </h4>
-                              <p className="text-[10px] text-muted-foreground mt-1.5 font-mono truncate" title={doc.title ? doc.name : undefined}>
-                                {doc.title ? `${doc.name} • ` : ""}{doc.size_kb} KB • .{doc.ext.toUpperCase()}
-                              </p>
+                  ) : (() => {
+                    const filteredDocs = documents.filter((doc) => {
+                      if (!docSearchQuery.trim()) return true;
+                      const q = docSearchQuery.toLowerCase().trim();
+                      const nameMatch = doc.name.toLowerCase().includes(q);
+                      const titleMatch = doc.title?.toLowerCase().includes(q) ?? false;
+                      const notesMatch = doc.notes?.toLowerCase().includes(q) ?? false;
+                      const tagsMatch = doc.tags?.some((t) => t.toLowerCase().includes(q)) ?? false;
+                      return nameMatch || titleMatch || notesMatch || tagsMatch;
+                    });
+
+                    if (filteredDocs.length === 0) {
+                      return (
+                        <div className="text-center py-8 border-2 border-dashed border-border rounded-lg text-muted-foreground p-4">
+                          <p className="text-xs font-medium">No files match the filter query.</p>
+                          <p className="text-[10px] text-muted-foreground/80 mt-1">
+                            Try clearing the search query or search for something else.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {filteredDocs.map((doc) => (
+                          <div
+                            key={doc.path}
+                            onClick={() => handleOpenFile(doc.path)}
+                            className="rounded-lg border border-border bg-card p-3 hover:shadow-xs hover:border-primary/40 dark:hover:border-primary/45 transition-all duration-150 flex items-center justify-between gap-4 group cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {/* Visual file-type icon */}
+                              <FileIcon ext={doc.ext} />
+                              <div className="min-w-0 flex-1">
+                                <h4 className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors pr-2 leading-tight" title={doc.title || doc.name}>
+                                  {doc.title || doc.name}
+                                </h4>
+                                <p className="text-[10px] text-muted-foreground mt-1.5 font-mono truncate" title={doc.title ? doc.name : undefined}>
+                                  {doc.title ? `${doc.name} • ` : ""}{doc.size_kb} KB • .{doc.ext.toUpperCase()}
+                                </p>
+
+                                {/* Render tags if any */}
+                                {doc.tags && doc.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {doc.tags.map((tag) => (
+                                      <span
+                                        key={tag}
+                                        className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold border border-primary/20 tracking-wide uppercase select-none"
+                                      >
+                                        #{tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Render notes if any */}
+                                {doc.notes && (
+                                  <p className="text-[10px] text-muted-foreground/80 mt-1.5 italic line-clamp-2 border-l-2 border-border/85 pl-1.5 bg-muted/20 py-0.5 rounded-r">
+                                    "{doc.notes}"
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setEditingDoc(doc)}
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
+                                title="Edit notes & tags"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M12 2H2v10l9.29 9.29c.39.39 1.02.39 1.41 0l8.59-8.59c.39-.39.39-1.02 0-1.41L12 2z" />
+                                  <path d="M7 7h.01" />
+                                </svg>
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenFile(doc.path)}
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
+                                title={`Open file in system default viewer`}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M15 3h6v6" />
+                                  <path d="M10 14 21 3" />
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                </svg>
+                              </Button>
                             </div>
                           </div>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenFile(doc.path);
-                            }}
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0 group-hover:bg-primary/5"
-                            title={`Open file in system default viewer`}
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M15 3h6v6" />
-                              <path d="M10 14 21 3" />
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                            </svg>
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {editingDoc && (
+        <DocumentAnnotationsModal
+          fileName={editingDoc.name}
+          filePath={editingDoc.path}
+          initialNotes={editingDoc.notes}
+          initialTags={editingDoc.tags}
+          onCancel={() => setEditingDoc(null)}
+          onSave={(notes, tags) => {
+            setDocuments((prev) =>
+              prev.map((d) =>
+                d.path === editingDoc.path ? { ...d, notes, tags } : d
+              )
+            );
+            setEditingDoc(null);
+          }}
+          onDelete={() => {
+            setDocuments((prev) =>
+              prev.map((d) =>
+                d.path === editingDoc.path ? { ...d, notes: undefined, tags: [] } : d
+              )
+            );
+            setEditingDoc(null);
+          }}
+        />
+      )}
     </main>
   );
 }
