@@ -341,17 +341,36 @@ pub fn list_case_templates(conn: &Connection) -> Result<Vec<CaseTemplateRow>, ru
 
     let mut templates = Vec::new();
     for r in rows {
-        let (id, name, fields, created_at) = r?;
+        let (id, name, fields_json, created_at) = r?;
         let mut doc_stmt = conn.prepare(
             "SELECT template_id FROM case_template_docs WHERE case_template_id = ?1"
         )?;
         let doc_ids: Vec<i64> = doc_stmt
             .query_map(params![id], |row| row.get(0))?
             .collect::<Result<Vec<i64>, _>>()?;
+
+        // DYNAMICALLY MERGE FIELDS IN RUST
+        let mut merged_fields: Vec<String> = serde_json::from_str(&fields_json).unwrap_or_default();
+        for &doc_id in &doc_ids {
+            let mut fields_stmt = conn.prepare(
+                "SELECT fields_found FROM doc_templates WHERE id = ?1"
+            )?;
+            if let Ok(fields_found_json) = fields_stmt.query_row(params![doc_id], |row| row.get::<_, String>(0)) {
+                if let Ok(fields_found) = serde_json::from_str::<Vec<String>>(&fields_found_json) {
+                    for f in fields_found {
+                        if !merged_fields.contains(&f) {
+                            merged_fields.push(f);
+                        }
+                    }
+                }
+            }
+        }
+        let merged_fields_json = serde_json::to_string(&merged_fields).unwrap_or_else(|_| "[]".to_string());
+
         templates.push(CaseTemplateRow {
             id,
             name,
-            fields,
+            fields: merged_fields_json,
             created_at,
             doc_template_ids: doc_ids,
         });

@@ -62,58 +62,12 @@ export default function CasesManagementTemplate() {
         invoke<DocTemplate[]>("list_templates"),
       ]);
 
-      // Automatically check and sync each case template's stored fields
-      // with all fields parsed from its associated document templates.
-      const syncedCaseTemplates = caseRows.map(ct => {
-        let storedFields: string[] = [];
-        try {
-          storedFields = JSON.parse(ct.fields);
-        } catch {}
-
-        const docFields = new Set<string>();
-        ct.doc_template_ids.forEach(docId => {
-          const doc = docRows.find(d => d.id === docId);
-          if (doc) {
-            try {
-              const fs = JSON.parse(doc.fields_found);
-              if (Array.isArray(fs)) {
-                fs.forEach(f => docFields.add(f));
-              }
-            } catch {}
-          }
-        });
-
-        // Merge any document fields that aren't already stored in ct.fields
-        let merged = [...storedFields];
-        let changed = false;
-        docFields.forEach(f => {
-          if (!merged.includes(f)) {
-            merged.push(f);
-            changed = true;
-          }
-        });
-
-        if (changed) {
-          // Fire-and-forget background invoke to save update to SQLite DB
-          invoke("update_case_template", {
-            id: ct.id,
-            name: ct.name,
-            fields: merged,
-            docTemplateIds: ct.doc_template_ids,
-          }).catch(err => console.error("Failed to auto-sync fields for case template:", err));
-
-          return { ...ct, fields: JSON.stringify(merged) };
-        }
-
-        return ct;
-      });
-
-      setCaseTemplates(syncedCaseTemplates);
+      setCaseTemplates(caseRows);
       setDocTemplates(docRows);
 
       // Auto-select first template if none is selected and list is not empty
-      if (syncedCaseTemplates.length > 0 && selectedTemplateId === null) {
-        setSelectedTemplateId(syncedCaseTemplates[0].id);
+      if (caseRows.length > 0 && selectedTemplateId === null) {
+        setSelectedTemplateId(caseRows[0].id);
       }
     } catch (err) {
       console.error(err);
@@ -121,6 +75,28 @@ export default function CasesManagementTemplate() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function getManualFields(template: CaseTemplate): string[] {
+    let fieldsArr: string[] = [];
+    try {
+      fieldsArr = JSON.parse(template.fields);
+    } catch {}
+
+    const docFields = new Set<string>();
+    template.doc_template_ids.forEach(docId => {
+      const doc = docTemplates.find(d => d.id === docId);
+      if (doc) {
+        try {
+          const fs = JSON.parse(doc.fields_found);
+          if (Array.isArray(fs)) {
+            fs.forEach(f => docFields.add(f));
+          }
+        } catch {}
+      }
+    });
+
+    return fieldsArr.filter(f => !docFields.has(f));
   }
 
   const activeTemplate = caseTemplates.find((ct) => ct.id === selectedTemplateId) || null;
@@ -162,11 +138,11 @@ export default function CasesManagementTemplate() {
   async function handleRenameTemplate(newName: string) {
     if (!activeTemplate) return;
     try {
-      const fieldsArr = JSON.parse(activeTemplate.fields);
+      const manualFields = getManualFields(activeTemplate);
       await invoke("update_case_template", {
         id: activeTemplate.id,
         name: newName,
-        fields: fieldsArr,
+        fields: manualFields,
         docTemplateIds: activeTemplate.doc_template_ids,
       });
       await loadData();
@@ -179,20 +155,12 @@ export default function CasesManagementTemplate() {
   async function handleAddDoc(docId: number) {
     if (!activeTemplate) return;
     try {
-      const fieldsArr = JSON.parse(activeTemplate.fields);
-      const doc = docTemplates.find(d => d.id === docId);
-      let docFields: string[] = [];
-      if (doc) {
-        try {
-          docFields = JSON.parse(doc.fields_found);
-        } catch {}
-      }
-      const updatedFields = Array.from(new Set([...fieldsArr, ...docFields]));
+      const manualFields = getManualFields(activeTemplate);
       const updatedDocs = [...activeTemplate.doc_template_ids, docId];
       await invoke("update_case_template", {
         id: activeTemplate.id,
         name: activeTemplate.name,
-        fields: updatedFields,
+        fields: manualFields,
         docTemplateIds: updatedDocs,
       });
       await loadData();
@@ -205,43 +173,12 @@ export default function CasesManagementTemplate() {
   async function handleRemoveDoc(docId: number) {
     if (!activeTemplate) return;
     try {
-      const fieldsArr = JSON.parse(activeTemplate.fields);
-      
-      // Determine fields belonging to the doc we are removing
-      const removingDoc = docTemplates.find(d => d.id === docId);
-      let removingFields: string[] = [];
-      if (removingDoc) {
-        try {
-          removingFields = JSON.parse(removingDoc.fields_found);
-        } catch {}
-      }
-
-      // Determine fields belonging to all OTHER associated docs
-      const otherDocIds = activeTemplate.doc_template_ids.filter(id => id !== docId);
-      const otherFields = new Set<string>();
-      otherDocIds.forEach(id => {
-        const doc = docTemplates.find(d => d.id === id);
-        if (doc) {
-          try {
-            const fs = JSON.parse(doc.fields_found);
-            fs.forEach((f: string) => otherFields.add(f));
-          } catch {}
-        }
-      });
-
-      // Find fields that were added manually (fields not in any of the associated documents)
-      const allDocFields = new Set<string>(removingFields);
-      otherFields.forEach(f => allDocFields.add(f));
-      const manualFields = fieldsArr.filter((f: string) => !allDocFields.has(f));
-
-      // New fields list is the union of manual fields and fields from remaining documents
-      const updatedFields = Array.from(new Set([...manualFields, ...Array.from(otherFields)]));
+      const manualFields = getManualFields(activeTemplate);
       const updatedDocs = activeTemplate.doc_template_ids.filter((id) => id !== docId);
-      
       await invoke("update_case_template", {
         id: activeTemplate.id,
         name: activeTemplate.name,
-        fields: updatedFields,
+        fields: manualFields,
         docTemplateIds: updatedDocs,
       });
       await loadData();
@@ -254,13 +191,13 @@ export default function CasesManagementTemplate() {
   async function handleAddField(fieldName: string) {
     if (!activeTemplate) return;
     try {
-      const fieldsArr: string[] = JSON.parse(activeTemplate.fields);
-      if (!fieldsArr.includes(fieldName)) {
-        fieldsArr.push(fieldName);
+      const manualFields = getManualFields(activeTemplate);
+      if (!manualFields.includes(fieldName)) {
+        manualFields.push(fieldName);
         await invoke("update_case_template", {
           id: activeTemplate.id,
           name: activeTemplate.name,
-          fields: fieldsArr,
+          fields: manualFields,
           docTemplateIds: activeTemplate.doc_template_ids,
         });
       }
@@ -274,11 +211,11 @@ export default function CasesManagementTemplate() {
   async function handleRemoveField(fieldName: string) {
     if (!activeTemplate) return;
     try {
-      const fieldsArr: string[] = JSON.parse(activeTemplate.fields).filter((f: string) => f !== fieldName);
+      const manualFields = getManualFields(activeTemplate).filter((f) => f !== fieldName);
       await invoke("update_case_template", {
         id: activeTemplate.id,
         name: activeTemplate.name,
-        fields: fieldsArr,
+        fields: manualFields,
         docTemplateIds: activeTemplate.doc_template_ids,
       });
       await loadData();
