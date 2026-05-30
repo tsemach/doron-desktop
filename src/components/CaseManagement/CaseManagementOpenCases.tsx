@@ -257,7 +257,7 @@ export default function CaseManagementOpenCases() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{cases.length} total cases</span>
-          <Button onClick={() => navigate("/case-management/new-case")}>+ Add Case</Button>
+          <Button onClick={() => navigate("/case-management/new-case")}>+ New Case</Button>
         </div>
       </div>
 

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
-import { invoke } from "@tauri-apps/api/core";
- import { Button } from "@/components/ui/button";
 import CaseManagement from "@/components/CaseManagement/CaseManagement";
 import DocsManagement from "./components/DocsManagement/DocsManagement";
 import Settings from "./components/Settings/Settings";
@@ -9,8 +7,8 @@ import { getCurrentWindow  } from "@tauri-apps/api/window";
 
 function Home() {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [greeting, setGreeting] = useState<string>("");
+  const [username, setUsername] = useState<string>(() => localStorage.getItem("user_name") || "");
+  const [nameInput, setNameInput] = useState("");
 
   useEffect(() => {
     const setupWindow = async () => {
@@ -24,17 +22,6 @@ function Home() {
     setupWindow();
   }, []);
 
-
-  async function handleGreet() {
-    try {
-      const response = await invoke("greet", { name });
-      setGreeting(String(response));
-    } catch (error) {
-      setGreeting("Failed to invoke greet command.");
-      console.error(error);
-    }
-  }
-  
   function handleCaseMagement() {
     navigate("/case-management");
   }
@@ -47,59 +34,82 @@ function Home() {
     navigate("/settings");
   }
 
+  function handleSaveName(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = nameInput.trim();
+    if (trimmed) {
+      localStorage.setItem("user_name", trimmed);
+      setUsername(trimmed);
+    }
+  }
+
   return (
-    <main className="flex flex-col items-center pt-[10vh] text-center">
-      <h1 className="text-2xl font-semibold">Welcome to Tauri + React</h1>
+    <div className="min-h-screen flex flex-col bg-background text-foreground justify-center items-center px-4 py-12">
+      <div className="max-w-5xl w-full flex flex-col items-center gap-12">
+        {/* Welcome Title & Input */}
+        <div className="text-center space-y-4">
+          <h2 className="text-3xl font-bold tracking-tight">
+            {username ? `Welcome, ${username}` : "Welcome to Your Workspace"}
+          </h2>
 
-      <div className="flex justify-center gap-4 my-6">
-        <a href="https://vite.dev" target="_blank" rel="noreferrer">
-          <img src="/src/assets/vite.svg" className="size-20 p-6 transition-all hover:drop-shadow-[0_0_2em_#747bff]" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank" rel="noreferrer">
-          <img src="/src/assets/tauri.svg" className="size-20 p-6 transition-all hover:drop-shadow-[0_0_2em_#24c8db]" alt="Tauri logo" />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank" rel="noreferrer">
-          <img src="/src/assets/typescript.svg" className="size-20 p-6 transition-all hover:drop-shadow-[0_0_2em_#2d79c7]" alt="TypeScript logo" />
-        </a>
+          {/* Show input below the heading if name doesn't exist */}
+          {!username && (
+            <form onSubmit={handleSaveName} className="flex items-center justify-center gap-2 mt-6">
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="Enter your name..."
+                className="border border-border/80 rounded-lg px-4 py-2 text-sm bg-background w-64 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black font-bold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-sm"
+              >
+                Save
+              </button>
+            </form>
+          )}
+
+          <p className="text-muted-foreground text-sm max-w-md mx-auto">
+            Manage your legal cases, search documents, and index new files from one central control panel.
+          </p>
+        </div>
+
+        {/* Action cards & Settings Wrapper */}
+        <div className="w-full max-w-[1008px] flex flex-col gap-2">
+          {/* Action cards - Keep Case Management and Document Management as is */}
+          <div className="flex flex-col md:flex-row justify-center gap-8 w-full">
+            <button
+              type="button"
+              onClick={handleCaseMagement}
+              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
+            >
+              Case Management
+            </button>
+            <button
+              type="button"
+              onClick={handleDocsManagement}
+              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
+            >
+              Documents Management
+            </button>
+          </div>
+
+          {/* Footer Settings Link */}
+          <div className="flex justify-end w-full">
+            <button
+              type="button"
+              onClick={handleSettings}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 flex items-center gap-1.5 cursor-pointer"
+            >
+              ⚙ Settings
+            </button>
+          </div>
+        </div>
       </div>
-
-      <p>Use React for your GUI and call Tauri commands from the app.</p>
-
-      <div className="flex justify-center gap-2 mt-4">
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Enter a name..."
-          className="border rounded px-3 py-2 text-sm"
-        />
-        <button type="button" onClick={handleGreet} className="border rounded px-4 py-2 text-sm font-medium hover:border-blue-500 transition-colors">
-          Greet
-        </button>
-      </div>
-      <div className="flex justify-center gap-8 mt-4">
-        <button type="button" onClick={handleCaseMagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
-          Case Management
-        </button>
-        <button type="button" onClick={handleDocsManagement} className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors">
-          Documents Management
-        </button>
-      </div>
-      <div className="flex justify-end w-full max-w-[1008px] mt-2">
-        <button type="button" onClick={handleSettings} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1">
-          ⚙ Settings
-        </button>
-      </div>
-
-      <h1 className="text-3xl font-bold underline text-blue-500 mt-6">Hello world!</h1>
-      <h2 className="text-3xl font-bold underline text-gray-400">Hello world!</h2>
-
-      <p>{greeting}</p>
-
-      <button type="button" className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-        Click Managment
-      </button>
-       <Button variant="outline">Shadcn Button</Button>
-    </main>
+    </div>
   );
 }
 
