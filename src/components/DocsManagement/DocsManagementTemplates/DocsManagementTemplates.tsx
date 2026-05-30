@@ -293,6 +293,7 @@ export default function DocsManagementTemplates() {
           <DocsManagementTemplatesEmptyState
             onAddTemplate={handleAddTemplate}
             isProcessing={processing?.status === "processing"}
+            templates={templates}
           />
         )}
       </section>
