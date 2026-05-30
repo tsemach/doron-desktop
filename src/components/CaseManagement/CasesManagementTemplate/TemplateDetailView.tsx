@@ -12,7 +12,7 @@ interface TemplateDetailViewProps {
   onRemoveDoc: (docId: number) => Promise<void>;
   onAddField: (fieldName: string) => Promise<void>;
   onRemoveField: (fieldName: string) => Promise<void>;
-  onSyncDocFields: (docId: number) => Promise<void>;
+  onSyncAllFields: () => Promise<void>;
 }
 
 export default function TemplateDetailView({
@@ -24,7 +24,7 @@ export default function TemplateDetailView({
   onRemoveDoc,
   onAddField,
   onRemoveField,
-  onSyncDocFields,
+  onSyncAllFields,
 }: TemplateDetailViewProps) {
   // Inline editing state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -34,7 +34,7 @@ export default function TemplateDetailView({
   const [isAddingFieldInline, setIsAddingFieldInline] = useState(false);
   const [newFieldInlineValue, setNewFieldInlineValue] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [syncingDocId, setSyncingDocId] = useState<number | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
   
   // State for filtering fields by selected document
   const [selectedDocIdForFields, setSelectedDocIdForFields] = useState<number | null>(null);
@@ -356,31 +356,7 @@ export default function TemplateDetailView({
                         </button>
                       ) : null}
 
-                      {/* Sync/scan fields */}
-                      {doc ? (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            setSyncingDocId(id);
-                            try {
-                              await onSyncDocFields(id);
-                            } catch (err) {
-                              console.error("Error syncing fields:", err);
-                            } finally {
-                              setSyncingDocId(null);
-                            }
-                          }}
-                          className={`p-1 text-muted-foreground hover:text-blue-600 hover:bg-accent rounded transition-all cursor-pointer ${
-                            syncingDocId === id ? "animate-spin text-blue-500" : ""
-                          }`}
-                          title="Sync template fields"
-                          disabled={syncingDocId === id}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-                          </svg>
-                        </button>
-                      ) : null}
+
 
                       {/* Remove document link */}
                       <button
@@ -440,19 +416,53 @@ export default function TemplateDetailView({
                 </button>
               </form>
             ) : (
-              <button
-                onClick={() => {
-                  setIsAddingFieldInline(true);
-                  setNewFieldInlineValue("");
-                }}
-                className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline hover:text-primary/80 font-medium"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
-                  <path d="M5 12h14" />
-                  <path d="M12 5v14" />
-                </svg>
-                Add Field
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={async () => {
+                    setSyncingAll(true);
+                    try {
+                      await onSyncAllFields();
+                    } catch (err) {
+                      console.error("Error syncing fields:", err);
+                    } finally {
+                      setSyncingAll(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline hover:text-primary/80 font-medium cursor-pointer"
+                  disabled={syncingAll || activeTemplate.doc_template_ids.length === 0}
+                  title="Sync fields for all template documents"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`inline ${syncingAll ? "animate-spin text-blue-500" : ""}`}
+                  >
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                  </svg>
+                  Sync Fields
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsAddingFieldInline(true);
+                    setNewFieldInlineValue("");
+                  }}
+                  className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline hover:text-primary/80 font-medium cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
+                    <path d="M5 12h14" />
+                    <path d="M12 5v14" />
+                  </svg>
+                  Add Field
+                </button>
+              </div>
             )}
           </div>
 
