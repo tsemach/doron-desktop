@@ -62,7 +62,7 @@ export default function TemplateDeleteWarningModal({
             className="rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-2 text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
             disabled={deleting}
           >
-            {deleting ? "Deleting..." : "Delete Template"}
+            {deleting ? "Deleting..." : "Delete Document Template"}
           </button>
         </div>
       </div>

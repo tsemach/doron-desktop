@@ -122,7 +122,7 @@ export default function DocsManagementTemplatesForm({
       {/* Action footer */}
       <div className="p-4 border-t border-border bg-muted/10 shrink-0 flex items-center justify-between">
         <Button variant="destructive" size="sm" onClick={onDelete}>
-          Delete Template
+          Delete Document Template
         </Button>
         <Button size="sm" onClick={onClearSelection}>
           Close
