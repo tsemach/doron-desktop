@@ -83,6 +83,45 @@ export default function CaseManagementOpenCases() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Split pane states
+  const [leftPercent, setLeftPercent] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isLgScreen, setIsLgScreen] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLgScreen(window.innerWidth >= 1024);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = document.getElementById("case-management-split-container");
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const percentage = (relativeX / rect.width) * 100;
+      const clamped = Math.max(20, Math.min(80, percentage));
+      setLeftPercent(clamped);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
+
   useEffect(() => {
     loadCases();
   }, []);
@@ -294,10 +333,16 @@ export default function CaseManagementOpenCases() {
         </div>
       </div>
 
-      {/* Main split grid */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch mb-6">
+      {/* Main split container */}
+      <div 
+        id="case-management-split-container"
+        className={`flex-1 min-h-0 flex ${isLgScreen ? "flex-row gap-0" : "flex-col gap-6"} items-stretch mb-6 relative ${isDragging ? "select-none cursor-col-resize" : ""}`}
+      >
         {/* Left Side: Cases List Table */}
-        <div className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs">
+        <div 
+          style={isLgScreen ? { flex: `0 0 calc(${leftPercent}% - 6px)` } : undefined}
+          className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs"
+        >
           <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
             <span>Cases List</span>
             <span className="text-xs text-muted-foreground font-normal">{filtered.length} visible</span>
@@ -439,8 +484,25 @@ export default function CaseManagementOpenCases() {
           </div>
         </div>
 
+        {/* Resizable Divider (rendered only on large screens) */}
+        {isLgScreen && (
+          <div 
+            onMouseDown={() => setIsDragging(true)}
+            className={`w-3 group cursor-col-resize flex items-center justify-center shrink-0 z-20 select-none ${
+              isDragging ? "bg-primary/10" : "hover:bg-primary/5"
+            } transition-colors`}
+          >
+            {/* Grab handle indicator lines */}
+            <div className={`w-1 h-12 rounded-full ${
+              isDragging ? "bg-primary" : "bg-border/60 group-hover:bg-primary/50"
+            } transition-colors`} />
+          </div>
+        )}
+
         {/* Right Side: Case Documents Panel */}
-        <div className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs">
+        <div 
+          style={isLgScreen ? { flex: `0 0 calc(${100 - leftPercent}% - 6px)` } : undefined}
+          className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs">
           <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
             <span>Case Documents</span>
             {selectedCase && documents.length > 0 && (
