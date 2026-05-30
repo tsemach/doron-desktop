@@ -1,9 +1,20 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import BackButton from "../ui/back-button";
 import { Button } from "../ui/button";
 
 export default function CaseManagementSidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  const isOpenCasesActive =
+    pathname === "/case-management" ||
+    (pathname.startsWith("/case-management") &&
+      !pathname.startsWith("/case-management/templates") &&
+      !pathname.startsWith("/case-management/new-case"));
+
+  const isNewCaseActive = pathname.startsWith("/case-management/new-case");
+  const isTemplatesActive = pathname.startsWith("/case-management/templates");
 
   return (
     <aside className="w-35 shrink-0 flex flex-col py-4 px-3 border-r border-border">       
@@ -16,7 +27,9 @@ export default function CaseManagementSidebar() {
         <div className="flex flex-col gap-1">
           <Button
             variant="ghost"
-            className="w-full justify-start font-normal"
+            className={`w-full justify-start font-normal ${
+              isOpenCasesActive ? "bg-muted text-foreground font-semibold" : ""
+            }`}
             onClick={() => navigate("/case-management")}
           >
             Open Cases
@@ -30,7 +43,9 @@ export default function CaseManagementSidebar() {
           </Button>
           <Button
             variant="ghost"
-            className="w-full justify-start font-normal"
+            className={`w-full justify-start font-normal ${
+              isNewCaseActive ? "bg-muted text-foreground font-semibold" : ""
+            }`}
             onClick={() => navigate("/case-management/new-case")}
           >
             New Case
@@ -42,7 +57,9 @@ export default function CaseManagementSidebar() {
         <div className="flex flex-col gap-1">
           <Button
             variant="ghost"
-            className="w-full justify-start font-normal"
+            className={`w-full justify-start font-normal ${
+              isTemplatesActive ? "bg-muted text-foreground font-semibold" : ""
+            }`}
             onClick={() => navigate("/case-management/templates")}
           >
             Template
