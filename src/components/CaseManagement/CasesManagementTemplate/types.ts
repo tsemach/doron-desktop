@@ -2,8 +2,11 @@ export interface DocTemplate {
   id: number;
   file_name: string;
   file_ext: string;
+  file_size_kb: number;
   fields_found: string; // JSON string of array
   uploaded_at: string;
+  original_path: string;
+  marked_path: string;
   title: string | null;
 }
 

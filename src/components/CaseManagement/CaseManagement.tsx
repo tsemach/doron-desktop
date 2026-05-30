@@ -1,11 +1,10 @@
 import CaseManagementSidebar from "./CasesManagementSidebar";
-import { Route, Routes, useNavigate } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import CaseManagementOpenCases from "./CaseManagementOpenCases";
 import CasesManagementTemplate from "./CasesManagementTemplate/CasesManagementTemplate";
 import CaseCreate from "./CaseCreate";
 
 export default function CaseManagement() {
-  const navigate = useNavigate();
 
   return (
     <div className="flex h-screen">

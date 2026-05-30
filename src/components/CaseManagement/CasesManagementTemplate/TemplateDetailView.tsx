@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { CaseTemplate, DocTemplate } from "./types";
 import DeleteWarningModal from "./DeleteWarningModal";
 
@@ -11,6 +12,7 @@ interface TemplateDetailViewProps {
   onRemoveDoc: (docId: number) => Promise<void>;
   onAddField: (fieldName: string) => Promise<void>;
   onRemoveField: (fieldName: string) => Promise<void>;
+  onSyncDocFields: (docId: number) => Promise<void>;
 }
 
 export default function TemplateDetailView({
@@ -22,6 +24,7 @@ export default function TemplateDetailView({
   onRemoveDoc,
   onAddField,
   onRemoveField,
+  onSyncDocFields,
 }: TemplateDetailViewProps) {
   // Inline editing state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -31,6 +34,7 @@ export default function TemplateDetailView({
   const [isAddingFieldInline, setIsAddingFieldInline] = useState(false);
   const [newFieldInlineValue, setNewFieldInlineValue] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [syncingDocId, setSyncingDocId] = useState<number | null>(null);
   
   // State for filtering fields by selected document
   const [selectedDocIdForFields, setSelectedDocIdForFields] = useState<number | null>(null);
@@ -44,6 +48,19 @@ export default function TemplateDetailView({
     setSelectedDocIdForFields(null);
     setEditingNameValue(activeTemplate.name);
   }, [activeTemplate]);
+
+  // Open Document File
+  async function handleOpenDoc(path: string | undefined) {
+    if (!path) {
+      alert("No path found for this template document.");
+      return;
+    }
+    try {
+      await invoke("open_template_file", { path });
+    } catch (err) {
+      alert(`Failed to open template file: ${err}`);
+    }
+  }
 
   // Rename inline
   async function handleSaveNameInline(e?: React.FormEvent) {
@@ -289,6 +306,11 @@ export default function TemplateDetailView({
             <div className="space-y-2">
               {activeTemplate.doc_template_ids.map((id) => {
                 const isSelected = selectedDocIdForFields === id;
+                const doc = docTemplates.find(d => d.id === id);
+                const hasTitle = !!(doc && doc.title);
+                const primaryText = hasTitle ? doc!.title : getDocName(id);
+                const secondaryText = hasTitle ? getDocName(id) : null;
+
                 return (
                   <div
                     key={id}
@@ -300,17 +322,14 @@ export default function TemplateDetailView({
                     }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-foreground truncate" title={getDocName(id)}>
-                        {getDocName(id)}
+                      <span className="block text-sm font-medium text-foreground truncate" title={primaryText || ""}>
+                        {primaryText}
                       </span>
-                      {(() => {
-                        const doc = docTemplates.find(d => d.id === id);
-                        return doc && doc.title ? (
-                          <span className="block text-xs text-muted-foreground italic truncate mt-0.5" title={doc.title}>
-                            {doc.title}
-                          </span>
-                        ) : null;
-                      })()}
+                      {secondaryText && (
+                        <span className="block text-xs text-muted-foreground italic truncate mt-0.5" title={secondaryText}>
+                          {secondaryText}
+                        </span>
+                      )}
                       <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-1">
                         <span className="uppercase text-[8px] bg-muted px-1.5 py-0.2 rounded border">
                           {getDocExt(id)}
@@ -318,19 +337,66 @@ export default function TemplateDetailView({
                         <span>{getDocFieldCount(id)} fields found</span>
                       </span>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemoveDoc(id);
-                      }}
-                      className="p-1 text-muted-foreground hover:text-destructive hover:scale-110 transition-transform ml-2"
-                      title="Remove document from template"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 6 6 18" />
-                        <path d="m6 6 12 12" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center gap-1 ml-2">
+                      {/* Open file in external app */}
+                      {doc && doc.marked_path ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDoc(doc.marked_path);
+                          }}
+                          className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all cursor-pointer"
+                          title="Open template document"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                        </button>
+                      ) : null}
+
+                      {/* Sync/scan fields */}
+                      {doc ? (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setSyncingDocId(id);
+                            try {
+                              await onSyncDocFields(id);
+                            } catch (err) {
+                              console.error("Error syncing fields:", err);
+                            } finally {
+                              setSyncingDocId(null);
+                            }
+                          }}
+                          className={`p-1 text-muted-foreground hover:text-blue-600 hover:bg-accent rounded transition-all cursor-pointer ${
+                            syncingDocId === id ? "animate-spin text-blue-500" : ""
+                          }`}
+                          title="Sync template fields"
+                          disabled={syncingDocId === id}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                          </svg>
+                        </button>
+                      ) : null}
+
+                      {/* Remove document link */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveDoc(id);
+                        }}
+                        className="p-1 text-muted-foreground hover:text-destructive hover:bg-accent rounded transition-all cursor-pointer"
+                        title="Remove document from template"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 6 6 18" />
+                          <path d="m6 6 12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 );
               })}

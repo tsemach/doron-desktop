@@ -1,15 +1,9 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import BackButton from "../ui/back-button";
 import { Button } from "../ui/button";
 
 export default function CaseManagementSidebar() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const currentPath = location.pathname;
-  const isCases = currentPath === "/case-management" || currentPath === "/case-management/";
-  const isNewCase = currentPath === "/case-management/new-case";
-  const isTemplates = currentPath.includes("/case-management/templates");
 
   return (
     <aside className="w-35 shrink-0 flex flex-col py-4 px-3 border-r border-border">       

@@ -287,6 +287,16 @@ export default function CasesManagementTemplate() {
     }
   }
 
+  // Inline Sync Document Fields
+  async function handleSyncDocFields(docId: number) {
+    try {
+      await invoke<string[]>("sync_template_fields", { templateId: docId });
+      await loadData();
+    } catch (err) {
+      alert(`Error syncing document fields: ${err}`);
+    }
+  }
+
   return (
     <main className="flex-1 flex flex-col h-screen overflow-hidden bg-background">
       {/* Top Header */}
@@ -355,6 +365,7 @@ export default function CasesManagementTemplate() {
                 onRemoveDoc={handleRemoveDoc}
                 onAddField={handleAddField}
                 onRemoveField={handleRemoveField}
+                onSyncDocFields={handleSyncDocFields}
               />
             ) : (
               <TemplateEmptyState />
