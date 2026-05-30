@@ -55,7 +55,7 @@ export default function DocsManagementTemplatesForm({
               Template Variables
             </h4>
             <p className="text-xs text-muted-foreground">
-              The following placeholder tags (e.g. `&lt;&lt;variable_name&gt;&gt;`) were identified in this document template. These tags will be automatically extracted and filled during document assembly.
+              The following placeholder tags (e.g. `[[field name]]`) were identified in this document template. These tags will be automatically extracted and filled during document assembly.
             </p>
           </div>
           <Button
@@ -86,7 +86,7 @@ export default function DocsManagementTemplatesForm({
 
         {Object.keys(fieldValues).length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground bg-muted/10">
-            No placeholder tags (e.g. `[Variable]`) were identified in this document.
+            No placeholder tags (e.g. `[[field name]]`) were identified in this document.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">

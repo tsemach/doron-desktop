@@ -45,12 +45,12 @@ export default function DocsManagementTemplatesListItem({
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
         <div className="min-w-0 flex-1">
-          <span className="font-mono text-xs font-semibold truncate text-foreground block">
-            {template.file_name}
+          <span className="text-xs font-semibold truncate text-foreground block" title={template.title || template.file_name}>
+            {template.title || template.file_name}
           </span>
           {template.title && (
-            <span className="text-[10px] text-muted-foreground italic truncate block mt-0.5" title={template.title}>
-              {template.title}
+            <span className="font-mono text-[10px] text-muted-foreground truncate block mt-0.5" title={template.file_name}>
+              {template.file_name}
             </span>
           )}
         </div>
