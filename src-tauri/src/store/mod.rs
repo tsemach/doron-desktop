@@ -29,9 +29,31 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
             status      TEXT    NOT NULL DEFAULT 'open',
             name        TEXT    NOT NULL,
             created_at  TEXT    NOT NULL,
-            updated_at  TEXT
+            updated_at  TEXT,
+            folder      TEXT,
+            deleted     INTEGER DEFAULT 0
         );
     ").map_err(|e| e.to_string())?;
+
+    // Ensure 'folder' column exists in 'cases'
+    let folder_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('cases') WHERE name='folder'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !folder_exists {
+        let _ = conn.execute("ALTER TABLE cases ADD COLUMN folder TEXT;", []);
+    }
+
+    // Ensure 'deleted' column exists in 'cases'
+    let deleted_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('cases') WHERE name='deleted'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !deleted_exists {
+        let _ = conn.execute("ALTER TABLE cases ADD COLUMN deleted INTEGER DEFAULT 0;", []);
+    }
 
     // Migrate templates to doc_templates if necessary
     let templates_exists: bool = conn.query_row(

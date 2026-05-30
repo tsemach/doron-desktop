@@ -1,11 +1,16 @@
+import { useLocation, useNavigate } from "react-router-dom";
 import BackButton from "../ui/back-button";
 import { Button } from "../ui/button";
 
-export type CaseManagementSidebarProps = {
-  handleTemplate: () => void;
-}
+export default function CaseManagementSidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-export default function CaseManagementSidebar({ handleTemplate }: CaseManagementSidebarProps) {
+  const currentPath = location.pathname;
+  const isCases = currentPath === "/case-management" || currentPath === "/case-management/";
+  const isNewCase = currentPath === "/case-management/new-case";
+  const isTemplates = currentPath.includes("/case-management/templates");
+
   return (
     <aside className="w-35 shrink-0 flex flex-col py-4 px-3 border-r border-border">       
       <BackButton navigateTo={"/"} /> 
@@ -15,13 +20,25 @@ export default function CaseManagementSidebar({ handleTemplate }: CaseManagement
       {/* Centered Navigation Menu */}
       <div className="flex-1 flex flex-col justify-center">
         <div className="flex flex-col gap-1">
-          <Button variant="ghost" className="w-full justify-start">
+          <Button
+            variant="ghost"
+            className="w-full justify-start font-normal"
+            onClick={() => navigate("/case-management")}
+          >
             Open Cases
           </Button>
-          <Button variant="ghost" className="w-full justify-start">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground/40 cursor-not-allowed"
+            disabled
+          >
             Search
           </Button>
-          <Button variant="ghost" className="w-full justify-start">
+          <Button
+            variant="ghost"
+            className="w-full justify-start font-normal"
+            onClick={() => navigate("/case-management/new-case")}
+          >
             New Case
           </Button>
         </div>
@@ -29,7 +46,11 @@ export default function CaseManagementSidebar({ handleTemplate }: CaseManagement
         <div className="border-t border-border -mx-3 my-4" />
 
         <div className="flex flex-col gap-1">
-          <Button variant="ghost" className="w-full justify-start" onClick={handleTemplate}>
+          <Button
+            variant="ghost"
+            className="w-full justify-start font-normal"
+            onClick={() => navigate("/case-management/templates")}
+          >
             Template
           </Button>        
         </div>

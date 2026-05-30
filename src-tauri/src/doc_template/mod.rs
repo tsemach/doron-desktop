@@ -4,13 +4,7 @@ use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{extractor, llm, store};
-
-const TEMPLATE_FIELD_PROMPT: &str = r#"You are a document template analyzer. Read the document below and return ONLY the original text with every form field, blank, or placeholder replaced by <<field-name>>, where field-name is a short descriptive snake_case label in English.
-
-Look for: underscores (___), bracketed placeholders ([Name], {company}), labels followed by blank space (Date:___), empty table cells that clearly expect input, and any other placeholder pattern.
-
-Return ONLY the marked text, preserving the exact same line structure as the input — same number of lines, same blank lines. Do not add or remove line breaks. No JSON, no explanation, no markdown formatting."#;
+use crate::{extractor, store};
 
 #[derive(Serialize, Clone)]
 struct TemplateProgress {
@@ -43,7 +37,7 @@ fn emit_progress(app: &AppHandle, status: &str, message: &str) {
 }
 
 fn extract_field_names(marked_text: &str) -> Vec<String> {
-    let re = Regex::new(r"<<([^>]+)>>").unwrap();
+    let re = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
     let mut names: Vec<String> = re
         .captures_iter(marked_text)
         .map(|c| c[1].to_string())
@@ -56,7 +50,7 @@ fn extract_field_names(marked_text: &str) -> Vec<String> {
 
 // ── DOCX in-place modification ────────────────────────────────────────────────
 
-fn xml_escape(s: &str) -> String {
+pub fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
@@ -68,6 +62,14 @@ fn extract_wt_text(s: &str) -> String {
     let mut result = String::new();
     let mut search = s;
     while let Some(start) = search.find("<w:t") {
+        if start + 4 < search.len() {
+            let next_char = search.as_bytes()[start + 4];
+            if next_char != b'>' && next_char != b' ' {
+                // Skip tags like <w:textInput>, <w:tab>, etc.
+                search = &search[start + 4..];
+                continue;
+            }
+        }
         let rest = &search[start..];
         if let Some(bracket_end) = rest.find('>') {
             let content_start = bracket_end + 1;
@@ -201,6 +203,39 @@ fn replace_para_runs(para_xml: &str, marked_text: &str) -> String {
     out
 }
 
+pub fn replace_docx_placeholders(xml: &str, field_values: &std::collections::HashMap<String, String>) -> String {
+    let paras = collect_paragraphs(xml);
+    let mut replacements: Vec<(usize, usize, String)> = Vec::new();
+
+    for (start, end, text) in paras {
+        let mut new_text = text.clone();
+        let mut changed = false;
+        
+        for (key, val) in field_values {
+            let placeholder = format!("[[{}]]", key);
+            if new_text.contains(&placeholder) {
+                let escaped_val = xml_escape(val);
+                new_text = new_text.replace(&placeholder, &escaped_val);
+                changed = true;
+            }
+        }
+
+        if changed {
+            let para_xml = &xml[start..end];
+            if !has_drawing(para_xml) {
+                let replaced = replace_para_runs(para_xml, &new_text);
+                replacements.push((start, end, replaced));
+            }
+        }
+    }
+
+    let mut result = xml.to_string();
+    for (start, end, new_para) in replacements.iter().rev() {
+        result.replace_range(start..end, new_para);
+    }
+    result
+}
+
 /// Apply the LLM-marked text to the XML by replacing paragraph runs in-place.
 fn mark_document_xml(xml: &str, marked_text: &str) -> String {
     let paras = collect_paragraphs(xml);
@@ -236,7 +271,7 @@ fn mark_document_xml(xml: &str, marked_text: &str) -> String {
 }
 
 /// Read the original DOCX bytes, update only `word/document.xml` with the
-/// marked text, and return the new DOCX bytes.  All other ZIP entries
+/// marked text, and return the new DOCX bytes. All other ZIP entries
 /// (styles, images, relationships, …) are copied verbatim.
 fn apply_marks_to_docx(original_bytes: &[u8], marked_text: &str) -> Result<Vec<u8>, String> {
     let cursor = std::io::Cursor::new(original_bytes);
@@ -451,10 +486,7 @@ pub async fn generate_document_from_template(
         };
 
         let mut new_doc_xml = doc_xml;
-        for (key, val) in field_values {
-            let escaped_val = xml_escape(&val);
-            new_doc_xml = new_doc_xml.replace(&format!("<<{key}>>"), &escaped_val);
-        }
+        new_doc_xml = replace_docx_placeholders(&new_doc_xml, &field_values);
 
         let out_buf: Vec<u8> = Vec::new();
         let out_cursor = std::io::Cursor::new(out_buf);
@@ -492,7 +524,7 @@ pub async fn generate_document_from_template(
             .map_err(|e| format!("Failed to read marked text template: {e}"))?;
 
         for (key, val) in field_values {
-            text = text.replace(&format!("<<{key}>>"), &val);
+            text = text.replace(&format!("[[{key}]]"), &val);
         }
 
         std::fs::write(&output_path, text)
@@ -503,45 +535,9 @@ pub async fn generate_document_from_template(
 }
 
 #[tauri::command]
-pub fn list_case_templates(app: AppHandle) -> Result<Vec<store::CaseTemplateRow>, String> {
-    let conn = store::open_db(&app)?;
-    store::list_case_templates(&conn).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn create_case_template(
-    app: AppHandle,
-    name: String,
-    fields: Vec<String>,
-    doc_template_ids: Vec<i64>,
-) -> Result<i64, String> {
-    let conn = store::open_db(&app)?;
-    store::create_case_template(&conn, &name, &fields, &doc_template_ids).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn update_case_template(
-    app: AppHandle,
-    id: i64,
-    name: String,
-    fields: Vec<String>,
-    doc_template_ids: Vec<i64>,
-) -> Result<(), String> {
-    let conn = store::open_db(&app)?;
-    store::update_case_template(&conn, id, &name, &fields, &doc_template_ids).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn delete_case_template(app: AppHandle, id: i64) -> Result<(), String> {
-    let conn = store::open_db(&app)?;
-    store::delete_case_template(&conn, id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub fn open_template_file(path: String) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
-        // Check if running in WSL
         let is_wsl = std::path::Path::new("/proc/sys/fs/binfmt_misc/WSLInterop").exists()
             || std::env::var("WSL_DISTRO_NAME").is_ok();
 
@@ -625,4 +621,3 @@ pub fn delete_template(app: AppHandle, id: i64) -> Result<(), String> {
 
     Ok(())
 }
-

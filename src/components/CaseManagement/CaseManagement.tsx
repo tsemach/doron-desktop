@@ -2,21 +2,18 @@ import CaseManagementSidebar from "./CasesManagementSidebar";
 import { Route, Routes, useNavigate } from "react-router-dom";
 import CaseManagementOpenCases from "./CaseManagementOpenCases";
 import CasesManagementTemplate from "./CasesManagementTemplate/CasesManagementTemplate";
+import CaseCreate from "./CaseCreate";
 
 export default function CaseManagement() {
   const navigate = useNavigate();
 
-  function handleTemplate() {
-    navigate("templates");
-  }
-
   return (
     <div className="flex h-screen">
-      <CaseManagementSidebar handleTemplate={handleTemplate} />
+      <CaseManagementSidebar />
       <Routes>
         <Route path="/" element={<CaseManagementOpenCases />} />
         <Route path="templates" element={<CasesManagementTemplate />} />
-
+        <Route path="new-case" element={<CaseCreate />} />
       </Routes>
       {/* Main content */}
       {/* <main className="flex-1 overflow-auto p-6">      

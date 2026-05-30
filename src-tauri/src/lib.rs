@@ -6,7 +6,9 @@ pub mod store;
 pub mod extractor;
 pub mod llm;
 pub mod indexer;
-pub mod template;
+pub mod doc_template;
+pub mod case_template;
+pub mod case;
 pub mod query;
 pub mod embeddings;
 
@@ -15,34 +17,7 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Case {
-    pub id: i64,
-    pub subject: Option<String>,
-    pub status: String,
-    pub name: String,
-    pub created_at: String,
-    pub updated_at: Option<String>,
-}
 
-
-
-#[tauri::command]
-fn add_case(
-    app: AppHandle,
-    subject: String,
-    status: String,
-    name: String,
-    created_at: String,
-) -> Result<Case, String> {
-    let conn = store::open_db(&app)?;
-    conn.execute(
-        "INSERT INTO cases (subject, status, name, created_at) VALUES (?1, ?2, ?3, ?4)",
-        params![subject, status, name, created_at],
-    ).map_err(|e| format!("[insert case] {e}"))?;
-    let id = conn.last_insert_rowid();
-    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None })
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -64,20 +39,26 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             store::get_db_path,
-            add_case,
             indexer::index_folder,
             indexer::index_file,
-            template::process_template,
-            template::list_templates,
-            template::sync_template_fields,
             query::search_documents,
-            template::generate_document_from_template,
-            template::list_case_templates,
-            template::create_case_template,
-            template::update_case_template,
-            template::delete_case_template,
-            template::delete_template,
-            template::open_template_file
+            // doc_template
+            doc_template::process_template,
+            doc_template::list_templates,
+            doc_template::sync_template_fields,
+            doc_template::generate_document_from_template,
+            doc_template::delete_template,
+            doc_template::open_template_file,
+            // case_template
+            case_template::list_case_templates,
+            case_template::create_case_template,
+            case_template::update_case_template,
+            case_template::delete_case_template,
+            // case
+            case::list_cases,
+            case::add_case,
+            case::create_new_case,
+            case::delete_case
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
