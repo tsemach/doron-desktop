@@ -5,6 +5,8 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import DocumentAnnotationsModal from "./DocumentAnnotationsModal";
 import AddDocumentModal from "./AddDocumentModal";
+import CaseFieldsModal from "./CaseFieldsModal";
+
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -80,6 +82,8 @@ export default function CaseManagementOpenCases() {
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [editingDoc, setEditingDoc] = useState<CaseFile | null>(null);
   const [showAddDocModal, setShowAddDocModal] = useState(false);
+  const [showFieldsModal, setShowFieldsModal] = useState(false);
+
 
   // General loading/error
   const [error, setError] = useState<string | null>(null);
@@ -542,27 +546,54 @@ export default function CaseManagementOpenCases() {
                     <h3 className="text-lg font-bold text-foreground leading-snug">{selectedCase.subject || "No Subject"}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">Customer: {selectedCase.name}</p>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => setShowAddDocModal(true)}
-                    className="shrink-0 text-xs px-3 h-8 gap-1.5"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFieldsModal(true)}
+                      className="text-xs px-3 h-8 gap-1.5 border-border hover:bg-muted"
                     >
-                      <path d="M5 12h14" />
-                      <path d="M12 5v14" />
-                    </svg>
-                    Add Document
-                  </Button>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                        <path d="M7 8h10" />
+                        <path d="M7 12h10" />
+                        <path d="M7 16h10" />
+                      </svg>
+                      Case Fields
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowAddDocModal(true)}
+                      className="text-xs px-3 h-8 gap-1.5"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M5 12h14" />
+                        <path d="M12 5v14" />
+                      </svg>
+                      Add Document
+                    </Button>
+                  </div>
+
                 </div>
 
                 {/* Case File Search Bar */}
@@ -800,6 +831,15 @@ export default function CaseManagementOpenCases() {
           onCancel={() => setShowAddDocModal(false)}
         />
       )}
+
+      {showFieldsModal && selectedCase && (
+        <CaseFieldsModal
+          caseId={Number(selectedCase.id)}
+          caseName={selectedCase.name}
+          onClose={() => setShowFieldsModal(false)}
+        />
+      )}
+
     </main>
   );
 }
