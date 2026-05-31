@@ -204,7 +204,18 @@ fn replace_para_runs(para_xml: &str, marked_text: &str) -> String {
 }
 
 pub fn replace_docx_placeholders(xml: &str, field_values: &std::collections::HashMap<String, String>) -> String {
-    let paras = collect_paragraphs(xml);
+    let mut result = xml.to_string();
+
+    // 1. Perform global string replacement for placeholders that are not split
+    // (e.g. inside form field attributes like w:default, or single XML text runs)
+    for (key, val) in field_values {
+        let placeholder = format!("[[{}]]", key);
+        let escaped_val = xml_escape(val);
+        result = result.replace(&placeholder, &escaped_val);
+    }
+
+    // 2. Perform run-based reconstruction for placeholders split across runs
+    let paras = collect_paragraphs(&result);
     let mut replacements: Vec<(usize, usize, String)> = Vec::new();
 
     for (start, end, text) in paras {
@@ -221,7 +232,7 @@ pub fn replace_docx_placeholders(xml: &str, field_values: &std::collections::Has
         }
 
         if changed {
-            let para_xml = &xml[start..end];
+            let para_xml = &result[start..end];
             if !has_drawing(para_xml) {
                 let replaced = replace_para_runs(para_xml, &new_text);
                 replacements.push((start, end, replaced));
@@ -229,12 +240,57 @@ pub fn replace_docx_placeholders(xml: &str, field_values: &std::collections::Has
         }
     }
 
-    let mut result = xml.to_string();
     for (start, end, new_para) in replacements.iter().rev() {
         result.replace_range(start..end, new_para);
     }
-    result
+    
+    strip_docx_form_fields(&result)
 }
+
+fn strip_docx_form_fields(xml: &str) -> String {
+    // 1. Remove bookmark tags
+    let mut result = xml.to_string();
+    if let Ok(re_start) = Regex::new(r"<w:bookmarkStart[^>]*/>") {
+        result = re_start.replace_all(&result, "").to_string();
+    }
+    if let Ok(re_end) = Regex::new(r"<w:bookmarkEnd[^>]*/>") {
+        result = re_end.replace_all(&result, "").to_string();
+    }
+
+    // 2. Remove form field runs
+    let mut final_xml = String::new();
+    let mut last_idx = 0;
+    
+    while let Some(start_idx) = find_run_open(&result[last_idx..]) {
+        let abs_start = last_idx + start_idx;
+        final_xml.push_str(&result[last_idx..abs_start]);
+        
+        if let Some(end_offset) = result[abs_start..].find("</w:r>") {
+            let abs_end = abs_start + end_offset + "</w:r>".len();
+            let run_xml = &result[abs_start..abs_end];
+            
+            let should_strip = run_xml.contains("w:fldCharType=\"begin\"")
+                || run_xml.contains("<w:instrText")
+                || run_xml.contains("w:fldCharType=\"separate\"")
+                || run_xml.contains("w:fldCharType=\"end\"");
+                
+            if !should_strip {
+                final_xml.push_str(run_xml);
+            }
+            last_idx = abs_end;
+        } else {
+            final_xml.push_str(&result[abs_start..]);
+            last_idx = result.len();
+            break;
+        }
+    }
+    if last_idx < result.len() {
+        final_xml.push_str(&result[last_idx..]);
+    }
+    
+    final_xml
+}
+
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
 

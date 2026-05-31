@@ -95,6 +95,14 @@ pub async fn create_new_case(
     ).map_err(|e| format!("[insert case] {e}"))?;
     let id = conn.last_insert_rowid();
 
+    // Save fields to case_fields
+    for (key, val) in &field_values {
+        conn.execute(
+            "INSERT OR REPLACE INTO case_fields (case_id, field_name, field_value) VALUES (?1, ?2, ?3)",
+            params![id, key, val],
+        ).map_err(|e| format!("[insert case field] {e}"))?;
+    }
+
     // 3. If a template is chosen, copy then fill documents
     if let Some(ct_id) = case_template_id {
         // Find document template IDs associated with the case template
@@ -451,3 +459,78 @@ pub fn list_all_annotation_tags(app: AppHandle) -> Result<Vec<String>, String> {
     sorted_tags.sort();
     Ok(sorted_tags)
 }
+
+#[tauri::command]
+pub fn add_file_to_case(
+    _app: AppHandle,
+    case_folder: String,
+    source_path: String,
+) -> Result<String, String> {
+    let src = Path::new(&source_path);
+    if !src.exists() {
+        return Err("Source file does not exist".to_string());
+    }
+    if !src.is_file() {
+        return Err("Source path is not a file".to_string());
+    }
+
+    let dest_dir = Path::new(&case_folder);
+    if !dest_dir.exists() {
+        return Err("Case directory does not exist".to_string());
+    }
+
+    let file_name = src.file_name()
+        .ok_or_else(|| "Invalid source file name".to_string())?;
+    
+    let dest_path = dest_dir.join(file_name);
+    
+    // Copy the file to the case folder
+    std::fs::copy(src, &dest_path)
+        .map_err(|e| format!("Failed to copy file to case directory: {e}"))?;
+
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn get_case_fields(
+    app: AppHandle,
+    case_id: i64,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    let conn = store::open_db(&app)?;
+    let mut stmt = conn
+        .prepare("SELECT field_name, field_value FROM case_fields WHERE case_id = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![case_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut fields = std::collections::HashMap::new();
+    for r in rows {
+        if let Ok((name, val)) = r {
+            fields.insert(name, val);
+        }
+    }
+    println!("get_case_fields for case_id {}: {:?}", case_id, fields);
+    Ok(fields)
+}
+
+#[tauri::command]
+pub fn save_case_fields(
+    app: AppHandle,
+    case_id: i64,
+    fields: std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    println!("save_case_fields for case_id {}: {:?}", case_id, fields);
+    let conn = store::open_db(&app)?;
+    for (key, val) in fields {
+        conn.execute(
+            "INSERT OR REPLACE INTO case_fields (case_id, field_name, field_value) VALUES (?1, ?2, ?3)",
+            params![case_id, key, val],
+        ).map_err(|e| format!("[save_case_fields] {e}"))?;
+    }
+    Ok(())
+}
+

@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import DocumentAnnotationsModal from "./DocumentAnnotationsModal";
+import AddDocumentModal from "./AddDocumentModal";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -78,6 +79,7 @@ export default function CaseManagementOpenCases() {
   const [docsError, setDocsError] = useState<string | null>(null);
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [editingDoc, setEditingDoc] = useState<CaseFile | null>(null);
+  const [showAddDocModal, setShowAddDocModal] = useState(false);
 
   // General loading/error
   const [error, setError] = useState<string | null>(null);
@@ -535,9 +537,32 @@ export default function CaseManagementOpenCases() {
             ) : (
               <div className="p-4 space-y-4">
                 {/* Active Case Details Header */}
-                <div className="pb-2 border-b border-border/60">
-                  <h3 className="text-lg font-bold text-foreground leading-snug">{selectedCase.subject || "No Subject"}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Customer: {selectedCase.name}</p>
+                <div className="pb-2 border-b border-border/60 flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground leading-snug">{selectedCase.subject || "No Subject"}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Customer: {selectedCase.name}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddDocModal(true)}
+                    className="shrink-0 text-xs px-3 h-8 gap-1.5"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="M12 5v14" />
+                    </svg>
+                    Add Document
+                  </Button>
                 </div>
 
                 {/* Case File Search Bar */}
@@ -759,6 +784,20 @@ export default function CaseManagementOpenCases() {
             );
             setEditingDoc(null);
           }}
+        />
+      )}
+
+      {showAddDocModal && selectedCase?.folder && (
+        <AddDocumentModal
+          caseId={Number(selectedCase.id)}
+          caseFolder={selectedCase.folder}
+          onSave={() => {
+            setShowAddDocModal(false);
+            if (selectedCase.folder) {
+              loadDocuments(selectedCase.folder);
+            }
+          }}
+          onCancel={() => setShowAddDocModal(false)}
         />
       )}
     </main>

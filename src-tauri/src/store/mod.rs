@@ -96,6 +96,16 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
         );
     ").map_err(|e| format!("[annotations schema] {e}"))?;
 
+    conn.execute_batch("
+        CREATE TABLE IF NOT EXISTS case_fields (
+            case_id      INTEGER NOT NULL,
+            field_name   TEXT NOT NULL,
+            field_value  TEXT NOT NULL,
+            PRIMARY KEY (case_id, field_name),
+            FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+        );
+    ").map_err(|e| format!("[case_fields schema] {e}"))?;
+
     Ok(conn)
 }
 
