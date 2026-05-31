@@ -256,6 +256,13 @@ fn strip_docx_form_fields(xml: &str) -> String {
     if let Ok(re_end) = Regex::new(r"<w:bookmarkEnd[^>]*/>") {
         result = re_end.replace_all(&result, "").to_string();
     }
+    if let Ok(re_perm_start) = Regex::new(r"<w:permStart[^>]*/>") {
+        result = re_perm_start.replace_all(&result, "").to_string();
+    }
+    if let Ok(re_perm_end) = Regex::new(r"<w:permEnd[^>]*/>") {
+        result = re_perm_end.replace_all(&result, "").to_string();
+    }
+
 
     // 2. Remove form field runs
     let mut final_xml = String::new();
