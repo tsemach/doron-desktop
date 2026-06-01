@@ -7,7 +7,7 @@ interface DeleteWarningModalProps {
   onCancel: () => void;
 }
 
-export default function DeleteWarningModal({
+export default function CaseTemplateDeleteWarningModal({
   templateName,
   onConfirm,
   onCancel,
@@ -37,7 +37,7 @@ export default function DeleteWarningModal({
           <div className="space-y-1.5">
             <h3 className="text-lg font-bold text-foreground">Delete Case Template?</h3>
             <p className="text-sm text-muted-foreground leading-normal">
-              Are you sure you want to delete the case template <strong className="text-foreground">"{templateName}"</strong>? 
+              Are you sure you want to delete the case template <strong className="text-foreground">"{templateName}"</strong>?
               This will permanently delete this template configuration and cannot be undone.
             </p>
           </div>

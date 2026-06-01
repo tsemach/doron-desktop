@@ -1,7 +1,7 @@
 import { Button } from "../../ui/button";
 import { CaseTemplate } from "./types";
 
-interface TemplateListProps {
+interface CaseTemplateListProps {
   caseTemplates: CaseTemplate[];
   selectedTemplateId: number | null;
   isCreating: boolean;
@@ -10,14 +10,14 @@ interface TemplateListProps {
   width?: number;
 }
 
-export default function TemplateList({
+export default function CaseTemplateList({
   caseTemplates,
   selectedTemplateId,
   isCreating,
   onSelectTemplate,
   onStartCreate,
   width,
-}: TemplateListProps) {
+}: CaseTemplateListProps) {
   function formatDate(iso: string): string {
     try {
       return new Date(iso).toLocaleDateString(undefined, {
@@ -31,7 +31,7 @@ export default function TemplateList({
   }
 
   return (
-    <aside 
+    <aside
       style={width ? { width } : undefined}
       className={`${width ? "" : "w-1/3"} flex flex-col bg-muted/10 shrink-0 overflow-y-auto`}
     >
@@ -56,17 +56,16 @@ export default function TemplateList({
             let fieldCount = 0;
             try {
               fieldCount = JSON.parse(ct.fields).length;
-            } catch {}
+            } catch { }
 
             return (
               <div
                 key={ct.id}
                 onClick={() => onSelectTemplate(ct.id)}
-                className={`p-4 cursor-pointer hover:bg-muted/40 transition-all border-l-4 ${
-                  isSelected
+                className={`p-4 cursor-pointer hover:bg-muted/40 transition-all border-l-4 ${isSelected
                     ? "bg-accent/40 border-primary border-b"
                     : "border-transparent bg-transparent"
-                }`}
+                  }`}
               >
                 <h4 className="font-semibold text-sm text-foreground truncate" title={ct.name}>
                   {ct.name}

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DocTemplate, CaseTemplate } from "./types";
-import TemplateList from "./TemplateList";
-import TemplateCreateForm from "./TemplateCreateForm";
-import TemplateDetailView from "./TemplateDetailView";
-import TemplateEmptyState from "./TemplateEmptyState";
+import CaseTemplateList from "./CaseTemplateList";
+import CaseTemplateCreateForm from "./CaseTemplateCreateForm";
+import CaseTemplateDetailsView from "./CaseTemplateDetailsView";
+import CaseTemplateEmptyState from "./CaseTemplateEmptyState";
 
 export default function CasesManagementTemplate() {
   const [caseTemplates, setCaseTemplates] = useState<CaseTemplate[]>([]);
@@ -81,7 +81,7 @@ export default function CasesManagementTemplate() {
     let fieldsArr: string[] = [];
     try {
       fieldsArr = JSON.parse(template.fields);
-    } catch {}
+    } catch { }
 
     const docFields = new Set<string>();
     template.doc_template_ids.forEach(docId => {
@@ -92,7 +92,7 @@ export default function CasesManagementTemplate() {
           if (Array.isArray(fs)) {
             fs.forEach(f => docFields.add(f));
           }
-        } catch {}
+        } catch { }
       }
     });
 
@@ -265,9 +265,9 @@ export default function CasesManagementTemplate() {
       ) : (
         /* Split-pane Workspace */
         <div ref={containerRef} className="flex-1 flex overflow-hidden">
-          
+
           {/* Left Column: Templates List */}
-          <TemplateList
+          <CaseTemplateList
             caseTemplates={caseTemplates}
             selectedTemplateId={selectedTemplateId}
             isCreating={isCreating}
@@ -282,9 +282,8 @@ export default function CasesManagementTemplate() {
           {/* Draggable Resizable Divider */}
           <div
             onMouseDown={startResizing}
-            className={`w-[1px] bg-border shrink-0 h-full relative cursor-col-resize select-none group transition-colors duration-150 ${
-              isResizing ? "bg-primary" : "hover:bg-primary"
-            }`}
+            className={`w-[1px] bg-border shrink-0 h-full relative cursor-col-resize select-none group transition-colors duration-150 ${isResizing ? "bg-primary" : "hover:bg-primary"
+              }`}
           >
             <div className="absolute top-0 bottom-0 -left-1.5 -right-1.5 cursor-col-resize z-10" />
           </div>
@@ -292,13 +291,13 @@ export default function CasesManagementTemplate() {
           {/* Right Column: Detailed View / Forms */}
           <section className="flex-1 flex flex-col overflow-y-auto bg-background p-6">
             {isCreating ? (
-              <TemplateCreateForm
+              <CaseTemplateCreateForm
                 docTemplates={docTemplates}
                 onSave={handleCreateTemplate}
                 onCancel={() => setIsCreating(false)}
               />
             ) : activeTemplate ? (
-              <TemplateDetailView
+              <CaseTemplateDetailsView
                 activeTemplate={activeTemplate}
                 docTemplates={docTemplates}
                 onDelete={handleDeleteTemplate}
@@ -310,7 +309,7 @@ export default function CasesManagementTemplate() {
                 onSyncAllFields={handleSyncAllFields}
               />
             ) : (
-              <TemplateEmptyState />
+              <CaseTemplateEmptyState />
             )}
           </section>
 

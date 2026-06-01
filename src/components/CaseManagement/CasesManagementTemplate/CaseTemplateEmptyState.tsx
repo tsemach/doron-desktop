@@ -1,4 +1,4 @@
-export default function TemplateEmptyState() {
+export default function CaseTemplateEmptyState() {
   return (
     <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground space-y-4 py-20">
       <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground">

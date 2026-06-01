@@ -534,3 +534,100 @@ pub fn save_case_fields(
     Ok(())
 }
 
+#[tauri::command]
+pub fn remove_file_from_case(
+    app: AppHandle,
+    case_id: i64,
+    file_name: String,
+) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+
+    // 1. Get folder path for the case
+    let folder_path: String = conn.query_row(
+        "SELECT folder FROM cases WHERE id = ?1",
+        params![case_id],
+        |row| row.get(0)
+    ).map_err(|e| format!("Failed to find case: {e}"))?;
+
+    let file_path = Path::new(&folder_path).join(&file_name);
+    let file_path_str = file_path.to_string_lossy().to_string();
+    let normalized_file_path = file_path_str.replace('\\', "/");
+
+    // 2. Query fields defined in the template matching the file name being deleted
+    let deleted_fields: Vec<String> = match conn.query_row(
+        "SELECT fields_found FROM doc_templates WHERE file_name = ?1",
+        params![file_name],
+        |row| row.get::<_, String>(0)
+    ) {
+        Ok(fields_json) => {
+            serde_json::from_str(&fields_json).unwrap_or_default()
+        }
+        Err(_) => Vec::new(),
+    };
+
+    // 3. Physically delete the file from disk if it exists
+    if file_path.exists() {
+        std::fs::remove_file(&file_path)
+            .map_err(|e| format!("Failed to delete file from disk: {e}"))?;
+    }
+
+    // 4. Delete document-specific DB entries (annotations and FTS/metadata index)
+    let _ = conn.execute(
+        "DELETE FROM document_annotations WHERE file_path = ?1 OR REPLACE(file_path, '\\', '/') = ?2",
+        params![file_path_str, normalized_file_path],
+    );
+
+    let _ = conn.execute(
+        "DELETE FROM documents WHERE file_path = ?1 OR REPLACE(file_path, '\\', '/') = ?2",
+        params![file_path_str, normalized_file_path],
+    );
+
+    // 5. Clean up case fields that are no longer used by any other document in the case folder
+    if !deleted_fields.is_empty() {
+        let mut remaining_fields = std::collections::HashSet::new();
+        if let Ok(entries) = std::fs::read_dir(&folder_path) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let p = entry.path();
+                    if p.is_file() {
+                        let name = p.file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("");
+                        
+                        // Skip hidden and Word temp files
+                        if name.starts_with('.') || name.starts_with("~$") {
+                            continue;
+                        }
+
+                        // Get fields found for this remaining template
+                        if let Ok(fields_json) = conn.query_row(
+                            "SELECT fields_found FROM doc_templates WHERE file_name = ?1",
+                            params![name],
+                            |row| row.get::<_, String>(0)
+                        ) {
+                            if let Ok(fields) = serde_json::from_str::<Vec<String>>(&fields_json) {
+                                for field in fields {
+                                    remaining_fields.insert(field);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Delete from case_fields where case_id = case_id AND field_name NOT IN remaining_fields
+        for field in deleted_fields {
+            if !remaining_fields.contains(&field) {
+                let _ = conn.execute(
+                    "DELETE FROM case_fields WHERE case_id = ?1 AND field_name = ?2",
+                    params![case_id, field],
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+

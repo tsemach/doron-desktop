@@ -65,7 +65,8 @@ pub fn run() {
             case::list_all_annotation_tags,
             case::add_file_to_case,
             case::get_case_fields,
-            case::save_case_fields
+            case::save_case_fields,
+            case::remove_file_from_case
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

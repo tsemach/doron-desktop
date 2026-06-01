@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CaseTemplate, DocTemplate } from "./types";
-import DeleteWarningModal from "./DeleteWarningModal";
+import CaseTemplateDeleteWarningModal from "./CaseTemplateDeleteWarningModal";
 
-interface TemplateDetailViewProps {
+interface CaseTemplateDetailsViewProps {
   activeTemplate: CaseTemplate;
   docTemplates: DocTemplate[];
   onDelete: () => Promise<void>;
@@ -15,7 +15,7 @@ interface TemplateDetailViewProps {
   onSyncAllFields: () => Promise<void>;
 }
 
-export default function TemplateDetailView({
+export default function CaseTemplateDetailsView({
   activeTemplate,
   docTemplates,
   onDelete,
@@ -25,7 +25,7 @@ export default function TemplateDetailView({
   onAddField,
   onRemoveField,
   onSyncAllFields,
-}: TemplateDetailViewProps) {
+}: CaseTemplateDetailsViewProps) {
   // Inline editing state
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState("");
@@ -35,7 +35,7 @@ export default function TemplateDetailView({
   const [newFieldInlineValue, setNewFieldInlineValue] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [syncingAll, setSyncingAll] = useState(false);
-  
+
   // State for filtering fields by selected document
   const [selectedDocIdForFields, setSelectedDocIdForFields] = useState<number | null>(null);
 
@@ -134,7 +134,7 @@ export default function TemplateDetailView({
   let totalStoredFields: string[] = [];
   try {
     totalStoredFields = JSON.parse(activeTemplate.fields) as string[];
-  } catch {}
+  } catch { }
 
   const manualFields = totalStoredFields.filter((f) => !autoFields.includes(f));
   const allCurrentFields = Array.from(new Set([...manualFields, ...autoFields]));
@@ -168,7 +168,7 @@ export default function TemplateDetailView({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      
+
       {/* Title & Delete Header */}
       <div className="flex items-start justify-between border-b border-border pb-4">
         <div>
@@ -219,27 +219,27 @@ export default function TemplateDetailView({
           </button>
         </div>
       </div>
- 
+
       {/* Main Details Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
+
         {/* Associated Documents Column */}
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b pb-1 relative">
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Document Templates ({activeTemplate.doc_template_ids.length})
             </h4>
- 
+
             {/* Floating popover to add unassociated documents */}
             {showAddDocDropdown && (
               <div className="absolute right-0 top-6 z-20 w-[500px] bg-card border border-border rounded-lg shadow-xl p-3.5 space-y-3 animate-in fade-in slide-in-from-top-1 duration-150">
                 <div className="flex items-center justify-between border-b pb-1.5">
                   <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Document Template</span>
-                  <button 
+                  <button
                     onClick={() => {
                       setShowAddDocDropdown(false);
                       setDocFilterText("");
-                    }} 
+                    }}
                     className="text-muted-foreground hover:text-foreground font-semibold"
                   >
                     ✕
@@ -249,7 +249,7 @@ export default function TemplateDetailView({
                   <div className="text-xs text-muted-foreground italic p-2 text-center">All templates already added.</div>
                 ) : (
                   <>
-                    <input 
+                    <input
                       type="text"
                       placeholder="Search by filename or title..."
                       value={docFilterText}
@@ -285,7 +285,7 @@ export default function TemplateDetailView({
                 )}
               </div>
             )}
- 
+
             {!showAddDocDropdown && (
               <button
                 onClick={() => setShowAddDocDropdown(true)}
@@ -299,7 +299,7 @@ export default function TemplateDetailView({
               </button>
             )}
           </div>
- 
+
           {activeTemplate.doc_template_ids.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No document templates associated with this case template.</p>
           ) : (
@@ -315,11 +315,10 @@ export default function TemplateDetailView({
                   <div
                     key={id}
                     onClick={() => setSelectedDocIdForFields(isSelected ? null : id)}
-                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors ${
-                      isSelected
-                        ? "border-primary bg-primary/5 hover:bg-primary/10"
-                        : "border-border bg-muted/20 hover:bg-muted/30"
-                    }`}
+                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors ${isSelected
+                      ? "border-primary bg-primary/5 hover:bg-primary/10"
+                      : "border-border bg-muted/20 hover:bg-muted/30"
+                      }`}
                   >
                     <div className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-foreground truncate" title={primaryText || ""}>
@@ -476,15 +475,14 @@ export default function TemplateDetailView({
                 {filteredFields.map((field) => {
                   const isAuto = autoFields.includes(field);
                   const docsWithField = fieldToDocsMap[field] || [];
-                  
+
                   return (
                     <span
                       key={field}
-                      className={`text-xs font-mono pl-2.5 pr-1.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${
-                        isAuto
-                          ? "bg-muted/80 text-muted-foreground border-border/80"
-                          : "bg-secondary text-secondary-foreground border-border"
-                      }`}
+                      className={`text-xs font-mono pl-2.5 pr-1.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${isAuto
+                        ? "bg-muted/80 text-muted-foreground border-border/80"
+                        : "bg-secondary text-secondary-foreground border-border"
+                        }`}
                       title={
                         isAuto
                           ? `Required by: ${docsWithField.map((d) => d.file_name).join(", ")}`
@@ -530,7 +528,7 @@ export default function TemplateDetailView({
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <DeleteWarningModal
+        <CaseTemplateDeleteWarningModal
           templateName={activeTemplate.name}
           onConfirm={onDelete}
           onCancel={() => setShowDeleteConfirm(false)}

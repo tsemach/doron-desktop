@@ -10,7 +10,7 @@ interface CaseTemplate {
   fields: string; // JSON string representing string[]
 }
 
-export default function CaseCreate() {
+export default function CaseManagementCaseCreate() {
   const navigate = useNavigate();
   const [subject, setSubject] = useState("");
   const [name, setName] = useState("");
@@ -50,7 +50,7 @@ export default function CaseCreate() {
   // Verify if case storage folder is already in use by another case
   useEffect(() => {
     if (!folder.trim()) {
-      setError((prev) => 
+      setError((prev) =>
         prev === "A case with this storage directory path already exists." ? null : prev
       );
       return;
@@ -62,7 +62,7 @@ export default function CaseCreate() {
         if (inUse) {
           setError("A case with this storage directory path already exists.");
         } else {
-          setError((prev) => 
+          setError((prev) =>
             prev === "A case with this storage directory path already exists." ? null : prev
           );
         }
@@ -163,7 +163,7 @@ export default function CaseCreate() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className={`grid grid-cols-1 ${hasFields ? "lg:grid-cols-11" : ""} gap-4 items-stretch`}>
-            
+
             {/* Left Column: Main Case Details */}
             <div className={`rounded-lg border border-border bg-card p-4 space-y-3 ${hasFields ? "lg:col-span-5" : ""}`}>
               {/* Subject */}

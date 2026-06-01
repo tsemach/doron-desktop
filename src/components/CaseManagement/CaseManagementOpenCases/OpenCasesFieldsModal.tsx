@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button } from "../ui/button";
+import { Button } from "../../ui/button";
 
 interface CaseFieldsModalProps {
   caseId: number;
@@ -8,7 +8,7 @@ interface CaseFieldsModalProps {
   onClose: () => void;
 }
 
-export default function CaseFieldsModal({
+export default function OpenCasesFieldsModal({
   caseId,
   caseName,
   onClose,
@@ -40,7 +40,7 @@ export default function CaseFieldsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div 
+      <div
         className="bg-card border border-border rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden relative"
         style={{
           width: "550px",

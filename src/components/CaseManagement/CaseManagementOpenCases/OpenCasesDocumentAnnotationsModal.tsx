@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button } from "../ui/button";
+import { Button } from "../../ui/button";
 
-interface DocumentAnnotationsModalProps {
+interface OpenCasesDocumentAnnotationsModalProps {
   fileName: string;
   filePath: string;
   initialNotes?: string;
@@ -12,7 +12,7 @@ interface DocumentAnnotationsModalProps {
   onDelete: () => void;
 }
 
-export default function DocumentAnnotationsModal({
+export default function OpenCasesDocumentAnnotationsModal({
   fileName,
   filePath,
   initialNotes = "",
@@ -20,7 +20,7 @@ export default function DocumentAnnotationsModal({
   onSave,
   onCancel,
   onDelete,
-}: DocumentAnnotationsModalProps) {
+}: OpenCasesDocumentAnnotationsModalProps) {
   const [notes, setNotes] = useState(initialNotes);
   const [tags, setTags] = useState<string[]>(initialTags);
   const [newTag, setNewTag] = useState("");
@@ -103,7 +103,7 @@ export default function DocumentAnnotationsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       {/* Resizable Modal Container */}
-      <div 
+      <div
         className="bg-card border border-border rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 resize overflow-hidden relative"
         style={{
           width: "1000px",
@@ -134,7 +134,7 @@ export default function DocumentAnnotationsModal({
                 <span>Tags</span>
                 <span className="text-[10px] text-muted-foreground">Press Enter or comma to add</span>
               </label>
-              
+
               {/* Render current tags */}
               <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border border-input rounded-lg bg-background/50 focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all">
                 {tags.map((tag) => (

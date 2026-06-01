@@ -8,7 +8,7 @@ interface TemplateCreateFormProps {
   onCancel: () => void;
 }
 
-export default function TemplateCreateForm({
+export default function CaseTemplateCreateForm({
   docTemplates,
   onSave,
   onCancel,
@@ -139,7 +139,7 @@ export default function TemplateCreateForm({
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
             Include Document Templates
           </label>
-          
+
           {docTemplates.length === 0 ? (
             <div className="rounded-md border border-dashed border-input p-6 text-center text-xs text-muted-foreground">
               No document templates found. Go to <strong>Documents Management &rarr; Templates</strong> to upload doc templates first.
@@ -151,9 +151,8 @@ export default function TemplateCreateForm({
                 return (
                   <label
                     key={doc.id}
-                    className={`flex items-start gap-2.5 p-2 rounded-md border cursor-pointer hover:bg-muted/40 transition-all ${
-                      isChecked ? "bg-primary/5 border-primary/30" : "border-border bg-card"
-                    }`}
+                    className={`flex items-start gap-2.5 p-2 rounded-md border cursor-pointer hover:bg-muted/40 transition-all ${isChecked ? "bg-primary/5 border-primary/30" : "border-border bg-card"
+                      }`}
                   >
                     <input
                       type="checkbox"
