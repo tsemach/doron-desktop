@@ -142,47 +142,10 @@ export default function DocsManagementTemplatesEmptyState({
     );
   }
 
-  // Split-screen Layout
+  // Full-width Layout
   return (
-    <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 h-full overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-border bg-background">
-      
-      {/* Left Column: No Template Selected Hero (occupies 2/5 columns) */}
-      <div className="lg:col-span-2 flex flex-col items-center justify-center p-8 text-center bg-muted/5 h-full space-y-4 select-none">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="9" y1="15" x2="15" y2="15" />
-            <line x1="9" y1="11" x2="15" y2="11" />
-          </svg>
-        </div>
-        <div className="space-y-1.5 max-w-xs mx-auto">
-          <h3 className="text-sm font-bold text-foreground">No Document Template Selected</h3>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Choose a template from the list on the left to fill placeholders and auto-generate new
-            filled copies, or upload a new template to get started.
-          </p>
-        </div>
-        <div>
-          <Button size="sm" onClick={onAddTemplate} disabled={isProcessing} className="shadow-sm cursor-pointer">
-            Upload New Template
-          </Button>
-        </div>
-      </div>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
 
-      {/* Right Column: Available Fields Dictionary (occupies 3/5 columns) */}
-      <div className="lg:col-span-3 flex flex-col h-full overflow-hidden bg-background">
-        
         {/* Header containing title, tabs & search */}
         <div className="p-4 border-b border-border/60 bg-muted/5 flex flex-col gap-4 shrink-0">
           <div className="flex items-center gap-2">
@@ -212,21 +175,19 @@ export default function DocsManagementTemplatesEmptyState({
             <div className="inline-flex rounded-lg bg-muted p-1 text-muted-foreground text-[11px] self-start select-none">
               <button
                 onClick={() => setActiveTab("unique")}
-                className={`px-3 py-1.2 rounded-md font-medium transition-all cursor-pointer ${
-                  activeTab === "unique"
+                className={`px-3 py-1.2 rounded-md font-medium transition-all cursor-pointer ${activeTab === "unique"
                     ? "bg-background text-foreground shadow-sm"
                     : "hover:text-foreground"
-                }`}
+                  }`}
               >
                 All Unique Fields ({filteredUniqueFields.length})
               </button>
               <button
                 onClick={() => setActiveTab("by_doc")}
-                className={`px-3 py-1.2 rounded-md font-medium transition-all cursor-pointer ${
-                  activeTab === "by_doc"
+                className={`px-3 py-1.2 rounded-md font-medium transition-all cursor-pointer ${activeTab === "by_doc"
                     ? "bg-background text-foreground shadow-sm"
                     : "hover:text-foreground"
-                }`}
+                  }`}
               >
                 By Document ({filteredDocFields.length})
               </button>
@@ -269,9 +230,9 @@ export default function DocsManagementTemplatesEmptyState({
         </div>
 
         {/* Scrollable Dictionary Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto pt-8 px-4 pb-4 space-y-4">
           {activeTab === "unique" ? (
-            
+
             /* 1. Flat unique fields tags grid */
             filteredUniqueFields.length === 0 ? (
               <p className="text-xs text-muted-foreground italic text-center py-6">No fields match your search.</p>
@@ -280,18 +241,17 @@ export default function DocsManagementTemplatesEmptyState({
                 {filteredUniqueFields.map((field) => {
                   const isCopied = copiedField === field;
                   const docCount = uniqueFieldsMap[field].count;
-                  const sourceDocs = uniqueFieldsMap[field].docNames.join(", ");
+                  const sourceDocs = uniqueFieldsMap[field].docNames.join("\n");
 
                   return (
                     <div
                       key={field}
                       onClick={() => handleCopyField(field)}
-                      className={`text-xs font-mono px-2.5 py-1.5 rounded-lg border cursor-pointer select-none relative group transition-all duration-150 flex items-center gap-2 ${
-                        isCopied
+                      className={`text-xs font-mono px-2.5 py-1.5 rounded-lg border cursor-pointer select-none relative group transition-all duration-150 flex items-center gap-2 ${isCopied
                           ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400 font-bold shadow-sm"
                           : "bg-muted/40 hover:bg-muted/95 border-border hover:border-primary/40 text-foreground hover:scale-102 hover:shadow-sm"
-                      }`}
-                      title={`Placeholder format: [[${field}]]\nUsed in ${docCount} template(s): ${sourceDocs}`}
+                        }`}
+                      title={`Placeholder format: [[${field}]]\nUsed in ${docCount} template(s):\n${sourceDocs}`}
                     >
                       {/* Copy success tooltip banner */}
                       {isCopied && (
@@ -305,11 +265,10 @@ export default function DocsManagementTemplatesEmptyState({
                       {/* Variable state icons */}
                       <div className="flex items-center gap-1.5">
                         {docCount > 1 && (
-                          <span className={`text-[9px] rounded-full px-1.5 py-0.2 border shrink-0 ${
-                            isCopied
+                          <span className={`text-[9px] rounded-full px-1.5 py-0.2 border shrink-0 ${isCopied
                               ? "bg-green-500/20 border-green-500/30 text-green-700 dark:text-green-300"
                               : "bg-primary/5 border-primary/20 text-primary font-semibold"
-                          }`}>
+                            }`}>
                             x{docCount}
                           </span>
                         )}
@@ -331,7 +290,7 @@ export default function DocsManagementTemplatesEmptyState({
               </div>
             )
           ) : (
-            
+
             /* 2. Grouped By Document Cards Grid */
             filteredDocFields.length === 0 ? (
               <p className="text-xs text-muted-foreground italic text-center py-6">No matching templates found.</p>
@@ -365,9 +324,8 @@ export default function DocsManagementTemplatesEmptyState({
                           {hasFields && (
                             <button
                               onClick={() => handleCopyAllFields(doc.id, doc.fields)}
-                              className={`text-[10px] font-medium shrink-0 flex items-center gap-1 hover:underline cursor-pointer transition-colors ${
-                                isDocCopied ? "text-green-600 dark:text-green-400 font-bold" : "text-primary"
-                              }`}
+                              className={`text-[10px] font-medium shrink-0 flex items-center gap-1 hover:underline cursor-pointer transition-colors ${isDocCopied ? "text-green-600 dark:text-green-400 font-bold" : "text-primary"
+                                }`}
                             >
                               {isDocCopied ? (
                                 <>
@@ -393,7 +351,7 @@ export default function DocsManagementTemplatesEmptyState({
                         {!hasFields ? (
                           <p className="text-[10px] text-muted-foreground italic">No placeholders found in document.</p>
                         ) : (
-                          <div className="flex flex-wrap gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                          <div className="flex flex-wrap gap-1.5 max-h-[140px] overflow-y-auto pt-7 px-1 pb-1">
                             {doc.fields.map((field) => {
                               const isFieldCopied = copiedField === `${doc.id}_${field}`;
 
@@ -409,15 +367,14 @@ export default function DocsManagementTemplatesEmptyState({
                                       setCopiedField(null);
                                     }, 1500);
                                   }}
-                                  className={`text-[10px] font-mono px-2 py-1 rounded border cursor-pointer select-none transition-all duration-150 flex items-center gap-1 group relative ${
-                                    isFieldCopied
+                                  className={`text-[10px] font-mono px-2 py-1 rounded border cursor-pointer select-none transition-all duration-150 flex items-center gap-1 group relative ${isFieldCopied
                                       ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400 font-bold"
                                       : "bg-muted/20 hover:bg-muted/70 border-border hover:border-primary/30 text-foreground"
-                                  }`}
+                                    }`}
                                   title={`Click to copy: [[${field}]]`}
                                 >
                                   {isFieldCopied && (
-                                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10">
+                                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10 animate-bounce">
                                       Copied!
                                     </span>
                                   )}
@@ -455,6 +412,5 @@ export default function DocsManagementTemplatesEmptyState({
         </div>
 
       </div>
-    </div>
   );
 }
