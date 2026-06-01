@@ -25,18 +25,29 @@ export default function DocsManagementTemplatesForm({
       {/* Header Details */}
       <div className="p-6 border-b border-border/60 bg-muted/10 shrink-0 flex items-center justify-between">
         <div className="space-y-1.5 min-w-0 flex-1 mr-4">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-foreground truncate">
-              {selectedTemplate.file_name}
-            </h3>
-            <span className="shrink-0 text-[10px] font-mono bg-muted border rounded-full px-2 py-0.5 text-muted-foreground uppercase">
-              {selectedTemplate.file_ext}
-            </span>
-          </div>
-          {selectedTemplate.title && (
-            <p className="text-xs text-muted-foreground italic truncate" title={selectedTemplate.title}>
-              Description: {selectedTemplate.title}
-            </p>
+          {selectedTemplate.title ? (
+            <>
+              <h3 className="text-sm font-bold text-foreground truncate" title={selectedTemplate.title}>
+                {selectedTemplate.title}
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground truncate font-mono">
+                  {selectedTemplate.file_name}
+                </span>
+                <span className="shrink-0 text-[10px] font-mono bg-muted border rounded-full px-2 py-0.5 text-muted-foreground uppercase">
+                  {selectedTemplate.file_ext}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground truncate">
+                {selectedTemplate.file_name}
+              </h3>
+              <span className="shrink-0 text-[10px] font-mono bg-muted border rounded-full px-2 py-0.5 text-muted-foreground uppercase">
+                {selectedTemplate.file_ext}
+              </span>
+            </div>
           )}
           <p className="text-[11px] text-muted-foreground truncate font-mono">
             Path: {selectedTemplate.original_path}
