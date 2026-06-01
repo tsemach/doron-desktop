@@ -9,12 +9,16 @@ interface DocsManagementTemplatesEmptyStateProps {
   onAddTemplate: () => void;
   isProcessing: boolean;
   templates: TemplateRow[];
+  onSyncAllFields?: () => void;
+  isSyncingAll?: boolean;
 }
 
 export default function DocsManagementTemplatesMain({
   onAddTemplate,
   isProcessing,
   templates,
+  onSyncAllFields,
+  isSyncingAll,
 }: DocsManagementTemplatesEmptyStateProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"unique" | "by_doc">("unique");
@@ -102,6 +106,8 @@ export default function DocsManagementTemplatesMain({
         docCount={filteredDocFields.length}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        onSyncAllFields={onSyncAllFields}
+        isSyncingAll={isSyncingAll}
       />
 
       {/* Scrollable Dictionary Content */}

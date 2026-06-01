@@ -145,9 +145,12 @@ export default function CaseTemplateCreateForm({
               No document templates found. Go to <strong>Documents Management &rarr; Templates</strong> to upload doc templates first.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto border border-input rounded-md p-3 bg-muted/10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-input rounded-md p-3 bg-muted/10">
               {docTemplates.map((doc) => {
                 const isChecked = selectedDocs.includes(doc.id);
+                const hasTitle = !!doc.title;
+                const primaryText = hasTitle ? doc.title : doc.file_name;
+                const secondaryText = hasTitle ? doc.file_name : null;
                 return (
                   <label
                     key={doc.id}
@@ -162,9 +165,14 @@ export default function CaseTemplateCreateForm({
                       disabled={submitting}
                     />
                     <div className="min-w-0">
-                      <span className="block text-xs font-medium text-foreground truncate" title={doc.file_name}>
-                        {doc.file_name}
+                      <span className="block text-xs font-medium text-foreground truncate" title={primaryText || ""}>
+                        {primaryText}
                       </span>
+                      {secondaryText && (
+                        <span className="block text-[10px] text-muted-foreground truncate" title={secondaryText}>
+                          {secondaryText}
+                        </span>
+                      )}
                       <span className="inline-flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground font-mono">
                         <span className="uppercase text-[8px] bg-muted px-1 py-0.2 rounded border">
                           {doc.file_ext}

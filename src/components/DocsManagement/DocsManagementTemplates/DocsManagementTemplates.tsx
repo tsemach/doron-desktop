@@ -21,6 +21,7 @@ import TemplateDeleteWarningModal from "../TemplateDeleteWarningModal";
 export default function DocsManagementTemplates() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [processing, setProcessing] = useState<ProcessingState>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
@@ -169,6 +170,22 @@ export default function DocsManagementTemplates() {
     }
   }
 
+  async function handleSyncAllFields() {
+    setIsSyncingAll(true);
+    setProcessing({ status: "processing", message: "Scanning all templates for variables..." });
+    try {
+      await invoke("sync_all_templates_fields");
+      setProcessing({ status: "ok", message: "All template variables synchronized!" });
+      await loadTemplates();
+      setTimeout(() => setProcessing(null), 3000);
+    } catch (e) {
+      setProcessing({ status: "failed", message: `Sync failed: ${String(e)}` });
+      setTimeout(() => setProcessing(null), 4000);
+    } finally {
+      setIsSyncingAll(false);
+    }
+  }
+
   async function handleGenerate() {
     if (!selectedTemplate) return;
     setGenerating(true);
@@ -294,6 +311,8 @@ export default function DocsManagementTemplates() {
             onAddTemplate={handleAddTemplate}
             isProcessing={processing?.status === "processing"}
             templates={templates}
+            onSyncAllFields={handleSyncAllFields}
+            isSyncingAll={isSyncingAll}
           />
         )}
       </section>

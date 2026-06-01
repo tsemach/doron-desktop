@@ -419,6 +419,37 @@ pub fn sync_template_fields(app: AppHandle, template_id: i64) -> Result<Vec<Stri
 }
 
 #[tauri::command]
+pub fn sync_all_templates_fields(app: AppHandle) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+    
+    let mut stmt = conn
+        .prepare("SELECT id, marked_path FROM doc_templates")
+        .map_err(|e| e.to_string())?;
+        
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+    }).map_err(|e| e.to_string())?;
+    
+    for r in rows {
+        if let Ok((id, marked_path_str)) = r {
+            let marked_path = std::path::Path::new(&marked_path_str);
+            if marked_path.exists() {
+                if let Ok(extracted) = extractor::extract(marked_path) {
+                    let fields = extract_field_names(&extracted.text);
+                    let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
+                    let _ = conn.execute(
+                        "UPDATE doc_templates SET fields_found = ?1 WHERE id = ?2",
+                        rusqlite::params![fields_json, id],
+                    );
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
 pub fn list_templates(app: AppHandle) -> Result<Vec<store::TemplateRow>, String> {
     let conn = store::open_db(&app)?;
     store::list_templates(&conn).map_err(|e| e.to_string())
