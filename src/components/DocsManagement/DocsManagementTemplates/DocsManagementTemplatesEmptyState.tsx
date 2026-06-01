@@ -241,7 +241,7 @@ export default function DocsManagementTemplatesEmptyState({
                 {filteredUniqueFields.map((field) => {
                   const isCopied = copiedField === field;
                   const docCount = uniqueFieldsMap[field].count;
-                  const sourceDocs = uniqueFieldsMap[field].docNames.join("\n");
+                  const sourceDocs = uniqueFieldsMap[field].docNames.map(name => `• ${name}`).join("\n");
 
                   return (
                     <div
