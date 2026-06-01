@@ -14,7 +14,7 @@ import DocsManagementTemplatesSearchBar from "./DocsManagementTemplatesSearchBar
 import DocsManagementTemplatesListItem from "./DocsManagementTemplatesListItem";
 import DocsManagementTemplatesProcessingStatus from "./DocsManagementTemplatesProcessingStatus";
 import DocsManagementTemplatesForm from "./DocsManagementTemplatesForm";
-import DocsManagementTemplatesEmptyState from "./DocsManagementTemplatesEmptyState";
+import DocsManagementTemplatesMain from "./DocsManagementTemplatesMain";
 import TemplateTitlePromptModal from "../TemplateTitlePromptModal";
 import TemplateDeleteWarningModal from "../TemplateDeleteWarningModal";
 
@@ -289,8 +289,8 @@ export default function DocsManagementTemplates() {
             onDelete={() => setShowDeleteConfirm(true)}
           />
         ) : (
-          /* Empty state */
-          <DocsManagementTemplatesEmptyState
+          /* Main state */
+          <DocsManagementTemplatesMain
             onAddTemplate={handleAddTemplate}
             isProcessing={processing?.status === "processing"}
             templates={templates}
