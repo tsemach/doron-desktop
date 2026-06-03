@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import CaseManagementOpenCases from "./CaseManagementOpenCases/CaseManagementOpenCases";
 import CasesManagementTemplate from "./CasesManagementTemplate/CasesManagementTemplate";
 import CaseManagementCaseCreate from "./CaseManagementCaseCreate";
+import CaseManagementOpenCasesDetails from "./CaseManagementOpenCases/CaseManagementOpenCasesDetails";
 
 export default function CaseManagement() {
 
@@ -13,6 +14,7 @@ export default function CaseManagement() {
         <Route path="/" element={<CaseManagementOpenCases />} />
         <Route path="templates" element={<CasesManagementTemplate />} />
         <Route path="new-case" element={<CaseManagementCaseCreate />} />
+        <Route path="cases/:caseId" element={<CaseManagementOpenCasesDetails />} />
       </Routes>
     </div>
   );

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -83,7 +84,13 @@ export default function OpenCasesList({
                   }`}
                 >
                   <td className="px-4 py-3.5">
-                    <div className="font-semibold text-foreground leading-snug">{c.subject || "No Subject"}</div>
+                    <Link
+                      to={`/case-management/cases/${c.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-semibold text-primary hover:underline leading-snug block w-fit"
+                    >
+                      {c.subject || "No Subject"}
+                    </Link>
                     <div className="text-xs text-muted-foreground mt-0.5 font-normal">{c.name}</div>
                     {c.folder && (
                       <div className="flex items-center gap-1.5 mt-1.5">
