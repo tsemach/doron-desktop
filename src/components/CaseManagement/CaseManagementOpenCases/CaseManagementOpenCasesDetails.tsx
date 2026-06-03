@@ -7,6 +7,8 @@ import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
 import OpenCasesFieldsModal from "./OpenCasesFieldsModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
+import { Button } from "@/components/ui/button";
+import mammoth from "mammoth";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -43,12 +45,19 @@ export default function CaseManagementOpenCasesDetails() {
   const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
 
+  // Document preview states
+  const [selectedDocument, setSelectedDocument] = useState<CaseFile | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+
   // General loading/error
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Split pane states
-  const [leftPercent, setLeftPercent] = useState(50);
+  const [leftPercent, setLeftPercent] = useState(30);
   const [isDragging, setIsDragging] = useState(false);
   const [isLgScreen, setIsLgScreen] = useState(window.innerWidth >= 1024);
 
@@ -100,6 +109,58 @@ export default function CaseManagementOpenCasesDetails() {
       setDocuments([]);
     }
   }, [selectedCase?.id, selectedCase?.folder]);
+
+  // Handle selected document preview loading
+  useEffect(() => {
+    if (!selectedDocument) {
+      setPreviewHtml(null);
+      setPreviewText(null);
+      setPreviewError(null);
+      return;
+    }
+
+    let active = true;
+
+    async function loadPreview() {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      setPreviewHtml(null);
+      setPreviewText(null);
+
+      try {
+        const ext = selectedDocument!.ext.toLowerCase();
+        if (ext === "docx") {
+          const bytes = await invoke<number[]>("read_file_bytes", { path: selectedDocument!.path });
+          if (!active) return;
+          const arrayBuffer = new Uint8Array(bytes).buffer;
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          if (!active) return;
+          setPreviewHtml(result.value);
+        } else if (ext === "txt" || ext === "json" || ext === "md") {
+          const bytes = await invoke<number[]>("read_file_bytes", { path: selectedDocument!.path });
+          if (!active) return;
+          const text = new TextDecoder().decode(new Uint8Array(bytes));
+          setPreviewText(text);
+        } else {
+          setPreviewError("Direct preview is only supported for Word (.docx) and Text (.txt, .md) files. Please use the open icon to view this file in your default application.");
+        }
+      } catch (err) {
+        if (!active) return;
+        console.error("Failed to load document preview:", err);
+        setPreviewError("Failed to load document preview: " + err);
+      } finally {
+        if (active) {
+          setPreviewLoading(false);
+        }
+      }
+    }
+
+    loadPreview();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDocument]);
 
   async function loadCase(id: string) {
     setLoading(true);
@@ -167,6 +228,12 @@ export default function CaseManagementOpenCasesDetails() {
         caseId: Number(selectedCase.id),
         fileName: doc.name,
       });
+      
+      // If the currently previewed document is deleted, clear the preview
+      if (selectedDocument?.path === doc.path) {
+        setSelectedDocument(null);
+      }
+
       if (selectedCase.folder) {
         await loadDocuments(selectedCase.folder);
       }
@@ -180,6 +247,73 @@ export default function CaseManagementOpenCasesDetails() {
 
   return (
     <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-screen">
+      {/* Scope styles for the converted DOCX output */}
+      <style>{`
+        .docx-content-view h1 {
+          font-size: 1.45rem;
+          font-weight: 700;
+          margin-top: 1.4rem;
+          margin-bottom: 0.75rem;
+          color: var(--foreground);
+          border-b: 1px solid var(--border);
+          padding-bottom: 0.25rem;
+        }
+        .docx-content-view h2 {
+          font-size: 1.25rem;
+          font-weight: 600;
+          margin-top: 1.2rem;
+          margin-bottom: 0.5rem;
+          color: var(--foreground);
+        }
+        .docx-content-view h3 {
+          font-size: 1.1rem;
+          font-weight: 600;
+          margin-top: 1rem;
+          margin-bottom: 0.5rem;
+          color: var(--foreground);
+        }
+        .docx-content-view p {
+          margin-bottom: 0.75rem;
+          line-height: 1.6;
+        }
+        .docx-content-view ul {
+          list-style-type: disc;
+          padding-left: 1.5rem;
+          margin-bottom: 0.75rem;
+        }
+        .docx-content-view ol {
+          list-style-type: decimal;
+          padding-left: 1.5rem;
+          margin-bottom: 0.75rem;
+        }
+        .docx-content-view li {
+          margin-bottom: 0.25rem;
+        }
+        .docx-content-view table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 1rem;
+          margin-bottom: 1rem;
+          font-size: 0.85rem;
+        }
+        .docx-content-view th, .docx-content-view td {
+          border: 1px solid var(--border);
+          padding: 0.5rem 0.75rem;
+          text-align: left;
+        }
+        .docx-content-view th {
+          background-color: var(--muted);
+          font-weight: 600;
+        }
+        .docx-content-view blockquote {
+          border-left: 4px solid var(--primary);
+          padding-left: 1rem;
+          font-style: italic;
+          color: var(--muted-foreground);
+          margin-bottom: 0.75rem;
+        }
+      `}</style>
+
       {/* Header with back button */}
       <div className="flex items-center gap-3 mb-6 shrink-0">
         <Link
@@ -243,6 +377,8 @@ export default function CaseManagementOpenCasesDetails() {
             onEditAnnotations={setEditingDoc}
             onShowFields={() => setShowFieldsModal(true)}
             onAddDocument={() => setShowAddDocModal(true)}
+            onSelectDocument={setSelectedDocument}
+            selectedDocument={selectedDocument}
           />
 
           {/* Resizable Divider (rendered only on large screens) */}
@@ -258,15 +394,106 @@ export default function CaseManagementOpenCasesDetails() {
             </div>
           )}
 
-          {/* Right side: Empty panel for now */}
+          {/* Right side: Document Previewer */}
           <div
             style={isLgScreen ? { flex: `0 0 calc(${100 - leftPercent}% - 6px)` } : undefined}
-            className="flex flex-col border border-dashed border-border rounded-xl bg-card/30 overflow-hidden h-full shadow-xs items-center justify-center text-muted-foreground p-8 text-center"
+            className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs"
           >
-            <p className="text-sm font-medium">Details View Right Side</p>
-            <p className="text-xs text-muted-foreground/80 mt-1">
-              This area is currently empty.
-            </p>
+            <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
+              <span>Document Preview</span>
+              {selectedDocument && (
+                <span className="text-xs text-muted-foreground font-mono font-normal truncate max-w-[200px]" title={selectedDocument.name}>
+                  {selectedDocument.name}
+                </span>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-background/50 dark:bg-background/20 relative">
+              {!selectedDocument ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center animate-fade-in">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="36"
+                    height="36"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-muted-foreground/30 mb-3"
+                  >
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <p className="text-sm font-semibold">No Document Selected</p>
+                  <p className="text-xs text-muted-foreground/80 mt-1 max-w-[280px]">
+                    Select a document from the list on the left to preview its content here.
+                  </p>
+                </div>
+              ) : previewLoading ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
+                  <div className="animate-spin text-3xl font-bold mb-2">⟳</div>
+                  <p className="text-sm">Converting and loading preview...</p>
+                </div>
+              ) : previewError ? (
+                <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground animate-fade-in">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-amber-500 mb-3"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" x2="12" y1="8" y2="12" />
+                    <line x1="12" x2="12.01" y1="16" y2="16" />
+                  </svg>
+                  <p className="text-sm font-semibold text-foreground">Preview Unavailable</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px]">
+                    {previewError}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenFile(selectedDocument.path)}
+                    className="mt-4 gap-1.5"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M15 3h6v6" />
+                      <path d="M10 14 21 3" />
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    </svg>
+                    Open in External App
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-6 md:p-8 w-full max-w-4xl bg-card min-h-full border-r border-border/40 shadow-xs animate-fade-in">
+                  {previewHtml && (
+                    <div
+                      className="docx-content-view prose dark:prose-invert max-w-none text-foreground/90 text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: previewHtml }}
+                    />
+                  )}
+                  {previewText && (
+                    <pre className="font-mono text-xs whitespace-pre-wrap leading-relaxed text-foreground/90 bg-muted/30 p-4 rounded-lg border border-border/80">
+                      {previewText}
+                    </pre>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -284,6 +511,10 @@ export default function CaseManagementOpenCasesDetails() {
                 d.path === editingDoc.path ? { ...d, notes, tags } : d
               )
             );
+            // Sync current selected preview doc annotations if edited
+            if (selectedDocument?.path === editingDoc.path) {
+              setSelectedDocument((prev) => prev ? { ...prev, notes, tags } : null);
+            }
             setEditingDoc(null);
           }}
           onDelete={() => {
@@ -292,6 +523,9 @@ export default function CaseManagementOpenCasesDetails() {
                 d.path === editingDoc.path ? { ...d, notes: undefined, tags: [] } : d
               )
             );
+            if (selectedDocument?.path === editingDoc.path) {
+              setSelectedDocument((prev) => prev ? { ...prev, notes: undefined, tags: [] } : null);
+            }
             setEditingDoc(null);
           }}
         />

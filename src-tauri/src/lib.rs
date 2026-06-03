@@ -67,7 +67,8 @@ pub fn run() {
             case::add_file_to_case,
             case::get_case_fields,
             case::save_case_fields,
-            case::remove_file_from_case
+            case::remove_file_from_case,
+            case::read_file_bytes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

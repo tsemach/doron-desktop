@@ -36,6 +36,8 @@ interface OpenCasesDocumentsPanelProps {
   onEditAnnotations: (doc: CaseFile) => void;
   onShowFields: () => void;
   onAddDocument: () => void;
+  onSelectDocument?: (doc: CaseFile) => void;
+  selectedDocument?: CaseFile | null;
 }
 
 export default function OpenCasesDocumentsPanel({
@@ -50,6 +52,8 @@ export default function OpenCasesDocumentsPanel({
   onEditAnnotations,
   onShowFields,
   onAddDocument,
+  onSelectDocument,
+  selectedDocument,
 }: OpenCasesDocumentsPanelProps) {
   const [docSearchQuery, setDocSearchQuery] = useState("");
 
@@ -238,8 +242,18 @@ export default function OpenCasesDocumentsPanel({
                   {filteredDocs.map((doc) => (
                     <div
                       key={doc.path}
-                      onClick={() => onOpenFile(doc.path)}
-                      className="rounded-lg border border-border bg-card p-3 hover:shadow-xs hover:border-primary/40 dark:hover:border-primary/45 transition-all duration-150 flex items-center justify-between gap-4 group cursor-pointer"
+                      onClick={() => {
+                        if (onSelectDocument) {
+                          onSelectDocument(doc);
+                        } else {
+                          onOpenFile(doc.path);
+                        }
+                      }}
+                      className={`rounded-lg border p-3 hover:shadow-xs transition-all duration-150 flex items-center justify-between gap-4 group cursor-pointer ${
+                        selectedDocument?.path === doc.path
+                          ? "border-primary bg-primary/5 dark:bg-primary/10"
+                          : "border-border hover:border-primary/40 dark:hover:border-primary/45 bg-card"
+                      }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Visual file-type icon */}
