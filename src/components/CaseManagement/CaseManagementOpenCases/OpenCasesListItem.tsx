@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Case, CaseStatus } from "./OpenCasesList";
+import { useLanguage } from "../../../context/LanguageContext";
 
 const STATUS_STYLES: Record<CaseStatus, string> = {
   open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
@@ -25,6 +26,8 @@ export default function OpenCasesListItem({
   onDeleteCase,
   onOpenFolder,
 }: OpenCasesListItemProps) {
+  const { t } = useLanguage();
+
   return (
     <tr
       onClick={() => onSelectCase(c)}
@@ -40,7 +43,7 @@ export default function OpenCasesListItem({
           onClick={(e) => e.stopPropagation()}
           className="font-semibold text-primary hover:underline leading-snug block w-fit"
         >
-          {c.subject || "No Subject"}
+          {c.subject || t("no_subject")}
         </Link>
         <div className="text-xs text-muted-foreground mt-0.5 font-normal">{c.name}</div>
         {c.folder && (
@@ -78,7 +81,7 @@ export default function OpenCasesListItem({
       </td>
       <td className="px-4 py-3.5 align-middle">
         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[c.status]}`}>
-          {c.status}
+          {c.status === "open" ? t("status_open") : c.status === "in-progress" ? t("status_in_progress") : t("status_closed")}
         </span>
       </td>
       <td className="px-4 py-3.5 align-middle text-xs text-muted-foreground whitespace-nowrap">
@@ -92,7 +95,7 @@ export default function OpenCasesListItem({
               size="icon"
               onClick={() => onCloseCase(c.id)}
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              title="Close Case"
+              title={t("close_case_title")}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -115,7 +118,7 @@ export default function OpenCasesListItem({
             size="icon"
             onClick={() => onDeleteCase(c)}
             className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            title="Delete Case"
+            title={t("delete_case_title")}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

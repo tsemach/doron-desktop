@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import OpenCasesFileIcon from "./OpenCasesFileIcon";
+import { useLanguage } from "../../../context/LanguageContext";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -56,6 +57,7 @@ export default function OpenCasesDocumentsPanel({
   selectedDocument,
 }: OpenCasesDocumentsPanelProps) {
   const [docSearchQuery, setDocSearchQuery] = useState("");
+  const { t } = useLanguage();
 
   const filteredDocs = documents.filter((doc) => {
     if (!docSearchQuery.trim()) return true;
@@ -73,9 +75,9 @@ export default function OpenCasesDocumentsPanel({
       className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs"
     >
       <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
-        <span>Case Documents</span>
+        <span>{t("case_documents")}</span>
         {selectedCase && documents.length > 0 && (
-          <span className="text-xs text-muted-foreground font-normal">{documents.length} file(s)</span>
+          <span className="text-xs text-muted-foreground font-normal">{documents.length} {t("file_count")}</span>
         )}
       </div>
 
@@ -96,9 +98,9 @@ export default function OpenCasesDocumentsPanel({
             >
               <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
             </svg>
-            <p className="text-sm font-semibold">No Case Selected</p>
+            <p className="text-sm font-semibold">{t("no_case_selected")}</p>
             <p className="text-xs text-muted-foreground/80 mt-1 max-w-[280px]">
-              Select a case from the list on the left to see its associated documents.
+              {t("select_case_desc")}
             </p>
           </div>
         ) : (
@@ -106,8 +108,8 @@ export default function OpenCasesDocumentsPanel({
             {/* Active Case Details Header */}
             <div className="pb-2 border-b border-border/60 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-lg font-bold text-foreground leading-snug">{selectedCase.subject || "No Subject"}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Customer: {selectedCase.name}</p>
+                <h3 className="text-lg font-bold text-foreground leading-snug">{selectedCase.subject || t("no_subject")}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("customer")}: {selectedCase.name}</p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <Button
@@ -132,7 +134,7 @@ export default function OpenCasesDocumentsPanel({
                     <path d="M7 12h10" />
                     <path d="M7 16h10" />
                   </svg>
-                  Case Fields
+                  {t("case_fields")}
                 </Button>
                 <Button
                   size="sm"
@@ -153,7 +155,7 @@ export default function OpenCasesDocumentsPanel({
                     <path d="M5 12h14" />
                     <path d="M12 5v14" />
                   </svg>
-                  Add Document
+                  {t("add_document")}
                 </Button>
               </div>
             </div>
@@ -161,7 +163,7 @@ export default function OpenCasesDocumentsPanel({
             {/* Case File Search Bar */}
             {documents.length > 0 && (
               <div className="relative flex items-center">
-                <span className="absolute left-2.5 text-muted-foreground">
+                <span className="absolute left-2.5 rtl:left-auto rtl:right-2.5 text-muted-foreground">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="12"
@@ -179,15 +181,15 @@ export default function OpenCasesDocumentsPanel({
                 </span>
                 <input
                   type="text"
-                  placeholder="Filter files by name, tags, or notes..."
+                  placeholder={t("filter_files_placeholder")}
                   value={docSearchQuery}
                   onChange={(e) => setDocSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background pl-8 pr-7 py-1.5 text-xs placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring transition-all"
+                  className="w-full rounded-lg border border-input bg-background pl-8 pr-7 rtl:pr-8 rtl:pl-7 py-1.5 text-xs placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring transition-all"
                 />
                 {docSearchQuery && (
                   <button
                     onClick={() => setDocSearchQuery("")}
-                    className="absolute right-2 text-muted-foreground hover:text-foreground p-0.5"
+                    className="absolute right-2 rtl:right-auto rtl:left-2 text-muted-foreground hover:text-foreground p-0.5"
                     title="Clear filter"
                   >
                     <svg
@@ -210,31 +212,31 @@ export default function OpenCasesDocumentsPanel({
             {/* Documents List */}
             <div className="space-y-2">
               <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-2">
-                Files In Case folder:
+                {t("files_in_folder")}
               </div>
 
               {docsLoading ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                   <div className="animate-spin text-xl font-bold mb-1">⟳</div>
-                  <p className="text-xs">Loading case files...</p>
+                  <p className="text-xs">{t("loading_files")}</p>
                 </div>
               ) : docsError ? (
                 <div className="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-xs text-destructive">
-                  <span className="font-bold">Error loading folder files: </span>
+                  <span className="font-bold">{t("error_loading_files")}</span>
                   {docsError}
                 </div>
               ) : documents.length === 0 ? (
                 <div className="text-center py-8 border-2 border-dashed border-border rounded-lg text-muted-foreground p-4">
-                  <p className="text-xs font-medium">No files found inside the case folder.</p>
+                  <p className="text-xs font-medium">{t("no_files_found")}</p>
                   <p className="text-[10px] text-muted-foreground/80 mt-1">
-                    Any Word, PDF, Excel or text documents placed in the directory will show up here.
+                    {t("no_files_found_desc")}
                   </p>
                 </div>
               ) : filteredDocs.length === 0 ? (
                 <div className="text-center py-8 border-2 border-dashed border-border rounded-lg text-muted-foreground p-4">
-                  <p className="text-xs font-medium">No files match the filter query.</p>
+                  <p className="text-xs font-medium">{t("no_files_match")}</p>
                   <p className="text-[10px] text-muted-foreground/80 mt-1">
-                    Try clearing the search query or search for something else.
+                    {t("no_files_match_desc")}
                   </p>
                 </div>
               ) : (
@@ -301,7 +303,7 @@ export default function OpenCasesDocumentsPanel({
                           size="icon"
                           onClick={() => onEditAnnotations(doc)}
                           className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
-                          title="Edit notes & tags"
+                          title={t("edit_notes_tags")}
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -324,7 +326,7 @@ export default function OpenCasesDocumentsPanel({
                           size="icon"
                           onClick={() => onOpenFile(doc.path)}
                           className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
-                          title={`Open file in system default viewer`}
+                          title={t("open_external")}
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -348,7 +350,7 @@ export default function OpenCasesDocumentsPanel({
                           size="icon"
                           onClick={() => onRemoveDocument(doc)}
                           className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          title="Remove document from case"
+                          title={t("remove_document")}
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"

@@ -4,11 +4,13 @@ import CaseManagement from "@/components/CaseManagement/CaseManagement";
 import DocsManagement from "./components/DocsManagement/DocsManagement";
 import Settings from "./components/Settings/Settings";
 import { getCurrentWindow  } from "@tauri-apps/api/window";
+import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 
 function Home() {
   const navigate = useNavigate();
   const [username, setUsername] = useState<string>(() => localStorage.getItem("user_name") || "");
   const [nameInput, setNameInput] = useState("");
+  const { t } = useLanguage();
 
   useEffect(() => {
     const setupWindow = async () => {
@@ -49,7 +51,7 @@ function Home() {
         {/* Welcome Title & Input */}
         <div className="text-center space-y-4">
           <h2 className="text-3xl font-bold tracking-tight">
-            {username ? `Welcome, ${username}` : "Welcome to Your Workspace"}
+            {username ? `${t("welcome")}, ${username}` : t("welcome_workspace")}
           </h2>
 
           {/* Show input below the heading if name doesn't exist */}
@@ -59,7 +61,7 @@ function Home() {
                 type="text"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
-                placeholder="Enter your name..."
+                placeholder={t("enter_name")}
                 className="border border-border/80 rounded-lg px-4 py-2 text-sm bg-background w-64 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />
@@ -67,13 +69,13 @@ function Home() {
                 type="submit"
                 className="bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black font-bold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-sm"
               >
-                Save
+                {t("save")}
               </button>
             </form>
           )}
 
           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            Manage your legal cases, search documents, and index new files from one central control panel.
+            {t("home_desc")}
           </p>
         </div>
 
@@ -86,14 +88,14 @@ function Home() {
               onClick={handleCaseMagement}
               className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
             >
-              Case Management
+              {t("case_management")}
             </button>
             <button
               type="button"
               onClick={handleDocsManagement}
               className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
             >
-              Documents Management
+              {t("docs_management")}
             </button>
           </div>
 
@@ -104,7 +106,7 @@ function Home() {
               onClick={handleSettings}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 flex items-center gap-1.5 cursor-pointer"
             >
-              ⚙ Settings
+              {t("settings_footer")}
             </button>
           </div>
         </div>
@@ -115,12 +117,14 @@ function Home() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/case-management/*" element={<CaseManagement />} />
-      <Route path="/docs-management/*" element={<DocsManagement />} />
-      <Route path="/settings" element={<Settings />} />
-    </Routes>
+    <LanguageProvider>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/case-management/*" element={<CaseManagement />} />
+        <Route path="/docs-management/*" element={<DocsManagement />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </LanguageProvider>
   );
 }
 

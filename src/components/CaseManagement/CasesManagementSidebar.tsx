@@ -1,11 +1,13 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import BackButton from "../ui/back-button";
 import { Button } from "../ui/button";
+import { useLanguage } from "../../context/LanguageContext";
 
 export default function CaseManagementSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
+  const { t } = useLanguage();
 
   const isOpenCasesActive =
     pathname === "/case-management" ||
@@ -16,8 +18,10 @@ export default function CaseManagementSidebar() {
   const isNewCaseActive = pathname.startsWith("/case-management/new-case");
   const isTemplatesActive = pathname.startsWith("/case-management/templates");
 
+  const displayName = localStorage.getItem("user_name");
+
   return (
-    <aside className="w-35 shrink-0 flex flex-col py-4 px-3 border-r border-border">       
+    <aside className="w-35 shrink-0 flex flex-col py-4 px-3 border-r rtl:border-r-0 rtl:border-l border-border">       
       <BackButton navigateTo={"/"} /> 
 
       <div className="border-t border-border -mx-3 mt-2" />
@@ -32,14 +36,14 @@ export default function CaseManagementSidebar() {
             }`}
             onClick={() => navigate("/case-management")}
           >
-            Open Cases
+            {t("open_cases")}
           </Button>
           <Button
             variant="ghost"
             className="w-full justify-start text-muted-foreground/40 cursor-not-allowed"
             disabled
           >
-            Search
+            {t("search")}
           </Button>
           <Button
             variant="ghost"
@@ -48,7 +52,7 @@ export default function CaseManagementSidebar() {
             }`}
             onClick={() => navigate("/case-management/new-case")}
           >
-            New Case
+            {t("new_case")}
           </Button>
         </div>
 
@@ -62,7 +66,7 @@ export default function CaseManagementSidebar() {
             }`}
             onClick={() => navigate("/case-management/templates")}
           >
-            Template
+            {t("template")}
           </Button>        
         </div>
       </div>
@@ -80,7 +84,7 @@ export default function CaseManagementSidebar() {
         </div>
         <div className="border-t border-border -mx-3 mb-2" />
         <div className="flex items-center justify-center pb-2 pt-2">
-          <span className="text-xs text-muted-foreground">Doron Mizachi</span>
+          <span className="text-xs text-muted-foreground">{displayName}</span>
         </div>
       </div>
     </aside>

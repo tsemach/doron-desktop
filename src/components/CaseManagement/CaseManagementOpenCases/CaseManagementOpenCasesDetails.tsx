@@ -9,6 +9,7 @@ import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
 import { Button } from "@/components/ui/button";
 import mammoth from "mammoth";
+import { useLanguage } from "../../../context/LanguageContext";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -35,6 +36,7 @@ interface CaseFile {
 export default function CaseManagementOpenCasesDetails() {
   const { caseId } = useParams<{ caseId: string }>();
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const { t } = useLanguage();
 
   // Documents states
   const [documents, setDocuments] = useState<CaseFile[]>([]);
@@ -257,6 +259,8 @@ export default function CaseManagementOpenCasesDetails() {
           color: var(--foreground);
           border-b: 1px solid var(--border);
           padding-bottom: 0.25rem;
+          unicode-bidi: plaintext;
+          text-align: start;
         }
         .docx-content-view h2 {
           font-size: 1.25rem;
@@ -264,6 +268,8 @@ export default function CaseManagementOpenCasesDetails() {
           margin-top: 1.2rem;
           margin-bottom: 0.5rem;
           color: var(--foreground);
+          unicode-bidi: plaintext;
+          text-align: start;
         }
         .docx-content-view h3 {
           font-size: 1.1rem;
@@ -271,23 +277,31 @@ export default function CaseManagementOpenCasesDetails() {
           margin-top: 1rem;
           margin-bottom: 0.5rem;
           color: var(--foreground);
+          unicode-bidi: plaintext;
+          text-align: start;
         }
         .docx-content-view p {
           margin-bottom: 0.75rem;
           line-height: 1.6;
+          unicode-bidi: plaintext;
+          text-align: start;
         }
         .docx-content-view ul {
           list-style-type: disc;
           padding-left: 1.5rem;
           margin-bottom: 0.75rem;
+          unicode-bidi: plaintext;
         }
         .docx-content-view ol {
           list-style-type: decimal;
           padding-left: 1.5rem;
           margin-bottom: 0.75rem;
+          unicode-bidi: plaintext;
         }
         .docx-content-view li {
           margin-bottom: 0.25rem;
+          unicode-bidi: plaintext;
+          text-align: start;
         }
         .docx-content-view table {
           width: 100%;
@@ -295,11 +309,12 @@ export default function CaseManagementOpenCasesDetails() {
           margin-top: 1rem;
           margin-bottom: 1rem;
           font-size: 0.85rem;
+          unicode-bidi: plaintext;
         }
         .docx-content-view th, .docx-content-view td {
           border: 1px solid var(--border);
           padding: 0.5rem 0.75rem;
-          text-align: left;
+          text-align: inherit;
         }
         .docx-content-view th {
           background-color: var(--muted);
@@ -311,6 +326,8 @@ export default function CaseManagementOpenCasesDetails() {
           font-style: italic;
           color: var(--muted-foreground);
           margin-bottom: 0.75rem;
+          unicode-bidi: plaintext;
+          text-align: start;
         }
       `}</style>
 
@@ -319,7 +336,7 @@ export default function CaseManagementOpenCasesDetails() {
         <Link
           to="/case-management"
           className="p-2 hover:bg-muted rounded-lg transition-colors border border-border shrink-0"
-          title="Back to Open Cases"
+          title={t("back_to_open_cases")}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -331,18 +348,19 @@ export default function CaseManagementOpenCasesDetails() {
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="rtl:rotate-180"
           >
             <path d="m15 18-6-6 6-6" />
           </svg>
         </Link>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Case Management</span>
+            <span className="text-sm text-muted-foreground">{t("case_management")}</span>
             <span className="text-muted-foreground/60 text-xs">/</span>
-            <span className="text-sm font-medium text-foreground">Case Detail</span>
+            <span className="text-sm font-medium text-foreground">{t("case_detail")}</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight mt-1">
-            {selectedCase?.subject || "Loading Case..."}
+            {selectedCase?.subject || t("loading_case_details")}
           </h1>
         </div>
       </div>
@@ -356,7 +374,7 @@ export default function CaseManagementOpenCasesDetails() {
       {loading ? (
         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
           <div className="animate-spin text-3xl font-bold mb-2">⟳</div>
-          <p className="text-sm">Loading case details...</p>
+          <p className="text-sm">{t("loading_case_details")}</p>
         </div>
       ) : (
         /* Main split container */
@@ -400,7 +418,7 @@ export default function CaseManagementOpenCasesDetails() {
             className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs"
           >
             <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
-              <span>Document Preview</span>
+              <span>{t("document_preview")}</span>
               {selectedDocument && (
                 <span className="text-xs text-muted-foreground font-mono font-normal truncate max-w-[200px]" title={selectedDocument.name}>
                   {selectedDocument.name}
@@ -426,15 +444,15 @@ export default function CaseManagementOpenCasesDetails() {
                     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                     <polyline points="14 2 14 8 20 8" />
                   </svg>
-                  <p className="text-sm font-semibold">No Document Selected</p>
+                  <p className="text-sm font-semibold">{t("no_document_selected")}</p>
                   <p className="text-xs text-muted-foreground/80 mt-1 max-w-[280px]">
-                    Select a document from the list on the left to preview its content here.
+                    {t("select_document_desc")}
                   </p>
                 </div>
               ) : previewLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
                   <div className="animate-spin text-3xl font-bold mb-2">⟳</div>
-                  <p className="text-sm">Converting and loading preview...</p>
+                  <p className="text-sm">{t("converting_preview")}</p>
                 </div>
               ) : previewError ? (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground animate-fade-in">
@@ -452,7 +470,7 @@ export default function CaseManagementOpenCasesDetails() {
                     <line x1="12" x2="12" y1="8" y2="12" />
                     <line x1="12" x2="12.01" y1="16" y2="16" />
                   </svg>
-                  <p className="text-sm font-semibold text-foreground">Preview Unavailable</p>
+                  <p className="text-sm font-semibold text-foreground">{t("preview_unavailable")}</p>
                   <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px]">
                     {previewError}
                   </p>
@@ -475,14 +493,15 @@ export default function CaseManagementOpenCasesDetails() {
                       <path d="M10 14 21 3" />
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                     </svg>
-                    Open in External App
+                    {t("open_external_app")}
                   </Button>
                 </div>
               ) : (
-                <div className="p-6 md:p-8 w-full max-w-4xl bg-card min-h-full border-r border-border/40 shadow-xs animate-fade-in">
+                <div className="p-6 md:p-8 w-full bg-card min-h-full shadow-xs animate-fade-in">
                   {previewHtml && (
                     <div
                       className="docx-content-view prose dark:prose-invert max-w-none text-foreground/90 text-sm leading-relaxed"
+                      dir="auto"
                       dangerouslySetInnerHTML={{ __html: previewHtml }}
                     />
                   )}
