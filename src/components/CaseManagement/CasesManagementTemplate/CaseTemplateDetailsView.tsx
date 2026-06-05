@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CaseTemplate, DocTemplate } from "./types";
 import CaseTemplateDeleteWarningModal from "./CaseTemplateDeleteWarningModal";
+import CaseManagementSearch from "../CaseManagementSearch";
 
 interface CaseTemplateDetailsViewProps {
   activeTemplate: CaseTemplate;
@@ -249,12 +250,12 @@ export default function CaseTemplateDetailsView({
                   <div className="text-xs text-muted-foreground italic p-2 text-center">All templates already added.</div>
                 ) : (
                   <>
-                    <input
-                      type="text"
-                      placeholder="Search by filename or title..."
+                    <CaseManagementSearch
                       value={docFilterText}
-                      onChange={(e) => setDocFilterText(e.target.value)}
-                      className="w-full rounded border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+                      onChange={setDocFilterText}
+                      placeholder="Search by filename or title..."
+                      containerClassName="relative flex items-center w-full"
+                      inputClassName="w-full rounded border border-input bg-background pl-8 pr-7 rtl:pr-8 rtl:pl-7 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
                       autoFocus
                     />
                     <div className="max-h-[220px] overflow-y-auto divide-y divide-border border rounded bg-muted/5">

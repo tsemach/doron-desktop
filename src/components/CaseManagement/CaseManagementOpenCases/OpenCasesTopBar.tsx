@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import CaseManagementSearch from "../CaseManagementSearch";
 
 interface OpenCasesTopBarProps {
   filter: "all" | "open" | "in-progress" | "closed";
@@ -30,53 +31,19 @@ export default function OpenCasesTopBar({
       </div>
 
       {/* Search Input */}
-      <div className="relative flex items-center w-full sm:w-80">
-        <span className="absolute left-3 text-muted-foreground">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-        </span>
-        <input
-          type="text"
-          placeholder="Search cases by subject, customer, folder..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-md border border-input bg-background pl-9 pr-8 py-2 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-2.5 text-muted-foreground hover:text-foreground p-1 rounded-sm"
-            title="Clear search"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
+      <CaseManagementSearch
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search cases by subject, customer, folder..."
+        containerClassName="relative flex items-center w-full sm:w-80"
+        inputClassName="w-full rounded-md border border-input bg-background pl-9 pr-8 py-2 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
+        searchIconSize={14}
+        searchIconStrokeWidth={2.5}
+        searchIconClassName="absolute left-3 text-muted-foreground"
+        clearIconSize={12}
+        clearButtonClassName="absolute right-2.5 text-muted-foreground hover:text-foreground p-1 rounded-sm"
+        clearButtonTitle="Clear search"
+      />
     </div>
   );
 }

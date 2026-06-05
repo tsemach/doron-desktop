@@ -1,0 +1,105 @@
+import { Button } from "@/components/ui/button";
+import { useLanguage } from "../../../context/LanguageContext";
+
+interface CaseFile {
+  name: string;
+  path: string;
+  ext: string;
+  size_kb: number;
+  title?: string;
+  notes?: string;
+  tags: string[];
+}
+
+interface OpenCasesDocumentPanelControlProps {
+  doc: CaseFile;
+  onEditAnnotations: (doc: CaseFile) => void;
+  onOpenFile: (filePath: string) => void;
+  onRemoveDocument: (doc: CaseFile) => void;
+}
+
+export default function OpenCasesDocumentPanelControl({
+  doc,
+  onEditAnnotations,
+  onOpenFile,
+  onRemoveDocument,
+}: OpenCasesDocumentPanelControlProps) {
+  const { t } = useLanguage();
+
+  return (
+    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onEditAnnotations(doc)}
+        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
+        title={t("edit_notes_tags")}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 2H2v10l9.29 9.29c.39.39 1.02.39 1.41 0l8.59-8.59c.39-.39.39-1.02 0-1.41L12 2z" />
+          <path d="M7 7h.01" />
+        </svg>
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onOpenFile(doc.path)}
+        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
+        title={t("open_external")}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M15 3h6v6" />
+          <path d="M10 14 21 3" />
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        </svg>
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onRemoveDocument(doc)}
+        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+        title={t("remove_document")}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 6h18" />
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+          <line x1="10" x2="10" y1="11" y2="17" />
+          <line x1="14" x2="14" y1="11" y2="17" />
+        </svg>
+      </Button>
+    </div>
+  );
+}

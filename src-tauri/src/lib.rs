@@ -9,6 +9,7 @@ pub mod case_template;
 pub mod case;
 pub mod query;
 pub mod embeddings;
+pub mod email;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -29,6 +30,11 @@ pub fn run() {
             // Pre-warm the embedding model in a background thread on startup
             tauri::async_runtime::spawn(async {
                 let _ = crate::embeddings::get_embedding_model();
+            });
+            // Start background email polling worker
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::email::poll_emails_background(handle).await;
             });
             Ok(())
         })
@@ -68,7 +74,14 @@ pub fn run() {
             case::get_case_fields,
             case::save_case_fields,
             case::remove_file_from_case,
-            case::read_file_bytes
+            case::read_file_bytes,
+            // email commands
+            email::get_email_settings,
+            email::save_email_settings,
+            email::list_pending_email_alerts,
+            email::confirm_email_alert,
+            email::delete_email_alert,
+            email::list_case_emails
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

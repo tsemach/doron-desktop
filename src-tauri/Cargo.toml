@@ -35,6 +35,9 @@ walkdir     = "2"
 chrono      = { version = "0.4", features = ["serde"] }
 regex       = "1"
 fastembed   = "4"
+imap        = { version = "2.4", features = ["native-tls"] }
+mailparse   = "0.14"
+native-tls  = "0.2"
 
 [dev-dependencies]
 dotenvy = "0.15"

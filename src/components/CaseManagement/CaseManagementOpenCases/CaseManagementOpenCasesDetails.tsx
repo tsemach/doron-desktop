@@ -7,6 +7,7 @@ import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
 import OpenCasesFieldsModal from "./OpenCasesFieldsModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
+import CaseEmailsChat from "./CaseEmailsChat";
 import { Button } from "@/components/ui/button";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -46,6 +47,9 @@ export default function CaseManagementOpenCasesDetails() {
   const [showAddDocModal, setShowAddDocModal] = useState(false);
   const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
+
+  // Right side panel tab state
+  const [activeRightTab, setActiveRightTab] = useState<"preview" | "emails">("preview");
 
   // Document preview states
   const [selectedDocument, setSelectedDocument] = useState<CaseFile | null>(null);
@@ -395,8 +399,13 @@ export default function CaseManagementOpenCasesDetails() {
             onEditAnnotations={setEditingDoc}
             onShowFields={() => setShowFieldsModal(true)}
             onAddDocument={() => setShowAddDocModal(true)}
-            onSelectDocument={setSelectedDocument}
+            onSelectDocument={(doc) => {
+              setSelectedDocument(doc);
+              setActiveRightTab("preview");
+            }}
             selectedDocument={selectedDocument}
+            activeRightTab={activeRightTab}
+            onTabChange={setActiveRightTab}
           />
 
           {/* Resizable Divider (rendered only on large screens) */}
@@ -412,23 +421,29 @@ export default function CaseManagementOpenCasesDetails() {
             </div>
           )}
 
-          {/* Right side: Document Previewer */}
+          {/* Right side: Document Previewer & Emails Workspace */}
           <div
             style={isLgScreen ? { flex: `0 0 calc(${100 - leftPercent}% - 6px)` } : undefined}
             className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs"
           >
             <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
-              <span>{t("document_preview")}</span>
-              {selectedDocument && (
-                <span className="text-xs text-muted-foreground font-mono font-normal truncate max-w-[200px]" title={selectedDocument.name}>
+              <span>
+                {activeRightTab === "emails"
+                  ? (t("emails_exchange") || "Case Email Correspondence")
+                  : (t("document_preview") || "Document Preview")}
+              </span>
+              {activeRightTab === "preview" && selectedDocument && (
+                <span className="text-xs text-muted-foreground font-mono font-normal truncate max-w-[200px] align-middle" title={selectedDocument.name}>
                   {selectedDocument.name}
                 </span>
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-background/50 dark:bg-background/20 relative">
-              {!selectedDocument ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center animate-fade-in">
+            <div className="flex-1 overflow-y-auto bg-background/50 dark:bg-background/20 relative flex flex-col min-h-0">
+              {activeRightTab === "emails" ? (
+                <CaseEmailsChat caseId={Number(selectedCase?.id || 0)} />
+              ) : !selectedDocument ? (
+                <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-8 text-center animate-fade-in">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="36"
@@ -450,12 +465,12 @@ export default function CaseManagementOpenCasesDetails() {
                   </p>
                 </div>
               ) : previewLoading ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
+                <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground py-12">
                   <div className="animate-spin text-3xl font-bold mb-2">⟳</div>
                   <p className="text-sm">{t("converting_preview")}</p>
                 </div>
               ) : previewError ? (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground animate-fade-in">
+                <div className="flex-grow flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-fade-in">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="32"

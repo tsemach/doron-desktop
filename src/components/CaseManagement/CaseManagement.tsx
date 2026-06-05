@@ -4,11 +4,12 @@ import CaseManagementOpenCases from "./CaseManagementOpenCases/CaseManagementOpe
 import CasesManagementTemplate from "./CasesManagementTemplate/CasesManagementTemplate";
 import CaseManagementCaseCreate from "./CaseManagementCaseCreate";
 import CaseManagementOpenCasesDetails from "./CaseManagementOpenCases/CaseManagementOpenCasesDetails";
+import EmailAlertReview from "./CaseManagementOpenCases/EmailAlertReview";
 
 export default function CaseManagement() {
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen relative w-full">
       <CaseManagementSidebar />
       <Routes>
         <Route path="/" element={<CaseManagementOpenCases />} />
@@ -16,6 +17,7 @@ export default function CaseManagement() {
         <Route path="new-case" element={<CaseManagementCaseCreate />} />
         <Route path="cases/:caseId" element={<CaseManagementOpenCasesDetails />} />
       </Routes>
+      <EmailAlertReview />
     </div>
   );
 }

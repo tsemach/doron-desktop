@@ -21,6 +21,16 @@ export default function OpenCasesFieldsModal({
     loadFields();
   }, [caseId]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   async function loadFields() {
     setLoading(true);
     setError(null);

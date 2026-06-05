@@ -106,6 +106,46 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
         );
     ").map_err(|e| format!("[case_fields schema] {e}"))?;
 
+    conn.execute_batch("
+        CREATE TABLE IF NOT EXISTS email_configurations (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            imap_server   TEXT NOT NULL,
+            imap_port     INTEGER NOT NULL,
+            username      TEXT NOT NULL,
+            password_enc  TEXT NOT NULL,
+            provider      TEXT NOT NULL DEFAULT 'claude',
+            api_key_enc   TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS case_emails (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id          INTEGER NOT NULL,
+            message_id       TEXT UNIQUE,
+            sender           TEXT NOT NULL,
+            recipient        TEXT NOT NULL,
+            subject          TEXT NOT NULL,
+            body_text        TEXT,
+            body_html        TEXT,
+            direction        TEXT NOT NULL CHECK(direction IN ('incoming', 'outgoing')),
+            received_at      TEXT NOT NULL,
+            attachments_json TEXT NOT NULL DEFAULT '[]',
+            FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS pending_email_alerts (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id    TEXT UNIQUE,
+            sender        TEXT NOT NULL,
+            subject       TEXT NOT NULL,
+            body_snippet  TEXT NOT NULL,
+            received_at   TEXT NOT NULL,
+            suggested_case_id INTEGER,
+            confidence    REAL,
+            reason        TEXT,
+            attachments_json TEXT
+        );
+    ").map_err(|e| format!("[emails schema] {e}"))?;
+
     Ok(conn)
 }
 
