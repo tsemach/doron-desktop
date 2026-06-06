@@ -118,7 +118,38 @@ pub fn save_email_settings(app: AppHandle, config: EmailConfig) -> Result<(), St
 
 #[tauri::command]
 pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, String> {
+    println!("[Rust Backend] list_pending_email_alerts called!");
     let conn = store::open_db(&app)?;
+
+    // Clean up existing unrelated/spam pending alerts (suggested_case_id IS NULL or confidence = 0.0)
+    let mut cleanup_stmt = conn
+        .prepare("SELECT message_id FROM pending_email_alerts WHERE suggested_case_id IS NULL OR confidence = 0.0")
+        .map_err(|e| e.to_string())?;
+
+    let message_ids: Vec<String> = cleanup_stmt
+        .query_map([], |r| r.get(0))
+        .map_err(|e| e.to_string())?
+        .filter_map(Result::ok)
+        .collect();
+
+    let staging_base = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."))
+        .join("email_staging");
+
+    for msg_id in message_ids {
+        let folder = staging_base.join(&msg_id);
+        if folder.exists() {
+            let _ = std::fs::remove_dir_all(folder);
+        }
+        // Save to ignored_emails to prevent infinite re-ingestion loop
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+            params![msg_id],
+        );
+    }
+
+    conn.execute("DELETE FROM pending_email_alerts WHERE suggested_case_id IS NULL OR confidence = 0.0", [])
+        .map_err(|e| e.to_string())?;
+
     let mut stmt = conn
         .prepare("SELECT id, message_id, sender, subject, body_snippet, received_at, suggested_case_id, confidence, reason, attachments_json FROM pending_email_alerts ORDER BY id DESC")
         .map_err(|e| e.to_string())?;
@@ -140,8 +171,25 @@ pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, St
 
     let mut list = Vec::new();
     for row in rows {
-        list.push(row.map_err(|e| e.to_string())?);
+        let alert = row.map_err(|e| e.to_string())?;
+        if is_transactional_or_spam(&alert.sender, &alert.subject) {
+            let folder = staging_base.join(&alert.message_id);
+            if folder.exists() {
+                let _ = std::fs::remove_dir_all(folder);
+            }
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+                params![alert.message_id],
+            );
+            let _ = conn.execute(
+                "DELETE FROM pending_email_alerts WHERE id = ?1",
+                params![alert.id],
+            );
+        } else {
+            list.push(alert);
+        }
     }
+    println!("[Rust Backend] list_pending_email_alerts returning {} alerts", list.len());
     Ok(list)
 }
 
@@ -252,6 +300,9 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
         let _ = std::fs::remove_dir_all(staging_dir);
     }
 
+    println!("[Rust Backend] Email alert {} confirmed and moved to case {}. Emitting event...", alert_id, case_id);
+    let _ = app.emit("case-emails-updated", case_id);
+
     Ok(())
 }
 
@@ -309,6 +360,24 @@ pub fn list_case_emails(app: AppHandle, case_id: i64) -> Result<Vec<CaseEmail>, 
     Ok(list)
 }
 
+#[tauri::command]
+pub async fn trigger_email_ingestion(app: AppHandle) -> Result<(), String> {
+    println!("[Rust Backend] trigger_email_ingestion called!");
+    if let Some(config) = get_email_settings_internal(&app) {
+        // Spawn background task to check and ingest emails so it is non-blocking
+        tauri::async_runtime::spawn(async move {
+            println!("[Rust Backend] Background email ingestion started...");
+            match check_and_ingest_emails(&app, &config).await {
+                Ok(_) => println!("[Rust Backend] Background email ingestion finished successfully!"),
+                Err(e) => println!("[Rust Backend] Background email ingestion error: {}", e),
+            }
+        });
+        Ok(())
+    } else {
+        Err("Email configurations not found. Please set them up in Settings.".to_string())
+    }
+}
+
 // ── Ingestion Background Worker ──────────────────────────────────────────────
 
 pub async fn poll_emails_background(app: AppHandle) {
@@ -357,17 +426,75 @@ async fn check_and_ingest_emails(app: &AppHandle, config: &EmailConfig) -> Resul
 
     session.select("INBOX").map_err(|e| e.to_string())?;
 
-    // Search for unseen messages
-    let unseen_seqs = session.search("UNSEEN").map_err(|e| e.to_string())?;
+    // Search for unseen messages from the last 30 days
+    let thirty_days_ago = chrono::Utc::now() - chrono::Duration::days(30);
+    let imap_date = thirty_days_ago.format("%d-%b-%Y").to_string();
+    let search_query = format!("UNSEEN SINCE {}", imap_date);
+    
+    let mut unseen_seqs: Vec<u32> = session.search(&search_query)
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .collect();
     if unseen_seqs.is_empty() {
         return Ok(());
     }
+    unseen_seqs.sort();
 
     let conn = store::open_db(app)?;
 
-    for seq in unseen_seqs.iter() {
-        // Fetch raw envelope headers and content
-        let fetches = session.fetch(seq.to_string(), "RFC822").map_err(|e| e.to_string())?;
+    // 1. Batch fetch ENVELOPEs in chunks of 100 to check which ones are new
+    let mut new_seqs = Vec::new();
+    let mut seq_to_msg_id = std::collections::HashMap::new();
+
+    for chunk in unseen_seqs.chunks(100) {
+        let query = chunk.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(",");
+        let fetches = match session.fetch(&query, "ENVELOPE") {
+            Ok(f) => f,
+            Err(e) => {
+                println!("[IMAP Envelope Fetch Error] {}", e);
+                continue;
+            }
+        };
+
+        for fetch in fetches.iter() {
+            let seq = fetch.message;
+            let message_id = fetch.envelope()
+                .and_then(|e| e.message_id)
+                .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+                .unwrap_or_else(|| format!("{}_{}", chrono::Utc::now().timestamp_micros(), seq));
+
+            let message_id_trimmed = message_id.trim_matches(|c| c == '<' || c == '>');
+
+            // Skip if already processed or ignored
+            let exists: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM pending_email_alerts WHERE message_id = ?1 OR message_id = ?2) OR
+                        EXISTS(SELECT 1 FROM case_emails WHERE message_id = ?1 OR message_id = ?2) OR
+                        EXISTS(SELECT 1 FROM ignored_emails WHERE message_id = ?1 OR message_id = ?2)",
+                params![message_id, message_id_trimmed],
+                |r| r.get::<_, i32>(0)
+            ).unwrap_or(0) > 0;
+
+            if !exists {
+                new_seqs.push(seq);
+                seq_to_msg_id.insert(seq, message_id);
+            }
+        }
+    }
+
+    for seq in new_seqs {
+        let message_id = match seq_to_msg_id.get(&seq) {
+            Some(id) => id.clone(),
+            None => continue,
+        };
+
+        // 2. Fetch full RFC822 body for new emails only
+        let fetches = match session.fetch(seq.to_string(), "RFC822") {
+            Ok(f) => f,
+            Err(e) => {
+                println!("[IMAP RFC822 Fetch Error] {}", e);
+                continue;
+            }
+        };
         let fetch = match fetches.iter().next() {
             Some(f) => f,
             None => continue,
@@ -383,26 +510,6 @@ async fn check_and_ingest_emails(app: &AppHandle, config: &EmailConfig) -> Resul
             Ok(pm) => pm,
             Err(_) => continue,
         };
-
-        // Get unique Message-ID
-        let message_id = parsed_mail.headers
-            .iter()
-            .find(|h| h.get_key().to_lowercase() == "message-id")
-            .map(|h| h.get_value())
-            .unwrap_or_else(|| format!("{}_{}", chrono::Utc::now().timestamp_micros(), seq));
-
-        // Skip if already processed
-        let exists: bool = conn.query_row(
-            "SELECT COUNT(1) FROM pending_email_alerts WHERE message_id = ?1
-             UNION ALL
-             SELECT COUNT(1) FROM case_emails WHERE message_id = ?1",
-            params![message_id],
-            |r| r.get(0)
-        ).unwrap_or(0) > 0;
-
-        if exists {
-            continue;
-        }
 
         // Extract headers
         let sender = parsed_mail.headers
@@ -429,8 +536,9 @@ async fn check_and_ingest_emails(app: &AppHandle, config: &EmailConfig) -> Resul
         let mut attachments = Vec::new();
         extract_parts(&parsed_mail, &mut text_body, &mut html_body, &mut attachments);
 
-        let snippet = if text_body.len() > 500 {
-            format!("{}...", &text_body[..500])
+        let snippet = if text_body.chars().count() > 500 {
+            let chunk: String = text_body.chars().take(500).collect();
+            format!("{}...", chunk)
         } else {
             text_body.clone()
         };
@@ -465,25 +573,36 @@ async fn check_and_ingest_emails(app: &AppHandle, config: &EmailConfig) -> Resul
             &snippet
         ).await;
 
-        // Insert into pending alerts
-        conn.execute(
-            "INSERT INTO pending_email_alerts (message_id, sender, subject, body_snippet, received_at, suggested_case_id, confidence, reason, attachments_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![
-                message_id,
-                sender,
-                subject,
-                snippet,
-                date_str,
-                suggested_case_id,
-                confidence,
-                reason,
-                attachments_json
-            ],
-        ).ok();
+        if suggested_case_id.is_some() {
+            // Insert into pending alerts
+            conn.execute(
+                "INSERT INTO pending_email_alerts (message_id, sender, subject, body_snippet, received_at, suggested_case_id, confidence, reason, attachments_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    message_id,
+                    sender,
+                    subject,
+                    snippet,
+                    date_str,
+                    suggested_case_id,
+                    confidence,
+                    reason,
+                    attachments_json
+                ],
+            ).ok();
 
-        // Emit Tauri window notification event
-        let _ = app.emit("new-email-alert", ());
+            // Emit Tauri window notification event
+            let _ = app.emit("new-email-alert", ());
+        } else {
+            // Clean up staged folder since email is unrelated/spam
+            if app_staging_dir.exists() {
+                let _ = std::fs::remove_dir_all(&app_staging_dir);
+            }
+            conn.execute(
+                "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+                params![message_id],
+            ).ok();
+        }
     }
 
     Ok(())
@@ -533,6 +652,10 @@ async fn run_cascade_classification(
     subject: &str,
     snippet: &str
 ) -> (Option<i64>, f64, String) {
+    if is_transactional_or_spam(sender, subject) {
+        return (None, 0.0, "Transactional or spam email ignored.".to_string());
+    }
+
     struct CaseCandidate {
         id: i64,
         name: String,
@@ -620,10 +743,30 @@ async fn run_cascade_classification(
 
     // Threshold filtering (spams have very low cosine similarity to any legal document)
     let best_local_score = sorted_candidates.first().map(|c| *c.1).unwrap_or(0.0);
+    let mut best_direct = 0.0;
+    let mut direct_match: Option<i64> = None;
+    let mut exact_match_found = false;
+
+    // 1. Direct exact substring match in the email subject first (high efficiency, 100% accurate)
+    for kase in &cases {
+        let lower_subject = subject.to_lowercase();
+        let lower_name = kase.name.to_lowercase();
+        let lower_case_subj = kase.subject.to_lowercase();
+
+        if lower_subject.contains(&lower_name) || (!lower_case_subj.is_empty() && lower_subject.contains(&lower_case_subj)) {
+            best_direct = 1.0;
+            direct_match = Some(kase.id);
+            exact_match_found = true;
+            break;
+        }
+    }
+
+    if exact_match_found {
+        return (direct_match, 1.0, "High confidence name match (exact substring in subject).".to_string());
+    }
+
     if best_local_score < 0.35 {
         // Double check against case names/subjects directly
-        let mut direct_match: Option<i64> = None;
-        let mut best_direct = 0.0;
         for kase in &cases {
             let name_vec = match embeddings::get_query_embedding(&kase.name) {
                 Ok(v) => v,
@@ -637,7 +780,7 @@ async fn run_cascade_classification(
         }
 
         if best_direct < 0.40 {
-            return (None, 0.0, format!("Rough filtering skipped: similarity index {best_local_score:.2} too low. Unrelated to any case.", ));
+            return (None, 0.0, format!("Rough filtering skipped: similarity index {best_local_score:.2} too low. Unrelated to any case."));
         } else if best_direct > 0.85 {
             return (direct_match, best_direct as f64, "High confidence name match.".to_string());
         }
@@ -661,8 +804,13 @@ async fn run_cascade_classification(
     // 3. Step 2: Verification using provider-agnostic LLM
     if config.api_key_enc.is_empty() {
         // Fallback to highest embedding match if no API key configured
-        let best_id = top_cases.first().map(|c| c.id);
-        return (best_id, best_local_score as f64, "Embedding-only classification (API key not configured)".to_string());
+        if best_local_score >= 0.35 || best_direct > 0.85 {
+            let best_id = top_cases.first().map(|c| c.id);
+            let confidence = if best_local_score >= 0.35 { best_local_score as f64 } else { best_direct as f64 };
+            return (best_id, confidence, "Embedding-only classification (API key not configured)".to_string());
+        } else {
+            return (None, 0.0, "Embedding-only classification (API key not configured - similarity too low)".to_string());
+        }
     }
 
     let provider = get_active_provider(ProviderConfig {
@@ -706,4 +854,88 @@ async fn run_cascade_classification(
             format!("LLM classification API error: {e}. Falling back to embedding search.")
         )
     }
+}
+
+fn is_transactional_or_spam(sender: &str, subject: &str) -> bool {
+    let s_lower = sender.to_lowercase();
+    let subj_lower = subject.to_lowercase();
+
+    // Check sender email/domain blocklist
+    let blocked_domains = [
+        "calmail",
+        "icc.co.il",
+        "cal.co.il",
+        "leumicard.co.il",
+        "max.co.il",
+        "isracard.co.il",
+        "amex.co.il",
+        "americanexpress.co.il",
+        "paypal.com",
+        "paypal.co.il",
+        "linkedin.com",
+        "github.com",
+        "coursera.org",
+        "idealista.com",
+        "booking.com",
+        "noreply@",
+        "no-reply@",
+        "donotreply@",
+        "do-not-reply@",
+        "info@leumicard.co.il",
+        "info@cal.co.il",
+        "billing@",
+        "newsletter@",
+        "notification@",
+        "notifications@",
+        "alert@",
+        "alerts@",
+    ];
+
+    for domain in &blocked_domains {
+        if s_lower.contains(domain) {
+            return true;
+        }
+    }
+
+    // Check subject blocklist (mostly Hebrew credit card/marketing and some English)
+    let blocked_subject_keywords = [
+        "דף פירוט",
+        "חיוב חודשי",
+        "פירוט החיובים",
+        "חשבונית מס",
+        "קבלה",
+        "חשבונית/קבלה",
+        "פירוט חיוב",
+        "אישור תשלום",
+        "הוראת קבע",
+        "אישור פעולה",
+        "תנועה חדשה",
+        "הודעת תשלום",
+        "החשבונית שלך",
+        "הקבלה שלך",
+        "newsletter",
+        "digest",
+        "weekly summary",
+        "monthly summary",
+        "your account",
+        "statement of account",
+        "reset password",
+        "otp",
+        "one-time password",
+        "verification code",
+        "קוד אימות",
+    ];
+
+    for keyword in &blocked_subject_keywords {
+        if subj_lower.contains(keyword) {
+            return true;
+        }
+    }
+
+    // Double check specific transactional patterns (e.g. Cal / Max statements)
+    if s_lower.contains("cal") && subj_lower.contains("פירוט") {
+        return true;
+    }
+
+    false
 }

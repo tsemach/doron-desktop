@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useLanguage } from "../../../context/LanguageContext";
 
@@ -40,6 +41,18 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
 
   useEffect(() => {
     loadEmails();
+
+    // Listen for real-time case emails updates
+    const unlisten = listen("case-emails-updated", (event) => {
+      const updatedCaseId = event.payload as number;
+      if (updatedCaseId === caseId) {
+        fetchCaseEmailsFromDb();
+      }
+    });
+
+    return () => {
+      unlisten.then((f) => f());
+    };
   }, [caseId]);
 
   useEffect(() => {
@@ -49,12 +62,29 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
     }
   }, [emails]);
 
+  async function fetchCaseEmailsFromDb() {
+    try {
+      const res = await invoke<CaseEmail[]>("list_case_emails", { caseId });
+      setEmails(res);
+    } catch (err) {
+      console.error("Failed to load case emails from DB:", err);
+      setError(String(err));
+    }
+  }
+
   async function loadEmails() {
     setLoading(true);
     setError(null);
     try {
-      const res = await invoke<CaseEmail[]>("list_case_emails", { caseId });
-      setEmails(res);
+      // 1. Force network check on Gmail in the background (non-blocking in Rust)
+      try {
+        await invoke("trigger_email_ingestion");
+      } catch (ingestErr) {
+        console.warn("Failed to trigger background email ingestion:", ingestErr);
+      }
+      
+      // 2. Fetch all linked emails for this case from DB immediately
+      await fetchCaseEmailsFromDb();
     } catch (err) {
       console.error(err);
       setError(String(err));
@@ -92,19 +122,44 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
 
   return (
     <div className="flex flex-col h-full bg-[#f0f2f5] dark:bg-zinc-950 relative">
-      {/* WhatsApp header */}
-      <div className="bg-white dark:bg-zinc-900 border-b border-border px-4 py-2 flex items-center gap-3 shrink-0 shadow-xs">
-        <div className="w-10 h-10 rounded-full bg-slate-300 dark:bg-zinc-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-200">
-          ✉
+      {/* Header */}
+      <div className="bg-white dark:bg-zinc-900 border-b border-border px-4 py-2 flex items-center justify-between shrink-0 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-slate-300 dark:bg-zinc-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-200">
+            ✉
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm text-foreground">
+              {t("emails_exchange") || "Case Email Correspondence"}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {emails.length} {t("messages") || "messages"}
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-semibold text-sm text-foreground">
-            {t("emails_exchange") || "Case Email Correspondence"}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {emails.length} {t("messages") || "messages"}
-          </p>
-        </div>
+
+        <button
+          onClick={loadEmails}
+          disabled={loading}
+          className="p-1.5 hover:bg-muted border border-border rounded-lg text-muted-foreground hover:text-foreground cursor-pointer transition-colors flex items-center justify-center disabled:opacity-50"
+          title={t("refresh")}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={loading ? "animate-spin" : ""}
+          >
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.72 2.78L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
+        </button>
       </div>
 
       {/* Chat workspace area */}

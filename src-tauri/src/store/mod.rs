@@ -144,6 +144,10 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
             reason        TEXT,
             attachments_json TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS ignored_emails (
+            message_id    TEXT PRIMARY KEY
+        );
     ").map_err(|e| format!("[emails schema] {e}"))?;
 
     Ok(conn)

@@ -81,7 +81,8 @@ pub fn run() {
             email::list_pending_email_alerts,
             email::confirm_email_alert,
             email::delete_email_alert,
-            email::list_case_emails
+            email::list_case_emails,
+            email::trigger_email_ingestion
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

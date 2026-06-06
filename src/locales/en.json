@@ -87,5 +87,6 @@
   "provider": "Provider",
   "provider_api_key": "Provider API Key",
   "provider_key_desc": "Used to process incoming emails and suggest case matching. Stored locally.",
-  "emails": "Emails"
+  "emails": "Emails",
+  "refresh": "Refresh"
 }
