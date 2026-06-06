@@ -138,6 +138,7 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
             sender        TEXT NOT NULL,
             subject       TEXT NOT NULL,
             body_snippet  TEXT NOT NULL,
+            body_text     TEXT,
             received_at   TEXT NOT NULL,
             suggested_case_id INTEGER,
             confidence    REAL,
@@ -149,6 +150,36 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
             message_id    TEXT PRIMARY KEY
         );
     ").map_err(|e| format!("[emails schema] {e}"))?;
+
+    // Ensure 'body_text' column exists in 'pending_email_alerts' for migration
+    let body_text_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('pending_email_alerts') WHERE name='body_text'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !body_text_exists {
+        let _ = conn.execute("ALTER TABLE pending_email_alerts ADD COLUMN body_text TEXT;", []);
+    }
+
+    // Clean up forwarded headers from existing case_emails
+    if let Ok(mut stmt) = conn.prepare("SELECT id, body_text FROM case_emails") {
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, Option<String>>(1)?)));
+        if let Ok(rows) = rows {
+            for row in rows.flatten() {
+                let (id, body_text) = row;
+                if let Some(body) = body_text {
+                    let cleaned = crate::email::strip_forward_headers(&body);
+                    if cleaned != body {
+                        let _ = conn.execute(
+                            "UPDATE case_emails SET body_text = ?1 WHERE id = ?2",
+                            params![cleaned, id],
+                        );
+                        println!("[DB Migration] Stripped forward headers for case email ID {}", id);
+                    }
+                }
+            }
+        }
+    }
 
     Ok(conn)
 }

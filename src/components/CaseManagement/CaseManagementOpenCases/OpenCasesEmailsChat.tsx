@@ -37,6 +37,9 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
   // Selected email for detail view
   const [selectedEmail, setSelectedEmail] = useState<CaseEmail | null>(null);
   
+  // Track expanded emails in the chat view
+  const [expandedEmails, setExpandedEmails] = useState<Record<number, boolean>>({});
+  
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -226,9 +229,27 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
                     </div>
 
                     {/* Snippet / Text */}
-                    <p className="text-sm text-foreground/80 break-words leading-normal whitespace-pre-wrap">
-                      {email.body_text}
-                    </p>
+                    <div className="text-sm text-foreground/80 break-words leading-normal whitespace-pre-wrap">
+                      <p>
+                        {email.body_text && email.body_text.length > 250 && !expandedEmails[email.id]
+                          ? `${email.body_text.slice(0, 250)}...`
+                          : email.body_text}
+                      </p>
+                      {email.body_text && email.body_text.length > 250 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedEmails(prev => ({
+                              ...prev,
+                              [email.id]: !prev[email.id]
+                            }));
+                          }}
+                          className="mt-1.5 text-xs font-semibold text-[#007acc] dark:text-[#38bdf8] hover:underline cursor-pointer select-none focus:outline-none focus:ring-0"
+                        >
+                          {expandedEmails[email.id] ? t("show_less") : t("show_more")}
+                        </button>
+                      )}
+                    </div>
 
                     {/* Attachments inside bubble */}
                     {attachments.length > 0 && (

@@ -28,8 +28,7 @@ pub async fn search_documents(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests { 
     use rusqlite::Connection;
 
     #[test]
