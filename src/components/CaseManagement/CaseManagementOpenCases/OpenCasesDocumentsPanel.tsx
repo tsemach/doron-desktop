@@ -64,6 +64,7 @@ export default function OpenCasesDocumentsPanel({
   attachments = [],
 }: OpenCasesDocumentsPanelProps) {
   const [docSearchQuery, setDocSearchQuery] = useState("");
+  const [attachmentsExpanded, setAttachmentsExpanded] = useState(true);
   const { t } = useLanguage();
 
   const filteredDocs = documents.filter((doc) => {
@@ -143,30 +144,50 @@ export default function OpenCasesDocumentsPanel({
               onRemoveDocument={onRemoveDocument}
             />
 
-            {activeRightTab === "emails" && attachments && attachments.length > 0 && (
-              <div className="pt-4 border-t border-border mt-4">
-                <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-2">
-                  📎 {t("attachments") || "Attachments"}
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  {attachments.map((att, index) => (
-                    <div
-                      key={index}
-                      onClick={() => onOpenFile(att.staged_path)}
-                      className="rounded-lg border border-border p-3 hover:border-primary/40 dark:hover:border-primary/45 bg-card hover:shadow-xs transition-all duration-150 flex items-center gap-3 cursor-pointer group animate-fade-in"
-                    >
-                      <span className="text-muted-foreground group-hover:text-primary transition-colors">📎</span>
-                      <h4
-                        className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors leading-tight"
-                        title={att.name}
-                      >
-                        {att.name}
-                      </h4>
+            {activeRightTab === "emails" && attachments && attachments.length > 0 && (() => {
+              // Deduplicate attachments by name
+              const uniqueAttachments = Array.from(
+                new Map(attachments.map(att => [att.name, att])).values()
+              );
+
+              return (
+                <div className="pt-4 border-t border-border mt-4">
+                  <button
+                    onClick={() => setAttachmentsExpanded(!attachmentsExpanded)}
+                    className="w-full flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-2 hover:text-foreground transition-colors focus:outline-none focus:ring-0 cursor-pointer select-none leading-none"
+                    type="button"
+                  >
+                    <span className="text-xs flex items-center justify-center leading-none">📎</span>
+                    <span className={`text-xs flex items-center justify-center transition-transform duration-200 select-none leading-none font-sans ${attachmentsExpanded ? "rotate-90" : ""}`}>
+                      ▸
+                    </span>
+                    <span className="flex items-center leading-none">
+                      {t("attachments") || "Attachments"} ({uniqueAttachments.length})
+                    </span>
+                  </button>
+                  
+                  {attachmentsExpanded && (
+                    <div className="grid grid-cols-1 gap-2">
+                      {uniqueAttachments.map((att, index) => (
+                        <div
+                          key={index}
+                          onClick={() => onOpenFile(att.staged_path)}
+                          className="rounded-lg border border-border p-3 hover:border-primary/40 dark:hover:border-primary/45 bg-card hover:shadow-xs transition-all duration-150 flex items-center gap-3 cursor-pointer group animate-fade-in"
+                        >
+                          <span className="text-muted-foreground group-hover:text-primary transition-colors">📎</span>
+                          <h4
+                            className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors leading-tight"
+                            title={att.name}
+                          >
+                            {att.name}
+                          </h4>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
       </div>
