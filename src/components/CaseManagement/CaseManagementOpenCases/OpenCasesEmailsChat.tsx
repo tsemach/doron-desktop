@@ -65,6 +65,22 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
     }
   }, [emails]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedEmail(null);
+      }
+    };
+
+    if (selectedEmail) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedEmail]);
+
   async function fetchCaseEmailsFromDb() {
     try {
       const res = await invoke<CaseEmail[]>("list_case_emails", { caseId });
