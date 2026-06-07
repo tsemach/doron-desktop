@@ -216,3 +216,48 @@ pub fn list_case_attachments(app: AppHandle, case_id: i64) -> Result<Vec<super::
     }
     Ok(all_attachments)
 }
+
+#[tauri::command]
+pub fn remove_attachment(
+    app: AppHandle,
+    case_id: i64,
+    staged_path: String,
+) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+
+    // 1. Physically delete the file from disk if it exists
+    let path = std::path::Path::new(&staged_path);
+    if path.exists() {
+        std::fs::remove_file(path)
+            .map_err(|e| format!("Failed to delete attachment from disk: {e}"))?;
+    }
+
+    // 2. Query all emails for this case
+    let mut stmt = conn
+        .prepare("SELECT id, attachments_json FROM case_emails WHERE case_id = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt.query_map(params![case_id], |row| {
+        let id: i64 = row.get(0)?;
+        let json_str: String = row.get(1)?;
+        Ok((id, json_str))
+    }).map_err(|e| e.to_string())?;
+
+    // 3. For each email, filter out the attachment with the matching staged_path
+    for row in rows {
+        if let Ok((id, json_str)) = row {
+            let mut atts: Vec<super::types::AttachmentMetadata> = serde_json::from_str(&json_str).unwrap_or_default();
+            let original_len = atts.len();
+            atts.retain(|att| att.staged_path != staged_path);
+            if atts.len() != original_len {
+                let new_json = serde_json::to_string(&atts).unwrap_or_else(|_| "[]".to_string());
+                conn.execute(
+                    "UPDATE case_emails SET attachments_json = ?1 WHERE id = ?2",
+                    params![new_json, id],
+                ).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+
+    Ok(())
+}

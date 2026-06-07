@@ -48,6 +48,7 @@ export default function CaseManagementOpenCasesDetails() {
   const [showAddDocModal, setShowAddDocModal] = useState(false);
   const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
 
   // Right side panel tab state
   const [activeRightTab, setActiveRightTab] = useState<"preview" | "emails">("preview");
@@ -286,6 +287,29 @@ export default function CaseManagementOpenCasesDetails() {
     }
   }
 
+  async function confirmRemoveAttachment() {
+    if (!attachmentToDelete || !selectedCase) return;
+    const att = attachmentToDelete;
+    setAttachmentToDelete(null);
+
+    setDocsLoading(true);
+    setDocsError(null);
+    try {
+      await invoke("remove_attachment", {
+        caseId: Number(selectedCase.id),
+        stagedPath: att.staged_path,
+      });
+
+      // Reload attachments list
+      await loadAttachments(Number(selectedCase.id));
+    } catch (err) {
+      console.error(err);
+      setDocsError(String(err));
+    } finally {
+      setDocsLoading(false);
+    }
+  }
+
   return (
     <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-screen">
       {/* Scope styles for the converted DOCX output */}
@@ -442,6 +466,7 @@ export default function CaseManagementOpenCasesDetails() {
             activeRightTab={activeRightTab}
             onTabChange={setActiveRightTab}
             attachments={attachments}
+            onRemoveAttachment={(att) => setAttachmentToDelete(att)}
           />
 
           {/* Resizable Divider (rendered only on large screens) */}
@@ -554,6 +579,14 @@ export default function CaseManagementOpenCasesDetails() {
           docName={docToDelete.title || docToDelete.name}
           onConfirm={confirmRemoveDocument}
           onCancel={() => setDocToDelete(null)}
+        />
+      )}
+
+      {attachmentToDelete && (
+        <OpenCasesDocumentDeleteModal
+          docName={attachmentToDelete.name}
+          onConfirm={confirmRemoveAttachment}
+          onCancel={() => setAttachmentToDelete(null)}
         />
       )}
     </main>

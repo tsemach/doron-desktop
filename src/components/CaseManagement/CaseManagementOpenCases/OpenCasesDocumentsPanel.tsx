@@ -43,6 +43,7 @@ interface OpenCasesDocumentsPanelProps {
   activeRightTab?: "preview" | "emails";
   onTabChange?: (tab: "preview" | "emails") => void;
   attachments?: { name: string; staged_path: string; size_kb: number }[];
+  onRemoveAttachment?: (att: { name: string; staged_path: string; size_kb: number }) => void;
 }
 
 export default function OpenCasesDocumentsPanel({
@@ -62,6 +63,7 @@ export default function OpenCasesDocumentsPanel({
   activeRightTab = "preview",
   onTabChange,
   attachments = [],
+  onRemoveAttachment,
 }: OpenCasesDocumentsPanelProps) {
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(true);
@@ -172,15 +174,45 @@ export default function OpenCasesDocumentsPanel({
                         <div
                           key={index}
                           onClick={() => onOpenFile(att.staged_path)}
-                          className="rounded-lg border border-border p-3 hover:border-primary/40 dark:hover:border-primary/45 bg-card hover:shadow-xs transition-all duration-150 flex items-center gap-3 cursor-pointer group animate-fade-in"
+                          className="rounded-lg border border-border p-3 hover:border-primary/40 dark:hover:border-primary/45 bg-card hover:shadow-xs transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer group animate-fade-in"
                         >
-                          <span className="text-muted-foreground group-hover:text-primary transition-colors">📎</span>
-                          <h4
-                            className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors leading-tight"
-                            title={att.name}
-                          >
-                            {att.name}
-                          </h4>
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <span className="text-muted-foreground group-hover:text-primary transition-colors shrink-0">📎</span>
+                            <h4
+                              className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors leading-tight"
+                              title={att.name}
+                            >
+                              {att.name}
+                            </h4>
+                          </div>
+                          {onRemoveAttachment && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveAttachment(att);
+                              }}
+                              className="h-8 w-8 rounded-lg flex items-center justify-center text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
+                              title={t("remove_document") || "Remove attachment"}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M3 6h18" />
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                <line x1="10" x2="10" y1="11" y2="17" />
+                                <line x1="14" x2="14" y1="11" y2="17" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
