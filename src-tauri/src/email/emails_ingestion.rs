@@ -288,33 +288,60 @@ pub async fn check_and_ingest_emails(app: &AppHandle, config: &EmailConfig) -> R
         .login(&config.username, &config.password_enc)
         .map_err(|e| format!("IMAP login failed: {}", e.0))?;
 
-    session.select("INBOX").map_err(|e| e.to_string())?;
-
-    // Heal any existing truncated case emails
-    if let Err(e) = heal_truncated_case_emails(app, &mut session).await {
-        println!("[Email Healer Error] {}", e);
-    }
-
-    // Search for unseen messages from the last 30 days
     let thirty_days_ago = chrono::Utc::now() - chrono::Duration::days(30);
     let imap_date = thirty_days_ago.format("%d-%b-%Y").to_string();
-    let search_query = format!("UNSEEN SINCE {}", imap_date);
 
-    let mut unseen_seqs: Vec<u32> = session
-        .search(&search_query)
-        .map_err(|e| e.to_string())?
-        .into_iter()
-        .collect();
-    if unseen_seqs.is_empty() {
-        return Ok(());
+    // 1. Process INBOX (incoming unseen emails)
+    if session.select("INBOX").is_ok() {
+        // Heal any existing truncated case emails
+        if let Err(e) = heal_truncated_case_emails(app, &mut session).await {
+            println!("[Email Healer Error] {}", e);
+        }
+
+        let search_query = format!("UNSEEN SINCE {}", imap_date);
+        if let Ok(unseen_seqs_iter) = session.search(&search_query) {
+            let mut unseen_seqs: Vec<u32> = unseen_seqs_iter.into_iter().collect();
+            if !unseen_seqs.is_empty() {
+                unseen_seqs.sort();
+                if let Ok(new_emails) = filter_new_emails(app, &mut session, &unseen_seqs).await {
+                    let mut new_emails = new_emails;
+                    new_emails.sort_by(|a, b| b.0.cmp(&a.0));
+                    for (seq, message_id) in new_emails {
+                        if let Err(e) = ingest_single_email(app, config, &mut session, seq, &message_id).await {
+                            println!("[Email Ingestion Error] Failed to ingest sequence {}: {}", seq, e);
+                        }
+                    }
+                }
+            }
+        }
     }
-    unseen_seqs.sort();
 
-    let new_emails = filter_new_emails(app, &mut session, &unseen_seqs).await?;
+    // 2. Process Sent Folder (outgoing emails)
+    let sent_folders = ["[Gmail]/Sent Mail", "Sent", "Sent Messages", "Sent Items"];
+    let mut selected_sent = false;
+    for folder in sent_folders {
+        if session.select(folder).is_ok() {
+            selected_sent = true;
+            break;
+        }
+    }
 
-    for (seq, message_id) in new_emails {
-        if let Err(e) = ingest_single_email(app, config, &mut session, seq, &message_id).await {
-            println!("[Email Ingestion Error] Failed to ingest sequence {}: {}", seq, e);
+    if selected_sent {
+        let search_query_sent = format!("SINCE {}", imap_date);
+        if let Ok(sent_seqs_iter) = session.search(&search_query_sent) {
+            let mut sent_seqs: Vec<u32> = sent_seqs_iter.into_iter().collect();
+            if !sent_seqs.is_empty() {
+                sent_seqs.sort();
+                if let Ok(new_sent_emails) = filter_new_emails(app, &mut session, &sent_seqs).await {
+                    let mut new_sent_emails = new_sent_emails;
+                    new_sent_emails.sort_by(|a, b| b.0.cmp(&a.0));
+                    for (seq, message_id) in new_sent_emails {
+                        if let Err(e) = ingest_single_email(app, config, &mut session, seq, &message_id).await {
+                            println!("[Email Ingestion Error] Failed to ingest sent sequence {}: {}", seq, e);
+                        }
+                    }
+                }
+            }
         }
     }
 

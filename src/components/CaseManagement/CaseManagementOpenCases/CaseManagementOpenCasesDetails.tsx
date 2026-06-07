@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsModal";
 import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
@@ -62,6 +63,9 @@ export default function CaseManagementOpenCasesDetails() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Email attachments state
+  const [attachments, setAttachments] = useState<{ name: string; staged_path: string; size_kb: number }[]>([]);
+
   // Split pane states
   const [leftPercent, setLeftPercent] = useState(30);
   const [isDragging, setIsDragging] = useState(false);
@@ -107,14 +111,45 @@ export default function CaseManagementOpenCasesDetails() {
     }
   }, [caseId]);
 
-  // Fetch documents when selected case changes
+  // Fetch documents and attachments when selected case changes
   useEffect(() => {
     if (selectedCase?.folder) {
       loadDocuments(selectedCase.folder);
     } else {
       setDocuments([]);
     }
+
+    if (selectedCase?.id) {
+      loadAttachments(Number(selectedCase.id));
+    } else {
+      setAttachments([]);
+    }
   }, [selectedCase?.id, selectedCase?.folder]);
+
+  // Listen for email updates to refresh attachments list
+  useEffect(() => {
+    if (!selectedCase?.id) return;
+
+    const unlisten = listen("case-emails-updated", (event) => {
+      const updatedCaseId = event.payload as number;
+      if (updatedCaseId === Number(selectedCase.id)) {
+        loadAttachments(Number(selectedCase.id));
+      }
+    });
+
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, [selectedCase?.id]);
+
+  async function loadAttachments(cId: number) {
+    try {
+      const atts = await invoke<any[]>("list_case_attachments", { caseId: cId });
+      setAttachments(atts);
+    } catch (err) {
+      console.error("Failed to load case attachments:", err);
+    }
+  }
 
   // Handle selected document preview loading
   useEffect(() => {
@@ -406,6 +441,7 @@ export default function CaseManagementOpenCasesDetails() {
             selectedDocument={selectedDocument}
             activeRightTab={activeRightTab}
             onTabChange={setActiveRightTab}
+            attachments={attachments}
           />
 
           {/* Resizable Divider (rendered only on large screens) */}

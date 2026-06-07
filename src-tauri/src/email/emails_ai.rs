@@ -42,10 +42,21 @@ fn check_exact_subject_match(cases: &[CaseCandidate], subject: &str) -> Option<i
         let lower_name = kase.name.to_lowercase();
         let lower_case_subj = kase.subject.to_lowercase();
 
-        if lower_subject.contains(&lower_name)
-            || (!lower_case_subj.is_empty() && lower_subject.contains(&lower_case_subj))
-        {
+        if lower_subject.contains(&lower_name) {
             return Some(kase.id);
+        }
+
+        if !lower_case_subj.is_empty() {
+            if lower_subject.contains(&lower_case_subj) {
+                return Some(kase.id);
+            }
+            // Check parts split by '-' or ':'
+            for part in lower_case_subj.split(|c| c == '-' || c == ':') {
+                let trimmed = part.trim();
+                if trimmed.len() >= 4 && lower_subject.contains(trimmed) {
+                    return Some(kase.id);
+                }
+            }
         }
     }
     None
@@ -188,32 +199,13 @@ pub(crate) async fn run_cascade_classification(
 
     // Threshold filtering (spams have very low cosine similarity to any legal document)
     let best_local_score = sorted_candidates.first().map(|c| *c.1).unwrap_or(0.0);
-    let mut best_direct = 0.0;
-    let mut direct_match: Option<i64> = None;
 
     if best_local_score < 0.35 {
-        // Double check against case names/subjects directly
-        for kase in &cases {
-            let name_vec = match embeddings::get_query_embedding(&kase.name) {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-            let sim = embeddings::cosine_similarity(&query_vector, &name_vec);
-            if sim > best_direct {
-                best_direct = sim;
-                direct_match = Some(kase.id);
-            }
-        }
-
-        if best_direct < 0.40 {
-            return (None, 0.0, format!("Rough filtering skipped: similarity index {best_local_score:.2} too low. Unrelated to any case."));
-        } else if best_direct > 0.85 {
-            return (
-                direct_match,
-                best_direct as f64,
-                "High confidence name match.".to_string(),
-            );
-        }
+        return (
+            None,
+            0.0,
+            format!("Rough filtering skipped: similarity index {best_local_score:.2} too low. Unrelated to any case."),
+        );
     }
 
     // Get top 3 cases for LLM verification
@@ -233,27 +225,12 @@ pub(crate) async fn run_cascade_classification(
 
     // 4. Step 2: Verification using provider-agnostic LLM
     if config.api_key_enc.is_empty() {
-        // Fallback to highest embedding match if no API key configured
-        if best_local_score >= 0.35 || best_direct > 0.85 {
-            let best_id = top_cases.first().map(|c| c.id);
-            let confidence = if best_local_score >= 0.35 {
-                best_local_score as f64
-            } else {
-                best_direct as f64
-            };
-            return (
-                best_id,
-                confidence,
-                "Embedding-only classification (API key not configured)".to_string(),
-            );
-        } else {
-            return (
-                None,
-                0.0,
-                "Embedding-only classification (API key not configured - similarity too low)"
-                    .to_string(),
-            );
-        }
+        let best_id = top_cases.first().map(|c| c.id);
+        return (
+            best_id,
+            best_local_score as f64,
+            "Embedding-only classification (API key not configured)".to_string(),
+        );
     }
 
     match call_llm_classification(config, sender, subject, snippet, &top_cases).await {

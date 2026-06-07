@@ -192,3 +192,27 @@ fn clean_line_for_header_check(line: &str) -> String {
         .collect::<String>()
         .to_lowercase()
 }
+
+#[tauri::command]
+pub fn list_case_attachments(app: AppHandle, case_id: i64) -> Result<Vec<super::types::AttachmentMetadata>, String> {
+    let conn = store::open_db(&app)?;
+    let mut stmt = conn
+        .prepare("SELECT attachments_json FROM case_emails WHERE case_id = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt.query_map(params![case_id], |r| {
+        let json_str: String = r.get(0)?;
+        Ok(json_str)
+    }).map_err(|e| e.to_string())?;
+
+    let mut all_attachments = Vec::new();
+    for row in rows {
+        if let Ok(json_str) = row {
+            let atts: Vec<super::types::AttachmentMetadata> = serde_json::from_str(&json_str).unwrap_or_default();
+            for att in atts {
+                all_attachments.push(att);
+            }
+        }
+    }
+    Ok(all_attachments)
+}

@@ -117,15 +117,19 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
     ).map_err(|e| format!("Failed to find case folder: {e}"))?;
     let case_folder = Path::new(&folder_path);
 
-    // 3. Move staged attachments to case folder
+    // 3. Move staged attachments to case folder's attachments directory
     let staged_attachments: Vec<AttachmentMetadata> = serde_json::from_str(&alert.attachments_json)
         .unwrap_or_default();
     
+    let attachments_dir = case_folder.join("attachments");
+    std::fs::create_dir_all(&attachments_dir)
+        .map_err(|e| format!("Failed to create attachments folder: {e}"))?;
+
     let mut case_attachments = Vec::new();
     for att in staged_attachments {
         let src_path = Path::new(&att.staged_path);
         if src_path.exists() {
-            let dest_path = case_folder.join(&att.name);
+            let dest_path = attachments_dir.join(&att.name);
             std::fs::copy(src_path, &dest_path)
                 .map_err(|e| format!("Failed to copy attachment {}: {e}", att.name))?;
             
