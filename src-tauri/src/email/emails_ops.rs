@@ -40,14 +40,8 @@ pub fn list_case_emails(app: AppHandle, case_id: i64) -> Result<Vec<CaseEmail>, 
 pub async fn trigger_email_ingestion(app: AppHandle) -> Result<(), String> {
     println!("[Rust Backend] trigger_email_ingestion called!");
     if let Some(config) = get_email_settings_internal(&app) {
-        // Spawn background task to check and ingest emails so it is non-blocking
-        tauri::async_runtime::spawn(async move {
-            println!("[Rust Backend] Background email ingestion started...");
-            match check_and_ingest_emails(&app, &config).await {
-                Ok(_) => println!("[Rust Backend] Background email ingestion finished successfully!"),
-                Err(e) => println!("[Rust Backend] Background email ingestion error: {}", e),
-            }
-        });
+        // Await the check directly so the frontend refresh spinner stays active during the network operation
+        check_and_ingest_emails(&app, &config).await?;
         Ok(())
     } else {
         Err("Email configurations not found. Please set them up in Settings.".to_string())

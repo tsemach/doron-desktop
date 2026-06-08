@@ -181,6 +181,39 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
         }
     }
 
+    // Convert existing received_at dates in case_emails and pending_email_alerts to standard RFC3339
+    if let Ok(mut stmt) = conn.prepare("SELECT id, received_at FROM case_emails") {
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)));
+        if let Ok(rows) = rows {
+            for row in rows.flatten() {
+                let (id, received_at) = row;
+                if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(received_at.trim()) {
+                    let rfc3339 = dt.to_rfc3339();
+                    let _ = conn.execute(
+                        "UPDATE case_emails SET received_at = ?1 WHERE id = ?2",
+                        params![rfc3339, id],
+                    );
+                }
+            }
+        }
+    }
+
+    if let Ok(mut stmt) = conn.prepare("SELECT id, received_at FROM pending_email_alerts") {
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)));
+        if let Ok(rows) = rows {
+            for row in rows.flatten() {
+                let (id, received_at) = row;
+                if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(received_at.trim()) {
+                    let rfc3339 = dt.to_rfc3339();
+                    let _ = conn.execute(
+                        "UPDATE pending_email_alerts SET received_at = ?1 WHERE id = ?2",
+                        params![rfc3339, id],
+                    );
+                }
+            }
+        }
+    }
+
     Ok(conn)
 }
 

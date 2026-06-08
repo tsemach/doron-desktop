@@ -240,12 +240,12 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
                     </div>
 
                     {/* Subject */}
-                    <div className="font-semibold text-xs text-foreground/90 truncate mb-1">
+                    <div className="font-semibold text-xs text-foreground/90 truncate mb-1" dir="auto">
                       {email.subject}
                     </div>
 
                     {/* Snippet / Text */}
-                    <div className="text-sm text-foreground/80 break-words leading-normal whitespace-pre-wrap">
+                    <div className="text-sm text-foreground/80 break-words leading-normal whitespace-pre-wrap" dir="auto">
                       <p>
                         {email.body_text && email.body_text.length > 250 && !expandedEmails[email.id]
                           ? `${email.body_text.slice(0, 250)}...`
@@ -304,7 +304,7 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-border bg-muted/35 flex justify-between items-center shrink-0">
               <div>
-                <h4 className="font-bold text-base text-foreground truncate max-w-[450px]">
+                <h4 className="font-bold text-base text-foreground truncate max-w-[450px]" dir="auto">
                   {selectedEmail.subject}
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -326,7 +326,7 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
             </div>
 
             {/* Modal Body scroll */}
-            <div className="flex-1 overflow-y-auto p-6 bg-background/50 dark:bg-background/25">
+            <div className="flex-1 overflow-y-auto p-6 bg-background/50 dark:bg-background/25" dir="auto">
               {selectedEmail.body_html ? (
                 <div 
                   className="prose dark:prose-invert max-w-none text-sm leading-relaxed"

@@ -93,6 +93,15 @@ async fn ingest_single_email(
         .iter()
         .find(|h| h.get_key().to_lowercase() == "date")
         .map(|h| h.get_value())
+        .map(|rd| {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(rd.trim()) {
+                dt.to_rfc3339()
+            } else if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(rd.trim()) {
+                dt.to_rfc3339()
+            } else {
+                chrono::Utc::now().to_rfc3339()
+            }
+        })
         .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
 
     // Extract body parts & attachments
