@@ -90,5 +90,6 @@
   "emails": "Emails",
   "refresh": "Refresh",
   "show_more": "Show More",
-  "show_less": "Show Less"
+  "show_less": "Show Less",
+  "copy_to_case": "Copy & Update to Case Documents"
 }

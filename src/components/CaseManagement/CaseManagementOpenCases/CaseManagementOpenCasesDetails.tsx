@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsModal";
 import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
+import OpenCasesUpdateDocumentModal from "./OpenCasesUpdateDocumentModal";
 import OpenCasesFieldsModal from "./OpenCasesFieldsModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
@@ -46,6 +47,7 @@ export default function CaseManagementOpenCasesDetails() {
   const [docsError, setDocsError] = useState<string | null>(null);
   const [editingDoc, setEditingDoc] = useState<CaseFile | null>(null);
   const [showAddDocModal, setShowAddDocModal] = useState(false);
+  const [updatingAttachment, setUpdatingAttachment] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
   const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
@@ -467,6 +469,7 @@ export default function CaseManagementOpenCasesDetails() {
             onTabChange={setActiveRightTab}
             attachments={attachments}
             onRemoveAttachment={(att) => setAttachmentToDelete(att)}
+            onCopyAttachmentToCase={setUpdatingAttachment}
           />
 
           {/* Resizable Divider (rendered only on large screens) */}
@@ -562,6 +565,22 @@ export default function CaseManagementOpenCasesDetails() {
             }
           }}
           onCancel={() => setShowAddDocModal(false)}
+        />
+      )}
+
+      {updatingAttachment && selectedCase?.folder && (
+        <OpenCasesUpdateDocumentModal
+          caseId={Number(selectedCase.id)}
+          caseFolder={selectedCase.folder}
+          attachment={updatingAttachment}
+          existingDocuments={documents}
+          onSave={() => {
+            setUpdatingAttachment(null);
+            if (selectedCase.folder) {
+              loadDocuments(selectedCase.folder);
+            }
+          }}
+          onCancel={() => setUpdatingAttachment(null)}
         />
       )}
 

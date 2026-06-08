@@ -1,3 +1,4 @@
+import { useState } from "react";
 import OpenCasesFileIcon from "./OpenCasesFileIcon";
 import OpenCasesDocumentPanelControl from "./OpenCasesDocumentPanelControl";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -22,6 +23,7 @@ interface OpenCasesDocumentsPanelListProps {
   onOpenFile: (filePath: string) => void;
   onEditAnnotations: (doc: CaseFile) => void;
   onRemoveDocument: (doc: CaseFile) => void;
+  onDropAttachment?: (att: { name: string; staged_path: string; size_kb: number }) => void;
 }
 
 export default function OpenCasesDocumentsPanelList({
@@ -34,12 +36,46 @@ export default function OpenCasesDocumentsPanelList({
   onOpenFile,
   onEditAnnotations,
   onRemoveDocument,
+  onDropAttachment,
 }: OpenCasesDocumentsPanelListProps) {
   const { t } = useLanguage();
+  const [isDragOver, setIsDragOver] = useState(false);
 
   return (
-    <div className="space-y-2">
-      <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-2">
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (onDropAttachment) {
+          setIsDragOver(true);
+        }
+      }}
+      onDragLeave={() => {
+        setIsDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        if (onDropAttachment) {
+          try {
+            const dataStr = e.dataTransfer.getData("application/json");
+            if (dataStr) {
+              const att = JSON.parse(dataStr);
+              if (att && att.staged_path) {
+                onDropAttachment(att);
+              }
+            }
+          } catch (err) {
+            console.error("Drop attachment error:", err);
+          }
+        }
+      }}
+      className={`space-y-2 rounded-xl transition-all duration-200 border-2 ${
+        isDragOver
+          ? "border-primary border-dashed bg-primary/5 p-4 -m-2 scale-[1.01]"
+          : "border-transparent"
+      }`}
+    >
+      <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-2 select-none">
         {t("files_in_folder")}
       </div>
 

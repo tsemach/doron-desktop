@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsModal";
 import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
+import OpenCasesUpdateDocumentModal from "./OpenCasesUpdateDocumentModal";
 import OpenCasesFieldsModal from "./OpenCasesFieldsModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesCaseDeleteModal from "./OpenCasesCaseDeleteModal";
@@ -47,6 +48,7 @@ export default function CaseManagementOpenCases() {
   const [docsError, setDocsError] = useState<string | null>(null);
   const [editingDoc, setEditingDoc] = useState<CaseFile | null>(null);
   const [showAddDocModal, setShowAddDocModal] = useState(false);
+  const [updatingAttachment, setUpdatingAttachment] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
   const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null);
@@ -314,6 +316,7 @@ export default function CaseManagementOpenCases() {
           onEditAnnotations={setEditingDoc}
           onShowFields={() => setShowFieldsModal(true)}
           onAddDocument={() => setShowAddDocModal(true)}
+          onCopyAttachmentToCase={setUpdatingAttachment}
         />
       </div>
 
@@ -354,6 +357,22 @@ export default function CaseManagementOpenCases() {
             }
           }}
           onCancel={() => setShowAddDocModal(false)}
+        />
+      )}
+
+      {updatingAttachment && selectedCase?.folder && (
+        <OpenCasesUpdateDocumentModal
+          caseId={Number(selectedCase.id)}
+          caseFolder={selectedCase.folder}
+          attachment={updatingAttachment}
+          existingDocuments={documents}
+          onSave={() => {
+            setUpdatingAttachment(null);
+            if (selectedCase.folder) {
+              loadDocuments(selectedCase.folder);
+            }
+          }}
+          onCancel={() => setUpdatingAttachment(null)}
         />
       )}
 
