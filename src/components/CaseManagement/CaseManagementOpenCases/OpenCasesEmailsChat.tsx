@@ -84,7 +84,10 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
   async function fetchCaseEmailsFromDb() {
     try {
       const res = await invoke<CaseEmail[]>("list_case_emails", { caseId });
-      setEmails(res);
+      const sorted = [...res].sort(
+        (a, b) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime()
+      );
+      setEmails(sorted);
     } catch (err) {
       console.error("Failed to load case emails from DB:", err);
       setError(String(err));
