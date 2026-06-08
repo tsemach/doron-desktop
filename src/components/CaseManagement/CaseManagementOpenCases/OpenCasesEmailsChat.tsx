@@ -22,13 +22,16 @@ interface Attachment {
   name: string;
   staged_path: string;
   size_kb: number;
+  is_imported?: boolean;
 }
 
 interface CaseEmailsChatProps {
   caseId: number;
+  caseFolder?: string;
 }
 
-export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
+export default function CaseEmailsChat({ caseId, caseFolder }: CaseEmailsChatProps) {
+  const [emailsCount, setEmailsCount] = useState(0);
   const { t } = useLanguage();
   const [emails, setEmails] = useState<CaseEmail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,7 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setEmailsCount(0); // Reset count on case change so it scrolls to the bottom
     loadEmails();
 
     // Listen for real-time case emails updates
@@ -59,10 +63,13 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
   }, [caseId]);
 
   useEffect(() => {
-    // Scroll to bottom when emails load
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    // Scroll to bottom only when emails load for the first time OR when a new email is added (length increases)
+    if (emails.length > emailsCount) {
+      if (chatEndRef.current) {
+        chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
     }
+    setEmailsCount(emails.length);
   }, [emails]);
 
   useEffect(() => {
@@ -115,9 +122,13 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
     }
   }
 
-  async function handleOpenAttachment(stagedPath: string) {
+  async function handleOpenAttachment(att: Attachment) {
     try {
-      await openPath(stagedPath);
+      let filePath = att.staged_path;
+      if (att.is_imported && caseFolder && !filePath.toLowerCase().includes(caseFolder.toLowerCase().replace(/\\/g, "/"))) {
+        filePath = `${caseFolder}/${att.name}`.replace(/\\/g, "/");
+      }
+      await openPath(filePath);
     } catch (e) {
       console.error("Failed to open attachment:", e);
       alert(`Failed to open file: ${e}`);
@@ -280,11 +291,17 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
                           {attachments.map((att, aIdx) => (
                             <button
                               key={aIdx}
-                              onClick={() => handleOpenAttachment(att.staged_path)}
-                              className="inline-flex items-center gap-1.5 text-xs bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 border border-border/40 px-2 py-1 rounded-md transition-colors cursor-pointer text-foreground/80 max-w-[200px]"
-                              title={att.name}
+                              onClick={() => handleOpenAttachment(att)}
+                              className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors cursor-pointer max-w-[200px] ${
+                                att.is_imported
+                                  ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold"
+                                  : "bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 border border-border/40 text-foreground/80"
+                              }`}
+                              title={att.is_imported ? `${att.name} (Imported to Case)` : att.name}
                             >
-                              <span className="truncate max-w-[120px] font-medium">{att.name}</span>
+                              <span className="truncate max-w-[120px] font-medium">
+                                {att.is_imported ? `✓ ${att.name}` : att.name}
+                              </span>
                               <span className="text-[10px] text-muted-foreground">({att.size_kb} KB)</span>
                             </button>
                           ))}
@@ -355,10 +372,17 @@ export default function CaseEmailsChat({ caseId }: CaseEmailsChatProps) {
                     {attachments.map((att, aIdx) => (
                       <button
                         key={aIdx}
-                        onClick={() => handleOpenAttachment(att.staged_path)}
-                        className="inline-flex items-center gap-1.5 text-xs bg-muted hover:bg-accent border border-border px-3 py-1.5 rounded-lg transition-colors cursor-pointer text-foreground/90"
+                        onClick={() => handleOpenAttachment(att)}
+                        className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                          att.is_imported
+                            ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-bold"
+                            : "bg-muted hover:bg-accent border border-border text-foreground/90"
+                        }`}
+                        title={att.is_imported ? `${att.name} (Imported to Case)` : att.name}
                       >
-                        <span className="font-semibold">{att.name}</span>
+                        <span className="font-semibold">
+                          {att.is_imported ? `✓ ${att.name}` : att.name}
+                        </span>
                         <span className="text-[10px] text-muted-foreground">({att.size_kb} KB)</span>
                       </button>
                     ))}

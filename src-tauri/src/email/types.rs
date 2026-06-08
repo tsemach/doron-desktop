@@ -47,6 +47,8 @@ pub struct AttachmentMetadata {
     pub name: String,
     pub staged_path: String,
     pub size_kb: i64,
+    #[serde(default)]
+    pub is_imported: Option<bool>,
 }
 
 pub struct AttachmentData {

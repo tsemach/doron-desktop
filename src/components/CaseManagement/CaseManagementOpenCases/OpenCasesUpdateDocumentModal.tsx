@@ -188,6 +188,7 @@ export default function OpenCasesUpdateDocumentModal({
       await invoke("remove_attachment", {
         caseId,
         stagedPath: attachment.staged_path,
+        importedPath: normalizedFilePath,
       });
 
       onSave();

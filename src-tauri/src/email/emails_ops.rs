@@ -204,7 +204,9 @@ pub fn list_case_attachments(app: AppHandle, case_id: i64) -> Result<Vec<super::
         if let Ok(json_str) = row {
             let atts: Vec<super::types::AttachmentMetadata> = serde_json::from_str(&json_str).unwrap_or_default();
             for att in atts {
-                all_attachments.push(att);
+                if !att.is_imported.unwrap_or(false) {
+                    all_attachments.push(att);
+                }
             }
         }
     }
@@ -216,8 +218,10 @@ pub fn remove_attachment(
     app: AppHandle,
     case_id: i64,
     staged_path: String,
+    imported_path: Option<String>,
 ) -> Result<(), String> {
     let conn = store::open_db(&app)?;
+    use tauri::Emitter;
 
     // 1. Physically delete the file from disk if it exists
     let path = std::path::Path::new(&staged_path);
@@ -237,13 +241,29 @@ pub fn remove_attachment(
         Ok((id, json_str))
     }).map_err(|e| e.to_string())?;
 
-    // 3. For each email, filter out the attachment with the matching staged_path
+    // 3. For each email, either mark as imported or filter out completely
     for row in rows {
         if let Ok((id, json_str)) = row {
             let mut atts: Vec<super::types::AttachmentMetadata> = serde_json::from_str(&json_str).unwrap_or_default();
-            let original_len = atts.len();
-            atts.retain(|att| att.staged_path != staged_path);
-            if atts.len() != original_len {
+            let mut modified = false;
+
+            if let Some(ref imp_path) = imported_path {
+                for att in &mut atts {
+                    if att.staged_path == staged_path {
+                        att.is_imported = Some(true);
+                        att.staged_path = imp_path.clone(); // Point to the new path in case folder
+                        modified = true;
+                    }
+                }
+            } else {
+                let original_len = atts.len();
+                atts.retain(|att| att.staged_path != staged_path);
+                if atts.len() != original_len {
+                    modified = true;
+                }
+            }
+
+            if modified {
                 let new_json = serde_json::to_string(&atts).unwrap_or_else(|_| "[]".to_string());
                 conn.execute(
                     "UPDATE case_emails SET attachments_json = ?1 WHERE id = ?2",
@@ -252,6 +272,9 @@ pub fn remove_attachment(
             }
         }
     }
+
+    // 4. Emit the updated event so the frontend chat refreshes smoothly
+    let _ = app.emit("case-emails-updated", case_id);
 
     Ok(())
 }

@@ -142,6 +142,7 @@ async fn ingest_single_email(
                 name: att.filename,
                 staged_path: staged_path.to_string_lossy().to_string(),
                 size_kb: att.size_kb,
+                is_imported: None,
             });
         }
     }

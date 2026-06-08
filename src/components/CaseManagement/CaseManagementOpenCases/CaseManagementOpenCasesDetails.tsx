@@ -300,6 +300,7 @@ export default function CaseManagementOpenCasesDetails() {
       await invoke("remove_attachment", {
         caseId: Number(selectedCase.id),
         stagedPath: att.staged_path,
+        importedPath: null,
       });
 
       // Reload attachments list
@@ -505,7 +506,10 @@ export default function CaseManagementOpenCasesDetails() {
 
             <div className="flex-1 overflow-y-auto bg-background/50 dark:bg-background/20 relative flex flex-col min-h-0">
               {activeRightTab === "emails" ? (
-                <CaseEmailsChat caseId={Number(selectedCase?.id || 0)} />
+                <CaseEmailsChat 
+                  caseId={Number(selectedCase?.id || 0)} 
+                  caseFolder={selectedCase?.folder || ""} 
+                />
               ) : (
                 <OpenCasesDocumentPreview
                   selectedDocument={selectedDocument}

@@ -137,6 +137,7 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
                 name: att.name.clone(),
                 staged_path: dest_path.to_string_lossy().to_string(),
                 size_kb: att.size_kb,
+                is_imported: None,
             });
 
             // Trigger document indexing asynchronously
