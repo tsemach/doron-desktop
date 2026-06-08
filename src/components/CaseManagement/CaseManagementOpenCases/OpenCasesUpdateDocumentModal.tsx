@@ -150,11 +150,22 @@ export default function OpenCasesUpdateDocumentModal({
     setIsSubmitting(true);
     setError(null);
     try {
-      // 1. Copy the file into the case folder
-      const targetFilePath = await invoke<string>("add_file_to_case", {
-        caseFolder,
-        sourcePath: attachment.staged_path,
-      });
+      // 1. Copy the file into the case folder and replace placeholders if template exists
+      let targetFilePath = "";
+      const outPath = `${caseFolder}/${attachment.name}`.replace(/\\/g, "/");
+
+      if (matchingTemplate && templateFields.length > 0) {
+        targetFilePath = await invoke<string>("fill_document_placeholders", {
+          sourcePath: attachment.staged_path,
+          outputPath: outPath,
+          fieldValues,
+        });
+      } else {
+        targetFilePath = await invoke<string>("add_file_to_case", {
+          caseFolder,
+          sourcePath: attachment.staged_path,
+        });
+      }
 
       const normalizedFilePath = targetFilePath.replace(/\\/g, "/");
 
@@ -171,6 +182,12 @@ export default function OpenCasesUpdateDocumentModal({
         filePath: normalizedFilePath,
         notes: notes.trim() || null,
         tags,
+      });
+
+      // 4. Remove the file from email attachments
+      await invoke("remove_attachment", {
+        caseId,
+        stagedPath: attachment.staged_path,
       });
 
       onSave();

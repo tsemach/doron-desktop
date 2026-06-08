@@ -579,6 +579,9 @@ export default function CaseManagementOpenCasesDetails() {
             if (selectedCase.folder) {
               loadDocuments(selectedCase.folder);
             }
+            if (selectedCase.id) {
+              loadAttachments(Number(selectedCase.id));
+            }
           }}
           onCancel={() => setUpdatingAttachment(null)}
         />

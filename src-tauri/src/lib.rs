@@ -52,6 +52,7 @@ pub fn run() {
             doc_template::sync_template_fields,
             doc_template::sync_all_templates_fields,
             doc_template::generate_document_from_template,
+            doc_template::fill_document_placeholders,
             doc_template::delete_template,
             doc_template::open_template_file,
             // case_template

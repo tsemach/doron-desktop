@@ -545,6 +545,89 @@ pub async fn generate_document_from_template(
 }
 
 #[tauri::command]
+pub async fn fill_document_placeholders(
+    source_path: String,
+    output_path: String,
+    field_values: std::collections::HashMap<String, String>,
+) -> Result<String, String> {
+    let path = std::path::Path::new(&source_path);
+    if !path.exists() {
+        return Err("Source file does not exist".to_string());
+    }
+
+    let file_ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if file_ext == "docx" {
+        let original_bytes = std::fs::read(path)
+            .map_err(|e| format!("Failed to read source DOCX: {e}"))?;
+
+        let cursor = std::io::Cursor::new(original_bytes);
+        let mut archive = zip::ZipArchive::new(cursor)
+            .map_err(|e| format!("Cannot open source DOCX: {e}"))?;
+
+        let doc_xml = {
+            let mut f = archive
+                .by_name("word/document.xml")
+                .map_err(|_| "word/document.xml not found".to_string())?;
+            let mut s = String::new();
+            f.read_to_string(&mut s).map_err(|e| e.to_string())?;
+            s
+        };
+
+        let mut new_doc_xml = doc_xml;
+        new_doc_xml = replace_docx_placeholders(&new_doc_xml, &field_values);
+
+        let out_buf: Vec<u8> = Vec::new();
+        let out_cursor = std::io::Cursor::new(out_buf);
+        let mut new_zip = zip::ZipWriter::new(out_cursor);
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+            let opts = zip::write::FileOptions::<()>::default()
+                .compression_method(file.compression());
+
+            if file.is_dir() {
+                new_zip.add_directory(&name, opts).map_err(|e| e.to_string())?;
+            } else {
+                new_zip.start_file(&name, opts).map_err(|e| e.to_string())?;
+                if name == "word/document.xml" {
+                    new_zip
+                        .write_all(new_doc_xml.as_bytes())
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    let mut content = Vec::new();
+                    file.read_to_end(&mut content).map_err(|e| e.to_string())?;
+                    new_zip.write_all(&content).map_err(|e| e.to_string())?;
+                }
+            }
+        }
+
+        let out_cursor = new_zip.finish().map_err(|e| e.to_string())?;
+        let output_bytes = out_cursor.into_inner();
+
+        std::fs::write(&output_path, &output_bytes)
+            .map_err(|e| format!("Failed to write generated DOCX: {e}"))?;
+    } else {
+        let mut text = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read source text file: {e}"))?;
+
+        for (key, val) in field_values {
+            text = text.replace(&format!("[[{key}]]"), &val);
+        }
+
+        std::fs::write(&output_path, text)
+            .map_err(|e| format!("Failed to write generated text: {e}"))?;
+    }
+
+    Ok(output_path)
+}
+
+#[tauri::command]
 pub fn open_template_file(path: String) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
