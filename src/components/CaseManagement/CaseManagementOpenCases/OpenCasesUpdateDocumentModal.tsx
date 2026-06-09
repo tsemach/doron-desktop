@@ -2,18 +2,6 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 
-interface DocTemplate {
-  id: number;
-  file_name: string;
-  file_ext: string;
-  file_size_kb: number;
-  fields_found: string; // JSON string of array
-  uploaded_at: string;
-  original_path: string;
-  marked_path: string;
-  title: string | null;
-}
-
 interface CaseFile {
   name: string;
   path: string;
@@ -41,19 +29,14 @@ export default function OpenCasesUpdateDocumentModal({
   onSave,
   onCancel,
 }: OpenCasesUpdateDocumentModalProps) {
-  const [matchingTemplate, setMatchingTemplate] = useState<DocTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Overwrite state
+  // Check if file exists to display overwrite warning
   const fileExists = existingDocuments.some(
     (doc) => doc.name.toLowerCase() === attachment.name.toLowerCase()
   );
-
-  // Template fields states
-  const [templateFields, setTemplateFields] = useState<string[]>([]);
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
 
   // Annotations states
   const [notes, setNotes] = useState("");
@@ -69,49 +52,19 @@ export default function OpenCasesUpdateDocumentModal({
     setLoading(true);
     setError(null);
     try {
-      // 1. Get case fields
-      const caseFields = await invoke<Record<string, string>>("get_case_fields", { caseId });
-
-      // 2. Get all templates and search for a match
-      const allTemplates = await invoke<DocTemplate[]>("list_templates");
-
-      const match = allTemplates.find(
-        (t) => t.file_name.toLowerCase() === attachment.name.toLowerCase()
+      // 1. Load annotations if document already exists in existingDocuments list
+      const existingDoc = existingDocuments.find(
+        (doc) => doc.name.toLowerCase() === attachment.name.toLowerCase()
       );
-
-      if (match) {
-        setMatchingTemplate(match);
-        try {
-          const fields = JSON.parse(match.fields_found || "[]") as string[];
-          setTemplateFields(fields);
-
-          // Populate field values with existing case fields
-          const initialVals: Record<string, string> = {};
-          fields.forEach((f) => {
-            initialVals[f] = caseFields[f] || "";
-          });
-          setFieldValues(initialVals);
-        } catch (e) {
-          console.error("Failed to parse template fields:", e);
-        }
+      if (existingDoc) {
+        setNotes(existingDoc.notes || "");
+        setTags(existingDoc.tags || []);
+      } else {
+        setNotes("");
+        setTags([]);
       }
 
-      // 3. Load annotations if document already exists
-      const targetFilePath = `${caseFolder}/${attachment.name}`.replace(/\\/g, "/");
-      try {
-        const ann = await invoke<{ notes: string | null; tags: string[] } | null>(
-          "get_document_annotations",
-          { filePath: targetFilePath }
-        );
-        if (ann) {
-          setNotes(ann.notes || "");
-          setTags(ann.tags || []);
-        }
-      } catch (e) {
-        console.error("Failed to load document annotations:", e);
-      }
-
-      // 4. Load all suggested tags
+      // 2. Load all suggested tags
       try {
         const allTags = await invoke<string[]>("list_all_annotation_tags");
         setSuggestedTags(allTags);
@@ -150,41 +103,22 @@ export default function OpenCasesUpdateDocumentModal({
     setIsSubmitting(true);
     setError(null);
     try {
-      // 1. Copy the file into the case folder and replace placeholders if template exists
-      let targetFilePath = "";
-      const outPath = `${caseFolder}/${attachment.name}`.replace(/\\/g, "/");
-
-      if (matchingTemplate && templateFields.length > 0) {
-        targetFilePath = await invoke<string>("fill_document_placeholders", {
-          sourcePath: attachment.staged_path,
-          outputPath: outPath,
-          fieldValues,
-        });
-      } else {
-        targetFilePath = await invoke<string>("add_file_to_case", {
-          caseFolder,
-          sourcePath: attachment.staged_path,
-        });
-      }
+      // 1. Copy the file into the case folder
+      const targetFilePath = await invoke<string>("add_file_to_case", {
+        caseFolder,
+        sourcePath: attachment.staged_path,
+      });
 
       const normalizedFilePath = targetFilePath.replace(/\\/g, "/");
 
-      // 2. Save template variables if matching template found
-      if (matchingTemplate && templateFields.length > 0) {
-        await invoke("save_case_fields", {
-          caseId,
-          fields: fieldValues,
-        });
-      }
-
-      // 3. Save annotations (notes and tags)
+      // 2. Save annotations (notes and tags)
       await invoke("set_document_annotations", {
         filePath: normalizedFilePath,
         notes: notes.trim() || null,
         tags,
       });
 
-      // 4. Remove the file from email attachments
+      // 3. Remove the file from email attachments
       await invoke("remove_attachment", {
         caseId,
         stagedPath: attachment.staged_path,
@@ -203,14 +137,14 @@ export default function OpenCasesUpdateDocumentModal({
   const filteredSuggestions = suggestedTags.filter((t) => !tags.includes(t));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in duration-200">
       <div
         className="bg-card border border-border rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 resize overflow-hidden relative"
         style={{
-          width: "680px",
-          height: "580px",
-          minWidth: "480px",
-          minHeight: "450px",
+          width: "1200px",
+          height: "800px",
+          minWidth: "700px",
+          minHeight: "600px",
           maxWidth: "95vw",
           maxHeight: "95vh",
         }}
@@ -226,7 +160,7 @@ export default function OpenCasesUpdateDocumentModal({
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 flex flex-col min-h-0 p-6 overflow-y-auto space-y-4">
+        <div className="flex-1 flex flex-col min-h-0 p-6 space-y-4">
           {error && (
             <div className="rounded-md border border-destructive bg-destructive/10 px-4 py-2.5 text-xs text-destructive shrink-0">
               {error}
@@ -254,52 +188,8 @@ export default function OpenCasesUpdateDocumentModal({
                 </div>
               )}
 
-              {/* Template variables matching section */}
-              {matchingTemplate && templateFields.length > 0 && (
-                <div className="border border-border/80 bg-background/50 rounded-lg p-4 space-y-3 shrink-0">
-                  <div className="pb-1 border-b border-border/60">
-                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                      Template Variables / Placeholders
-                    </h4>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Update case variables based on this document.
-                    </p>
-                  </div>
-
-                  <div className="max-h-[140px] overflow-y-auto pr-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1">
-                      {templateFields.map((field) => (
-                        <div key={field} className="space-y-1">
-                          <label
-                            htmlFor={`field-input-${field}`}
-                            className="text-[10px] font-mono font-medium text-muted-foreground truncate block"
-                            title={field}
-                          >
-                            {field}
-                          </label>
-                          <input
-                            id={`field-input-${field}`}
-                            type="text"
-                            placeholder="Value..."
-                            value={fieldValues[field] || ""}
-                            onChange={(e) =>
-                              setFieldValues({
-                                ...fieldValues,
-                                [field]: e.target.value,
-                              })
-                            }
-                            disabled={isSubmitting}
-                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring transition-all font-mono"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Annotations Section */}
-              <div className="flex-1 flex flex-col min-h-[180px] space-y-3 border border-border/60 rounded-lg p-4 bg-muted/5">
+              <div className="flex-1 flex flex-col min-h-0 space-y-3 border border-border/60 rounded-lg p-4 bg-muted/5">
                 <div className="pb-1 border-b border-border/60 shrink-0">
                   <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
                     Document Annotations
@@ -309,9 +199,9 @@ export default function OpenCasesUpdateDocumentModal({
                   </p>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1 flex flex-col min-h-0">
                   {/* Tags */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 shrink-0">
                     <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex justify-between">
                       <span>Tags</span>
                       <span className="text-[9px] text-muted-foreground/85 normal-case">Press Enter to add</span>
@@ -360,13 +250,13 @@ export default function OpenCasesUpdateDocumentModal({
                   </div>
 
                   {/* Notes */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Notes</label>
+                  <div className="space-y-1 flex-1 flex flex-col min-h-0">
+                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0">Notes</label>
                     <textarea
                       placeholder="e.g. Signed contract received from client via email."
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground/80 leading-relaxed resize-none h-[65px]"
+                      className="w-full flex-1 min-h-[100px] rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground/80 leading-relaxed resize-none"
                     />
                   </div>
                 </div>
