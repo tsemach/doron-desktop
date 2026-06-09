@@ -62,7 +62,7 @@ export default function CaseTemplateList({
               <div
                 key={ct.id}
                 onClick={() => onSelectTemplate(ct.id)}
-                className={`p-4 cursor-pointer hover:bg-muted/40 transition-all border-l-4 ${isSelected
+                className={`p-4 cursor-pointer hover:bg-muted/80 transition-all border-l-4 ${isSelected
                     ? "bg-accent/40 border-primary border-b"
                     : "border-transparent bg-transparent"
                   }`}

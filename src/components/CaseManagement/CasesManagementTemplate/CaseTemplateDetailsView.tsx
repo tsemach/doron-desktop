@@ -317,8 +317,8 @@ export default function CaseTemplateDetailsView({
                     key={id}
                     onClick={() => setSelectedDocIdForFields(isSelected ? null : id)}
                     className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors ${isSelected
-                      ? "border-primary bg-primary/5 hover:bg-primary/10"
-                      : "border-border bg-muted/20 hover:bg-muted/30"
+                      ? "border-primary bg-primary/5 hover:bg-primary/25"
+                      : "border-border bg-muted/20 hover:bg-muted"
                       }`}
                   >
                     <div className="min-w-0 flex-1">
