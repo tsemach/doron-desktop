@@ -240,7 +240,7 @@ export default function CasesManagementTemplate() {
   }
 
   return (
-    <main className="flex-1 flex flex-col h-screen overflow-hidden bg-background">
+    <main className="flex-1 flex flex-col h-full overflow-hidden bg-background">
       {/* Top Header */}
       <div className="flex items-center justify-between p-6 border-b border-border bg-card shrink-0">
         <div>

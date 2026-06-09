@@ -336,7 +336,7 @@ export default function CaseManagementOpenCasesDetails() {
   }
 
   return (
-    <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-screen">
+    <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-full">
       {/* Scope styles for the converted DOCX output */}
       <style>{`
         .docx-content-view h1 {
@@ -512,7 +512,7 @@ export default function CaseManagementOpenCasesDetails() {
           {/* Right side: Document Previewer & Emails Workspace */}
           <div
             style={isLgScreen ? { flex: `0 0 calc(${100 - leftPercent}% - 6px)` } : undefined}
-            className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs"
+            className={`flex flex-col border border-border rounded-xl bg-card overflow-hidden min-h-0 flex-1 ${isLgScreen ? "h-full" : ""} shadow-xs`}
           >
             <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
               <span>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "../ui/button";
@@ -90,6 +91,7 @@ function ConfidenceBadge({ value }: { value: number | null }) {
 }
 
 export default function DocsManagementSearch() {
+  const navigate = useNavigate();
   const [text, setText] = useState("");
   const [docType, setDocType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -98,9 +100,41 @@ export default function DocsManagementSearch() {
   const [results, setResults] = useState<DocumentRow[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cases, setCases] = useState<{ id: string; folder: string; subject: string }[]>([]);
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
+
+  useEffect(() => {
+    loadCases();
+  }, []);
+
+  async function loadCases() {
+    try {
+      const res = await invoke<any[]>("list_cases");
+      setCases(res.map(c => ({
+        id: String(c.id),
+        folder: c.folder,
+        subject: c.subject,
+      })));
+    } catch (err) {
+      console.error("Failed to load cases in search:", err);
+    }
+  }
+
+  function findCaseForFile(filePath: string) {
+    if (!filePath) return null;
+    const normalizedFilePath = filePath.replace(/\\/g, "/");
+    const matchedCases = cases.filter(c => {
+      if (!c.folder) return false;
+      const normalizedFolder = c.folder.replace(/\\/g, "/");
+      return normalizedFilePath === normalizedFolder || normalizedFilePath.startsWith(normalizedFolder + "/");
+    });
+    if (matchedCases.length === 1) {
+      return matchedCases[0];
+    }
+    return null;
+  }
 
   async function handleOpenFile(path: string) {
     try {
@@ -280,6 +314,7 @@ export default function DocsManagementSearch() {
           <div className="space-y-3">
             {results.map((doc) => {
               const fileExtension = doc.file_name.split(".").pop() || "";
+              const matchedCase = findCaseForFile(doc.file_path);
               return (
                 <div
                   key={doc.id}
@@ -309,6 +344,20 @@ export default function DocsManagementSearch() {
                           <span className="text-[9px] uppercase px-1.5 py-0.5 rounded border border-border/80 text-muted-foreground">
                             {doc.language}
                           </span>
+                        )}
+                        {matchedCase && (
+                          <button
+                            onClick={() => navigate(`/case-management/cases/${matchedCase.id}`)}
+                            className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all cursor-pointer"
+                            title={`Jump to case: ${matchedCase.subject}`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                              <path d="M15 3h6v6" />
+                              <path d="M10 14 21 3" />
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            </svg>
+                            <span>Go to Case</span>
+                          </button>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">

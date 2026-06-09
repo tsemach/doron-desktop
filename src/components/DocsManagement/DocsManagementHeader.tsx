@@ -139,7 +139,7 @@ export default function DocsManagementHeader({
               <rect width="18" height="18" x="3" y="3" rx="2" />
               <path d="M7 7h10M7 12h10M7 17h10" />
             </svg>
-            Doc Templates
+            Documanets Templates
           </button>
         </nav>
 

@@ -32,7 +32,7 @@ export default function OpenCasesList({
   return (
     <div
       style={isLgScreen ? { flex: `0 0 calc(${leftPercent}% - 6px)` } : undefined}
-      className="flex flex-col border border-border rounded-xl bg-card overflow-hidden h-full shadow-xs"
+      className={`flex flex-col border border-border rounded-xl bg-card overflow-hidden min-h-0 flex-1 ${isLgScreen ? "h-full" : ""} shadow-xs`}
     >
       <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
         <span>{t("cases_list")}</span>

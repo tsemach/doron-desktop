@@ -9,7 +9,7 @@ import CaseManagementEmailAlertReview from "./CaseManagementOpenCases/CaseManage
 export default function CaseManagement() {
 
   return (
-    <div className="flex h-screen relative w-full">
+    <div className="flex h-screen relative w-full overflow-hidden">
       <CaseManagementSidebar />
       <Routes>
         <Route path="/" element={<CaseManagementOpenCases />} />

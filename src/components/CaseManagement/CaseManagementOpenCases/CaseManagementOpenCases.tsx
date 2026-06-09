@@ -245,7 +245,7 @@ export default function CaseManagementOpenCases() {
   ).length;
 
   return (
-    <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-screen">
+    <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-full">
       {/* Header */}
       <OpenCasesHeader
         casesCount={cases.length}
