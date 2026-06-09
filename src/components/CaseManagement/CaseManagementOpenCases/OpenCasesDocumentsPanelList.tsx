@@ -75,10 +75,6 @@ export default function OpenCasesDocumentsPanelList({
           : "border-transparent"
       }`}
     >
-      <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-2 select-none">
-        {t("files_in_folder")}
-      </div>
-
       {docsLoading ? (
         <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
           <div className="animate-spin text-xl font-bold mb-1">⟳</div>

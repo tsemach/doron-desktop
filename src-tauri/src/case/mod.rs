@@ -203,6 +203,10 @@ pub async fn create_new_case(
                 std::fs::write(&dest_path, text)
                     .map_err(|e| format!("Failed to write generated text: {e}"))?;
             }
+
+            if let Err(e) = crate::documents::versioning::create_document_backup_if_exists(&app, &dest_path, Some("Original Version".to_string()), true, true) {
+                println!("Failed to create document version backup on create_new_case: {}", e);
+            }
         }
     }
 
@@ -501,6 +505,10 @@ pub fn add_file_to_case(
     if dest_exists {
         if let Err(e) = crate::documents::versioning::create_document_backup_if_exists(&app, &dest_path, Some("Updated from attachment".to_string()), true, false) {
             println!("Failed to create document version backup on add: {}", e);
+        }
+    } else {
+        if let Err(e) = crate::documents::versioning::create_document_backup_if_exists(&app, &dest_path, Some("Original Version".to_string()), true, true) {
+            println!("Failed to create document version backup on add (new file): {}", e);
         }
     }
 

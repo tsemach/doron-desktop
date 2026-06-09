@@ -1,7 +1,7 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useLanguage } from "../../../context/LanguageContext";
-import OpenCasesDocumentsPanelCaseFields from "./OpenCasesDocumentsPanelCaseFields";
 
 type CaseStatus = "open" | "in-progress" | "closed";
 
@@ -31,6 +31,7 @@ export default function OpenDocumentsPanelTopMenu({
   onAddDocument,
 }: OpenDocumentsPanelTopMenuProps) {
   const { t } = useLanguage();
+  const [showMenu, setShowMenu] = useState(false);
 
   async function handleOpenFolder(folderPath: string) {
     try {
@@ -80,32 +81,7 @@ export default function OpenDocumentsPanelTopMenu({
           </div>
         )}
       </div>
-      <div className="flex gap-2 shrink-0">
-        <OpenCasesDocumentsPanelCaseFields onShowFields={onShowFields} />
-        {selectedCase && onTabChange && (
-          <Button
-            variant={activeRightTab === "emails" ? "default" : "outline"}
-            size="sm"
-            onClick={() => onTabChange(activeRightTab === "emails" ? "preview" : "emails")}
-            className="text-xs px-3 h-8 gap-1.5"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect width="20" height="16" x="2" y="4" rx="2" />
-              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-            </svg>
-            {t("emails")}
-          </Button>
-        )}
+      <div className="flex gap-2 shrink-0 items-center">
         <Button
           size="sm"
           onClick={onAddDocument}
@@ -127,6 +103,100 @@ export default function OpenDocumentsPanelTopMenu({
           </svg>
           {t("add_document")}
         </Button>
+
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowMenu(!showMenu)}
+            className="h-8 w-8 p-0 flex items-center justify-center border-border hover:bg-muted"
+            title="More Options"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+              <circle cx="12" cy="5" r="1.2" fill="currentColor" />
+              <circle cx="12" cy="19" r="1.2" fill="currentColor" />
+            </svg>
+          </Button>
+
+          {showMenu && (
+            <>
+              {/* Invisible overlay to close dropdown on click outside */}
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setShowMenu(false)}
+              />
+
+              <div className="absolute right-0 mt-1.5 w-48 rounded-lg border border-border bg-card shadow-lg py-1 z-40 animate-in fade-in slide-in-from-top-1 duration-100">
+                {selectedCase && onTabChange && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onTabChange(activeRightTab === "emails" ? "preview" : "emails");
+                    }}
+                    className={`w-full px-3 py-2 text-left text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer bg-transparent border-none ${
+                      activeRightTab === "emails" ? "text-primary bg-primary/5" : "text-foreground"
+                    }`}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={activeRightTab === "emails" ? "text-primary" : "text-muted-foreground"}
+                    >
+                      <rect width="20" height="16" x="2" y="4" rx="2" />
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                    </svg>
+                    {t("emails")}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onShowFields();
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer bg-transparent border-none"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-muted-foreground"
+                  >
+                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                    <path d="M7 8h10" />
+                    <path d="M7 12h10" />
+                    <path d="M7 16h10" />
+                  </svg>
+                  {t("case_fields")}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </>
   );
