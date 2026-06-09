@@ -11,6 +11,7 @@ import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
 import CaseEmailsChat from "./OpenCasesEmailsChat";
 import OpenCasesDocumentPreview from "./OpenCasesDocumentPreview";
+import OpenCasesDocumentHistory from "./OpenCasesDocumentHistory";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
 
@@ -54,6 +55,7 @@ export default function CaseManagementOpenCasesDetails() {
 
   // Right side panel tab state
   const [activeRightTab, setActiveRightTab] = useState<"preview" | "emails">("preview");
+  const [docSubTab, setDocSubTab] = useState<"preview" | "history">("preview");
 
   // Document preview states
   const [selectedDocument, setSelectedDocument] = useState<CaseFile | null>(null);
@@ -145,6 +147,32 @@ export default function CaseManagementOpenCasesDetails() {
     };
   }, [selectedCase?.id]);
 
+  // Start and stop folder watcher for active case
+  useEffect(() => {
+    if (selectedCase?.id && selectedCase?.folder) {
+      invoke("start_case_watcher", {
+        caseId: Number(selectedCase.id),
+        folderPath: selectedCase.folder,
+      }).catch((e) => console.error("Failed to start case watcher:", e));
+    }
+    return () => {
+      invoke("stop_case_watcher").catch((e) => console.error("Failed to stop case watcher:", e));
+    };
+  }, [selectedCase?.id, selectedCase?.folder]);
+
+  // Listen for file change notifications to reload case documents
+  useEffect(() => {
+    if (!selectedCase?.folder) return;
+
+    const unlistenPromise = listen("case-files-changed", () => {
+      loadDocuments(selectedCase.folder!);
+    });
+
+    return () => {
+      unlistenPromise.then((f) => f());
+    };
+  }, [selectedCase?.folder]);
+
   async function loadAttachments(cId: number) {
     try {
       const atts = await invoke<any[]>("list_case_attachments", { caseId: cId });
@@ -156,6 +184,9 @@ export default function CaseManagementOpenCasesDetails() {
 
   // Handle selected document preview loading
   useEffect(() => {
+    // Reset sub-tab to preview when selecting a different document
+    setDocSubTab("preview");
+
     if (!selectedDocument) {
       setPreviewHtml(null);
       setPreviewText(null);
@@ -239,6 +270,12 @@ export default function CaseManagementOpenCasesDetails() {
     try {
       const files = await invoke<CaseFile[]>("list_case_files", { folderPath });
       setDocuments(files);
+      // Sync selected document state with fresh database records
+      setSelectedDocument((current) => {
+        if (!current) return null;
+        const fresh = files.find((f) => f.path === current.path);
+        return fresh || null;
+      });
     } catch (err) {
       console.error(err);
       setDocsError(String(err));
@@ -504,11 +541,47 @@ export default function CaseManagementOpenCasesDetails() {
               )}
             </div>
 
+            {/* Sub-tabs for Preview vs Version History */}
+            {activeRightTab === "preview" && selectedDocument && (
+              <div className="flex border-b border-border bg-muted/20 px-4 py-1.5 shrink-0 gap-4 select-none">
+                <button
+                  onClick={() => setDocSubTab("preview")}
+                  className={`text-xs font-semibold pb-1 border-b-2 px-1 transition-all focus:outline-none focus:ring-0 cursor-pointer ${
+                    docSubTab === "preview"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Preview
+                </button>
+                <button
+                  onClick={() => setDocSubTab("history")}
+                  className={`text-xs font-semibold pb-1 border-b-2 px-1 transition-all focus:outline-none focus:ring-0 cursor-pointer ${
+                    docSubTab === "history"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Version History
+                </button>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto bg-background/50 dark:bg-background/20 relative flex flex-col min-h-0">
               {activeRightTab === "emails" ? (
                 <CaseEmailsChat 
                   caseId={Number(selectedCase?.id || 0)} 
                   caseFolder={selectedCase?.folder || ""} 
+                />
+              ) : docSubTab === "history" && selectedDocument ? (
+                <OpenCasesDocumentHistory
+                  selectedDocument={selectedDocument}
+                  onRestore={() => {
+                    if (selectedCase?.folder) {
+                      loadDocuments(selectedCase.folder);
+                    }
+                    setDocSubTab("preview"); // Switch back to preview
+                  }}
                 />
               ) : (
                 <OpenCasesDocumentPreview

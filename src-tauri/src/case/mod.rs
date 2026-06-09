@@ -462,7 +462,7 @@ pub fn list_all_annotation_tags(app: AppHandle) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub fn add_file_to_case(
-    _app: AppHandle,
+    app: AppHandle,
     case_folder: String,
     source_path: String,
 ) -> Result<String, String> {
@@ -484,9 +484,25 @@ pub fn add_file_to_case(
     
     let dest_path = dest_dir.join(file_name);
     
+    let dest_exists = dest_path.exists();
+
+    // Create backup version if file already exists (before overwriting)
+    if dest_exists {
+        if let Err(e) = crate::documents::versioning::create_document_backup_if_exists(&app, &dest_path, Some("State before update".to_string()), true, false) {
+            println!("Failed to create document version backup on add: {}", e);
+        }
+    }
+
     // Copy the file to the case folder
     std::fs::copy(src, &dest_path)
         .map_err(|e| format!("Failed to copy file to case directory: {e}"))?;
+
+    // Create version backup immediately if we overwrote an existing file
+    if dest_exists {
+        if let Err(e) = crate::documents::versioning::create_document_backup_if_exists(&app, &dest_path, Some("Updated from attachment".to_string()), true, false) {
+            println!("Failed to create document version backup on add: {}", e);
+        }
+    }
 
     Ok(dest_path.to_string_lossy().to_string())
 }
@@ -570,6 +586,28 @@ pub fn remove_file_from_case(
         std::fs::remove_file(&file_path)
             .map_err(|e| format!("Failed to delete file from disk: {e}"))?;
     }
+
+    // Delete all version files from disk and records from DB
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT version_path FROM document_versions 
+         WHERE active_path = ?1 OR REPLACE(active_path, '\\', '/') = ?2"
+    ) {
+        if let Ok(rows) = stmt.query_map(params![file_path_str, normalized_file_path], |row| row.get::<_, String>(0)) {
+            for r in rows {
+                if let Ok(vp) = r {
+                    let path = std::path::Path::new(&vp);
+                    if path.exists() {
+                        let _ = std::fs::remove_file(path);
+                    }
+                }
+            }
+        }
+    }
+    
+    let _ = conn.execute(
+        "DELETE FROM document_versions WHERE active_path = ?1 OR REPLACE(active_path, '\\', '/') = ?2",
+        params![file_path_str, normalized_file_path],
+    );
 
     // 4. Delete document-specific DB entries (annotations and FTS/metadata index)
     let _ = conn.execute(

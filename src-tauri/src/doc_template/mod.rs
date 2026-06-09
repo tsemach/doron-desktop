@@ -462,6 +462,11 @@ pub async fn generate_document_from_template(
     field_values: std::collections::HashMap<String, String>,
     output_path: String,
 ) -> Result<String, String> {
+    let dest_path = std::path::Path::new(&output_path);
+    if let Err(e) = crate::documents::versioning::create_document_backup_if_exists(&app, dest_path, None, true, true) {
+        println!("Failed to create document version backup on generate: {}", e);
+    }
+
     let conn = store::open_db(&app)?;
     let mut stmt = conn
         .prepare("SELECT marked_path, file_ext FROM doc_templates WHERE id = ?1")
@@ -540,6 +545,8 @@ pub async fn generate_document_from_template(
         std::fs::write(&output_path, text)
             .map_err(|e| format!("Failed to write generated text: {e}"))?;
     }
+
+
 
     Ok(output_path)
 }

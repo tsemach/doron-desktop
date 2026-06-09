@@ -38,6 +38,7 @@ fastembed   = "4"
 imap        = { version = "2.4", features = ["native-tls"] }
 mailparse   = "0.14"
 native-tls  = "0.2"
+md5         = "0.7.0"
 
 [dev-dependencies]
 dotenvy = "0.15"

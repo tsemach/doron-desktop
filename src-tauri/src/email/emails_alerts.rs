@@ -121,7 +121,7 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
     let staged_attachments: Vec<AttachmentMetadata> = serde_json::from_str(&alert.attachments_json)
         .unwrap_or_default();
     
-    let attachments_dir = case_folder.join("attachments");
+    let attachments_dir = case_folder.join(".attachments");
     std::fs::create_dir_all(&attachments_dir)
         .map_err(|e| format!("Failed to create attachments folder: {e}"))?;
 

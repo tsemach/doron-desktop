@@ -10,6 +10,7 @@ pub mod case;
 pub mod query;
 pub mod embeddings;
 pub mod email;
+pub mod documents;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -76,6 +77,12 @@ pub fn run() {
             case::save_case_fields,
             case::remove_file_from_case,
             case::read_file_bytes,
+            // documents versioning
+            documents::versioning::start_case_watcher,
+            documents::versioning::stop_case_watcher,
+            documents::versioning::list_document_versions,
+            documents::versioning::restore_document_version,
+            documents::versioning::delete_document_version,
             // email commands
             email::get_email_settings,
             email::save_email_settings,

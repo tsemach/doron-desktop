@@ -9,7 +9,10 @@
     {
       "identifier": "opener:allow-open-path",
       "allow": [
-        { "path": "/**" }
+        { "path": "/**" },
+        { "path": "/**/.*/**" },
+        { "path": "/**/.attachments/**" },
+        { "path": "/**/.versions/**" }
       ]
     },
     "dialog:default"
