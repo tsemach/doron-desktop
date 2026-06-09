@@ -6,6 +6,7 @@ interface OpenCasesTopBarProps {
   setFilter: (filter: "all" | "open" | "in-progress" | "closed" | "followup") => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  followupCount?: number;
 }
 
 export default function OpenCasesTopBar({
@@ -13,6 +14,7 @@ export default function OpenCasesTopBar({
   setFilter,
   searchQuery,
   setSearchQuery,
+  followupCount = 0,
 }: OpenCasesTopBarProps) {
   return (
     <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6 shrink-0">
@@ -25,13 +27,26 @@ export default function OpenCasesTopBar({
             size="sm"
             onClick={() => setFilter(s)}
           >
-            {s === "all"
-              ? "All"
-              : s === "in-progress"
-              ? "In Progress"
-              : s === "followup"
-              ? "Follow Up"
-              : s.charAt(0).toUpperCase() + s.slice(1)}
+            {s === "all" ? (
+              "All"
+            ) : s === "in-progress" ? (
+              "In Progress"
+            ) : s === "followup" ? (
+              <span className="flex items-center gap-1.5">
+                Follow Up
+                {followupCount > 0 && (
+                  <span className={`inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold rounded-full transition-all duration-150 ${
+                    filter === "followup"
+                      ? "bg-primary-foreground text-primary dark:bg-zinc-800 dark:text-slate-100"
+                      : "bg-muted-foreground/15 text-muted-foreground"
+                  }`}>
+                    {followupCount}
+                  </span>
+                )}
+              </span>
+            ) : (
+              s.charAt(0).toUpperCase() + s.slice(1)
+            )}
           </Button>
         ))}
       </div>

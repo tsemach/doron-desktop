@@ -240,6 +240,10 @@ export default function CaseManagementOpenCases() {
     return true;
   });
 
+  const followupCount = cases.filter(
+    (c) => c.tags?.includes("followup") || !!c.followupDate
+  ).length;
+
   return (
     <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-screen">
       {/* Header */}
@@ -260,6 +264,7 @@ export default function CaseManagementOpenCases() {
         setFilter={setFilter}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        followupCount={followupCount}
       />
 
       {/* Main split container */}
