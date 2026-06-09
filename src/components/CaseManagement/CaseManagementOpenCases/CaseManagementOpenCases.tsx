@@ -123,6 +123,7 @@ export default function CaseManagementOpenCases() {
         folder: c.folder,
         notes: c.notes,
         tags: c.tags || [],
+        followupDate: c.followup_date,
       }));
       setCases(mapped);
     } catch (err) {
@@ -222,6 +223,9 @@ export default function CaseManagementOpenCases() {
   }
 
   const filtered = cases.filter((c) => {
+    if (filter === "followup") {
+      return c.tags?.includes("followup") || !!c.followupDate;
+    }
     if (filter !== "all" && c.status !== filter) {
       return false;
     }
@@ -311,26 +315,27 @@ export default function CaseManagementOpenCases() {
           caseSubject={editingCaseAnnotations.subject || "No Subject"}
           initialNotes={editingCaseAnnotations.notes}
           initialTags={editingCaseAnnotations.tags}
+          initialFollowupDate={editingCaseAnnotations.followupDate}
           onCancel={() => setEditingCaseAnnotations(null)}
-          onSave={(notes, tags) => {
+          onSave={(notes, tags, followupDate) => {
             setCases((prev) =>
               prev.map((c) =>
-                c.id === editingCaseAnnotations.id ? { ...c, notes, tags } : c
+                c.id === editingCaseAnnotations.id ? { ...c, notes, tags, followupDate } : c
               )
             );
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes, tags } : prev
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes, tags, followupDate } : prev
             );
             setEditingCaseAnnotations(null);
           }}
           onDelete={() => {
             setCases((prev) =>
               prev.map((c) =>
-                c.id === editingCaseAnnotations.id ? { ...c, notes: undefined, tags: [] } : c
+                c.id === editingCaseAnnotations.id ? { ...c, notes: undefined, tags: [], followupDate: undefined } : c
               )
             );
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes: undefined, tags: [] } : prev
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes: undefined, tags: [], followupDate: undefined } : prev
             );
             setEditingCaseAnnotations(null);
           }}

@@ -117,9 +117,77 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    outline-color: var(--ring);
   }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Workaround for WebView2/Chromium GPU rendering bug on Windows 11 where rounded 
+   bordered elements display diagonal lines/crosses.
+   To avoid the bug, we make the native CSS border transparent (preserving layout size)
+   and simulate the 1px border line using box-shadow (which supports standard shadows). */
+.rounded.border,
+.rounded-sm.border,
+.rounded-md.border,
+.rounded-lg.border,
+.rounded-xl.border,
+.rounded-2xl.border,
+.rounded-3xl.border,
+.rounded-full.border,
+[class*="rounded-"].border {
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px var(--border), var(--tw-shadow, 0 0 #0000) !important;
+}
+
+.rounded.border-primary,
+.rounded-sm.border-primary,
+.rounded-md.border-primary,
+.rounded-lg.border-primary,
+.rounded-xl.border-primary,
+.rounded-2xl.border-primary,
+.rounded-3xl.border-primary,
+.rounded-full.border-primary,
+[class*="rounded-"].border-primary {
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px var(--primary), var(--tw-shadow, 0 0 #0000) !important;
+}
+
+/* Simulate hover border color change specifically on elements with Tailwind hover border classes */
+[class*="hover:border-primary/20"]:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent), var(--tw-shadow, 0 0 #0000) !important;
+}
+[class*="hover:border-primary/30"]:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent), var(--tw-shadow, 0 0 #0000) !important;
+}
+[class*="hover:border-primary/40"]:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent), var(--tw-shadow, 0 0 #0000) !important;
+}
+[class*="hover:border-primary/45"]:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 45%, transparent), var(--tw-shadow, 0 0 #0000) !important;
+}
+[class*="hover:border-border-hover"]:hover {
+  box-shadow: 0 0 0 1px oklch(0.708 0 0), var(--tw-shadow, 0 0 #0000) !important;
+}
+[class*="hover:border-border"]:hover {
+  box-shadow: 0 0 0 1px var(--border), var(--tw-shadow, 0 0 #0000) !important;
+}
+
+/* Simulate dark mode hover border color change specifically on elements with Tailwind dark mode hover border classes */
+.dark [class*="dark:hover:border-primary/45"]:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 45%, transparent), var(--tw-shadow, 0 0 #0000) !important;
+}
+
+/* Ensure selected cards maintain their primary border color on hover and do not get overwritten by simulated hover rules */
+.rounded.border-primary:hover,
+.rounded-sm.border-primary:hover,
+.rounded-md.border-primary:hover,
+.rounded-lg.border-primary:hover,
+.rounded-xl.border-primary:hover,
+.rounded-2xl.border-primary:hover,
+.rounded-3xl.border-primary:hover,
+.rounded-full.border-primary:hover,
+[class*="rounded-"].border-primary:hover {
+  box-shadow: 0 0 0 1px var(--primary), var(--tw-shadow, 0 0 #0000) !important;
 }

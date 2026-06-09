@@ -234,6 +234,7 @@ export default function CaseManagementOpenCasesDetails() {
         folder: c.folder,
         notes: c.notes,
         tags: c.tags || [],
+        followupDate: c.followup_date,
       }));
       const found = mapped.find((c) => c.id === id);
       if (found) {
@@ -589,16 +590,17 @@ export default function CaseManagementOpenCasesDetails() {
           caseSubject={editingCaseAnnotations.subject || "No Subject"}
           initialNotes={editingCaseAnnotations.notes}
           initialTags={editingCaseAnnotations.tags}
+          initialFollowupDate={editingCaseAnnotations.followupDate}
           onCancel={() => setEditingCaseAnnotations(null)}
-          onSave={(notes, tags) => {
+          onSave={(notes, tags, followupDate) => {
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes, tags } : prev
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes, tags, followupDate } : prev
             );
             setEditingCaseAnnotations(null);
           }}
           onDelete={() => {
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes: undefined, tags: [] } : prev
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes: undefined, tags: [], followupDate: undefined } : prev
             );
             setEditingCaseAnnotations(null);
           }}

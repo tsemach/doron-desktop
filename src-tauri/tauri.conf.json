@@ -16,7 +16,8 @@
         "title": "doron-desktop",
         "width": 1000,
         "height": 800,
-        "visible": false
+        "visible": false,
+        "additionalBrowserArgs": "--disable-gpu"
       }
     ],
     "security": {

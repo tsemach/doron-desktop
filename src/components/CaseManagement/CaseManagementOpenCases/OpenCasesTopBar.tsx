@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 import CaseManagementSearch from "../CaseManagementSearch";
 
 interface OpenCasesTopBarProps {
-  filter: "all" | "open" | "in-progress" | "closed";
-  setFilter: (filter: "all" | "open" | "in-progress" | "closed") => void;
+  filter: "all" | "open" | "in-progress" | "closed" | "followup";
+  setFilter: (filter: "all" | "open" | "in-progress" | "closed" | "followup") => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
 }
@@ -18,14 +18,20 @@ export default function OpenCasesTopBar({
     <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6 shrink-0">
       {/* Status filters */}
       <div className="flex flex-wrap gap-2">
-        {(["all", "open", "in-progress", "closed"] as const).map((s) => (
+        {(["all", "open", "in-progress", "closed", "followup"] as const).map((s) => (
           <Button
             key={s}
             variant={filter === s ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter(s)}
           >
-            {s === "all" ? "All" : s === "in-progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}
+            {s === "all"
+              ? "All"
+              : s === "in-progress"
+              ? "In Progress"
+              : s === "followup"
+              ? "Follow Up"
+              : s.charAt(0).toUpperCase() + s.slice(1)}
           </Button>
         ))}
       </div>

@@ -8,7 +8,8 @@ interface OpenCasesCaseAnnotationsModalProps {
   caseSubject: string;
   initialNotes?: string;
   initialTags?: string[];
-  onSave: (notes: string, tags: string[]) => void;
+  initialFollowupDate?: string;
+  onSave: (notes: string, tags: string[], followupDate?: string) => void;
   onCancel: () => void;
   onDelete: () => void;
 }
@@ -18,12 +19,20 @@ export default function OpenCasesCaseAnnotationsModal({
   caseSubject,
   initialNotes = "",
   initialTags = [],
+  initialFollowupDate = "",
   onSave,
   onCancel,
   onDelete,
 }: OpenCasesCaseAnnotationsModalProps) {
-  const [notes, setNotes] = useState(initialNotes);
-  const [tags, setTags] = useState<string[]>(initialTags);
+  const [notes, setNotes] = useState(initialNotes || "");
+  const [tags, setTags] = useState<string[]>(initialTags || []);
+  const [followupDate, setFollowupDate] = useState(initialFollowupDate || "");
+
+  useEffect(() => {
+    if (followupDate && followupDate.trim() && !tags.includes("followup")) {
+      setTags([...tags, "followup"]);
+    }
+  }, [followupDate]);
   const [newTag, setNewTag] = useState("");
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,6 +61,9 @@ export default function OpenCasesCaseAnnotationsModal({
 
   function handleRemoveTag(tagToRemove: string) {
     setTags(tags.filter((t) => t !== tagToRemove));
+    if (tagToRemove === "followup") {
+      setFollowupDate("");
+    }
   }
 
   function handleAddSuggestedTag(tag: string) {
@@ -73,10 +85,11 @@ export default function OpenCasesCaseAnnotationsModal({
     try {
       await invoke("set_case_annotations", {
         caseId: Number(caseId),
-        notes: notes.trim() || null,
+        notes: notes ? notes.trim() : null,
         tags,
+        followupDate: followupDate ? followupDate.trim() : null,
       });
-      onSave(notes.trim(), tags);
+      onSave(notes ? notes.trim() : "", tags, followupDate ? followupDate.trim() : undefined);
     } catch (err) {
       console.error(err);
       alert(`Failed to save case annotations: ${err}`);
@@ -99,8 +112,8 @@ export default function OpenCasesCaseAnnotationsModal({
     }
   };
 
-  // Filter suggested tags to exclude currently added ones
-  const filteredSuggestions = suggestedTags.filter((t) => !tags.includes(t));
+  // Filter suggested tags to exclude currently added ones, and ensure "followup" is always offered if not already added.
+  const filteredSuggestions = [...new Set(["followup", ...suggestedTags])].filter((t) => !tags.includes(t));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -196,6 +209,27 @@ export default function OpenCasesCaseAnnotationsModal({
                 </div>
               )}
             </div>
+
+            {/* Follow-up Date (renders conditionally if "followup" tag is present) */}
+            {tags.includes("followup") && (
+              <div className="space-y-2 shrink-0 animate-in slide-in-from-top-2 duration-200 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span>📅 Follow-up Date</span>
+                  <span className="text-[10px] text-muted-foreground font-normal">(Case status will show as due/overdue on this date)</span>
+                </label>
+                <input
+                  type="date"
+                  value={followupDate}
+                  onChange={(e) => {
+                    setFollowupDate(e.target.value);
+                    if (e.target.value && e.target.value.length === 10) {
+                      e.target.blur();
+                    }
+                  }}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground cursor-pointer"
+                />
+              </div>
+            )}
 
             {/* Notes section */}
             <div className="flex-grow flex flex-col min-h-[120px] space-y-2">

@@ -1,4 +1,4 @@
-export type CaseStatus = "open" | "in-progress" | "closed";
+export type CaseStatus = "open" | "in-progress" | "closed" | "followup";
 
 export interface Case {
   id: string;
@@ -10,6 +10,7 @@ export interface Case {
   folder?: string;
   notes?: string;
   tags?: string[];
+  followupDate?: string;
 }
 
 export interface CaseFile {

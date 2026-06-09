@@ -31,6 +31,7 @@
   "status_open": "Open",
   "status_in_progress": "In Progress",
   "status_closed": "Closed",
+  "status_followup": "Follow Up",
   "case_documents": "Case Documents",
   "file_count": "file(s)",
   "no_case_selected": "No Case Selected",

@@ -107,6 +107,16 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
         );
     ").map_err(|e| format!("[case annotations schema] {e}"))?;
 
+    // Ensure 'followup_date' column exists in 'case_annotations'
+    let followup_date_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('case_annotations') WHERE name='followup_date'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !followup_date_exists {
+        let _ = conn.execute("ALTER TABLE case_annotations ADD COLUMN followup_date TEXT;", []);
+    }
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS case_fields (
             case_id      INTEGER NOT NULL,

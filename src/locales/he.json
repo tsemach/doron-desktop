@@ -31,6 +31,7 @@
   "status_open": "פתוח",
   "status_in_progress": "בתהליך",
   "status_closed": "סגור",
+  "status_followup": "מעקב",
   "case_documents": "מסמכי התיק",
   "file_count": "קבצים",
   "no_case_selected": "לא נבחר תיק",

@@ -21,8 +21,8 @@ export default function OpenCasesDocumentAnnotationsModal({
   onCancel,
   onDelete,
 }: OpenCasesDocumentAnnotationsModalProps) {
-  const [notes, setNotes] = useState(initialNotes);
-  const [tags, setTags] = useState<string[]>(initialTags);
+  const [notes, setNotes] = useState(initialNotes || "");
+  const [tags, setTags] = useState<string[]>(initialTags || []);
   const [newTag, setNewTag] = useState("");
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,10 +71,10 @@ export default function OpenCasesDocumentAnnotationsModal({
     try {
       await invoke("set_document_annotations", {
         filePath,
-        notes: notes.trim() || null,
+        notes: notes ? notes.trim() : null,
         tags,
       });
-      onSave(notes.trim(), tags);
+      onSave(notes ? notes.trim() : "", tags);
     } catch (err) {
       console.error(err);
       alert(`Failed to save annotations: ${err}`);

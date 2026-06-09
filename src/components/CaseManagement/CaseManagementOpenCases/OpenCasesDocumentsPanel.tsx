@@ -98,7 +98,7 @@ export default function OpenCasesDocumentsPanel({
             </p>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4">
+          <div className="flex-1 flex flex-col min-h-0 pt-4 pb-4 pl-4 pr-1.5 space-y-4">
             {/* Active Case Details Header */}
             <div className="pb-2 border-b border-border/60 flex items-center justify-between gap-4 shrink-0">
               <OpenDocumentsPanelTopMenu
@@ -127,7 +127,7 @@ export default function OpenCasesDocumentsPanel({
                 {t("files_in_folder")}
               </div> */}
 
-              <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1">
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-3">
                 <OpenCasesDocumentsPanelList
                   docsLoading={docsLoading}
                   docsError={docsError}

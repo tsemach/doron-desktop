@@ -1,12 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Case, CaseStatus } from "./OpenCasesList";
+import { Case, CaseStatus } from "../CaseManagementTypes";
 import { useLanguage } from "../../../context/LanguageContext";
 
 const STATUS_STYLES: Record<CaseStatus, string> = {
   open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
   "in-progress": "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
   closed: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+  followup: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
 interface OpenCasesListItemProps {
@@ -28,10 +29,28 @@ export default function OpenCasesListItem({
 }: OpenCasesListItemProps) {
   const { t } = useLanguage();
 
+  const getFollowupStatus = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(dateStr);
+    target.setHours(0, 0, 0, 0);
+    
+    if (target.getTime() < today.getTime()) {
+      return { type: "overdue", label: `Overdue: ${dateStr}` };
+    } else if (target.getTime() === today.getTime()) {
+      return { type: "due-today", label: `Due Today: ${dateStr}` };
+    } else {
+      return { type: "pending", label: `Follow-up: ${dateStr}` };
+    }
+  };
+
+  const followupStatus = getFollowupStatus(c.followupDate);
+
   return (
     <tr
       onClick={() => onSelectCase(c)}
-      className={`border-t border-border cursor-pointer transition-all hover:bg-muted/30 ${
+      className={`border-t border-border cursor-pointer transition-all hover:bg-muted/70 ${
         isSelected
           ? "bg-primary/5 dark:bg-primary/10 border-l-4 border-l-primary font-medium"
           : ""
@@ -46,6 +65,25 @@ export default function OpenCasesListItem({
           {c.subject || t("no_subject")}
         </Link>
         <div className="text-xs text-muted-foreground mt-0.5 font-normal">{c.name}</div>
+        
+        {followupStatus && (
+          <div className="mt-1.5 select-none">
+            {followupStatus.type === "overdue" ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 text-[10px] font-bold border border-rose-200/50 animate-pulse">
+                <span>⚠️</span> {followupStatus.label}
+              </span>
+            ) : followupStatus.type === "due-today" ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 text-[10px] font-bold border border-amber-200/50">
+                <span>⏰</span> {followupStatus.label}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 text-[10px] font-semibold border border-blue-100/30">
+                <span>📅</span> {followupStatus.label}
+              </span>
+            )}
+          </div>
+        )}
+
         {c.folder && (
           <div className="flex items-center gap-1.5 mt-1.5">
             <span
@@ -81,7 +119,7 @@ export default function OpenCasesListItem({
       </td>
       <td className="px-4 py-3.5 align-middle">
         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[c.status]}`}>
-          {c.status === "open" ? t("status_open") : c.status === "in-progress" ? t("status_in_progress") : t("status_closed")}
+          {c.status === "open" ? t("status_open") : c.status === "in-progress" ? t("status_in_progress") : c.status === "followup" ? t("status_followup") : t("status_closed")}
         </span>
       </td>
       <td className="px-4 py-3.5 align-middle text-xs text-muted-foreground whitespace-nowrap">

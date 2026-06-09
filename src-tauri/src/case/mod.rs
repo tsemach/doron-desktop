@@ -20,6 +20,7 @@ pub struct Case {
     pub folder: Option<String>,
     pub notes: Option<String>,
     pub tags: Vec<String>,
+    pub followup_date: Option<String>,
 }
 
 #[tauri::command]
@@ -27,7 +28,7 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
         .prepare("
-            SELECT c.id, c.subject, c.status, c.name, c.created_at, c.updated_at, c.folder, ca.notes, ca.tags 
+            SELECT c.id, c.subject, c.status, c.name, c.created_at, c.updated_at, c.folder, ca.notes, ca.tags, ca.followup_date 
             FROM cases c
             LEFT JOIN case_annotations ca ON c.id = ca.case_id
             WHERE c.deleted = 0 OR c.deleted IS NULL 
@@ -50,6 +51,7 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
             folder: row.get(6)?,
             notes: row.get(7)?,
             tags,
+            followup_date: row.get(9)?,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -75,7 +77,7 @@ pub fn add_case(
         params![subject, status, name, created_at, folder],
     ).map_err(|e| format!("[insert case] {e}"))?;
     let id = conn.last_insert_rowid();
-    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder, notes: None, tags: Vec::new() })
+    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder, notes: None, tags: Vec::new(), followup_date: None })
 }
 
 #[tauri::command]
@@ -237,6 +239,7 @@ pub async fn create_new_case(
         folder: Some(folder),
         notes: None,
         tags: Vec::new(),
+        followup_date: None,
     })
 }
 
