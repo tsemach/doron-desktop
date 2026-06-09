@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "../ui/button";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../../context/LanguageContext";
 
 export type ProgressStatus = "processing" | "ok" | "skipped" | "failed";
 
@@ -52,6 +53,7 @@ export default function DocsManagementScan({
   startIndexing,
 }: Props) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const outputRef = useRef<HTMLDivElement>(null);
   const progressPercent = currentItem
     ? Math.round((currentItem.current / currentItem.total) * 100)
@@ -284,7 +286,7 @@ export default function DocsManagementScan({
 
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => navigate("/docs-management/search")}>
-                Go to Smart Search
+                {t("go_to_smart_search")}
               </Button>
               <Button size="sm" onClick={() => navigate("/docs-management/scan")}>
                 Index Another File/Folder

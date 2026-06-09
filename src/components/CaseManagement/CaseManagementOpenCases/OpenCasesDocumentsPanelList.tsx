@@ -63,7 +63,7 @@ export default function OpenCasesDocumentsPanelList({
       }}
       className={`space-y-2 rounded-xl transition-all duration-200 border-2 ${
         isDragOver
-          ? "border-primary border-dashed bg-primary/5 p-4 -m-2 scale-[1.01]"
+          ? "border-primary border-dashed bg-primary/5 p-3"
           : "border-transparent"
       }`}
     >

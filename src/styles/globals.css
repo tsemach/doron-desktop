@@ -130,28 +130,28 @@
    bordered elements display diagonal lines/crosses.
    To avoid the bug, we make the native CSS border transparent (preserving layout size)
    and simulate the 1px border line using box-shadow (which supports standard shadows). */
-.rounded.border,
-.rounded-sm.border,
-.rounded-md.border,
-.rounded-lg.border,
-.rounded-xl.border,
-.rounded-2xl.border,
-.rounded-3xl.border,
-.rounded-full.border,
-[class*="rounded-"].border {
+.rounded.border:not([class*="dashed"]),
+.rounded-sm.border:not([class*="dashed"]),
+.rounded-md.border:not([class*="dashed"]),
+.rounded-lg.border:not([class*="dashed"]),
+.rounded-xl.border:not([class*="dashed"]),
+.rounded-2xl.border:not([class*="dashed"]),
+.rounded-3xl.border:not([class*="dashed"]),
+.rounded-full.border:not([class*="dashed"]),
+[class*="rounded-"].border:not([class*="dashed"]) {
   border-color: transparent !important;
   box-shadow: 0 0 0 1px var(--border), var(--tw-shadow, 0 0 #0000) !important;
 }
 
-.rounded.border-primary,
-.rounded-sm.border-primary,
-.rounded-md.border-primary,
-.rounded-lg.border-primary,
-.rounded-xl.border-primary,
-.rounded-2xl.border-primary,
-.rounded-3xl.border-primary,
-.rounded-full.border-primary,
-[class*="rounded-"].border-primary {
+.rounded.border-primary:not([class*="dashed"]),
+.rounded-sm.border-primary:not([class*="dashed"]),
+.rounded-md.border-primary:not([class*="dashed"]),
+.rounded-lg.border-primary:not([class*="dashed"]),
+.rounded-xl.border-primary:not([class*="dashed"]),
+.rounded-2xl.border-primary:not([class*="dashed"]),
+.rounded-3xl.border-primary:not([class*="dashed"]),
+.rounded-full.border-primary:not([class*="dashed"]),
+[class*="rounded-"].border-primary:not([class*="dashed"]) {
   border-color: transparent !important;
   box-shadow: 0 0 0 1px var(--primary), var(--tw-shadow, 0 0 #0000) !important;
 }

@@ -94,5 +94,9 @@
   "show_less": "הצג פחות",
   "copy_to_case": "העתק ועדכן למסמכי התיק",
   "edit_case_notes_tags": "ערוך הערות ותגיות של התיק",
-  "case_annotations": "הערות ותגיות של התיק"
+  "case_annotations": "הערות ותגיות של התיק",
+  "smart_search": "חיפוש חכם",
+  "scan_and_index": "סריקה ואינדוקס",
+  "documents_templates": "תבניות מסמכים",
+  "go_to_smart_search": "עבור לחיפוש חכם"
 }

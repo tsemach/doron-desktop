@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import BackButton from "../ui/back-button";
+import { useLanguage } from "../../context/LanguageContext";
 
 type DocsManagementHeaderProps = {
   apiKey: string;
@@ -16,6 +17,7 @@ export default function DocsManagementHeader({
 }: DocsManagementHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage();
 
   // Helper to check active tab
   const getActiveTab = () => {
@@ -88,7 +90,7 @@ export default function DocsManagementHeader({
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
-            Smart Search
+            {t("smart_search")}
           </button>
           <button
             onClick={() => navigate("/docs-management/scan")}
@@ -113,7 +115,7 @@ export default function DocsManagementHeader({
               <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
               <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
             </svg>
-            Scan & Index
+            {t("scan_and_index")}
             {isProcessing && (
               <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-blue-500 animate-ping" />
             )}
@@ -139,7 +141,7 @@ export default function DocsManagementHeader({
               <rect width="18" height="18" x="3" y="3" rx="2" />
               <path d="M7 7h10M7 12h10M7 17h10" />
             </svg>
-            Documanets Templates
+            {t("documents_templates")}
           </button>
         </nav>
 
