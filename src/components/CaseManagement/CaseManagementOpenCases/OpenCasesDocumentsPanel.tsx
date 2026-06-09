@@ -98,7 +98,7 @@ export default function OpenCasesDocumentsPanel({
             </p>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 pt-4 pb-4 pl-4 pr-1.5 space-y-4">
+          <div className="flex-1 flex flex-col min-h-0 pt-4 pb-3 pl-4 pr-1.5 space-y-2">
             {/* Active Case Details Header */}
             <div className="pb-2 border-b border-border/60 flex items-center justify-between gap-4 shrink-0">
               <OpenDocumentsPanelTopMenu

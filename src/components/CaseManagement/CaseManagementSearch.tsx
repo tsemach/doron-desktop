@@ -20,7 +20,7 @@ export default function CaseManagementSearch({
   onChange,
   placeholder,
   containerClassName = "relative flex items-center",
-  inputClassName = "w-full rounded-lg border border-input bg-background pl-8 pr-7 rtl:pr-8 rtl:pl-7 py-1.5 text-xs placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring transition-all",
+  inputClassName = "w-full rounded-lg border border-input bg-background pl-8 pr-7 rtl:pr-8 rtl:pl-7 py-1 text-xs placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring transition-all",
   searchIconSize = 12,
   searchIconStrokeWidth = 2.5,
   searchIconClassName = "absolute left-2.5 rtl:left-auto rtl:right-2.5 text-muted-foreground",
