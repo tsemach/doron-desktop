@@ -3,17 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 
-interface DocTemplate {
-  id: number;
-  file_name: string;
-  file_ext: string;
-  file_size_kb: number;
-  fields_found: string; // JSON string of array
-  uploaded_at: string;
-  original_path: string;
-  marked_path: string;
-  title: string | null;
-}
+import { DocTemplate } from "../CaseManagementTypes";
 
 interface OpenCasesAddDocumentTemplateProps {
   caseId: number;

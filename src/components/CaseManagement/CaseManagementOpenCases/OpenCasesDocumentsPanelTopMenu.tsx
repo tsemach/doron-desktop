@@ -3,17 +3,7 @@ import { Button } from "@/components/ui/button";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useLanguage } from "../../../context/LanguageContext";
 
-type CaseStatus = "open" | "in-progress" | "closed";
-
-interface Case {
-  id: string;
-  subject?: string;
-  status: CaseStatus;
-  name: string;
-  createdAt: string;
-  updatedAt?: string;
-  folder?: string;
-}
+import { Case } from "../CaseManagementTypes";
 
 interface OpenDocumentsPanelTopMenuProps {
   selectedCase: Case | null;
@@ -21,6 +11,7 @@ interface OpenDocumentsPanelTopMenuProps {
   onTabChange?: (tab: "preview" | "emails") => void;
   onShowFields: () => void;
   onAddDocument: () => void;
+  onEditCaseAnnotations?: () => void;
 }
 
 export default function OpenDocumentsPanelTopMenu({
@@ -29,6 +20,7 @@ export default function OpenDocumentsPanelTopMenu({
   onTabChange,
   onShowFields,
   onAddDocument,
+  onEditCaseAnnotations,
 }: OpenDocumentsPanelTopMenuProps) {
   const { t } = useLanguage();
   const [showMenu, setShowMenu] = useState(false);
@@ -80,8 +72,50 @@ export default function OpenDocumentsPanelTopMenu({
             </button>
           </div>
         )}
+        {selectedCase?.tags && selectedCase.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {selectedCase.tags.map((tag) => (
+              <span
+                key={tag}
+                className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold border border-primary/20 tracking-wide uppercase select-none font-sans"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {selectedCase?.notes && (
+          <p className="text-[10px] text-muted-foreground/80 mt-2 italic border-l-2 border-border/85 pl-1.5 bg-muted/20 py-0.5 rounded-r max-w-md line-clamp-2">
+            "{selectedCase.notes}"
+          </p>
+        )}
       </div>
       <div className="flex gap-2 shrink-0 items-center">
+        {selectedCase && onEditCaseAnnotations && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onEditCaseAnnotations}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
+            title={t("edit_case_notes_tags")}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2H2v10l9.29 9.29c.39.39 1.02.39 1.41 0l8.59-8.59c.39-.39.39-1.02 0-1.41L12 2z" />
+              <path d="M7 7h.01" />
+            </svg>
+          </Button>
+        )}
         <Button
           size="sm"
           onClick={onAddDocument}

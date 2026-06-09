@@ -6,6 +6,9 @@ use tauri::AppHandle;
 
 use crate::store;
 
+pub mod annotations;
+pub use annotations::*;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Case {
     pub id: i64,
@@ -15,16 +18,28 @@ pub struct Case {
     pub created_at: String,
     pub updated_at: Option<String>,
     pub folder: Option<String>,
+    pub notes: Option<String>,
+    pub tags: Vec<String>,
 }
 
 #[tauri::command]
 pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
-        .prepare("SELECT id, subject, status, name, created_at, updated_at, folder FROM cases WHERE deleted = 0 OR deleted IS NULL ORDER BY id DESC")
+        .prepare("
+            SELECT c.id, c.subject, c.status, c.name, c.created_at, c.updated_at, c.folder, ca.notes, ca.tags 
+            FROM cases c
+            LEFT JOIN case_annotations ca ON c.id = ca.case_id
+            WHERE c.deleted = 0 OR c.deleted IS NULL 
+            ORDER BY c.id DESC
+        ")
         .map_err(|e| e.to_string())?;
     
     let rows = stmt.query_map([], |row| {
+        let tags_str: Option<String> = row.get(8)?;
+        let tags = tags_str
+            .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
+            .unwrap_or_default();
         Ok(Case {
             id: row.get(0)?,
             subject: row.get(1)?,
@@ -33,6 +48,8 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
             created_at: row.get(4)?,
             updated_at: row.get(5)?,
             folder: row.get(6)?,
+            notes: row.get(7)?,
+            tags,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -58,7 +75,7 @@ pub fn add_case(
         params![subject, status, name, created_at, folder],
     ).map_err(|e| format!("[insert case] {e}"))?;
     let id = conn.last_insert_rowid();
-    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder })
+    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder, notes: None, tags: Vec::new() })
 }
 
 #[tauri::command]
@@ -218,6 +235,8 @@ pub async fn create_new_case(
         created_at,
         updated_at: None,
         folder: Some(folder),
+        notes: None,
+        tags: Vec::new(),
     })
 }
 
@@ -439,26 +458,42 @@ pub fn delete_document_annotations(app: AppHandle, file_path: String) -> Result<
 #[tauri::command]
 pub fn list_all_annotation_tags(app: AppHandle) -> Result<Vec<String>, String> {
     let conn = store::open_db(&app)?;
-    let mut stmt = conn.prepare("SELECT tags FROM document_annotations")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt.query_map([], |row| {
-        let tags_str: Option<String> = row.get(0)?;
-        Ok(tags_str)
-    }).map_err(|e| e.to_string())?;
-    
     let mut all_tags = std::collections::HashSet::new();
-    for r in rows {
-        if let Ok(Some(tags_str)) = r {
-            if let Ok(tags) = serde_json::from_str::<Vec<String>>(&tags_str) {
-                for tag in tags {
-                    if !tag.trim().is_empty() {
-                        all_tags.insert(tag);
+
+    // Query document tags
+    if let Ok(mut stmt) = conn.prepare("SELECT tags FROM document_annotations") {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, Option<String>>(0)) {
+            for r in rows.flatten() {
+                if let Some(tags_str) = r {
+                    if let Ok(tags) = serde_json::from_str::<Vec<String>>(&tags_str) {
+                        for tag in tags {
+                            if !tag.trim().is_empty() {
+                                all_tags.insert(tag);
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    
+
+    // Query case tags
+    if let Ok(mut stmt) = conn.prepare("SELECT tags FROM case_annotations") {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, Option<String>>(0)) {
+            for r in rows.flatten() {
+                if let Some(tags_str) = r {
+                    if let Ok(tags) = serde_json::from_str::<Vec<String>>(&tags_str) {
+                        for tag in tags {
+                            if !tag.trim().is_empty() {
+                                all_tags.insert(tag);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let mut sorted_tags: Vec<String> = all_tags.into_iter().collect();
     sorted_tags.sort();
     Ok(sorted_tags)

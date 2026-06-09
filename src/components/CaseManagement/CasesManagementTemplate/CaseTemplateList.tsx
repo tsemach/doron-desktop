@@ -1,5 +1,5 @@
 import { Button } from "../../ui/button";
-import { CaseTemplate } from "./types";
+import { CaseTemplate } from "../CaseManagementTypes";
 
 interface CaseTemplateListProps {
   caseTemplates: CaseTemplate[];

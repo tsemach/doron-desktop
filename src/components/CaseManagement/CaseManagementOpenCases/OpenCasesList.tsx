@@ -1,17 +1,8 @@
 import OpenCasesListItem from "./OpenCasesListItem";
 import { useLanguage } from "../../../context/LanguageContext";
 
-export type CaseStatus = "open" | "in-progress" | "closed";
-
-export interface Case {
-  id: string;
-  subject?: string;
-  status: CaseStatus;
-  name: string;
-  createdAt: string;
-  updatedAt?: string;
-  folder?: string;
-}
+import { Case, CaseStatus } from "../CaseManagementTypes";
+export type { Case, CaseStatus };
 
 interface OpenCasesListProps {
   cases: Case[];

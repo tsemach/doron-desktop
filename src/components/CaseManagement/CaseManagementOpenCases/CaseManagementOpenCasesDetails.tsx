@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsModal";
+import OpenCasesCaseAnnotationsModal from "./OpenCasesCaseAnnotationsModal";
 import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
 import OpenCasesUpdateDocumentModal from "./OpenCasesUpdateDocumentModal";
 import OpenCasesFieldsModal from "./OpenCasesFieldsModal";
@@ -15,27 +16,7 @@ import OpenCasesDocumentHistory from "./OpenCasesDocumentHistory";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
 
-type CaseStatus = "open" | "in-progress" | "closed";
-
-interface Case {
-  id: string;
-  subject?: string;
-  status: CaseStatus;
-  name: string;
-  createdAt: string;
-  updatedAt?: string;
-  folder?: string;
-}
-
-interface CaseFile {
-  name: string;
-  path: string;
-  ext: string;
-  size_kb: number;
-  title?: string;
-  notes?: string;
-  tags: string[];
-}
+import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
 
 export default function CaseManagementOpenCasesDetails() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -47,6 +28,7 @@ export default function CaseManagementOpenCasesDetails() {
   const [docsLoading, setDocsLoading] = useState(false);
   const [docsError, setDocsError] = useState<string | null>(null);
   const [editingDoc, setEditingDoc] = useState<CaseFile | null>(null);
+  const [editingCaseAnnotations, setEditingCaseAnnotations] = useState<Case | null>(null);
   const [showAddDocModal, setShowAddDocModal] = useState(false);
   const [updatingAttachment, setUpdatingAttachment] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
   const [showFieldsModal, setShowFieldsModal] = useState(false);
@@ -250,6 +232,8 @@ export default function CaseManagementOpenCasesDetails() {
         createdAt: c.created_at ? c.created_at.split("T")[0] : "—",
         updatedAt: c.updated_at ? c.updated_at.split("T")[0] : undefined,
         folder: c.folder,
+        notes: c.notes,
+        tags: c.tags || [],
       }));
       const found = mapped.find((c) => c.id === id);
       if (found) {
@@ -496,6 +480,7 @@ export default function CaseManagementOpenCasesDetails() {
             onOpenFile={handleOpenFile}
             onRemoveDocument={handleRemoveDocument}
             onEditAnnotations={setEditingDoc}
+            onEditCaseAnnotations={() => setEditingCaseAnnotations(selectedCase)}
             onShowFields={() => setShowFieldsModal(true)}
             onAddDocument={() => setShowAddDocModal(true)}
             onSelectDocument={(doc) => {
@@ -596,6 +581,28 @@ export default function CaseManagementOpenCasesDetails() {
             </div>
           </div>
         </div>
+      )}
+
+      {editingCaseAnnotations && (
+        <OpenCasesCaseAnnotationsModal
+          caseId={editingCaseAnnotations.id}
+          caseSubject={editingCaseAnnotations.subject || "No Subject"}
+          initialNotes={editingCaseAnnotations.notes}
+          initialTags={editingCaseAnnotations.tags}
+          onCancel={() => setEditingCaseAnnotations(null)}
+          onSave={(notes, tags) => {
+            setSelectedCase((prev) =>
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes, tags } : prev
+            );
+            setEditingCaseAnnotations(null);
+          }}
+          onDelete={() => {
+            setSelectedCase((prev) =>
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes: undefined, tags: [] } : prev
+            );
+            setEditingCaseAnnotations(null);
+          }}
+        />
       )}
 
       {editingDoc && (

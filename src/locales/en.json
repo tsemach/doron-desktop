@@ -91,5 +91,7 @@
   "refresh": "Refresh",
   "show_more": "Show More",
   "show_less": "Show Less",
-  "copy_to_case": "Copy & Update to Case Documents"
+  "copy_to_case": "Copy & Update to Case Documents",
+  "edit_case_notes_tags": "Edit case notes & tags",
+  "case_annotations": "Case Annotations"
 }

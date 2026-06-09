@@ -4,7 +4,7 @@ import CaseManagementOpenCases from "./CaseManagementOpenCases/CaseManagementOpe
 import CasesManagementTemplate from "./CasesManagementTemplate/CasesManagementTemplate";
 import CaseManagementCaseCreate from "./CaseManagementCaseCreate";
 import CaseManagementOpenCasesDetails from "./CaseManagementOpenCases/CaseManagementOpenCasesDetails";
-import EmailAlertReview from "./CaseManagementOpenCases/EmailAlertReview";
+import CaseManagementEmailAlertReview from "./CaseManagementOpenCases/CaseManagementEmailAlertReview";
 
 export default function CaseManagement() {
 
@@ -17,7 +17,7 @@ export default function CaseManagement() {
         <Route path="new-case" element={<CaseManagementCaseCreate />} />
         <Route path="cases/:caseId" element={<CaseManagementOpenCasesDetails />} />
       </Routes>
-      <EmailAlertReview />
+      <CaseManagementEmailAlertReview />
     </div>
   );
 }

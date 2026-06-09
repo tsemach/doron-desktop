@@ -2,15 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 
-interface CaseFile {
-  name: string;
-  path: string;
-  ext: string;
-  size_kb: number;
-  title?: string;
-  notes?: string;
-  tags: string[];
-}
+import { CaseFile } from "../CaseManagementTypes";
 
 interface OpenCasesUpdateDocumentModalProps {
   caseId: number;

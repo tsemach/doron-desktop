@@ -4,15 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Button } from "@/components/ui/button";
 import { Loader2, FolderOpen, RotateCcw, Trash2, CheckCircle2 } from "lucide-react";
 
-interface CaseFile {
-  name: string;
-  path: string;
-  ext: string;
-  size_kb: number;
-  title?: string;
-  notes?: string;
-  tags: string[];
-}
+import { CaseFile } from "../CaseManagementTypes";
 
 interface DocumentVersion {
   id: number;

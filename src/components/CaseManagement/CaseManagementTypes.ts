@@ -1,3 +1,27 @@
+export type CaseStatus = "open" | "in-progress" | "closed";
+
+export interface Case {
+  id: string;
+  subject?: string;
+  status: CaseStatus;
+  name: string;
+  createdAt: string;
+  updatedAt?: string;
+  folder?: string;
+  notes?: string;
+  tags?: string[];
+}
+
+export interface CaseFile {
+  name: string;
+  path: string;
+  ext: string;
+  size_kb: number;
+  title?: string;
+  notes?: string;
+  tags: string[];
+}
+
 export interface DocTemplate {
   id: number;
   file_name: string;

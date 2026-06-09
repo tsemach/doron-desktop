@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { CaseTemplate, DocTemplate } from "./types";
+import { CaseTemplate, DocTemplate } from "../CaseManagementTypes";
 import CaseTemplateDeleteWarningModal from "./CaseTemplateDeleteWarningModal";
 import CaseManagementSearch from "../CaseManagementSearch";
 

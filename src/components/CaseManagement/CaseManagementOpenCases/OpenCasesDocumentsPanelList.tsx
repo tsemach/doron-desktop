@@ -3,15 +3,7 @@ import OpenCasesFileIcon from "./OpenCasesFileIcon";
 import OpenCasesDocumentPanelControl from "./OpenCasesDocumentPanelControl";
 import { useLanguage } from "../../../context/LanguageContext";
 
-interface CaseFile {
-  name: string;
-  path: string;
-  ext: string;
-  size_kb: number;
-  title?: string;
-  notes?: string;
-  tags: string[];
-}
+import { CaseFile } from "../CaseManagementTypes";
 
 interface OpenCasesDocumentsPanelListProps {
   docsLoading: boolean;

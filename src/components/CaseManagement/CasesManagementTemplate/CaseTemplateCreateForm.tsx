@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "../../ui/button";
-import { DocTemplate } from "./types";
+import { DocTemplate } from "../CaseManagementTypes";
 
 interface TemplateCreateFormProps {
   docTemplates: DocTemplate[];

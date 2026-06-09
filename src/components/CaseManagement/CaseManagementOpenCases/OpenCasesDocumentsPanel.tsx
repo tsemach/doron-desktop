@@ -4,27 +4,7 @@ import CaseManagementSearch from "../CaseManagementSearch";
 import OpenCasesDocumentsPanelList from "./OpenCasesDocumentsPanelList";
 import OpenDocumentsPanelTopMenu from "./OpenCasesDocumentsPanelTopMenu";
 
-type CaseStatus = "open" | "in-progress" | "closed";
-
-interface Case {
-  id: string;
-  subject?: string;
-  status: CaseStatus;
-  name: string;
-  createdAt: string;
-  updatedAt?: string;
-  folder?: string;
-}
-
-interface CaseFile {
-  name: string;
-  path: string;
-  ext: string;
-  size_kb: number;
-  title?: string;
-  notes?: string;
-  tags: string[];
-}
+import { Case, CaseFile } from "../CaseManagementTypes";
 
 interface OpenCasesDocumentsPanelProps {
   selectedCase: Case | null;
@@ -36,6 +16,7 @@ interface OpenCasesDocumentsPanelProps {
   onOpenFile: (filePath: string) => void;
   onRemoveDocument: (doc: CaseFile) => void;
   onEditAnnotations: (doc: CaseFile) => void;
+  onEditCaseAnnotations?: () => void;
   onShowFields: () => void;
   onAddDocument: () => void;
   onSelectDocument?: (doc: CaseFile) => void;
@@ -57,6 +38,7 @@ export default function OpenCasesDocumentsPanel({
   onOpenFile,
   onRemoveDocument,
   onEditAnnotations,
+  onEditCaseAnnotations,
   onShowFields,
   onAddDocument,
   onSelectDocument,
@@ -125,6 +107,7 @@ export default function OpenCasesDocumentsPanel({
                 onTabChange={onTabChange}
                 onShowFields={onShowFields}
                 onAddDocument={onAddDocument}
+                onEditCaseAnnotations={onEditCaseAnnotations}
               />
             </div>
 

@@ -16,17 +16,14 @@ interface PendingAlert {
   attachments_json: string;
 }
 
-interface Case {
-  id: string;
-  name: string;
-}
+import { Case } from "../CaseManagementTypes";
 
 interface Attachment {
   name: string;
   size_kb: number;
 }
 
-export default function EmailAlertReview() {
+export default function CaseManagementEmailAlertReview() {
   const { t } = useLanguage();
   const [alerts, setAlerts] = useState<PendingAlert[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
@@ -53,7 +50,7 @@ export default function EmailAlertReview() {
     try {
       const res = await invoke<PendingAlert[]>("list_pending_email_alerts");
       setAlerts(res);
-      
+
       // Pre-populate dropdown map with AI suggested cases
       const map: HashMap<number, number> = {};
       for (const alert of res) {
@@ -70,7 +67,17 @@ export default function EmailAlertReview() {
   async function loadCases() {
     try {
       const res = await invoke<any[]>("list_cases");
-      setCases(res.map(c => ({ id: String(c.id), name: c.name })));
+      setCases(res.map(c => ({
+        id: String(c.id),
+        name: c.name,
+        subject: c.subject,
+        status: c.status,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+        folder: c.folder,
+        notes: c.notes,
+        tags: c.tags || [],
+      })));
     } catch (e) {
       console.error("Failed to load cases list:", e);
     }
@@ -95,7 +102,7 @@ export default function EmailAlertReview() {
 
   async function handleDelete(alertId: number) {
     if (!confirm("Are you sure you want to dismiss this email? Attachments will be deleted.")) return;
-    
+
     try {
       await invoke("delete_email_alert", { alertId });
       loadAlerts();
