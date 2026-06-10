@@ -61,10 +61,10 @@ async fn ingest_single_email(
     seq: u32,
     message_id: &str,
 ) -> Result<(), String> {
-    // Fetch full RFC822 body for new emails only
+    // Fetch full body using BODY.PEEK[] to leave it unread on IMAP server
     let fetches = session
-        .fetch(seq.to_string(), "RFC822")
-        .map_err(|e| format!("Failed to fetch RFC822 for sequence {}: {}", seq, e))?;
+        .fetch(seq.to_string(), "BODY.PEEK[]")
+        .map_err(|e| format!("Failed to fetch BODY.PEEK[] for sequence {}: {}", seq, e))?;
     
     let fetch = fetches.iter().next().ok_or_else(|| format!("No fetch result for sequence {}", seq))?;
 
@@ -230,10 +230,10 @@ async fn heal_truncated_case_emails(app: &AppHandle, session: &mut ImapSession) 
             }
         };
 
-        let fetches = match session.fetch(seq.to_string(), "RFC822") {
+        let fetches = match session.fetch(seq.to_string(), "BODY.PEEK[]") {
             Ok(f) => f,
             Err(e) => {
-                println!("[Email Healer Warning] Failed to fetch RFC822 for sequence {}: {}", seq, e);
+                println!("[Email Healer Warning] Failed to fetch BODY.PEEK[] for sequence {}: {}", seq, e);
                 continue;
             }
         };
