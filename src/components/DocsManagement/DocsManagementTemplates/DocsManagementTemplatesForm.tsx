@@ -22,6 +22,7 @@ export default function DocsManagementTemplatesForm({
   onDelete,
 }: DocsManagementTemplatesFormProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleCopyField = (field: string) => {
     const textToCopy = `[[${field}]]`;
@@ -31,6 +32,11 @@ export default function DocsManagementTemplatesForm({
       setCopiedField(null);
     }, 1500);
   };
+
+  const fields = Object.keys(fieldValues);
+  const filteredFields = fields.filter((f) =>
+    f.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -107,13 +113,53 @@ export default function DocsManagementTemplatesForm({
           </Button>
         </div>
 
-        {Object.keys(fieldValues).length === 0 ? (
+        {/* Search bar */}
+        {fields.length > 0 && (
+          <div className="relative w-full max-w-sm">
+            <input
+              type="text"
+              placeholder="Search variables..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-8 py-1.5 text-xs rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+            />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground font-semibold text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
+
+        {fields.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground bg-muted/10">
             No placeholder tags (e.g. `[[field name]]`) were identified in this document.
           </div>
+        ) : filteredFields.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground bg-muted/10">
+            No variables match your search query.
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {Object.keys(fieldValues).map((field) => {
+            {filteredFields.map((field) => {
               const isCopied = copiedField === field;
               return (
                 <div

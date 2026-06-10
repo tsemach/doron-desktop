@@ -75,9 +75,13 @@ export default function DocsManagementTemplatesListItem({
               <line x1="10" y1="14" x2="21" y2="3" />
             </svg>
           </button>
-          <span className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/40">
+          <button
+            onClick={handleOpenDoc}
+            className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-muted hover:bg-muted-foreground/10 text-muted-foreground hover:text-foreground border border-border/40 cursor-pointer transition-colors"
+            title="Open in default application (e.g. Word, PDF viewer)"
+          >
             {template.file_ext}
-          </span>
+          </button>
         </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
