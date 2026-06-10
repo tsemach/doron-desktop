@@ -197,14 +197,20 @@ pub(crate) async fn run_cascade_classification(
     let mut sorted_candidates: Vec<(&i64, &f32)> = case_similarities.iter().collect();
     sorted_candidates.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-    // Threshold filtering (spams have very low cosine similarity to any legal document)
+    // Threshold filtering (spams/newsletters have low cosine similarity compared to case docs)
     let best_local_score = sorted_candidates.first().map(|c| *c.1).unwrap_or(0.0);
 
-    if best_local_score < 0.35 {
+    let required_threshold = if config.api_key_enc.is_empty() {
+        0.84 // Stricter threshold when relying purely on embeddings without LLM verification (E5 Small baseline)
+    } else {
+        0.76 // More relaxed threshold when verified by LLM
+    };
+
+    if best_local_score < required_threshold {
         return (
             None,
             0.0,
-            format!("Rough filtering skipped: similarity index {best_local_score:.2} too low. Unrelated to any case."),
+            format!("Rough filtering skipped: similarity index {best_local_score:.2} too low (required {required_threshold:.2}). Unrelated to any case."),
         );
     }
 
