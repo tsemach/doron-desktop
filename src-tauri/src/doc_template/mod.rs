@@ -423,27 +423,41 @@ pub fn sync_all_templates_fields(app: AppHandle) -> Result<(), String> {
     let conn = store::open_db(&app)?;
     
     let mut stmt = conn
-        .prepare("SELECT id, marked_path FROM doc_templates")
+        .prepare("SELECT id, file_name, marked_path FROM doc_templates")
         .map_err(|e| e.to_string())?;
         
     let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
     }).map_err(|e| e.to_string())?;
     
+    let mut errors = Vec::new();
     for r in rows {
-        if let Ok((id, marked_path_str)) = r {
+        if let Ok((id, file_name, marked_path_str)) = r {
             let marked_path = std::path::Path::new(&marked_path_str);
-            if marked_path.exists() {
-                if let Ok(extracted) = extractor::extract(marked_path) {
+            if !marked_path.exists() {
+                errors.push(format!("Template file not found for {file_name}"));
+                continue;
+            }
+            match extractor::extract(marked_path) {
+                Ok(extracted) => {
                     let fields = extract_field_names(&extracted.text);
                     let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
-                    let _ = conn.execute(
+                    if let Err(e) = conn.execute(
                         "UPDATE doc_templates SET fields_found = ?1 WHERE id = ?2",
                         rusqlite::params![fields_json, id],
-                    );
+                    ) {
+                        errors.push(format!("Database update failed for {file_name}: {e}"));
+                    }
+                }
+                Err(e) => {
+                    errors.push(format!("Failed to extract fields from {file_name}: {e}"));
                 }
             }
         }
+    }
+    
+    if !errors.is_empty() {
+        return Err(errors.join("; "));
     }
     
     Ok(())

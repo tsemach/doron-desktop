@@ -132,6 +132,15 @@ export default function DocsManagementTemplates() {
         initialValues[f] = "";
       });
       setFieldValues(initialValues);
+      
+      // Update both templates and selectedTemplate with the newly synced fields
+      const fieldsJson = JSON.stringify(fields);
+      setTemplates((prev) =>
+        prev.map((item) => (item.id === t.id ? { ...item, fields_found: fieldsJson } : item))
+      );
+      setSelectedTemplate((prev) =>
+        prev && prev.id === t.id ? { ...prev, fields_found: fieldsJson } : prev
+      );
     } catch (err) {
       console.error("Failed to sync fields on selection, falling back to database fields:", err);
       try {
