@@ -389,6 +389,71 @@ pub async fn process_template(
     })
 }
 
+fn sync_single_template_internal(conn: &rusqlite::Connection, template_id: i64, marked_path_str: &str) -> Result<Vec<String>, String> {
+    let marked_path = std::path::Path::new(marked_path_str);
+    if !marked_path.exists() {
+        return Err(format!("Marked template file not found at {marked_path_str}"));
+    }
+    
+    let old_fields_json: String = conn
+        .query_row(
+            "SELECT fields_found FROM doc_templates WHERE id = ?1",
+            rusqlite::params![template_id],
+            |row| row.get(0)
+        )
+        .unwrap_or_else(|_| "[]".to_string());
+    let old_fields: Vec<String> = serde_json::from_str(&old_fields_json).unwrap_or_default();
+
+    let extracted = extractor::extract(marked_path)?;
+    let fields = extract_field_names(&extracted.text);
+    let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
+    
+    let deleted_fields: Vec<String> = old_fields
+        .into_iter()
+        .filter(|f| !fields.contains(f))
+        .collect();
+
+    if !deleted_fields.is_empty() {
+        let mut case_stmt = conn
+            .prepare(
+                "SELECT ct.id, ct.fields 
+                 FROM case_templates ct
+                 JOIN case_template_docs ctd ON ct.id = ctd.case_template_id
+                 WHERE ctd.template_id = ?1"
+            )
+            .map_err(|e| e.to_string())?;
+        
+        let case_rows = case_stmt
+            .query_map(rusqlite::params![template_id], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
+        
+        for row in case_rows {
+            if let Ok((case_template_id, fields_json)) = row {
+                let mut case_fields: Vec<String> = serde_json::from_str(&fields_json).unwrap_or_default();
+                let original_len = case_fields.len();
+                case_fields.retain(|f| !deleted_fields.contains(f));
+                
+                if case_fields.len() < original_len {
+                    let updated_fields_json = serde_json::to_string(&case_fields).unwrap_or_else(|_| "[]".to_string());
+                    conn.execute(
+                        "UPDATE case_templates SET fields = ?1 WHERE id = ?2",
+                        rusqlite::params![updated_fields_json, case_template_id],
+                    ).map_err(|e| e.to_string())?;
+                }
+            }
+        }
+    }
+
+    conn.execute(
+        "UPDATE doc_templates SET fields_found = ?1 WHERE id = ?2",
+        rusqlite::params![fields_json, template_id],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(fields)
+}
+
 #[tauri::command]
 pub fn sync_template_fields(app: AppHandle, template_id: i64) -> Result<Vec<String>, String> {
     let conn = store::open_db(&app)?;
@@ -401,21 +466,7 @@ pub fn sync_template_fields(app: AppHandle, template_id: i64) -> Result<Vec<Stri
         .query_row(rusqlite::params![template_id], |row| row.get(0))
         .map_err(|e| format!("Failed to find template with ID {template_id}: {e}"))?;
         
-    let marked_path = std::path::Path::new(&marked_path_str);
-    if !marked_path.exists() {
-        return Err(format!("Marked template file not found at {marked_path_str}"));
-    }
-    
-    let extracted = extractor::extract(marked_path)?;
-    let fields = extract_field_names(&extracted.text);
-    let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
-    
-    conn.execute(
-        "UPDATE doc_templates SET fields_found = ?1 WHERE id = ?2",
-        rusqlite::params![fields_json, template_id],
-    ).map_err(|e| e.to_string())?;
-    
-    Ok(fields)
+    sync_single_template_internal(&conn, template_id, &marked_path_str)
 }
 
 #[tauri::command]
@@ -433,25 +484,8 @@ pub fn sync_all_templates_fields(app: AppHandle) -> Result<(), String> {
     let mut errors = Vec::new();
     for r in rows {
         if let Ok((id, file_name, marked_path_str)) = r {
-            let marked_path = std::path::Path::new(&marked_path_str);
-            if !marked_path.exists() {
-                errors.push(format!("Template file not found for {file_name}"));
-                continue;
-            }
-            match extractor::extract(marked_path) {
-                Ok(extracted) => {
-                    let fields = extract_field_names(&extracted.text);
-                    let fields_json = serde_json::to_string(&fields).unwrap_or_else(|_| "[]".to_string());
-                    if let Err(e) = conn.execute(
-                        "UPDATE doc_templates SET fields_found = ?1 WHERE id = ?2",
-                        rusqlite::params![fields_json, id],
-                    ) {
-                        errors.push(format!("Database update failed for {file_name}: {e}"));
-                    }
-                }
-                Err(e) => {
-                    errors.push(format!("Failed to extract fields from {file_name}: {e}"));
-                }
+            if let Err(e) = sync_single_template_internal(&conn, id, &marked_path_str) {
+                errors.push(format!("Failed to sync {file_name}: {e}"));
             }
         }
     }

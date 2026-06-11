@@ -24,10 +24,10 @@ export default function OpenCasesAddDocumentModal({
       <div
         className="bg-card border border-border rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 resize overflow-hidden relative"
         style={{
-          width: "680px",
-          height: "540px",
-          minWidth: "480px",
-          minHeight: "400px",
+          width: "860px",
+          height: "680px",
+          minWidth: "640px",
+          minHeight: "520px",
           maxWidth: "95vw",
           maxHeight: "95vh",
         }}

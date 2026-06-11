@@ -17,7 +17,7 @@ fn test_extract_docx_and_store() {
     println!("characters : {}", extracted.text.len());
     println!("page_count : {:?}", extracted.page_count);
     println!("--- text preview (first 300 chars) ---");
-    println!("{}", &extracted.text[..extracted.text.len().min(300)]);
+    println!("{}", extracted.text.chars().take(300).collect::<String>());
     println!("--- full text ---");
     println!("{}", extracted.text);
 

@@ -18,7 +18,6 @@ pub fn extract_docx(path: &Path) -> Result<String, String> {
     }
 
     let mut reader = Reader::from_str(&xml_content);
-    reader.config_mut().trim_text(true);
 
     let mut paragraphs: Vec<String> = Vec::new();
     let mut current_para: Vec<String> = Vec::new();

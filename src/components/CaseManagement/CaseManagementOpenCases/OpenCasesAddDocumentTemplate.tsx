@@ -29,6 +29,7 @@ export default function OpenCasesAddDocumentTemplate({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [templateFields, setTemplateFields] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isProcessingTemplate, setIsProcessingTemplate] = useState(false);
 
   // Common Action States
@@ -91,6 +92,7 @@ export default function OpenCasesAddDocumentTemplate({
 
   function handleSelectTemplate(tpl: DocTemplate) {
     setSelectedTemplateId(String(tpl.id));
+    setSearchQuery("");
     try {
       const fields = JSON.parse(tpl.fields_found || "[]");
       setTemplateFields(fields);
@@ -220,6 +222,10 @@ export default function OpenCasesAddDocumentTemplate({
     }
   }
 
+  const filteredFields = templateFields.filter((field) =>
+    field.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="flex-grow flex flex-col min-h-0">
       {/* Content Body */}
@@ -278,14 +284,54 @@ export default function OpenCasesAddDocumentTemplate({
               </p>
             </div>
 
+            {templateFields.length > 0 && (
+              <div className="relative w-full shrink-0">
+                <input
+                  type="text"
+                  placeholder="Search fields..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-1.5 text-xs rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-foreground font-mono"
+                />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground font-semibold text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto pr-1">
               {templateFields.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-center text-xs text-muted-foreground/80 py-8">
                   No placeholder variables found in this template.
                 </div>
+              ) : filteredFields.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center text-xs text-muted-foreground/80 py-8">
+                  No fields match your search query "{searchQuery}"
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1">
-                  {templateFields.map((field) => (
+                  {filteredFields.map((field) => (
                     <div key={field} className="space-y-1">
                       <label
                         htmlFor={`field-input-${field}`}

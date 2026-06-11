@@ -11,6 +11,7 @@ pub mod query;
 pub mod embeddings;
 pub mod email;
 pub mod documents;
+pub mod clipboard;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -95,7 +96,9 @@ pub fn run() {
             email::list_case_emails,
             email::trigger_email_ingestion,
             email::list_case_attachments,
-            email::remove_attachment
+            email::remove_attachment,
+            clipboard::read_clipboard,
+            clipboard::write_clipboard
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
