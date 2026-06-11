@@ -2,18 +2,19 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CaseTemplate, DocTemplate } from "../CaseManagementTypes";
 import CaseTemplateDeleteWarningModal from "./CaseTemplateDeleteWarningModal";
-import CaseManagementSearch from "../CaseManagementSearch";
 
 interface CaseTemplateDetailsViewProps {
   activeTemplate: CaseTemplate;
   docTemplates: DocTemplate[];
   onDelete: () => Promise<void>;
   onRename: (newName: string) => Promise<void>;
-  onAddDoc: (docId: number) => Promise<void>;
+  onAddDoc: (docIds: number[]) => Promise<void>;
   onRemoveDoc: (docId: number) => Promise<void>;
   onAddField: (fieldName: string) => Promise<void>;
   onRemoveField: (fieldName: string) => Promise<void>;
   onSyncAllFields: () => Promise<void>;
+  showAddDocDropdown: boolean;
+  onOpenAddDoc: () => void;
 }
 
 export default function CaseTemplateDetailsView({
@@ -21,17 +22,16 @@ export default function CaseTemplateDetailsView({
   docTemplates,
   onDelete,
   onRename,
-  onAddDoc,
   onRemoveDoc,
   onAddField,
   onRemoveField,
   onSyncAllFields,
+  showAddDocDropdown,
+  onOpenAddDoc,
 }: CaseTemplateDetailsViewProps) {
   // Inline editing state
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState("");
-  const [showAddDocDropdown, setShowAddDocDropdown] = useState(false);
-  const [docFilterText, setDocFilterText] = useState("");
   const [isAddingFieldInline, setIsAddingFieldInline] = useState(false);
   const [newFieldInlineValue, setNewFieldInlineValue] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -43,7 +43,6 @@ export default function CaseTemplateDetailsView({
   // Sync editing name if activeTemplate changes
   useEffect(() => {
     setIsEditingName(false);
-    setShowAddDocDropdown(false);
     setIsAddingFieldInline(false);
     setShowDeleteConfirm(false);
     setSelectedDocIdForFields(null);
@@ -81,17 +80,7 @@ export default function CaseTemplateDetailsView({
     setIsAddingFieldInline(false);
   }
 
-  // Get unassociated document templates
-  const unassociatedDocs = docTemplates.filter(
-    (doc) => !activeTemplate.doc_template_ids.includes(doc.id)
-  );
 
-  // Filtered unassociated docs
-  const filteredUnassociatedDocs = unassociatedDocs.filter(
-    (doc) =>
-      doc.file_name.toLowerCase().includes(docFilterText.toLowerCase()) ||
-      (doc.title && doc.title.toLowerCase().includes(docFilterText.toLowerCase()))
-  );
 
   function formatDate(iso: string): string {
     try {
@@ -225,71 +214,15 @@ export default function CaseTemplateDetailsView({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
         {/* Associated Documents Column */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between border-b pb-1 relative">
+        <div className="space-y-3 relative z-30">
+          <div className="flex items-center justify-between border-b pb-1 relative z-40">
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Document Templates ({activeTemplate.doc_template_ids.length})
             </h4>
 
-            {/* Floating popover to add unassociated documents */}
-            {showAddDocDropdown && (
-              <div className="absolute right-0 top-6 z-20 w-[500px] bg-card border border-border rounded-lg shadow-xl p-3.5 space-y-3 animate-in fade-in slide-in-from-top-1 duration-150">
-                <div className="flex items-center justify-between border-b pb-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Document Template</span>
-                  <button
-                    onClick={() => {
-                      setShowAddDocDropdown(false);
-                      setDocFilterText("");
-                    }}
-                    className="text-muted-foreground hover:text-foreground font-semibold"
-                  >
-                    ✕
-                  </button>
-                </div>
-                {unassociatedDocs.length === 0 ? (
-                  <div className="text-xs text-muted-foreground italic p-2 text-center">All templates already added.</div>
-                ) : (
-                  <>
-                    <CaseManagementSearch
-                      value={docFilterText}
-                      onChange={setDocFilterText}
-                      placeholder="Search by filename or title..."
-                      containerClassName="relative flex items-center w-full"
-                      inputClassName="w-full rounded border border-input bg-background pl-8 pr-7 rtl:pr-8 rtl:pl-7 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
-                      autoFocus
-                    />
-                    <div className="max-h-[220px] overflow-y-auto divide-y divide-border border rounded bg-muted/5">
-                      {filteredUnassociatedDocs.length === 0 ? (
-                        <div className="text-xs text-muted-foreground italic p-3 text-center">No matching templates found.</div>
-                      ) : (
-                        filteredUnassociatedDocs.map((doc) => (
-                          <div
-                            key={doc.id}
-                            onClick={() => {
-                              onAddDoc(doc.id);
-                              setDocFilterText("");
-                              setShowAddDocDropdown(false);
-                            }}
-                            className="flex items-center justify-between p-2.5 hover:bg-muted/50 cursor-pointer text-xs transition-colors gap-4"
-                          >
-                            <span className="font-mono text-foreground truncate max-w-[220px]" title={doc.file_name}>
-                              {doc.file_name}
-                            </span>
-                            <span className="text-muted-foreground truncate max-w-[220px] text-right italic" title={doc.title || ""}>
-                              {doc.title || "(No title indexed)"}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
             {!showAddDocDropdown && (
               <button
-                onClick={() => setShowAddDocDropdown(true)}
+                onClick={onOpenAddDoc}
                 className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline hover:text-primary/80 font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
@@ -304,7 +237,7 @@ export default function CaseTemplateDetailsView({
           {activeTemplate.doc_template_ids.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No document templates associated with this case template.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 relative z-10">
               {activeTemplate.doc_template_ids.map((id) => {
                 const isSelected = selectedDocIdForFields === id;
                 const doc = docTemplates.find(d => d.id === id);
@@ -381,7 +314,7 @@ export default function CaseTemplateDetailsView({
         </div>
 
         {/* Required Fields Column */}
-        <div className="space-y-3">
+        <div className="space-y-3 relative z-10">
           <div className="flex items-center justify-between border-b pb-1">
             <div className="flex items-center gap-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

@@ -494,6 +494,7 @@ export default function CaseManagementOpenCasesDetails() {
             attachments={attachments}
             onRemoveAttachment={(att) => setAttachmentToDelete(att)}
             onCopyAttachmentToCase={setUpdatingAttachment}
+            isDetailView={true}
           />
 
           {/* Resizable Divider (rendered only on large screens) */}

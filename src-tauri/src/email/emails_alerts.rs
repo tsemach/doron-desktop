@@ -36,6 +36,11 @@ pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, St
             "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
             params![msg_id],
         );
+        let msg_id_trimmed = msg_id.trim_matches(|c| c == '<' || c == '>');
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+            params![msg_id_trimmed],
+        );
     }
 
     let _ = conn.execute("DELETE FROM pending_email_alerts WHERE suggested_case_id IS NULL OR confidence = 0.0", []);
@@ -75,6 +80,11 @@ pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, St
             let _ = conn.execute(
                 "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
                 params![alert.message_id],
+            );
+            let msg_id_trimmed = alert.message_id.trim_matches(|c| c == '<' || c == '>');
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+                params![msg_id_trimmed],
             );
             let _ = conn.execute(
                 "DELETE FROM pending_email_alerts WHERE id = ?1",
@@ -218,6 +228,17 @@ pub fn delete_email_alert(app: AppHandle, alert_id: i64) -> Result<(), String> {
         params![alert_id],
         |r| r.get(0)
     ).map_err(|e| e.to_string())?;
+
+    // Save to ignored_emails to prevent infinite re-ingestion loop
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+        params![message_id],
+    );
+    let message_id_trimmed = message_id.trim_matches(|c| c == '<' || c == '>');
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+        params![message_id_trimmed],
+    );
 
     conn.execute("DELETE FROM pending_email_alerts WHERE id = ?1", params![alert_id]).map_err(|e| e.to_string())?;
 

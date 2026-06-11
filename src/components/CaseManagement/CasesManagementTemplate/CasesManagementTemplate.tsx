@@ -5,6 +5,8 @@ import CaseTemplateList from "./CaseTemplateList";
 import CaseTemplateCreateForm from "./CaseTemplateCreateForm";
 import CaseTemplateDetailsView from "./CaseTemplateDetailsView";
 import CaseTemplateEmptyState from "./CaseTemplateEmptyState";
+import { Button } from "../../ui/button";
+import CaseManagementSearch from "../CaseManagementSearch";
 
 export default function CasesManagementTemplate() {
   const [caseTemplates, setCaseTemplates] = useState<CaseTemplate[]>([]);
@@ -16,10 +18,41 @@ export default function CasesManagementTemplate() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
+  const activeTemplate = caseTemplates.find((ct) => ct.id === selectedTemplateId) || null;
+
   // Sidebar resizing states
   const containerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
+
+  // Add Document Popover states
+  const [showAddDocDropdown, setShowAddDocDropdown] = useState(false);
+  const [selectedAddDocIds, setSelectedAddDocIds] = useState<number[]>([]);
+  const [docFilterText, setDocFilterText] = useState("");
+
+  useEffect(() => {
+    setShowAddDocDropdown(false);
+    setSelectedAddDocIds([]);
+    setDocFilterText("");
+  }, [selectedTemplateId]);
+
+  function handleOpenAddDoc() {
+    setSelectedAddDocIds([]);
+    setDocFilterText("");
+    setShowAddDocDropdown(true);
+  }
+
+  // Get unassociated document templates
+  const unassociatedDocs = activeTemplate
+    ? docTemplates.filter((doc) => !activeTemplate.doc_template_ids.includes(doc.id))
+    : [];
+
+  // Filtered unassociated docs
+  const filteredUnassociatedDocs = unassociatedDocs.filter(
+    (doc) =>
+      doc.file_name.toLowerCase().includes(docFilterText.toLowerCase()) ||
+      (doc.title && doc.title.toLowerCase().includes(docFilterText.toLowerCase()))
+  );
 
   const startResizing = (mouseDownEvent: React.MouseEvent) => {
     mouseDownEvent.preventDefault();
@@ -99,7 +132,7 @@ export default function CasesManagementTemplate() {
     return fieldsArr.filter(f => !docFields.has(f));
   }
 
-  const activeTemplate = caseTemplates.find((ct) => ct.id === selectedTemplateId) || null;
+
 
   // --- ACTIONS ---
 
@@ -152,11 +185,12 @@ export default function CasesManagementTemplate() {
   }
 
   // Inline Add Document
-  async function handleAddDoc(docId: number) {
+  async function handleAddDoc(docIds: number[]) {
     if (!activeTemplate) return;
+    if (docIds.length === 0) return;
     try {
       const manualFields = getManualFields(activeTemplate);
-      const updatedDocs = [...activeTemplate.doc_template_ids, docId];
+      const updatedDocs = [...activeTemplate.doc_template_ids, ...docIds];
       await invoke("update_case_template", {
         id: activeTemplate.id,
         name: activeTemplate.name,
@@ -165,7 +199,7 @@ export default function CasesManagementTemplate() {
       });
       await loadData();
     } catch (err) {
-      alert(`Error adding document: ${err}`);
+      alert(`Error adding documents: ${err}`);
     }
   }
 
@@ -289,28 +323,149 @@ export default function CasesManagementTemplate() {
           </div>
 
           {/* Right Column: Detailed View / Forms */}
-          <section className="flex-1 flex flex-col overflow-y-auto bg-background p-6">
-            {isCreating ? (
-              <CaseTemplateCreateForm
-                docTemplates={docTemplates}
-                onSave={handleCreateTemplate}
-                onCancel={() => setIsCreating(false)}
-              />
-            ) : activeTemplate ? (
-              <CaseTemplateDetailsView
-                activeTemplate={activeTemplate}
-                docTemplates={docTemplates}
-                onDelete={handleDeleteTemplate}
-                onRename={handleRenameTemplate}
-                onAddDoc={handleAddDoc}
-                onRemoveDoc={handleRemoveDoc}
-                onAddField={handleAddField}
-                onRemoveField={handleRemoveField}
-                onSyncAllFields={handleSyncAllFields}
-              />
-            ) : (
-              <CaseTemplateEmptyState />
+          <section className="flex-1 flex flex-col overflow-visible bg-background relative z-20">
+            {showAddDocDropdown && activeTemplate && (
+              <div
+                className="absolute left-6 top-[84px] z-50 bg-card border border-border rounded-xl shadow-2xl p-4 flex flex-col space-y-4 resize overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+                style={{
+                  width: "560px",
+                  height: unassociatedDocs.length === 0 ? "auto" : "400px",
+                  minWidth: "420px",
+                  minHeight: "260px",
+                  maxWidth: "92vw",
+                  maxHeight: "80vh",
+                }}
+              >
+                <div className="flex items-center justify-between border-b pb-2 shrink-0">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Document Templates</span>
+                  <button
+                    onClick={() => {
+                      setShowAddDocDropdown(false);
+                      setDocFilterText("");
+                      setSelectedAddDocIds([]);
+                    }}
+                    className="text-muted-foreground hover:text-foreground font-semibold"
+                  >
+                    ✕
+                  </button>
+                </div>
+                {unassociatedDocs.length === 0 ? (
+                  <div className="text-xs text-muted-foreground italic p-2 text-center">All templates already added.</div>
+                ) : (
+                  <>
+                    <CaseManagementSearch
+                      value={docFilterText}
+                      onChange={setDocFilterText}
+                      placeholder="Search by filename or title..."
+                      containerClassName="relative flex items-center w-full shrink-0"
+                      inputClassName="w-full rounded border border-input bg-background pl-8 pr-7 rtl:pr-8 rtl:pl-7 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+                      autoFocus
+                    />
+                    <div className="flex-grow overflow-y-auto border rounded bg-muted/5 divide-y divide-border min-h-0">
+                      {filteredUnassociatedDocs.length === 0 ? (
+                        <div className="text-xs text-muted-foreground italic p-3 text-center">No matching templates found.</div>
+                      ) : (
+                        filteredUnassociatedDocs.map((doc) => {
+                          const isChecked = selectedAddDocIds.includes(doc.id);
+                          const hasTitle = !!doc.title;
+                          const primaryText = hasTitle ? doc.title : doc.file_name;
+                          const secondaryText = hasTitle ? doc.file_name : null;
+
+                          return (
+                            <div
+                              key={doc.id}
+                              onClick={() => {
+                                setSelectedAddDocIds(prev =>
+                                  prev.includes(doc.id) ? prev.filter(id => id !== doc.id) : [...prev, doc.id]
+                                );
+                              }}
+                              className={`flex items-center gap-3 p-3 hover:bg-muted/60 cursor-pointer transition-colors ${
+                                isChecked ? "bg-primary/5" : ""
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}} // Click is handled by parent div
+                                className="rounded border-input text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <span className="block text-xs font-semibold text-foreground truncate" title={primaryText || ""}>
+                                  {primaryText}
+                                </span>
+                                {secondaryText && (
+                                  <span className="block text-[10px] text-muted-foreground truncate mt-0.5" title={secondaryText}>
+                                    {secondaryText}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    
+                    <div className="pt-2.5 flex items-center justify-between border-t mt-auto shrink-0 select-none">
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        {selectedAddDocIds.length} templates selected
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedAddDocIds([]);
+                            setShowAddDocDropdown(false);
+                            setDocFilterText("");
+                          }}
+                          className="cursor-pointer"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={selectedAddDocIds.length === 0}
+                          onClick={async () => {
+                            await handleAddDoc(selectedAddDocIds);
+                            setDocFilterText("");
+                            setSelectedAddDocIds([]);
+                            setShowAddDocDropdown(false);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          Add Selected
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
+            <div className="flex-1 flex flex-col overflow-y-auto p-6 min-h-0">
+              {isCreating ? (
+                <CaseTemplateCreateForm
+                  docTemplates={docTemplates}
+                  onSave={handleCreateTemplate}
+                  onCancel={() => setIsCreating(false)}
+                />
+              ) : activeTemplate ? (
+                <CaseTemplateDetailsView
+                  activeTemplate={activeTemplate}
+                  docTemplates={docTemplates}
+                  onDelete={handleDeleteTemplate}
+                  onRename={handleRenameTemplate}
+                  onAddDoc={handleAddDoc}
+                  onRemoveDoc={handleRemoveDoc}
+                  onAddField={handleAddField}
+                  onRemoveField={handleRemoveField}
+                  onSyncAllFields={handleSyncAllFields}
+                  showAddDocDropdown={showAddDocDropdown}
+                  onOpenAddDoc={handleOpenAddDoc}
+                />
+              ) : (
+                <CaseTemplateEmptyState />
+              )}
+            </div>
           </section>
 
         </div>

@@ -311,6 +311,7 @@ export default function CaseManagementOpenCases() {
           onShowFields={() => setShowFieldsModal(true)}
           onAddDocument={() => setShowAddDocModal(true)}
           onCopyAttachmentToCase={setUpdatingAttachment}
+          isDetailView={false}
         />
       </div>
 

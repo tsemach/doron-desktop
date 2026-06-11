@@ -12,7 +12,24 @@ interface OpenDocumentsPanelTopMenuProps {
   onShowFields: () => void;
   onAddDocument: () => void;
   onEditCaseAnnotations?: () => void;
+  isDetailView?: boolean;
 }
+
+const getFollowupStatus = (dateStr?: string) => {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  
+  if (target.getTime() < today.getTime()) {
+    return { type: "overdue", label: `Overdue: ${dateStr}` };
+  } else if (target.getTime() === today.getTime()) {
+    return { type: "due-today", label: `Due Today: ${dateStr}` };
+  } else {
+    return { type: "pending", label: `Follow-up: ${dateStr}` };
+  }
+};
 
 export default function OpenDocumentsPanelTopMenu({
   selectedCase,
@@ -21,6 +38,7 @@ export default function OpenDocumentsPanelTopMenu({
   onShowFields,
   onAddDocument,
   onEditCaseAnnotations,
+  isDetailView = false,
 }: OpenDocumentsPanelTopMenuProps) {
   const { t } = useLanguage();
   const [showMenu, setShowMenu] = useState(false);
@@ -72,18 +90,48 @@ export default function OpenDocumentsPanelTopMenu({
             </button>
           </div>
         )}
-        {selectedCase?.tags && selectedCase.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {selectedCase.tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold border border-primary/20 tracking-wide uppercase select-none font-sans"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Render tags with conditional followup badge */}
+        {(() => {
+          let renderTags = selectedCase?.tags || [];
+          if (isDetailView && selectedCase?.followupDate && !renderTags.includes("followup")) {
+            renderTags = [...renderTags, "followup"];
+          }
+          const filteredTags = renderTags.filter((tag) => isDetailView || tag.toLowerCase() !== "followup");
+          if (filteredTags.length === 0) return null;
+
+          return (
+            <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+              {filteredTags.map((tag) => {
+                const isFollowupTag = tag.toLowerCase() === "followup";
+                const status = isFollowupTag && isDetailView ? getFollowupStatus(selectedCase?.followupDate) : null;
+
+                return (
+                  <div key={tag} className="flex items-center gap-1.5 select-none">
+                    <span
+                      className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold border border-primary/20 tracking-wide uppercase select-none font-sans"
+                    >
+                      #{tag}
+                    </span>
+                    {status && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border select-none font-sans ${
+                          status.type === "overdue"
+                            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border-rose-200/50 animate-pulse"
+                            : status.type === "due-today"
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200/50"
+                            : "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 border-blue-100/30"
+                        }`}
+                      >
+                        <span>{status.type === "overdue" ? "⚠️" : status.type === "due-today" ? "⏰" : "📅"}</span>
+                        {status.label}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {selectedCase?.notes && (
           <p className="text-[10px] text-muted-foreground/80 mt-2 italic border-l-2 border-border/85 pl-1.5 bg-muted/20 py-0.5 rounded-r max-w-md line-clamp-2">

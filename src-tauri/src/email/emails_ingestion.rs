@@ -186,6 +186,11 @@ async fn ingest_single_email(
             "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
             params![message_id],
         ).map_err(|e| format!("Database ignore insert error: {}", e))?;
+        let message_id_trimmed = message_id.trim_matches(|c| c == '<' || c == '>');
+        conn.execute(
+            "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
+            params![message_id_trimmed],
+        ).map_err(|e| format!("Database ignore insert error: {}", e))?;
     }
 
     Ok(())

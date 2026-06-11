@@ -26,6 +26,7 @@ interface OpenCasesDocumentsPanelProps {
   attachments?: { name: string; staged_path: string; size_kb: number }[];
   onRemoveAttachment?: (att: { name: string; staged_path: string; size_kb: number }) => void;
   onCopyAttachmentToCase?: (att: { name: string; staged_path: string; size_kb: number }) => void;
+  isDetailView?: boolean;
 }
 
 export default function OpenCasesDocumentsPanel({
@@ -48,6 +49,7 @@ export default function OpenCasesDocumentsPanel({
   attachments = [],
   onRemoveAttachment,
   onCopyAttachmentToCase,
+  isDetailView = false,
 }: OpenCasesDocumentsPanelProps) {
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(true);
@@ -108,6 +110,7 @@ export default function OpenCasesDocumentsPanel({
                 onShowFields={onShowFields}
                 onAddDocument={onAddDocument}
                 onEditCaseAnnotations={onEditCaseAnnotations}
+                isDetailView={isDetailView}
               />
             </div>
 
