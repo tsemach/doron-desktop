@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { CaseTemplate, DocTemplate } from "./CaseManagementTypes";
+import mammoth from "mammoth";
+
 
 export default function CaseManagementCaseCreate() {
   const navigate = useNavigate();
@@ -18,7 +20,8 @@ export default function CaseManagementCaseCreate() {
   const [filterDocId, setFilterDocId] = useState<number | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [expandedDocId, setExpandedDocId] = useState<number | null>(null);
-  const [contextSnippet, setContextSnippet] = useState<string>("");
+  const [docHtmlCache, setDocHtmlCache] = useState<Record<number, string>>({});
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingContext, setLoadingContext] = useState(false);
   const [bottomPercent, setBottomPercent] = useState(33);
   const [isDraggingHeight, setIsDraggingHeight] = useState(false);
@@ -124,7 +127,8 @@ export default function CaseManagementCaseCreate() {
     setFilterDocId(null); // Reset document filter when template changes
     setFocusedField(null); // Reset focused field
     setExpandedDocId(null); // Reset expanded document details
-    setContextSnippet(""); // Reset snippet text
+    setDocHtmlCache({}); // Clear preview HTML cache
+    setPreviewError(null); // Clear preview error
   }, [selectedTemplateId]);
 
   // Map each field to the documents containing it
@@ -156,18 +160,31 @@ export default function CaseManagementCaseCreate() {
     return true;
   });
 
-  const loadContextSnippet = async (docId: number, fieldName: string) => {
+  const loadFullDocHtml = async (docId: number) => {
     setLoadingContext(true);
-    setContextSnippet("");
+    setPreviewError(null);
     try {
-      const snippet = await invoke<string>("get_template_field_context", {
-        templateId: docId,
-        fieldName: fieldName,
-      });
-      setContextSnippet(snippet);
+      const doc = docTemplates.find((d) => d.id === docId);
+      if (!doc) throw new Error("Document template not found");
+
+      const ext = doc.file_ext ? doc.file_ext.toLowerCase() : doc.file_name.split('.').pop()?.toLowerCase() || "";
+
+      if (ext === "docx") {
+        const bytes = await invoke<number[]>("read_file_bytes", { path: doc.original_path });
+        const arrayBuffer = new Uint8Array(bytes).buffer;
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        setDocHtmlCache((prev) => ({ ...prev, [docId]: result.value }));
+      } else if (ext === "txt" || ext === "json" || ext === "md") {
+        const bytes = await invoke<number[]>("read_file_bytes", { path: doc.original_path });
+        const text = new TextDecoder().decode(new Uint8Array(bytes));
+        const html = text.split('\n').map((line) => `<p>${line}</p>`).join('');
+        setDocHtmlCache((prev) => ({ ...prev, [docId]: html }));
+      } else {
+        throw new Error(`Unsupported preview format: ${ext}`);
+      }
     } catch (err) {
       console.error(err);
-      setContextSnippet(`Error loading context: ${err}`);
+      setPreviewError(`Failed to load document preview: ${err}`);
     } finally {
       setLoadingContext(false);
     }
@@ -176,13 +193,12 @@ export default function CaseManagementCaseCreate() {
   const handleToggleDocContext = async (docId: number) => {
     if (expandedDocId === docId) {
       setExpandedDocId(null);
-      setContextSnippet("");
       return;
     }
 
     setExpandedDocId(docId);
-    if (focusedField) {
-      await loadContextSnippet(docId, focusedField);
+    if (!docHtmlCache[docId]) {
+      await loadFullDocHtml(docId);
     }
   };
 
@@ -193,12 +209,27 @@ export default function CaseManagementCaseCreate() {
     const hasDoc = docs.some((d) => d.id === expandedDocId);
 
     if (hasDoc) {
-      loadContextSnippet(expandedDocId, focusedField);
+      if (!docHtmlCache[expandedDocId]) {
+        loadFullDocHtml(expandedDocId);
+      }
     } else {
       setExpandedDocId(null);
-      setContextSnippet("");
     }
   }, [focusedField]);
+
+  // Scroll focused field into view in the document preview page
+  useEffect(() => {
+    if (expandedDocId === null || !focusedField || !docHtmlCache[expandedDocId]) return;
+
+    const timer = setTimeout(() => {
+      const anchor = document.getElementById("focused-field-preview-anchor");
+      if (anchor) {
+        anchor.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [focusedField, expandedDocId, docHtmlCache]);
 
   const isRtlText = (text: string | null | undefined): boolean => {
     if (!text) return false;
@@ -206,42 +237,32 @@ export default function CaseManagementCaseCreate() {
     return rtlRegex.test(text);
   };
 
-  const renderSnippetWithValues = (text: string) => {
-    if (!text) return null;
-    const parts = text.split(/(\[\[[^\]]+\]\])/g);
-    return parts.map((part, index) => {
-      if (part.startsWith("[[") && part.endsWith("]]")) {
-        const fieldName = part.slice(2, -2);
-        const userValue = fieldValues[fieldName];
-        if (userValue && userValue.trim() !== "") {
-          return (
-            <span
-              key={index}
-              className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-1 rounded border border-emerald-500/30"
-              title={`Filled variable: ${fieldName}`}
-            >
-              {userValue}
-            </span>
-          );
-        } else {
-          const isFocused = fieldName === focusedField;
-          return (
-            <span
-              key={index}
-              className={
-                isFocused
-                  ? "bg-primary/20 text-primary font-bold px-1 rounded border border-primary/30 animate-pulse"
-                  : "bg-amber-500/10 text-amber-600 dark:text-amber-500 font-mono px-1 rounded border border-amber-500/20 border-dashed"
-              }
-              title={`Unfilled variable: ${fieldName}`}
-            >
-              [[{fieldName}]]
-            </span>
-          );
-        }
+  const renderHtmlWithValues = (html: string) => {
+    if (!html) return "";
+    let processedHtml = html;
+
+    templateFields.forEach((field) => {
+      const placeholder = `[[${field}]]`;
+      const isFocused = field === focusedField;
+      const userValue = fieldValues[field];
+
+      let replacement = "";
+      if (userValue && userValue.trim() !== "") {
+        const focusAttr = isFocused ? 'id="focused-field-preview-anchor"' : '';
+        const focusClass = isFocused ? 'ring-2 ring-primary ring-offset-1 ring-offset-white' : '';
+        replacement = `<span ${focusAttr} class="bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30 inline-block font-mono text-xs ${focusClass}" title="Filled: ${field}">${userValue}</span>`;
+      } else {
+        const focusAttr = isFocused ? 'id="focused-field-preview-anchor"' : '';
+        const highlightClass = isFocused
+          ? "bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded border border-amber-500/40 inline-block animate-pulse text-xs ring-2 ring-amber-500 ring-offset-1 ring-offset-white"
+          : "bg-amber-50 text-amber-700 font-mono px-1 rounded border border-amber-500/20 border-dashed inline-block text-[11px]";
+        replacement = `<span ${focusAttr} class="${highlightClass}" title="Unfilled: ${field}">[[${field}]]</span>`;
       }
-      return <span key={index}>{part}</span>;
+
+      processedHtml = processedHtml.split(placeholder).join(replacement);
     });
+
+    return processedHtml;
   };
 
   // Verify if case storage folder is already in use by another case
@@ -741,7 +762,10 @@ export default function CaseManagementCaseCreate() {
                               <div className="border border-border/80 rounded-lg p-3 bg-muted/20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="flex justify-between items-center pb-1 border-b border-border/40">
                                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                    Document Snippet Context (5-Line Window)
+                                    Document Live Preview
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground font-mono">
+                                    {docTemplates.find(d => d.id === expandedDocId)?.file_name}
                                   </span>
                                 </div>
                                 {loadingContext ? (
@@ -766,15 +790,24 @@ export default function CaseManagementCaseCreate() {
                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                       />
                                     </svg>
-                                    Loading context snippet...
+                                    Loading template preview...
+                                  </div>
+                                ) : previewError ? (
+                                  <div className="py-4 text-center text-xs text-destructive bg-destructive/10 rounded border border-destructive/20">
+                                    {previewError}
+                                  </div>
+                                ) : docHtmlCache[expandedDocId] ? (
+                                  <div className="bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto max-h-[300px] min-h-[220px] relative select-text">
+                                    <div 
+                                      className="bg-white text-black p-6 sm:p-10 shadow-[0_4px_16px_rgba(0,0,0,0.06),_0_2px_4px_rgba(0,0,0,0.03)] border border-gray-100 mx-auto max-w-[800px] prose prose-sm max-w-none prose-headings:text-black prose-p:text-black text-xs sm:text-sm leading-relaxed font-serif"
+                                      dir={isRtlText(docHtmlCache[expandedDocId]) ? "rtl" : "ltr"}
+                                      dangerouslySetInnerHTML={{ __html: renderHtmlWithValues(docHtmlCache[expandedDocId]) }}
+                                    />
                                   </div>
                                 ) : (
-                                  <pre
-                                    dir={isRtlText(contextSnippet) ? "rtl" : "ltr"}
-                                    className="text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-[140px] overflow-y-auto pr-1 bg-background/40 p-2 rounded border border-border/40"
-                                  >
-                                    {renderSnippetWithValues(contextSnippet)}
-                                  </pre>
+                                  <div className="py-4 text-center text-xs text-muted-foreground">
+                                    No preview available
+                                  </div>
                                 )}
                               </div>
                             )}
