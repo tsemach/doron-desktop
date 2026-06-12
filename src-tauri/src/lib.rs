@@ -57,6 +57,7 @@ pub fn run() {
             doc_template::fill_document_placeholders,
             doc_template::delete_template,
             doc_template::open_template_file,
+            doc_template::context::get_template_field_context,
             // case_template
             case_template::list_case_templates,
             case_template::create_case_template,

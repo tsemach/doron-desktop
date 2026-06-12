@@ -4,6 +4,8 @@ use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
+pub mod context;
+
 use crate::{extractor, store};
 
 #[derive(Serialize, Clone)]
