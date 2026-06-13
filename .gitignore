@@ -24,4 +24,12 @@ dist-ssr
 *.sw?
 .env
 
-src-tauri/.fastembed_cache
+.pnpm-store/
+.turbo/
+**/.next
+**/src-tauri/.fastembed_cache
+**/src-tauri/target
+
+# Databases & OS Metadata
+*.db
+*Zone.Identifier
