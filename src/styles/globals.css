@@ -230,3 +230,82 @@
 .dark *::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--primary) 55%, transparent) !important;
 }
+
+/* Document template previews (Word-style tables, lists, and spacing) */
+.docx-content-view table,
+.word-preview-page table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 1.5rem 0 !important;
+  font-family: inherit !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.docx-content-view th,
+.docx-content-view td,
+.word-preview-page th,
+.word-preview-page td {
+  border: 1px solid #e2e8f0 !important;
+  padding: 10px 14px !important;
+  text-align: inherit !important;
+  vertical-align: top !important;
+}
+
+.docx-content-view th,
+.word-preview-page th {
+  background-color: #f3f4f6 !important;
+  font-weight: 600 !important;
+}
+
+/* Style multi-row table headers where the last row contains the actual labels (only in layout tables with rowspan, or when containing placeholders) */
+.docx-content-view table:has(th[rowspan]) tr:not(:last-child) th,
+.docx-content-view table:has(td[rowspan]) tr:not(:last-child) th,
+.docx-content-view table:has(th[rowspan]) tr:not(:last-child) td,
+.docx-content-view table:has(td[rowspan]) tr:not(:last-child) td,
+.docx-content-view tr:has(span[class*="bg-amber-"]) th,
+.docx-content-view tr:has(span[class*="bg-emerald-"]) th,
+.docx-content-view tr:has(span[class*="bg-amber-"]) td,
+.docx-content-view tr:has(span[class*="bg-emerald-"]) td {
+  background-color: transparent !important;
+  font-weight: normal !important;
+}
+
+.word-preview-page table:has(th[rowspan]) tr:not(:last-child) th,
+.word-preview-page table:has(td[rowspan]) tr:not(:last-child) th,
+.word-preview-page table:has(th[rowspan]) tr:not(:last-child) td,
+.word-preview-page table:has(td[rowspan]) tr:not(:last-child) td,
+.word-preview-page tr:has(span[class*="bg-amber-"]) th,
+.word-preview-page tr:has(span[class*="bg-emerald-"]) th,
+.word-preview-page tr:has(span[class*="bg-amber-"]) td,
+.word-preview-page tr:has(span[class*="bg-emerald-"]) td {
+  background-color: #ffffff !important;
+  font-weight: normal !important;
+}
+
+
+
+
+/* Hide spacer columns and empty cells in layout tables */
+.docx-content-view th[rowspan]:empty,
+.docx-content-view td[rowspan]:empty,
+.word-preview-page th[rowspan]:empty,
+.word-preview-page td[rowspan]:empty {
+  border: none !important;
+  background: transparent !important;
+  width: 16px !important;
+  padding: 0 !important;
+}
+
+.docx-content-view[dir="ltr"] td,
+.docx-content-view[dir="ltr"] th,
+.word-preview-page[dir="ltr"] td,
+.word-preview-page[dir="ltr"] th {
+  text-align: left !important;
+}
+
+.docx-content-view p,
+.word-preview-page p {
+  margin-top: 0.35rem !important;
+  margin-bottom: 0.35rem !important;
+  line-height: 1.5 !important;
+}

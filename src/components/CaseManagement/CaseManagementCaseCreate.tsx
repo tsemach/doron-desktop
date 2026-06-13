@@ -5,6 +5,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { CaseTemplate, DocTemplate } from "./CaseManagementTypes";
 import mammoth from "mammoth";
+import { openPath } from "@tauri-apps/plugin-opener";
+
 
 
 export default function CaseManagementCaseCreate() {
@@ -170,12 +172,12 @@ export default function CaseManagementCaseCreate() {
       const ext = doc.file_ext ? doc.file_ext.toLowerCase() : doc.file_name.split('.').pop()?.toLowerCase() || "";
 
       if (ext === "docx") {
-        const bytes = await invoke<number[]>("read_file_bytes", { path: doc.original_path });
+        const bytes = await invoke<number[]>("read_file_bytes", { path: doc.marked_path });
         const arrayBuffer = new Uint8Array(bytes).buffer;
         const result = await mammoth.convertToHtml({ arrayBuffer });
         setDocHtmlCache((prev) => ({ ...prev, [docId]: result.value }));
       } else if (ext === "txt" || ext === "json" || ext === "md") {
-        const bytes = await invoke<number[]>("read_file_bytes", { path: doc.original_path });
+        const bytes = await invoke<number[]>("read_file_bytes", { path: doc.marked_path });
         const text = new TextDecoder().decode(new Uint8Array(bytes));
         const html = text.split('\n').map((line) => `<p>${line}</p>`).join('');
         setDocHtmlCache((prev) => ({ ...prev, [docId]: html }));
@@ -235,6 +237,16 @@ export default function CaseManagementCaseCreate() {
     if (!text) return false;
     const rtlRegex = /[\u0590-\u05FF\u0600-\u06FF]/;
     return rtlRegex.test(text);
+  };
+
+  const handleOpenTemplateFile = async (e: React.MouseEvent, filePath: string) => {
+    e.stopPropagation();
+    try {
+      await openPath(filePath);
+    } catch (err) {
+      console.error("Failed to open template file:", err);
+      alert(`Failed to open template file: ${err}`);
+    }
   };
 
   const renderHtmlWithValues = (html: string) => {
@@ -725,32 +737,57 @@ export default function CaseManagementCaseCreate() {
                                         </div>
                                       </div>
                                       
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleToggleDocContext(doc.id);
-                                        }}
-                                        className={`p-1 rounded hover:bg-muted transition-all shrink-0 ${
-                                          isExpanded ? "text-primary rotate-180" : "text-muted-foreground"
-                                        }`}
-                                        title={isExpanded ? "Collapse context snippet" : "Expand context snippet"}
-                                      >
-                                        <svg
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2.5"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          className="transition-transform duration-200"
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleOpenTemplateFile(e, doc.marked_path)}
+                                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all shrink-0"
+                                          title="Open template file"
                                         >
-                                          <path d="m6 9 6 6 6-6" />
-                                        </svg>
-                                      </button>
+                                          <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="13"
+                                            height="13"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          >
+                                            <path d="M15 3h6v6" />
+                                            <path d="M10 14 21 3" />
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                          </svg>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleDocContext(doc.id);
+                                          }}
+                                          className={`p-1 rounded hover:bg-muted transition-all shrink-0 ${
+                                            isExpanded ? "text-primary rotate-180" : "text-muted-foreground"
+                                          }`}
+                                          title={isExpanded ? "Collapse preview" : "Expand preview"}
+                                        >
+                                          <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            className="transition-transform duration-200"
+                                          >
+                                            <path d="m6 9 6 6 6-6" />
+                                          </svg>
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 );
@@ -799,7 +836,7 @@ export default function CaseManagementCaseCreate() {
                                 ) : docHtmlCache[expandedDocId] ? (
                                   <div className="bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto max-h-[300px] min-h-[220px] relative select-text">
                                     <div 
-                                      className="bg-white text-black p-6 sm:p-10 shadow-[0_4px_16px_rgba(0,0,0,0.06),_0_2px_4px_rgba(0,0,0,0.03)] border border-gray-100 mx-auto max-w-[800px] prose prose-sm max-w-none prose-headings:text-black prose-p:text-black text-xs sm:text-sm leading-relaxed font-serif"
+                                      className="word-preview-page bg-white text-black p-6 sm:p-10 shadow-[0_4px_16px_rgba(0,0,0,0.06),_0_2px_4px_rgba(0,0,0,0.03)] border border-gray-100 mx-auto max-w-[800px] prose prose-sm max-w-none prose-headings:text-black prose-p:text-black text-xs sm:text-sm leading-relaxed font-serif"
                                       dir={isRtlText(docHtmlCache[expandedDocId]) ? "rtl" : "ltr"}
                                       dangerouslySetInnerHTML={{ __html: renderHtmlWithValues(docHtmlCache[expandedDocId]) }}
                                     />
