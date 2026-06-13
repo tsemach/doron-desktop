@@ -258,26 +258,34 @@
 }
 
 /* Style multi-row table headers where the last row contains the actual labels (only in layout tables with rowspan, or when containing placeholders) */
-.docx-content-view table:has(th[rowspan]) tr:not(:last-child) th,
+.docx-content-view table:has(th[rowspan]) th,
+.docx-content-view table:has(th[rowspan]) td,
 .docx-content-view table:has(td[rowspan]) tr:not(:last-child) th,
-.docx-content-view table:has(th[rowspan]) tr:not(:last-child) td,
 .docx-content-view table:has(td[rowspan]) tr:not(:last-child) td,
 .docx-content-view tr:has(span[class*="bg-amber-"]) th,
 .docx-content-view tr:has(span[class*="bg-emerald-"]) th,
 .docx-content-view tr:has(span[class*="bg-amber-"]) td,
-.docx-content-view tr:has(span[class*="bg-emerald-"]) td {
+.docx-content-view tr:has(span[class*="bg-emerald-"]) td,
+.docx-content-view tr:has(span[class*="bg-amber-"]) + tr th,
+.docx-content-view tr:has(span[class*="bg-emerald-"]) + tr th,
+.docx-content-view tr:has(span[class*="bg-amber-"]) + tr td,
+.docx-content-view tr:has(span[class*="bg-emerald-"]) + tr td {
   background-color: transparent !important;
   font-weight: normal !important;
 }
 
-.word-preview-page table:has(th[rowspan]) tr:not(:last-child) th,
+.word-preview-page table:has(th[rowspan]) th,
+.word-preview-page table:has(th[rowspan]) td,
 .word-preview-page table:has(td[rowspan]) tr:not(:last-child) th,
-.word-preview-page table:has(th[rowspan]) tr:not(:last-child) td,
 .word-preview-page table:has(td[rowspan]) tr:not(:last-child) td,
 .word-preview-page tr:has(span[class*="bg-amber-"]) th,
 .word-preview-page tr:has(span[class*="bg-emerald-"]) th,
 .word-preview-page tr:has(span[class*="bg-amber-"]) td,
-.word-preview-page tr:has(span[class*="bg-emerald-"]) td {
+.word-preview-page tr:has(span[class*="bg-emerald-"]) td,
+.word-preview-page tr:has(span[class*="bg-amber-"]) + tr th,
+.word-preview-page tr:has(span[class*="bg-emerald-"]) + tr th,
+.word-preview-page tr:has(span[class*="bg-amber-"]) + tr td,
+.word-preview-page tr:has(span[class*="bg-emerald-"]) + tr td {
   background-color: #ffffff !important;
   font-weight: normal !important;
 }
@@ -308,4 +316,40 @@
   margin-top: 0.35rem !important;
   margin-bottom: 0.35rem !important;
   line-height: 1.5 !important;
+}
+
+/* Prevent empty cells and paragraphs in signature/layout tables from collapsing so that the space above the line is preserved */
+.docx-content-view table:has(th[rowspan]) th:not([rowspan]):empty::before,
+.docx-content-view table:has(th[rowspan]) td:not([rowspan]):empty::before,
+.docx-content-view table:has(th[rowspan]) p:empty::before,
+.docx-content-view table:has(td[rowspan]) th:not([rowspan]):empty::before,
+.docx-content-view table:has(td[rowspan]) td:not([rowspan]):empty::before,
+.docx-content-view table:has(td[rowspan]) p:empty::before,
+.word-preview-page table:has(th[rowspan]) th:not([rowspan]):empty::before,
+.word-preview-page table:has(th[rowspan]) td:not([rowspan]):empty::before,
+.word-preview-page table:has(th[rowspan]) p:empty::before,
+.word-preview-page table:has(td[rowspan]) th:not([rowspan]):empty::before,
+.word-preview-page table:has(td[rowspan]) td:not([rowspan]):empty::before,
+.word-preview-page table:has(td[rowspan]) p:empty::before {
+  content: "\00a0" !important;
+}
+
+/* Style single-cell table rows in multi-column tables as full-width block elements with no border (fixes merged paragraph/title/footnote text) */
+.docx-content-view table:has(td + td, th + th, td + th, th + td) tr:has(> td:only-child:not([colspan])),
+.docx-content-view table:has(td + td, th + th, td + th, th + td) tr:has(> th:only-child:not([colspan])),
+.word-preview-page table:has(td + td, th + th, td + th, th + td) tr:has(> td:only-child:not([colspan])),
+.word-preview-page table:has(td + td, th + th, td + th, th + td) tr:has(> th:only-child:not([colspan])) {
+  display: block !important;
+  border: none !important;
+}
+
+.docx-content-view table:has(td + td, th + th, td + th, th + td) tr > td:only-child:not([colspan]),
+.docx-content-view table:has(td + td, th + th, td + th, th + td) tr > th:only-child:not([colspan]),
+.word-preview-page table:has(td + td, th + th, td + th, th + td) tr > td:only-child:not([colspan]),
+.word-preview-page table:has(td + td, th + th, td + th, th + td) tr > th:only-child:not([colspan]) {
+  display: block !important;
+  border: none !important;
+  width: 100% !important;
+  background-color: transparent !important;
+  padding: 8px 0 !important;
 }
