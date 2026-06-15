@@ -1,28 +1,30 @@
+import NextAuth from "next-auth";
+import authConfig from "./auth.config";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get("session_token");
+// Initialize NextAuth with base config
+const { auth } = NextAuth(authConfig);
 
-  // Protect /download path
-  if (request.nextUrl.pathname.startsWith("/download")) {
-    if (!session || session.value !== "mock-authenticated-session-jwt") {
-      const loginUrl = new URL("/login", request.url);
-      return NextResponse.redirect(loginUrl);
-    }
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const { nextUrl } = req;
+
+  const isLoginPage = nextUrl.pathname.startsWith("/login");
+
+  if (!isLoginPage && !isLoggedIn) {
+    // Redirect unauthenticated users to login page
+    return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  // Redirect logged-in users away from /login
-  if (request.nextUrl.pathname.startsWith("/login")) {
-    if (session && session.value === "mock-authenticated-session-jwt") {
-      const downloadUrl = new URL("/download", request.url);
-      return NextResponse.redirect(downloadUrl);
-    }
+  if (isLoginPage && isLoggedIn) {
+    // Redirect already authenticated users to the root portal page
+    return NextResponse.redirect(new URL("/", nextUrl));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
-  matcher: ["/download/:path*", "/login"],
+  // Protect all routes except api, _next/static, _next/image, and favicon.ico
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
