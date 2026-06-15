@@ -16,9 +16,9 @@ export default function MainTopBar({ userName, handleLogout }: Props) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   return (
-    <header className="border-b border-slate-200 px-6 py-1 flex items-center justify-between">
-        <MainTopBarDownload />
-        <MainTopBarUser userName={userName} handleLogout={handleLogout} />
-      </header>
+    <header className="bg-teal-950 border-b border-teal-900 px-6 py-1.5 flex items-center justify-between">
+      <MainTopBarDownload />
+      <MainTopBarUser userName={userName} handleLogout={handleLogout} />
+    </header>
   );
 }

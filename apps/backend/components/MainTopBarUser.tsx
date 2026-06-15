@@ -26,14 +26,14 @@ export default function MainTopBarUser({ userName, handleLogout }: MainTopBarUse
   return (
     <div className="flex items-center gap-3">
       
-      <span className="text-sm font-semibold text-slate-600 select-none">
+      <span className="text-sm font-semibold text-teal-200 select-none">
         {userName}
       </span>
       
       <div className="relative w-fit" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex items-center justify-center w-9 h-9 rounded-full border border-slate-300 hover:border-slate-400 bg-slate-50 text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+          className="flex items-center justify-center w-9 h-9 rounded-full border border-teal-900 hover:border-teal-700 bg-teal-900/40 text-teal-200 hover:text-white transition-all cursor-pointer"
         >
           <User className="w-4 h-4" />
         </button>

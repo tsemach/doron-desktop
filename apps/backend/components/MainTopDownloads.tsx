@@ -5,7 +5,7 @@ export default function MainTopBarDownload() {
   return (
     <Link 
       href="/download" 
-      className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+      className="flex items-center gap-2 text-sm font-semibold text-teal-200 hover:text-white transition-colors"
     >
       <Download className="w-4 h-4" />
       <span>Download</span>
