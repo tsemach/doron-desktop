@@ -33,3 +33,5 @@ dist-ssr
 # Databases & OS Metadata
 *.db
 *Zone.Identifier
+.vercel
+.env*
