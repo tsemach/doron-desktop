@@ -45,7 +45,7 @@ export default function MainHelpCentralWorkingSpace() {
           <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Document Indexer</span>
         </h1>
         <p className="text-slate-500 text-base max-w-4xl leading-relaxed">
-          <strong>Doron</strong> XXis a secure, AI-powered desktop application designed to streamline legal and business workflows. With <strong>Doron</strong>, you can index local directories, perform lightning-fast searches, match email correspondences, and generate rich metadata summaries with Claude AI—all from a single, centralized control panel.
+          <strong>Doron</strong> is a secure, AI-powered desktop application designed to streamline legal and business workflows. With <strong>Doron</strong>, you can index local directories, perform lightning-fast searches, match email correspondences, and generate rich metadata summaries with Claude AI—all from a single, centralized control panel.
         </p>
       </div>
 
