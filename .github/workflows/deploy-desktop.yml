@@ -24,6 +24,7 @@ jobs:
     permissions:
       contents: write
     runs-on: windows-latest
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
