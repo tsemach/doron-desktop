@@ -46,3 +46,9 @@ jobs:
           releaseName: "Release v__VERSION__"
           releaseDraft: false
           prerelease: false
+
+  deploy-backend:
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      environment: 'production'
+    secrets: inherit
