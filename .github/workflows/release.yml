@@ -42,8 +42,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: "./apps/desktop"
-          tagName: v__VERSION__
-          releaseName: "Release v__VERSION__"
+          tagName: ${{ github.ref_name }}
+          releaseName: "Release ${{ github.ref_name }}"
           releaseDraft: false
           prerelease: false
 
