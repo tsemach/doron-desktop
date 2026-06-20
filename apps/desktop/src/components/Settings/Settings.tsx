@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Eye, EyeOff, Check, Settings as SettingsIcon, Mail, Server } from "lucide-react";
+import { ArrowLeft, User, Eye, EyeOff, Check, Settings as SettingsIcon, Mail, Server, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { Language } from "../../locales/translations";
 import { invoke } from "@tauri-apps/api/core";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { getVersion } from "@tauri-apps/api/app";
 
 export const API_KEY_STORAGE_KEY = "claude_api_key";
 export const USER_NAME_STORAGE_KEY = "user_name";
@@ -26,6 +29,13 @@ export default function Settings() {
   const [providerApiKey, setProviderApiKey] = useState("");
   const [showProviderKey, setShowProviderKey] = useState(false);
 
+  // Software Update States
+  const [appVersion, setAppVersion] = useState("");
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "up-to-date" | "downloading" | "error">("idle");
+  const [updaterError, setUpdaterError] = useState("");
+  const [availableVersion, setAvailableVersion] = useState("");
+  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+
   useEffect(() => {
     const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
     if (storedKey) setApiKey(storedKey);
@@ -34,6 +44,17 @@ export default function Settings() {
     if (storedName) setUsername(storedName);
 
     loadEmailConfig();
+
+    // Fetch app version
+    const fetchVersion = async () => {
+      try {
+        const v = await getVersion();
+        setAppVersion(v);
+      } catch (e) {
+        console.error("Failed to load app version:", e);
+      }
+    };
+    fetchVersion();
   }, []);
 
   useEffect(() => {
@@ -80,6 +101,37 @@ export default function Settings() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
+
+  const handleCheckForUpdates = async () => {
+    try {
+      setUpdateStatus("checking");
+      const update = await check();
+      if (update) {
+        setUpdateStatus("available");
+        setAvailableVersion(update.version);
+        setPendingUpdate(update);
+      } else {
+        setUpdateStatus("up-to-date");
+      }
+    } catch (err: any) {
+      console.error("Manual check for updates failed:", err);
+      setUpdateStatus("error");
+      setUpdaterError(err.message || "Failed to check for updates.");
+    }
+  };
+
+  const handleInstallManual = async () => {
+    if (!pendingUpdate) return;
+    try {
+      setUpdateStatus("downloading");
+      await pendingUpdate.downloadAndInstall();
+      await relaunch();
+    } catch (err: any) {
+      console.error("Manual update install failed:", err);
+      setUpdateStatus("error");
+      setUpdaterError(err.message || "Failed to install the update.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-start items-start p-8 md:p-12 overflow-y-auto">
@@ -299,6 +351,78 @@ export default function Settings() {
               {t("provider_key_desc") || "Used to process incoming emails and suggest case matching. Stored locally."}
             </p>
           </div>
+
+          {/* Separator line */}
+          <div className="border-t border-border/60 my-6"></div>
+
+          {/* Software Updates Section */}
+          <h2 className="text-sm font-bold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5 pt-2">
+            <RefreshCw className="size-4 text-blue-500 animate-[spin_8s_linear_infinite]" />
+            {t("software_updates") || "Software Updates"}
+          </h2>
+
+          <div className="bg-background/40 border border-border/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Current Version</p>
+              <p className="text-sm font-semibold mt-0.5">{appVersion || "Loading..."}</p>
+            </div>
+
+            <div>
+              {updateStatus === "checking" && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <RefreshCw className="size-3.5 animate-spin" />
+                  Checking...
+                </span>
+              )}
+              {updateStatus === "up-to-date" && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                  <Check className="size-3.5" />
+                  App is up-to-date
+                </span>
+              )}
+              {updateStatus === "available" && (
+                <div className="flex flex-col sm:items-end gap-1.5">
+                  <span className="text-xs font-semibold text-blue-500">
+                    Version {availableVersion} available
+                  </span>
+                  <button
+                    onClick={handleInstallManual}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400 text-white dark:text-zinc-950 text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-sm"
+                  >
+                    Update & Restart
+                  </button>
+                </div>
+              )}
+              {updateStatus === "downloading" && (
+                <span className="text-xs text-blue-500 font-semibold flex items-center gap-1.5">
+                  <RefreshCw className="size-3.5 animate-spin" />
+                  Downloading...
+                </span>
+              )}
+              {updateStatus === "error" && (
+                <div className="flex flex-col sm:items-end gap-1">
+                  <span className="text-[10px] text-red-500 max-w-[160px] truncate">{updaterError}</span>
+                  <button
+                    onClick={handleCheckForUpdates}
+                    className="text-xs text-blue-500 hover:underline cursor-pointer"
+                  >
+                    Try check again
+                  </button>
+                </div>
+              )}
+              {updateStatus === "idle" && (
+                <button
+                  onClick={handleCheckForUpdates}
+                  className="w-full sm:w-auto px-4 py-2 border border-border bg-background hover:bg-accent rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-sm"
+                >
+                  Check for Updates
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Separator line */}
+          <div className="border-t border-border/60 my-6"></div>
 
           {/* Save Button */}
           <div className="pt-4">

@@ -42,5 +42,13 @@
         "compression": "lzma"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEwQTczNDhBOUNFOUQ0NTUKUldSVjFPbWNpalNuRUM2Y0FDVzZxTHU1VlNSMjV3SnBZVjZneXpYTlNHOGo1S2dXUFhnL3lSbHIK",
+      "endpoints": [
+        "https://github.com/tsemach/doron-desktop/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
