@@ -1,0 +1,42 @@
+# Ignore unrelated applications (since we are only deploying backend)
+apps/desktop
+
+# Ignore node_modules and lockfiles/caches
+**/node_modules
+.pnpm-store
+**/.turbo
+**/.next
+**/dist
+**/dist-ssr
+**/.vercel
+
+# Ignore Rust and Tauri build artifacts/caches (used in desktop app)
+**/target
+**/.fastembed_cache
+
+# Ignore local environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.local
+*.db
+
+# Ignore IDE configurations
+.vscode
+.idea
+.agents
+.claude
+*.suo
+*.sln
+*.sw?
+.DS_Store
+*Zone.Identifier
+
+# Ignore tests and mocks (not needed for deployment runtimes)
+**/*.test.ts
+**/*.spec.ts
+**/__tests__
+
+# Ignore prompts and local documentation
+*.prompt
+*.md
