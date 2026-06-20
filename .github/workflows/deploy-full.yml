@@ -11,6 +11,11 @@ on:
         options:
           - preview
           - production
+      tag_name:
+        description: 'Tag name (e.g. v0.1.0). If empty, uses v__VERSION__'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   deploy-backend:
@@ -23,4 +28,5 @@ jobs:
     uses: ./.github/workflows/deploy-desktop.yml
     with:
       environment: ${{ github.event.inputs.environment }}
+      tag_name: ${{ github.event.inputs.tag_name }}
     secrets: inherit

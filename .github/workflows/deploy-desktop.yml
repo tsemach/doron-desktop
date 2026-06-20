@@ -11,12 +11,22 @@ on:
         options:
           - preview
           - production
+      tag_name:
+        description: 'Tag name (e.g. v0.1.0). If empty, uses v__VERSION__'
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       environment:
         description: 'Environment to deploy/release'
         required: true
         type: string
+      tag_name:
+        description: 'Tag name (e.g. v0.1.0)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   publish-tauri:
@@ -53,13 +63,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Determine tag and release name
+        id: vars
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag_name }}"
+          if [ -z "$TAG" ]; then
+            TAG="v__VERSION__"
+            RELEASE="Release v__VERSION__"
+          else
+            RELEASE="Release $TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
+
       - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: "./apps/desktop"
-          tagName: v__VERSION__
-          releaseName: "Release v__VERSION__"
+          tagName: ${{ steps.vars.outputs.tag }}
+          releaseName: ${{ steps.vars.outputs.release }}
           releaseDraft: false
           prerelease: ${{ inputs.environment == 'preview' }}
