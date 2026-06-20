@@ -1,0 +1,64 @@
+name: "Deploy Desktop"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy/release'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to deploy/release'
+        required: true
+        type: string
+
+jobs:
+  publish-tauri:
+    name: "Build and Release Tauri App"
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 'master'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./apps/desktop/src-tauri -> target"
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build and Release Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: "./apps/desktop"
+          tagName: v__VERSION__
+          releaseName: "Release v__VERSION__"
+          releaseDraft: false
+          prerelease: ${{ inputs.environment == 'preview' }}

@@ -1,0 +1,26 @@
+name: "Deploy Full Stack"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+jobs:
+  deploy-backend:
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      environment: ${{ github.event.inputs.environment }}
+    secrets: inherit
+
+  deploy-desktop:
+    uses: ./.github/workflows/deploy-desktop.yml
+    with:
+      environment: ${{ github.event.inputs.environment }}
+    secrets: inherit
