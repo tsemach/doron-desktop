@@ -74,7 +74,7 @@ export default function DownloadDashboard() {
 
         {/* Action Button */}
         <div className="flex justify-center pt-2">
-          <a href="/api/download" className="w-full sm:w-auto">
+          <a href="https://github.com/tsemach/doron-desktop/releases/download/pre-0.0.1/doron-desktop_0.1.0_x64-setup.exe" className="w-full sm:w-auto">
             <Button className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-lg transition-all cursor-pointer shadow-md shadow-blue-900/20">
               <Download className="w-5 h-5 animate-pulse" />
               <span>Download Standalone App</span>
