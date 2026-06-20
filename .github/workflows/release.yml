@@ -5,10 +5,11 @@ on:
     tags:
       - "v*" # Triggers when pushing tags starting with 'v' (e.g., v0.1.0)
 
+permissions:
+  contents: write
+
 jobs:
   publish-tauri:
-    permissions:
-      contents: write
     runs-on: windows-latest
     steps:
       - name: Checkout repository

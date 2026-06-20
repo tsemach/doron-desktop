@@ -28,11 +28,12 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: write
+
 jobs:
   publish-tauri:
     name: "Build and Release Tauri App"
-    permissions:
-      contents: write
     runs-on: windows-latest
     environment: ${{ inputs.environment }}
     steps:
