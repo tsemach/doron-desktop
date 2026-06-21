@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "doron-desktop",
-  "version": "0.0.5",
+  "version": "0.0.13",
   "identifier": "com.tsemach.doron-desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -29,6 +29,7 @@
     "targets": [
       "nsis"
     ],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,6 +42,14 @@
         "installMode": "currentUser",
         "compression": "lzma"
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEwQTczNDhBOUNFOUQ0NTUKUldSVjFPbWNpalNuRUM2Y0FDVzZxTHU1VlNSMjV3SnBZVjZneXpYTlNHOGo1S2dXUFhnL3lSbHIK",
+      "endpoints": [
+        "https://github.com/tsemach/doron-desktop/releases/latest/download/latest.json"
+      ]
     }
   }
 }

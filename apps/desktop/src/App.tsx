@@ -6,6 +6,7 @@ import Settings from "./components/Settings/Settings";
 import { getCurrentWindow  } from "@tauri-apps/api/window";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { invoke } from "@tauri-apps/api/core";
+import UpdateBanner from "./components/Updater/UpdateBanner";
 
 function Home() {
   const navigate = useNavigate();
@@ -200,6 +201,7 @@ function App() {
 
   return (
     <LanguageProvider>
+      <UpdateBanner />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/case-management/*" element={<CaseManagement />} />
