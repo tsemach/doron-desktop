@@ -15,51 +15,6 @@ export default function Home() {
   const [userName, setUserName] = useState<string>("User");
   const [MainHelpFeatureSelected, setMainHelpFeatureSelected] = useState<string>("central-working-space");
 
-  // Screenshot Carousel State
-  const [activeScreenshot, setActiveScreenshot] = useState(0);
-
-  const screenshots = [
-    {
-      src: "/screenshot_smart_search_results.png",
-      alt: "Smart Search Engine (FTS5 Results)",
-    },
-    {
-      src: "/screenshot_templates_hover.png",
-      alt: "Document Preview & Templates Hover",
-    },
-    {
-      src: "/screenshot_followup_badge.png",
-      alt: "Active Cases Tracking & Status Badges",
-    },
-  ];
-
-  const features = [
-    {
-      title: "Central Working Space",
-      desc: "A single consolidated control panel to manage cases, view documents, sync emails, and configure preferences.",
-    },
-    {
-      title: "Case Management & Tracking",
-      desc: "Organize active legal/business cases, record client metadata, and track statuses seamlessly.",
-    },
-    {
-      title: "AI Document Indexing",
-      desc: "Auto-extract titles, summaries, dates, and topics from Word, PDF, and Excel files using Claude API.",
-    },
-    {
-      title: "Smart Full-Text Search",
-      desc: "Perform lightning-fast, index-wide searches over document texts and metadata attributes.",
-    },
-    {
-      title: "Document Tags & Notes",
-      desc: "Annotate cases and files with custom descriptions, flags, and tags to keep folders organized.",
-    },
-    {
-      title: "Email Correspondences Sync",
-      desc: "Direct IMAP sync that matches incoming emails and attachments to their corresponding cases.",
-    },
-  ];
-
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
   };
@@ -88,7 +43,7 @@ export default function Home() {
     console.log(`main: onFeatureSelect: ${featureTitle}, ${featureId}`)
     setMainHelpFeatureSelected(featureId);
   }
-    
+
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
 

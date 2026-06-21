@@ -34,19 +34,32 @@ export default function MainHelpCentralWorkingSpace() {
   return (
     <>
       <div className="space-y-4">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-150 text-blue-750 text-xs font-semibold w-fit">
+        {/* <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-150 text-blue-750 text-xs font-semibold w-fit">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping"></span>
           Secure Desktop Client
-        </div>
+        </div> */}
 
         {/* Title styling matching desktop welcome headers */}
-        <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
-          Doron Case & <br />
-          <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Document Indexer</span>
-        </h1>
+        <h2 className="text-3xl font-bold tracking-tight">
+          Amicus Desktop
+        </h2>
         <p className="text-slate-500 text-base max-w-4xl leading-relaxed">
-          <strong>Doron</strong> is a secure, AI-powered desktop application designed to streamline legal and business workflows. With <strong>Doron</strong>, you can index local directories, perform lightning-fast searches, match email correspondences, and generate rich metadata summaries with Claude AI—all from a single, centralized control panel.
+          <strong>Amicus Desktop</strong> is a secure, AI-powered desktop application designed to streamline legal and business workflows. At the heart of the experience is the <strong>Central Working Space</strong>:
         </p>
+        <ul className="space-y-3 max-w-4xl mt-2 text-slate-500 text-base leading-relaxed">
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 mt-1.5 shrink-0 text-[10px]">•</span>
+            <span>
+              <strong>Unified Control Panel:</strong> A single, consolidated interface where you can manage cases, view documents, sync client emails, and configure preferences.
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-blue-600 mt-1.5 shrink-0 text-[10px]">•</span>
+            <span>
+              <strong>Frictionless Navigation:</strong> Access all indexing, search, and correspondence tools in one central place, designed to minimize context switching and keep your workspace clean.
+            </span>
+          </li>
+        </ul>
       </div>
 
       {/* Call to Actions matching desktop buttons styling */}
