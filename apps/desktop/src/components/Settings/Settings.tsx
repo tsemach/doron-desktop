@@ -13,6 +13,8 @@ import SettingEmailIntegration from "./SettingEmailIntegration";
 import SettingAiProvider from "./SettingAiProvider";
 import SettingSoftwareUpdate from "./SettingSoftwareUpdate";
 import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
+import SettingAiProviderHelp from "./SettingAiProviderHelp";
+import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
 
 export const API_KEY_STORAGE_KEY = "claude_api_key";
 export const USER_NAME_STORAGE_KEY = "user_name";
@@ -23,20 +25,24 @@ export default function Settings() {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>("preferences");
-  const [activeHelp, setActiveHelp] = useState<"email" | null>(null);
+  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | null>(null);
+  const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
   
-  const [apiKey, setApiKey] = useState("");
   const [username, setUsername] = useState("");
   const [saved, setSaved] = useState(false);
   const [tempLang, setTempLang] = useState<Language>(language);
 
-  // Email Server & AI Settings States
+  // Email Server Configuration States
   const [imapServer, setImapServer] = useState("");
   const [imapPort, setImapPort] = useState(993);
   const [emailUsername, setEmailUsername] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
   const [showEmailPassword, setShowEmailPassword] = useState(false);
-  const [aiProvider, setAiProvider] = useState("claude");
+
+  // AI Provider (LLM) Configuration States
+  const [aiMode, setAiMode] = useState("");
+  const [aiProvider, setAiProvider] = useState("gemini");
+  const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
 
   // Software Update States
@@ -47,13 +53,10 @@ export default function Settings() {
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
 
   useEffect(() => {
-    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    if (storedKey) setApiKey(storedKey);
-
     const storedName = localStorage.getItem(USER_NAME_STORAGE_KEY);
     if (storedName) setUsername(storedName);
 
-    loadEmailConfig();
+    loadSettings();
 
     // Fetch app version
     const fetchVersion = async () => {
@@ -71,7 +74,8 @@ export default function Settings() {
     setTempLang(language);
   }, [language]);
 
-  async function loadEmailConfig() {
+  async function loadSettings() {
+    // Load email configurations
     try {
       const res = await invoke<any>("get_email_settings");
       if (res) {
@@ -79,19 +83,31 @@ export default function Settings() {
         setImapPort(res.imap_port);
         setEmailUsername(res.username);
         setEmailPassword(res.password_enc);
-        setAiProvider(res.provider);
-        setProviderApiKey(res.api_key_enc);
       }
     } catch (e) {
       console.error("Failed to load email configurations:", e);
     }
+
+    // Load AI configurations
+    try {
+      const res = await invoke<any>("get_ai_settings");
+      if (res) {
+        setAiMode(res.ai_mode || "");
+        setAiProvider(res.provider || "gemini");
+        setAiModel(res.ai_model || "");
+        setProviderApiKey(res.api_key_enc || "");
+      }
+    } catch (e) {
+      console.error("Failed to load AI configurations:", e);
+    }
   }
 
   async function handleSave() {
-    localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
+    localStorage.setItem(API_KEY_STORAGE_KEY, providerApiKey.trim());
     localStorage.setItem(USER_NAME_STORAGE_KEY, username.trim());
     setLanguage(tempLang);
 
+    // Save Email Settings
     try {
       await invoke("save_email_settings", {
         config: {
@@ -106,6 +122,23 @@ export default function Settings() {
     } catch (e) {
       console.error("Failed to save email settings:", e);
       alert("Failed to save email configurations: " + e);
+    }
+
+    // Save AI Settings
+    if (aiMode) {
+      try {
+        await invoke("save_ai_settings", {
+          config: {
+            ai_mode: aiMode,
+            provider: aiProvider,
+            ai_model: aiModel,
+            api_key_enc: providerApiKey.trim(),
+          }
+        });
+      } catch (e) {
+        console.error("Failed to save AI configurations:", e);
+        alert("Failed to save AI configurations: " + e);
+      }
     }
 
     setSaved(true);
@@ -175,12 +208,42 @@ export default function Settings() {
             saved={saved}
             setSaved={setSaved}
             t={t}
-            onToggleHelp={() => setActiveHelp(activeHelp === "email" ? null : "email")}
+            onToggleHelp={() => {
+              setHealthCheckResult(null);
+              setActiveHelp(activeHelp === "email" ? null : "email");
+            }}
             activeHelp={activeHelp}
           />
         );
       case "ai":
-        return <SettingAiProvider />;
+        return (
+          <SettingAiProvider
+            aiMode={aiMode}
+            setAiMode={setAiMode}
+            aiProvider={aiProvider}
+            setAiProvider={setAiProvider}
+            aiModel={aiModel}
+            setAiModel={setAiModel}
+            providerApiKey={providerApiKey}
+            setProviderApiKey={setProviderApiKey}
+            onSave={handleSave}
+            saved={saved}
+            setSaved={setSaved}
+            onToggleHelp={() => {
+              setHealthCheckResult(null);
+              setActiveHelp(activeHelp === "ai" ? null : "ai");
+            }}
+            onOpenHelp={() => {
+              setHealthCheckResult(null);
+              setActiveHelp("ai");
+            }}
+            activeHelp={activeHelp}
+            setHealthCheckResult={(res) => {
+              setActiveHelp(null);
+              setHealthCheckResult(res);
+            }}
+          />
+        );
       case "update":
         return (
           <SettingSoftwareUpdate
@@ -222,7 +285,7 @@ export default function Settings() {
           </div>
         </div>
       </div>
-
+ 
       {/* Main layout container (left-aligned w-full) */}
       <div className="w-full flex-1 flex flex-col px-8 md:px-12 py-8 md:py-12 space-y-6">
         
@@ -232,7 +295,7 @@ export default function Settings() {
           {/* Left Navigation Menu */}
           <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0 md:border-r rtl:md:border-r-0 rtl:md:border-l border-border md:pr-6 rtl:md:pl-6 pb-6 md:pb-0 border-b md:border-b-0">
             <button
-              onClick={() => { setActiveTab("preferences"); setActiveHelp(null); }}
+              onClick={() => { setActiveTab("preferences"); setActiveHelp(null); setHealthCheckResult(null); }}
               className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
                 activeTab === "preferences"
                   ? "bg-accent text-foreground shadow-sm font-bold"
@@ -243,11 +306,11 @@ export default function Settings() {
                 <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
               )}
               <User className="size-4 text-foreground" />
-              {t("system_preferences")}
+              {t("setting_system_preferences")}
             </button>
             
             <button
-              onClick={() => { setActiveTab("email"); setActiveHelp(null); }}
+              onClick={() => { setActiveTab("email"); setActiveHelp(null); setHealthCheckResult(null); }}
               className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
                 activeTab === "email"
                   ? "bg-accent text-foreground shadow-sm font-bold"
@@ -262,8 +325,8 @@ export default function Settings() {
             </button>
             
             <button
-              onClick={() => { setActiveTab("ai"); setActiveHelp(null); }}
-              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
+              onClick={() => { setActiveTab("ai"); setActiveHelp(null); setHealthCheckResult(null); }}
+              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-between relative ${
                 activeTab === "ai"
                   ? "bg-accent text-foreground shadow-sm font-bold"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -272,12 +335,17 @@ export default function Settings() {
               {activeTab === "ai" && (
                 <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
               )}
-              <Server className="size-4 text-foreground" />
-              AI Provider (LLM)
+              <div className="flex items-center gap-2.5">
+                <Server className="size-4 text-foreground" />
+                AI Provider (LLM)
+              </div>
+              {aiMode && (
+                <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="AI operational" />
+              )}
             </button>
             
             <button
-              onClick={() => { setActiveTab("update"); setActiveHelp(null); }}
+              onClick={() => { setActiveTab("update"); setActiveHelp(null); setHealthCheckResult(null); }}
               className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
                 activeTab === "update"
                   ? "bg-accent text-foreground shadow-sm font-bold"
@@ -294,14 +362,31 @@ export default function Settings() {
 
           {/* Right Content Area */}
           <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
-            <div className="w-full flex-1 max-w-3xl">
+            <div className="w-full lg:w-[640px] lg:shrink-0">
               {renderActiveTab()}
             </div>
             
-            {activeHelp && (
-              <div className="w-full flex-1 lg:max-w-3xl lg:border-l border-border lg:pl-8 pb-6 lg:pb-0 border-t lg:border-t-0 pt-6 lg:pt-0 relative min-h-[400px]">
-                {activeHelp === "email" && (
-                  <SettingEmailIntegrationHelp onClose={() => setActiveHelp(null)} />
+            {(activeHelp || healthCheckResult) && (
+              <div className="w-full flex-1 lg:max-w-3xl lg:border-l border-border lg:pl-8 pb-6 lg:pb-0 border-t lg:border-t-0 pt-6 lg:pt-0 relative min-h-[400px] lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pr-2">
+                {healthCheckResult ? (
+                  <SettingAiHealthCheckResult
+                    result={healthCheckResult}
+                    onClose={() => setHealthCheckResult(null)}
+                  />
+                ) : (
+                  <>
+                    {activeHelp === "email" && (
+                      <SettingEmailIntegrationHelp onClose={() => setActiveHelp(null)} />
+                    )}
+                    {activeHelp === "ai" && (
+                      <SettingAiProviderHelp
+                        onClose={() => setActiveHelp(null)}
+                        aiMode={aiMode}
+                        aiProvider={aiProvider}
+                        aiModel={aiModel}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}

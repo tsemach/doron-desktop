@@ -1,5 +1,7 @@
 pub mod llm_provider;
+pub mod llm_settings;
 
+pub use llm_settings::*;
 use serde::{Deserialize, Serialize};
 
 const EXTRACTION_PROMPT: &str = r#"You are a document analyst. Read the document text below and extract metadata as a single JSON object. Be concise and precise. Use null for any field you cannot determine.

@@ -101,7 +101,7 @@ fn compute_case_similarities(
 }
 
 async fn call_llm_classification(
-    config: &EmailConfig,
+    config: &crate::llm::AiConfig,
     sender: &str,
     subject: &str,
     snippet: &str,
@@ -110,7 +110,7 @@ async fn call_llm_classification(
     let provider = get_active_provider(ProviderConfig {
         provider_type: config.provider.clone(),
         api_key: config.api_key_enc.clone(),
-        model: String::new(),
+        model: config.ai_model.clone(),
     });
 
     let mut candidate_list = String::new();
@@ -146,7 +146,7 @@ async fn call_llm_classification(
 
 pub(crate) async fn run_cascade_classification(
     app: &AppHandle,
-    config: &EmailConfig,
+    _config: &EmailConfig,
     sender: &str,
     subject: &str,
     snippet: &str,
@@ -200,10 +200,19 @@ pub(crate) async fn run_cascade_classification(
     // Threshold filtering (spams/newsletters have low cosine similarity compared to case docs)
     let best_local_score = sorted_candidates.first().map(|c| *c.1).unwrap_or(0.0);
 
-    let required_threshold = if config.api_key_enc.is_empty() {
-        0.84 // Stricter threshold when relying purely on embeddings without LLM verification (E5 Small baseline)
-    } else {
+    let ai_config = crate::llm::get_ai_settings_internal(app);
+    let use_llm = ai_config.as_ref().map(|c| {
+        if c.ai_mode == "byom" {
+            !c.api_key_enc.is_empty()
+        } else {
+            !c.ai_mode.is_empty()
+        }
+    }).unwrap_or(false);
+
+    let required_threshold = if use_llm {
         0.76 // More relaxed threshold when verified by LLM
+    } else {
+        0.84 // Stricter threshold when relying purely on embeddings without LLM verification (E5 Small baseline)
     };
 
     if best_local_score < required_threshold {
@@ -230,21 +239,29 @@ pub(crate) async fn run_cascade_classification(
     }
 
     // 4. Step 2: Verification using provider-agnostic LLM
-    if config.api_key_enc.is_empty() {
+    if !use_llm {
         let best_id = top_cases.first().map(|c| c.id);
         return (
             best_id,
             best_local_score as f64,
-            "Embedding-only classification (API key not configured)".to_string(),
+            "Embedding-only classification (AI config not configured or active)".to_string(),
         );
     }
 
-    match call_llm_classification(config, sender, subject, snippet, &top_cases).await {
-        Ok((suggested_id, confidence, reason)) => (suggested_id, confidence, reason),
-        Err(e) => (
+    if let Some(ref config) = ai_config {
+        match call_llm_classification(config, sender, subject, snippet, &top_cases).await {
+            Ok((suggested_id, confidence, reason)) => (suggested_id, confidence, reason),
+            Err(e) => (
+                top_cases.first().map(|c| c.id),
+                0.5,
+                format!("{}. Falling back to embedding search.", e),
+            )
+        }
+    } else {
+        (
             top_cases.first().map(|c| c.id),
             0.5,
-            format!("{}. Falling back to embedding search.", e),
+            "Fallback to embedding search (no AI config).".to_string(),
         )
     }
 }

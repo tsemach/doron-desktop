@@ -170,6 +170,14 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
         CREATE TABLE IF NOT EXISTS ignored_emails (
             message_id    TEXT PRIMARY KEY
         );
+
+        CREATE TABLE IF NOT EXISTS ai_configurations (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            ai_mode       TEXT,
+            provider      TEXT NOT NULL DEFAULT 'claude',
+            ai_model      TEXT NOT NULL DEFAULT '',
+            api_key_enc   TEXT
+        );
     ").map_err(|e| format!("[emails schema] {e}"))?;
 
     // Ensure 'body_text' column exists in 'pending_email_alerts' for migration
@@ -180,6 +188,30 @@ pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
     ).unwrap_or(0) > 0;
     if !body_text_exists {
         let _ = conn.execute("ALTER TABLE pending_email_alerts ADD COLUMN body_text TEXT;", []);
+    }
+
+    // Migrate old AI configuration to the new ai_configurations table if new table is empty
+    let has_ai_config: bool = conn.query_row(
+        "SELECT COUNT(1) FROM ai_configurations",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+
+    if !has_ai_config {
+        if let Ok(mut stmt) = conn.prepare("SELECT provider, api_key_enc FROM email_configurations LIMIT 1") {
+            let row = stmt.query_row([], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, Option<String>>(1)?
+                ))
+            });
+            if let Ok((old_provider, old_key)) = row {
+                let _ = conn.execute(
+                    "INSERT INTO ai_configurations (ai_mode, provider, ai_model, api_key_enc) VALUES ('byom', ?1, '', ?2)",
+                    params![old_provider, old_key],
+                );
+            }
+        }
     }
 
     // Clean up forwarded headers from existing case_emails
