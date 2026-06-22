@@ -215,7 +215,7 @@ export default function Settings() {
             <div>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
                 <SettingsIcon className="size-3 animate-[spin_4s_linear_infinite]" />
-                {t("system_preferences")}
+                {t("setting_system_preferences")}
               </div>
               <h1 className="text-2xl font-bold tracking-tight mt-0.5">{t("settings")}</h1>
             </div>
