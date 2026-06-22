@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Eye, EyeOff, Check, Settings as SettingsIcon, Mail, Server, RefreshCw } from "lucide-react";
+import { ArrowLeft, User, Settings as SettingsIcon, Mail, Server, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { Language } from "../../locales/translations";
 import { invoke } from "@tauri-apps/api/core";
@@ -8,26 +8,42 @@ import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 
+import SettingPreferences from "./SettingPreferences";
+import SettingEmailIntegration from "./SettingEmailIntegration";
+import SettingAiProvider from "./SettingAiProvider";
+import SettingSoftwareUpdate from "./SettingSoftwareUpdate";
+import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
+import SettingAiProviderHelp from "./SettingAiProviderHelp";
+import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
+
 export const API_KEY_STORAGE_KEY = "claude_api_key";
 export const USER_NAME_STORAGE_KEY = "user_name";
+
+type TabType = "preferences" | "email" | "ai" | "update";
 
 export default function Settings() {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
-  const [apiKey, setApiKey] = useState("");
+  const [activeTab, setActiveTab] = useState<TabType>("preferences");
+  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | null>(null);
+  const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
+  
   const [username, setUsername] = useState("");
   const [saved, setSaved] = useState(false);
   const [tempLang, setTempLang] = useState<Language>(language);
 
-  // Email Server & AI Settings States
+  // Email Server Configuration States
   const [imapServer, setImapServer] = useState("");
   const [imapPort, setImapPort] = useState(993);
   const [emailUsername, setEmailUsername] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
   const [showEmailPassword, setShowEmailPassword] = useState(false);
-  const [aiProvider, setAiProvider] = useState("claude");
+
+  // AI Provider (LLM) Configuration States
+  const [aiMode, setAiMode] = useState("");
+  const [aiProvider, setAiProvider] = useState("gemini");
+  const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
-  const [showProviderKey, setShowProviderKey] = useState(false);
 
   // Software Update States
   const [appVersion, setAppVersion] = useState("");
@@ -37,13 +53,10 @@ export default function Settings() {
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
 
   useEffect(() => {
-    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    if (storedKey) setApiKey(storedKey);
-
     const storedName = localStorage.getItem(USER_NAME_STORAGE_KEY);
     if (storedName) setUsername(storedName);
 
-    loadEmailConfig();
+    loadSettings();
 
     // Fetch app version
     const fetchVersion = async () => {
@@ -61,7 +74,8 @@ export default function Settings() {
     setTempLang(language);
   }, [language]);
 
-  async function loadEmailConfig() {
+  async function loadSettings() {
+    // Load email configurations
     try {
       const res = await invoke<any>("get_email_settings");
       if (res) {
@@ -69,19 +83,31 @@ export default function Settings() {
         setImapPort(res.imap_port);
         setEmailUsername(res.username);
         setEmailPassword(res.password_enc);
-        setAiProvider(res.provider);
-        setProviderApiKey(res.api_key_enc);
       }
     } catch (e) {
       console.error("Failed to load email configurations:", e);
     }
+
+    // Load AI configurations
+    try {
+      const res = await invoke<any>("get_ai_settings");
+      if (res) {
+        setAiMode(res.ai_mode || "");
+        setAiProvider(res.provider || "gemini");
+        setAiModel(res.ai_model || "");
+        setProviderApiKey(res.api_key_enc || "");
+      }
+    } catch (e) {
+      console.error("Failed to load AI configurations:", e);
+    }
   }
 
   async function handleSave() {
-    localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
+    localStorage.setItem(API_KEY_STORAGE_KEY, providerApiKey.trim());
     localStorage.setItem(USER_NAME_STORAGE_KEY, username.trim());
     setLanguage(tempLang);
 
+    // Save Email Settings
     try {
       await invoke("save_email_settings", {
         config: {
@@ -96,6 +122,23 @@ export default function Settings() {
     } catch (e) {
       console.error("Failed to save email settings:", e);
       alert("Failed to save email configurations: " + e);
+    }
+
+    // Save AI Settings
+    if (aiMode) {
+      try {
+        await invoke("save_ai_settings", {
+          config: {
+            ai_mode: aiMode,
+            provider: aiProvider,
+            ai_model: aiModel,
+            api_key_enc: providerApiKey.trim(),
+          }
+        });
+      } catch (e) {
+        console.error("Failed to save AI configurations:", e);
+        alert("Failed to save AI configurations: " + e);
+      }
     }
 
     setSaved(true);
@@ -133,12 +176,97 @@ export default function Settings() {
     }
   };
 
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case "preferences":
+        return (
+          <SettingPreferences
+            username={username}
+            setUsername={setUsername}
+            tempLang={tempLang}
+            setTempLang={setTempLang}
+            onSave={handleSave}
+            saved={saved}
+            setSaved={setSaved}
+            t={t}
+          />
+        );
+      case "email":
+        return (
+          <SettingEmailIntegration
+            imapServer={imapServer}
+            setImapServer={setImapServer}
+            imapPort={imapPort}
+            setImapPort={setImapPort}
+            emailUsername={emailUsername}
+            setEmailUsername={setEmailUsername}
+            emailPassword={emailPassword}
+            setEmailPassword={setEmailPassword}
+            showEmailPassword={showEmailPassword}
+            setShowEmailPassword={setShowEmailPassword}
+            onSave={handleSave}
+            saved={saved}
+            setSaved={setSaved}
+            t={t}
+            onToggleHelp={() => {
+              setHealthCheckResult(null);
+              setActiveHelp(activeHelp === "email" ? null : "email");
+            }}
+            activeHelp={activeHelp}
+          />
+        );
+      case "ai":
+        return (
+          <SettingAiProvider
+            aiMode={aiMode}
+            setAiMode={setAiMode}
+            aiProvider={aiProvider}
+            setAiProvider={setAiProvider}
+            aiModel={aiModel}
+            setAiModel={setAiModel}
+            providerApiKey={providerApiKey}
+            setProviderApiKey={setProviderApiKey}
+            onSave={handleSave}
+            saved={saved}
+            setSaved={setSaved}
+            onToggleHelp={() => {
+              setHealthCheckResult(null);
+              setActiveHelp(activeHelp === "ai" ? null : "ai");
+            }}
+            onOpenHelp={() => {
+              setHealthCheckResult(null);
+              setActiveHelp("ai");
+            }}
+            activeHelp={activeHelp}
+            setHealthCheckResult={(res) => {
+              setActiveHelp(null);
+              setHealthCheckResult(res);
+            }}
+          />
+        );
+      case "update":
+        return (
+          <SettingSoftwareUpdate
+            appVersion={appVersion}
+            updateStatus={updateStatus}
+            updaterError={updaterError}
+            availableVersion={availableVersion}
+            onCheckForUpdates={handleCheckForUpdates}
+            onInstallManual={handleInstallManual}
+            t={t}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-start items-start p-8 md:p-12 overflow-y-auto">
-      <div className="max-w-xl w-full space-y-6">
-        
-        {/* Navigation & Header */}
-        <div className="flex items-center justify-between border-b border-border/60 pb-5 w-full">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-start items-stretch overflow-y-auto">
+      
+      {/* Navigation & Header (full-width border-b) */}
+      <div className="border-b border-border/60 w-full px-8 md:px-12 py-5 shrink-0">
+        <div className="w-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -148,303 +276,124 @@ export default function Settings() {
               <ArrowLeft className="size-4 group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5 transition-transform" />
             </button>
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-500 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
                 <SettingsIcon className="size-3 animate-[spin_4s_linear_infinite]" />
-                {t("system_preferences")}
+                {t("setting_system_preferences")}
               </div>
               <h1 className="text-2xl font-bold tracking-tight mt-0.5">{t("settings")}</h1>
             </div>
           </div>
         </div>
-
-        {/* Settings Card */}
-        <div className="bg-card border border-border/80 shadow-lg rounded-2xl p-6 md:p-8 space-y-6 w-full">
+      </div>
+ 
+      {/* Main layout container (left-aligned w-full) */}
+      <div className="w-full flex-1 flex flex-col px-8 md:px-12 py-8 md:py-12 space-y-6">
+        
+        {/* Main Settings Two-Column Layout */}
+        <div className="flex flex-col md:flex-row gap-8 w-full items-stretch mt-4 flex-1">
           
-          {/* User Name Preference */}
-          <div className="space-y-2">
-            <label className="text-sm font-semibold tracking-wide text-foreground flex items-center gap-1.5" htmlFor="username">
-              <User className="size-4 text-blue-500" />
-              {t("user_name")}
-            </label>
-            <div className="relative">
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => { setUsername(e.target.value); setSaved(false); }}
-                placeholder={t("enter_name")}
-                className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t("username_desc")}
-            </p>
-          </div>
-
-          {/* Separator line */}
-          <div className="border-t border-border/60 my-6"></div>
-
-          {/* Language Preference Section */}
-          <div className="space-y-2">
-            <label className="text-sm font-semibold tracking-wide text-foreground flex items-center gap-1.5" htmlFor="language-select">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4 text-blue-500">
-                <path d="m5 8 6 6" />
-                <path d="m4 14 6-6 2-3" />
-                <path d="M2 5h12" />
-                <path d="M7 2h1" />
-                <path d="m22 22-5-10-5 10" />
-                <path d="M14 18h6" />
-              </svg>
-              {t("language")}
-            </label>
-            <div className="relative">
-              <select
-                id="language-select"
-                value={tempLang}
-                onChange={(e) => { setTempLang(e.target.value as Language); setSaved(false); }}
-                className="w-full pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer appearance-none"
-              >
-                <option value="en">{t("english")}</option>
-                <option value="he">{t("hebrew")}</option>
-              </select>
-              {/* Custom arrow down */}
-              <div className="absolute inset-y-0 right-3 rtl:left-3 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {tempLang === "he" ? "שפת ממשק המערכת תוגדר לעברית בכיוון ימין לשמאל." : "System user interface language will be set to English."}
-            </p>
-          </div>
-
-          {/* Separator line */}
-          <div className="border-t border-border/60 my-6"></div>
-
-          {/* Email Server Ingestion Configuration */}
-          <h2 className="text-sm font-bold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5 pt-2">
-            <Mail className="size-4 text-blue-500" />
-            {t("email_integration") || "Email Integration"}
-          </h2>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2 col-span-2 sm:col-span-1">
-              <label className="text-xs font-semibold text-foreground" htmlFor="imap-server">
-                IMAP Host
-              </label>
-              <input
-                id="imap-server"
-                type="text"
-                value={imapServer}
-                onChange={(e) => { setImapServer(e.target.value); setSaved(false); }}
-                placeholder="imap.mail.com"
-                className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
-            <div className="space-y-2 col-span-2 sm:col-span-1">
-              <label className="text-xs font-semibold text-foreground" htmlFor="imap-port">
-                IMAP Port
-              </label>
-              <input
-                id="imap-port"
-                type="number"
-                value={imapPort}
-                onChange={(e) => { setImapPort(Number(e.target.value)); setSaved(false); }}
-                placeholder="993"
-                className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground" htmlFor="email-username">
-              {t("email_username") || "Username (Email)"}
-            </label>
-            <input
-              id="email-username"
-              type="email"
-              value={emailUsername}
-              onChange={(e) => { setEmailUsername(e.target.value); setSaved(false); }}
-              placeholder="lawyer@firm.com"
-              className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground" htmlFor="email-password">
-              {t("email_password") || "Password / App Token"}
-            </label>
-            <div className="relative">
-              <input
-                id="email-password"
-                type={showEmailPassword ? "text" : "password"}
-                value={emailPassword}
-                onChange={(e) => { setEmailPassword(e.target.value); setSaved(false); }}
-                placeholder="••••••••••••"
-                className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-              <button
-                type="button"
-                onClick={() => setShowEmailPassword(!showEmailPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-muted-foreground hover:text-foreground"
-              >
-                {showEmailPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Separator line */}
-          <div className="border-t border-border/60 my-6"></div>
-
-          {/* Provider Agnostic AI Model Configuration */}
-          <h2 className="text-sm font-bold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5 pt-2">
-            <Server className="size-4 text-amber-500" />
-            {t("ai_model_provider") || "AI Model Provider"}
-          </h2>
-
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground" htmlFor="ai-provider">
-              {t("provider") || "Provider"}
-            </label>
-            <div className="relative">
-              <select
-                id="ai-provider"
-                value={aiProvider}
-                onChange={(e) => { setAiProvider(e.target.value); setSaved(false); }}
-                className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
-              >
-                <option value="claude">Anthropic Claude</option>
-                <option value="gemini">Google Gemini</option>
-                <option value="openai">OpenAI</option>
-              </select>
-              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-muted-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground" htmlFor="provider-api-key">
-              {t("provider_api_key") || "Provider API Key"}
-            </label>
-            <div className="relative">
-              <input
-                id="provider-api-key"
-                type={showProviderKey ? "text" : "password"}
-                value={providerApiKey}
-                onChange={(e) => { setProviderApiKey(e.target.value); setSaved(false); }}
-                placeholder={aiProvider === "claude" ? "sk-ant-..." : aiProvider === "openai" ? "sk-..." : "AIzaSy..."}
-                className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-input bg-background/50 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-              <button
-                type="button"
-                onClick={() => setShowProviderKey(!showProviderKey)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-muted-foreground hover:text-foreground"
-              >
-                {showProviderKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t("provider_key_desc") || "Used to process incoming emails and suggest case matching. Stored locally."}
-            </p>
-          </div>
-
-          {/* Separator line */}
-          <div className="border-t border-border/60 my-6"></div>
-
-          {/* Software Updates Section */}
-          <h2 className="text-sm font-bold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5 pt-2">
-            <RefreshCw className="size-4 text-blue-500 animate-[spin_8s_linear_infinite]" />
-            {t("software_updates") || "Software Updates"}
-          </h2>
-
-          <div className="bg-background/40 border border-border/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Current Version</p>
-              <p className="text-sm font-semibold mt-0.5">{appVersion || "Loading..."}</p>
-            </div>
-
-            <div>
-              {updateStatus === "checking" && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <RefreshCw className="size-3.5 animate-spin" />
-                  Checking...
-                </span>
-              )}
-              {updateStatus === "up-to-date" && (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
-                  <Check className="size-3.5" />
-                  App is up-to-date
-                </span>
-              )}
-              {updateStatus === "available" && (
-                <div className="flex flex-col sm:items-end gap-1.5">
-                  <span className="text-xs font-semibold text-blue-500">
-                    Version {availableVersion} available
-                  </span>
-                  <button
-                    onClick={handleInstallManual}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400 text-white dark:text-zinc-950 text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-sm"
-                  >
-                    Update & Restart
-                  </button>
-                </div>
-              )}
-              {updateStatus === "downloading" && (
-                <span className="text-xs text-blue-500 font-semibold flex items-center gap-1.5">
-                  <RefreshCw className="size-3.5 animate-spin" />
-                  Downloading...
-                </span>
-              )}
-              {updateStatus === "error" && (
-                <div className="flex flex-col sm:items-end gap-1">
-                  <span className="text-[10px] text-red-500 max-w-[160px] truncate">{updaterError}</span>
-                  <button
-                    onClick={handleCheckForUpdates}
-                    className="text-xs text-blue-500 hover:underline cursor-pointer"
-                  >
-                    Try check again
-                  </button>
-                </div>
-              )}
-              {updateStatus === "idle" && (
-                <button
-                  onClick={handleCheckForUpdates}
-                  className="w-full sm:w-auto px-4 py-2 border border-border bg-background hover:bg-accent rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-sm"
-                >
-                  Check for Updates
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Separator line */}
-          <div className="border-t border-border/60 my-6"></div>
-
-          {/* Save Button */}
-          <div className="pt-4">
+          {/* Left Navigation Menu */}
+          <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0 md:border-r rtl:md:border-r-0 rtl:md:border-l border-border md:pr-6 rtl:md:pl-6 pb-6 md:pb-0 border-b md:border-b-0">
             <button
-              onClick={handleSave}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all cursor-pointer shadow-md ${
-                saved
-                  ? "bg-emerald-600 text-white shadow-emerald-500/10 hover:bg-emerald-700 animate-pulse"
-                  : "bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black shadow-neutral-950/10 dark:shadow-none"
+              onClick={() => { setActiveTab("preferences"); setActiveHelp(null); setHealthCheckResult(null); }}
+              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
+                activeTab === "preferences"
+                  ? "bg-accent text-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
-              {saved ? (
-                <>
-                  <Check className="size-4" />
-                  {t("saved")}
-                </>
-              ) : (
-                t("save_preferences")
+              {activeTab === "preferences" && (
+                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
+              )}
+              <User className="size-4 text-foreground" />
+              {t("setting_system_preferences")}
+            </button>
+            
+            <button
+              onClick={() => { setActiveTab("email"); setActiveHelp(null); setHealthCheckResult(null); }}
+              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
+                activeTab === "email"
+                  ? "bg-accent text-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              {activeTab === "email" && (
+                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
+              )}
+              <Mail className="size-4 text-foreground" />
+              {t("email_integration") || "Email Integration"}
+            </button>
+            
+            <button
+              onClick={() => { setActiveTab("ai"); setActiveHelp(null); setHealthCheckResult(null); }}
+              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-between relative ${
+                activeTab === "ai"
+                  ? "bg-accent text-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              {activeTab === "ai" && (
+                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
+              )}
+              <div className="flex items-center gap-2.5">
+                <Server className="size-4 text-foreground" />
+                AI Provider (LLM)
+              </div>
+              {aiMode && (
+                <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="AI operational" />
               )}
             </button>
+            
+            <button
+              onClick={() => { setActiveTab("update"); setActiveHelp(null); setHealthCheckResult(null); }}
+              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
+                activeTab === "update"
+                  ? "bg-accent text-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              {activeTab === "update" && (
+                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
+              )}
+              <RefreshCw className="size-4 text-foreground" />
+              {t("software_updates") || "Software Updates"}
+            </button>
           </div>
+
+          {/* Right Content Area */}
+          <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
+            <div className="w-full lg:w-[640px] lg:shrink-0">
+              {renderActiveTab()}
+            </div>
+            
+            {(activeHelp || healthCheckResult) && (
+              <div className="w-full flex-1 lg:max-w-3xl lg:border-l border-border lg:pl-8 pb-6 lg:pb-0 border-t lg:border-t-0 pt-6 lg:pt-0 relative min-h-[400px] lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pr-2">
+                {healthCheckResult ? (
+                  <SettingAiHealthCheckResult
+                    result={healthCheckResult}
+                    onClose={() => setHealthCheckResult(null)}
+                  />
+                ) : (
+                  <>
+                    {activeHelp === "email" && (
+                      <SettingEmailIntegrationHelp onClose={() => setActiveHelp(null)} />
+                    )}
+                    {activeHelp === "ai" && (
+                      <SettingAiProviderHelp
+                        onClose={() => setActiveHelp(null)}
+                        aiMode={aiMode}
+                        aiProvider={aiProvider}
+                        aiModel={aiModel}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
         </div>
+
       </div>
     </div>
   );

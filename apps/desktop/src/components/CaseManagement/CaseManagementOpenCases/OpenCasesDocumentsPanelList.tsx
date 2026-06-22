@@ -106,7 +106,7 @@ export default function OpenCasesDocumentsPanelList({
               className={`rounded-lg border p-3 hover:shadow-xs transition-all duration-150 flex items-center justify-between gap-4 group cursor-pointer ${
                 selectedDocument?.path === doc.path
                   ? "border-primary bg-primary/5 dark:bg-primary/10"
-                  : "border-border hover:border-primary/40 dark:hover:border-primary/45 bg-card"
+                  : "border-border hover:border-primary/40 dark:hover:border-primary/45 bg-card hover:bg-muted/50"
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">

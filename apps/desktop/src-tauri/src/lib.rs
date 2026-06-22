@@ -94,6 +94,10 @@ pub fn run() {
             email::get_email_settings,
             email::save_email_settings,
             email::list_pending_email_alerts,
+            // AI Provider commands
+            llm::get_ai_settings,
+            llm::save_ai_settings,
+            llm::check_ai_health,
             email::confirm_email_alert,
             email::delete_email_alert,
             email::list_case_emails,
