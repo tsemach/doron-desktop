@@ -12,6 +12,7 @@ import SettingPreferences from "./SettingPreferences";
 import SettingEmailIntegration from "./SettingEmailIntegration";
 import SettingAiProvider from "./SettingAiProvider";
 import SettingSoftwareUpdate from "./SettingSoftwareUpdate";
+import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
 
 export const API_KEY_STORAGE_KEY = "claude_api_key";
 export const USER_NAME_STORAGE_KEY = "user_name";
@@ -22,6 +23,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>("preferences");
+  const [activeHelp, setActiveHelp] = useState<"email" | null>(null);
   
   const [apiKey, setApiKey] = useState("");
   const [username, setUsername] = useState("");
@@ -173,6 +175,8 @@ export default function Settings() {
             saved={saved}
             setSaved={setSaved}
             t={t}
+            onToggleHelp={() => setActiveHelp(activeHelp === "email" ? null : "email")}
+            activeHelp={activeHelp}
           />
         );
       case "ai":
@@ -195,11 +199,11 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-start items-start p-8 md:p-12 overflow-y-auto">
-      <div className="max-w-5xl w-full space-y-6 flex flex-col flex-1">
-        
-        {/* Navigation & Header */}
-        <div className="flex items-center justify-between border-b border-border/60 pb-5 w-full">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-start items-stretch overflow-y-auto">
+      
+      {/* Navigation & Header (full-width border-b) */}
+      <div className="border-b border-border/60 w-full px-8 md:px-12 py-5 shrink-0">
+        <div className="w-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -217,14 +221,18 @@ export default function Settings() {
             </div>
           </div>
         </div>
+      </div>
 
+      {/* Main layout container (left-aligned w-full) */}
+      <div className="w-full flex-1 flex flex-col px-8 md:px-12 py-8 md:py-12 space-y-6">
+        
         {/* Main Settings Two-Column Layout */}
         <div className="flex flex-col md:flex-row gap-8 w-full items-stretch mt-4 flex-1">
           
           {/* Left Navigation Menu */}
           <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0 md:border-r rtl:md:border-r-0 rtl:md:border-l border-border md:pr-6 rtl:md:pl-6 pb-6 md:pb-0 border-b md:border-b-0">
             <button
-              onClick={() => setActiveTab("preferences")}
+              onClick={() => { setActiveTab("preferences"); setActiveHelp(null); }}
               className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
                 activeTab === "preferences"
                   ? "bg-accent text-foreground shadow-sm font-bold"
@@ -239,7 +247,7 @@ export default function Settings() {
             </button>
             
             <button
-              onClick={() => setActiveTab("email")}
+              onClick={() => { setActiveTab("email"); setActiveHelp(null); }}
               className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
                 activeTab === "email"
                   ? "bg-accent text-foreground shadow-sm font-bold"
@@ -254,7 +262,7 @@ export default function Settings() {
             </button>
             
             <button
-              onClick={() => setActiveTab("ai")}
+              onClick={() => { setActiveTab("ai"); setActiveHelp(null); }}
               className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
                 activeTab === "ai"
                   ? "bg-accent text-foreground shadow-sm font-bold"
@@ -269,7 +277,7 @@ export default function Settings() {
             </button>
             
             <button
-              onClick={() => setActiveTab("update")}
+              onClick={() => { setActiveTab("update"); setActiveHelp(null); }}
               className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
                 activeTab === "update"
                   ? "bg-accent text-foreground shadow-sm font-bold"
@@ -285,8 +293,18 @@ export default function Settings() {
           </div>
 
           {/* Right Content Area */}
-          <div className="flex-1 w-full">
-            {renderActiveTab()}
+          <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
+            <div className="w-full max-w-xl shrink-0">
+              {renderActiveTab()}
+            </div>
+            
+            {activeHelp && (
+              <div className="w-full flex-1 lg:border-l border-border lg:pl-8 pb-6 lg:pb-0 border-t lg:border-t-0 pt-6 lg:pt-0 relative min-h-[400px]">
+                {activeHelp === "email" && (
+                  <SettingEmailIntegrationHelp onClose={() => setActiveHelp(null)} />
+                )}
+              </div>
+            )}
           </div>
 
         </div>
