@@ -294,12 +294,12 @@ export default function Settings() {
 
           {/* Right Content Area */}
           <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
-            <div className="w-full max-w-xl shrink-0">
+            <div className="w-full flex-1 max-w-3xl">
               {renderActiveTab()}
             </div>
             
             {activeHelp && (
-              <div className="w-full flex-1 lg:border-l border-border lg:pl-8 pb-6 lg:pb-0 border-t lg:border-t-0 pt-6 lg:pt-0 relative min-h-[400px]">
+              <div className="w-full flex-1 lg:max-w-3xl lg:border-l border-border lg:pl-8 pb-6 lg:pb-0 border-t lg:border-t-0 pt-6 lg:pt-0 relative min-h-[400px]">
                 {activeHelp === "email" && (
                   <SettingEmailIntegrationHelp onClose={() => setActiveHelp(null)} />
                 )}
