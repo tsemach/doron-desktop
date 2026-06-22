@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Settings as SettingsIcon, Mail, Server, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { Language } from "../../locales/translations";
 import { invoke } from "@tauri-apps/api/core";
@@ -15,11 +14,11 @@ import SettingSoftwareUpdate from "./SettingSoftwareUpdate";
 import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
 import SettingAiProviderHelp from "./SettingAiProviderHelp";
 import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
+import SettingBack from "./SettingBack";
+import SettingMenuTab, { TabType } from "./SettingMenuTab";
 
 export const API_KEY_STORAGE_KEY = "claude_api_key";
 export const USER_NAME_STORAGE_KEY = "user_name";
-
-type TabType = "preferences" | "email" | "ai" | "update";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -266,24 +265,7 @@ export default function Settings() {
       
       {/* Navigation & Header (full-width border-b) */}
       <div className="border-b border-border/60 w-full px-8 md:px-12 py-5 shrink-0">
-        <div className="w-full flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="group flex items-center justify-center size-10 rounded-xl border border-border bg-card hover:bg-accent hover:text-foreground transition-all cursor-pointer shadow-sm animate-fade-in"
-              title="Go back"
-            >
-              <ArrowLeft className="size-4 group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5 transition-transform" />
-            </button>
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
-                <SettingsIcon className="size-3 animate-[spin_4s_linear_infinite]" />
-                {t("setting_system_preferences")}
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight mt-0.5">{t("settings")}</h1>
-            </div>
-          </div>
-        </div>
+        <SettingBack navigate={navigate} t={t} />
       </div>
  
       {/* Main layout container (left-aligned w-full) */}
@@ -293,72 +275,14 @@ export default function Settings() {
         <div className="flex flex-col md:flex-row gap-8 w-full items-stretch mt-4 flex-1">
           
           {/* Left Navigation Menu */}
-          <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0 md:border-r rtl:md:border-r-0 rtl:md:border-l border-border md:pr-6 rtl:md:pl-6 pb-6 md:pb-0 border-b md:border-b-0">
-            <button
-              onClick={() => { setActiveTab("preferences"); setActiveHelp(null); setHealthCheckResult(null); }}
-              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
-                activeTab === "preferences"
-                  ? "bg-accent text-foreground shadow-sm font-bold"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              {activeTab === "preferences" && (
-                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
-              )}
-              <User className="size-4 text-foreground" />
-              {t("setting_system_preferences")}
-            </button>
-            
-            <button
-              onClick={() => { setActiveTab("email"); setActiveHelp(null); setHealthCheckResult(null); }}
-              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
-                activeTab === "email"
-                  ? "bg-accent text-foreground shadow-sm font-bold"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              {activeTab === "email" && (
-                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
-              )}
-              <Mail className="size-4 text-foreground" />
-              {t("email_integration") || "Email Integration"}
-            </button>
-            
-            <button
-              onClick={() => { setActiveTab("ai"); setActiveHelp(null); setHealthCheckResult(null); }}
-              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-between relative ${
-                activeTab === "ai"
-                  ? "bg-accent text-foreground shadow-sm font-bold"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              {activeTab === "ai" && (
-                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
-              )}
-              <div className="flex items-center gap-2.5">
-                <Server className="size-4 text-foreground" />
-                AI Provider (LLM)
-              </div>
-              {aiMode && (
-                <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="AI operational" />
-              )}
-            </button>
-            
-            <button
-              onClick={() => { setActiveTab("update"); setActiveHelp(null); setHealthCheckResult(null); }}
-              className={`w-full text-left rtl:text-right px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2.5 relative ${
-                activeTab === "update"
-                  ? "bg-accent text-foreground shadow-sm font-bold"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              {activeTab === "update" && (
-                <div className="absolute left-0 rtl:left-auto rtl:right-0 top-2.5 bottom-2.5 w-1 bg-foreground rounded-full animate-fade-in" />
-              )}
-              <RefreshCw className="size-4 text-foreground" />
-              {t("software_updates") || "Software Updates"}
-            </button>
-          </div>
+          <SettingMenuTab
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            setActiveHelp={setActiveHelp}
+            setHealthCheckResult={setHealthCheckResult}
+            t={t}
+            aiMode={aiMode}
+          />
 
           {/* Right Content Area */}
           <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
