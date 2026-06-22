@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Mail, Server, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { Language } from "../../locales/translations";
 import { invoke } from "@tauri-apps/api/core";
@@ -16,12 +15,10 @@ import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
 import SettingAiProviderHelp from "./SettingAiProviderHelp";
 import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
 import SettingBack from "./SettingBack";
-import SettingMenuTabItem from "./SettingMenuTabItem";
+import SettingMenuTab, { TabType } from "./SettingMenuTab";
 
 export const API_KEY_STORAGE_KEY = "claude_api_key";
 export const USER_NAME_STORAGE_KEY = "user_name";
-
-type TabType = "preferences" | "email" | "ai" | "update";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -278,38 +275,14 @@ export default function Settings() {
         <div className="flex flex-col md:flex-row gap-8 w-full items-stretch mt-4 flex-1">
           
           {/* Left Navigation Menu */}
-          <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0 md:border-r rtl:md:border-r-0 rtl:md:border-l border-border md:pr-6 rtl:md:pl-6 pb-6 md:pb-0 border-b md:border-b-0">
-            <SettingMenuTabItem
-              isActive={activeTab === "preferences"}
-              onClick={() => { setActiveTab("preferences"); setActiveHelp(null); setHealthCheckResult(null); }}
-              icon={User}
-              label={t("setting_system_preferences")}
-            />
-            
-            <SettingMenuTabItem
-              isActive={activeTab === "email"}
-              onClick={() => { setActiveTab("email"); setActiveHelp(null); setHealthCheckResult(null); }}
-              icon={Mail}
-              label={t("email_integration") || "Email Integration"}
-            />
-            
-            <SettingMenuTabItem
-              isActive={activeTab === "ai"}
-              onClick={() => { setActiveTab("ai"); setActiveHelp(null); setHealthCheckResult(null); }}
-              icon={Server}
-              label="AI Provider (LLM)"
-              rightElement={aiMode ? (
-                <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="AI operational" />
-              ) : undefined}
-            />
-            
-            <SettingMenuTabItem
-              isActive={activeTab === "update"}
-              onClick={() => { setActiveTab("update"); setActiveHelp(null); setHealthCheckResult(null); }}
-              icon={RefreshCw}
-              label={t("software_updates") || "Software Updates"}
-            />
-          </div>
+          <SettingMenuTab
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            setActiveHelp={setActiveHelp}
+            setHealthCheckResult={setHealthCheckResult}
+            t={t}
+            aiMode={aiMode}
+          />
 
           {/* Right Content Area */}
           <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
