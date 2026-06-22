@@ -7,7 +7,7 @@ type SettingBackProps = {
 
 export default function SettingBack({navigate, t}:SettingBackProps) {
     return (
-      <div className="flex items-center justify-between border-b border-border/60 pb-5 w-full">
+      <div className="w-full flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -17,9 +17,9 @@ export default function SettingBack({navigate, t}:SettingBackProps) {
             <ArrowLeft className="size-4 group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5 transition-transform" />
           </button>
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-500 uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
               <SettingsIcon className="size-3 animate-[spin_4s_linear_infinite]" />
-              {t("setting_save_preferences")}
+              {t("setting_system_preferences")}
             </div>
             <h1 className="text-2xl font-bold tracking-tight mt-0.5">{t("settings")}</h1>
           </div>
