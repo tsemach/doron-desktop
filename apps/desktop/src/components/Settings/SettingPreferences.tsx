@@ -108,7 +108,7 @@ export default function SettingPreferences({
               {t("saved")}
             </>
           ) : (
-            t("save_preferences")
+            t("setting_save_preferences")
           )}
         </button>
       </div>

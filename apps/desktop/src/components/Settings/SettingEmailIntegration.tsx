@@ -189,7 +189,7 @@ export default function SettingEmailIntegration({
               {t("saved")}
             </>
           ) : (
-            t("save_preferences")
+            t("setting_save_email_integration")
           )}
         </button>
       </div>

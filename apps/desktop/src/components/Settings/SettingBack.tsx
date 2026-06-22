@@ -19,7 +19,7 @@ export default function SettingBack({navigate, t}:SettingBackProps) {
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-500 uppercase tracking-wider">
               <SettingsIcon className="size-3 animate-[spin_4s_linear_infinite]" />
-              {t("system_preferences")}
+              {t("setting_save_preferences")}
             </div>
             <h1 className="text-2xl font-bold tracking-tight mt-0.5">{t("settings")}</h1>
           </div>
