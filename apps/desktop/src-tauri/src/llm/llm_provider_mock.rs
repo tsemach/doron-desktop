@@ -27,6 +27,9 @@ impl MockProvider {
             } else if prompt.contains("רשלנות") {
                 keywords = vec!["רשלנות".to_string(), "רפואית".to_string(), "תביעה".to_string()];
                 doc_types = vec!["report".to_string()];
+            } else if prompt.contains("מכר") || prompt.contains("רחל") {
+                keywords = vec!["חוזה".to_string(), "מכר".to_string(), "לוי".to_string()];
+                doc_types = vec!["contract".to_string()];
             }
 
             let response_json = serde_json::json!({
@@ -69,6 +72,8 @@ impl MockProvider {
                 "will"
             } else if prompt.contains("רשלנות") {
                 "report"
+            } else if prompt.contains("מכר") || prompt.contains("רחל") {
+                "contract"
             } else {
                 "other"
             };
@@ -81,8 +86,24 @@ impl MockProvider {
                 "צוואה בעדים"
             } else if prompt.contains("רשלנות") {
                 "כתב תביעה בגין רשלנות רפואית"
+            } else if prompt.contains("מכר") || prompt.contains("רחל") {
+                "חוזה מכר דירה"
             } else {
                 "מסמך משפטי"
+            };
+
+            let keywords = if prompt.contains("שכירות") {
+                vec!["חוזה".to_string(), "שכירות".to_string(), "דירה".to_string()]
+            } else if prompt.contains("גירושין") {
+                vec!["הסכם".to_string(), "גירושין".to_string(), "משותף".to_string()]
+            } else if prompt.contains("צוואה") {
+                vec!["צוואה".to_string(), "ירושה".to_string(), "עיזבון".to_string()]
+            } else if prompt.contains("רשלנות") {
+                vec!["רשלנות".to_string(), "רפואית".to_string(), "תביעה".to_string()]
+            } else if prompt.contains("מכר") || prompt.contains("רחל") {
+                vec!["חוזה".to_string(), "מכר".to_string(), "לוי".to_string()]
+            } else {
+                vec!["חוזה".to_string(), "דירה".to_string(), "מסמך".to_string()]
             };
 
             let response_json = serde_json::json!({
@@ -94,7 +115,7 @@ impl MockProvider {
                 "topics": ["משפטים", "בדיקה"],
                 "entities": [],
                 "language": "he",
-                "keywords": ["חוזה", "דירה", "מסמך"],
+                "keywords": keywords,
                 "confidence": 0.95
             });
             return Ok(response_json.to_string());

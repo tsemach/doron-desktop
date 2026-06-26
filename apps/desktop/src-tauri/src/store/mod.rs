@@ -11,6 +11,24 @@ pub fn db_path(app: &AppHandle) -> std::path::PathBuf {
         .join("documents.db")
 }
 
+pub fn cli_app_data_dir() -> std::path::PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            return std::path::PathBuf::from(local_app_data).join("com.tsemach.doron-desktop");
+        }
+    }
+    // WSL / Linux / macOS fallback
+    if let Ok(home) = std::env::var("HOME") {
+        return std::path::PathBuf::from(home).join(".local/share/com.tsemach.doron-desktop");
+    }
+    std::path::PathBuf::from(".")
+}
+
+pub fn cli_db_path(name: &str) -> std::path::PathBuf {
+    cli_app_data_dir().join(name)
+}
+
 pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
     open_db_by_path(&db_path(app))
 }

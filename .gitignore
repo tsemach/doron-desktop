@@ -35,3 +35,6 @@ dist-ssr
 *Zone.Identifier
 .vercel
 .env*
+
+# Evaluation
+evaluation_corpus/
