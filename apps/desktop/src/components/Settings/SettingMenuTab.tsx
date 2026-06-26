@@ -36,13 +36,6 @@ export default function SettingMenuTab({
       />
       
       <SettingMenuTabItem
-        isActive={activeTab === "email"}
-        onClick={() => handleTabChange("email")}
-        icon={Mail}
-        label={t("email_integration") || "Email Integration"}
-      />
-      
-      <SettingMenuTabItem
         isActive={activeTab === "ai"}
         onClick={() => handleTabChange("ai")}
         icon={Server}
@@ -50,6 +43,13 @@ export default function SettingMenuTab({
         rightElement={aiMode ? (
           <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="AI operational" />
         ) : undefined}
+      />
+      
+      <SettingMenuTabItem
+        isActive={activeTab === "email"}
+        onClick={() => handleTabChange("email")}
+        icon={Mail}
+        label={t("email_integration") || "Email Integration"}
       />
       
       <SettingMenuTabItem

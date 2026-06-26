@@ -67,13 +67,7 @@ pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
 /// Tauri command to run the connection test/health check
 #[tauri::command]
 pub async fn check_ai_health(config: AiConfig) -> Result<String, String> {
-    if config.ai_mode == "local" {
-        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
-        return Ok(format!(
-            "Local model connection successful: simulated connection to provider '{}' and model '{}' is active.",
-            config.provider, config.ai_model
-        ));
-    } else if config.ai_mode == "online" {
+    if config.ai_mode == "online" {
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         return Ok(format!(
             "Online Pro model connection successful: verified account status, model '{}' is ready.",
@@ -81,15 +75,26 @@ pub async fn check_ai_health(config: AiConfig) -> Result<String, String> {
         ));
     }
 
-    // For BYOM (Bring Your Own Model), run a real network check!
-    let provider = crate::llm::llm_provider::get_active_provider(
-        crate::llm::llm_provider::ProviderConfig {
-            provider_type: config.provider.clone(),
-            api_key: config.api_key_enc.clone(),
-            model: config.ai_model.clone(),
-            base_url: None,
-        }
-    );
+    // For local or BYOM, perform a real network/service call!
+    let provider = if config.ai_mode == "local" {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: "local".to_string(),
+                api_key: "".to_string(),
+                model: config.ai_model.clone(),
+                base_url: None,
+            }
+        )
+    } else {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: config.provider.clone(),
+                api_key: config.api_key_enc.clone(),
+                model: config.ai_model.clone(),
+                base_url: None,
+            }
+        )
+    };
 
     match provider.call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None).await {
         Ok(res) => {

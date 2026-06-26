@@ -209,14 +209,25 @@ pub async fn index_file(
     }
 
     // Set up provider configuration
-    let provider = crate::llm::llm_provider::get_active_provider(
-        crate::llm::llm_provider::ProviderConfig {
-            provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
-            api_key,
-            model,
-            base_url: None,
-        }
-    );
+    let provider = if let Some(config) = crate::llm::get_ai_settings_internal(&app) {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: config.provider,
+                api_key: if config.api_key_enc.is_empty() { api_key } else { config.api_key_enc },
+                model: config.ai_model,
+                base_url: None,
+            }
+        )
+    } else {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
+                api_key,
+                model,
+                base_url: None,
+            }
+        )
+    };
 
     let options = IndexOptions {
         run_llm_metadata: true,
@@ -272,14 +283,25 @@ pub async fn index_folder(
     let mut failed = 0usize;
 
     // Set up provider configuration
-    let provider = crate::llm::llm_provider::get_active_provider(
-        crate::llm::llm_provider::ProviderConfig {
-            provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
-            api_key,
-            model,
-            base_url: None,
-        }
-    );
+    let provider = if let Some(config) = crate::llm::get_ai_settings_internal(&app) {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: config.provider,
+                api_key: if config.api_key_enc.is_empty() { api_key } else { config.api_key_enc },
+                model: config.ai_model,
+                base_url: None,
+            }
+        )
+    } else {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
+                api_key,
+                model,
+                base_url: None,
+            }
+        )
+    };
 
     let options = IndexOptions {
         run_llm_metadata: true,

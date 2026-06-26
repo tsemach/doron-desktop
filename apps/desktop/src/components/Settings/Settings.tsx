@@ -44,6 +44,68 @@ export default function Settings() {
   const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
 
+  // Mode-specific selection history to preserve UI selections on tab toggle
+  const [localProvider, setLocalProvider] = useState("gemini");
+  const [localModel, setLocalModel] = useState("gemini-1.5-flash-local");
+
+  const [onlineProvider, setOnlineProvider] = useState("gemini");
+  const [onlineModel, setOnlineModel] = useState("gemini-2.0-flash-exp");
+
+  const [byomProvider, setByomProvider] = useState("gemini");
+  const [byomModel, setByomModel] = useState("gemini-2.0-flash-exp");
+  const [byomApiKey, setByomApiKey] = useState("");
+
+  // Handler functions to sync active states and mode-specific states
+  const handleSetAiProvider = (val: string) => {
+    setAiProvider(val);
+    setSaved(false);
+    if (aiMode === "local") {
+      setLocalProvider(val);
+    } else if (aiMode === "online") {
+      setOnlineProvider(val);
+    } else if (aiMode === "byom") {
+      setByomProvider(val);
+    }
+  };
+
+  const handleSetAiModel = (val: string) => {
+    setAiModel(val);
+    setSaved(false);
+    if (aiMode === "local") {
+      setLocalModel(val);
+    } else if (aiMode === "online") {
+      setOnlineModel(val);
+    } else if (aiMode === "byom") {
+      setByomModel(val);
+    }
+  };
+
+  const handleSetProviderApiKey = (val: string) => {
+    setProviderApiKey(val);
+    setSaved(false);
+    if (aiMode === "byom") {
+      setByomApiKey(val);
+    }
+  };
+
+  const handleSetAiMode = (mode: string) => {
+    setAiMode(mode);
+    setSaved(false);
+    if (mode === "local") {
+      setAiProvider(localProvider);
+      setAiModel(localModel);
+      setProviderApiKey("");
+    } else if (mode === "online") {
+      setAiProvider(onlineProvider);
+      setAiModel(onlineModel);
+      setProviderApiKey("");
+    } else if (mode === "byom") {
+      setAiProvider(byomProvider);
+      setAiModel(byomModel);
+      setProviderApiKey(byomApiKey);
+    }
+  };
+
   // Software Update States
   const [appVersion, setAppVersion] = useState("");
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "up-to-date" | "downloading" | "error">("idle");
@@ -91,10 +153,27 @@ export default function Settings() {
     try {
       const res = await invoke<any>("get_ai_settings");
       if (res) {
-        setAiMode(res.ai_mode || "");
-        setAiProvider(res.provider || "gemini");
-        setAiModel(res.ai_model || "");
-        setProviderApiKey(res.api_key_enc || "");
+        const mode = res.ai_mode || "";
+        const provider = res.provider || "gemini";
+        const model = res.ai_model || "";
+        const apiKey = res.api_key_enc || "";
+
+        setAiMode(mode);
+        setAiProvider(provider);
+        setAiModel(model);
+        setProviderApiKey(apiKey);
+
+        if (mode === "local") {
+          setLocalProvider(provider);
+          setLocalModel(model);
+        } else if (mode === "online") {
+          setOnlineProvider(provider);
+          setOnlineModel(model);
+        } else if (mode === "byom") {
+          setByomProvider(provider);
+          setByomModel(model);
+          setByomApiKey(apiKey);
+        }
       }
     } catch (e) {
       console.error("Failed to load AI configurations:", e);
@@ -218,13 +297,13 @@ export default function Settings() {
         return (
           <SettingAiProvider
             aiMode={aiMode}
-            setAiMode={setAiMode}
+            setAiMode={handleSetAiMode}
             aiProvider={aiProvider}
-            setAiProvider={setAiProvider}
+            setAiProvider={handleSetAiProvider}
             aiModel={aiModel}
-            setAiModel={setAiModel}
+            setAiModel={handleSetAiModel}
             providerApiKey={providerApiKey}
-            setProviderApiKey={setProviderApiKey}
+            setProviderApiKey={handleSetProviderApiKey}
             onSave={handleSave}
             saved={saved}
             setSaved={setSaved}

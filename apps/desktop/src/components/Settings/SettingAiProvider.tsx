@@ -64,7 +64,7 @@ export default function SettingAiProvider({
     let list: string[] = [];
     if (aiMode === "local") {
       list = localModels[aiProvider.toLowerCase()] || [];
-    } else if (aiMode === "online") {
+    } else if (aiMode === "online" || aiMode === "byom") {
       list = onlineModels[aiProvider.toLowerCase()] || [];
     }
 
@@ -89,7 +89,7 @@ export default function SettingAiProvider({
       setHealthCheckResult({
         success: true,
         message: response,
-        modelName: aiMode === "byom" ? "Custom/BYOM" : aiModel,
+        modelName: aiModel,
         providerName: aiProvider,
         mode: aiMode,
       });
@@ -98,7 +98,7 @@ export default function SettingAiProvider({
       setHealthCheckResult({
         success: false,
         message: err.toString(),
-        modelName: aiMode === "byom" ? "Custom/BYOM" : aiModel,
+        modelName: aiModel,
         providerName: aiProvider,
         mode: aiMode,
       });
@@ -247,23 +247,24 @@ export default function SettingAiProvider({
               />
             </div>
 
-            {/* Model Selector or API Key based on mode */}
-            {aiMode !== "byom" ? (
-              <div className="col-span-2 sm:col-span-1">
-                <ModelSelector
-                  value={aiModel}
-                  onChange={(val) => {
-                    setAiModel(val);
-                    setSaved(false);
-                    setHealthStatus("idle");
-                  }}
-                  models={getAvailableModels()}
-                  onToggleHelp={onToggleHelp}
-                  activeHelp={activeHelp}
-                />
-              </div>
-            ) : (
-              <div className="col-span-2">
+            {/* Model Selector */}
+            <div className="col-span-2 sm:col-span-1">
+              <ModelSelector
+                value={aiModel}
+                onChange={(val) => {
+                  setAiModel(val);
+                  setSaved(false);
+                  setHealthStatus("idle");
+                }}
+                models={getAvailableModels()}
+                onToggleHelp={onToggleHelp}
+                activeHelp={activeHelp}
+              />
+            </div>
+
+            {/* API Key Input (only for BYOM) */}
+            {aiMode === "byom" && (
+              <div className="col-span-2 animate-fade-in">
                 <label className="text-xs font-semibold text-foreground flex items-center gap-1.5" htmlFor="api-key-input">
                   API Key / Access Token
                   <button

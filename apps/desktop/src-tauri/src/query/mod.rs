@@ -41,18 +41,29 @@ pub async fn search_documents(
     limit: Option<usize>,
     model: Option<String>,
 ) -> Result<Vec<DocumentRow>, String> {
-    let model = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
     let limit = limit.unwrap_or(10);
 
     // Set up provider configuration
-    let provider = crate::llm::llm_provider::get_active_provider(
-        crate::llm::llm_provider::ProviderConfig {
-            provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
-            api_key,
-            model,
-            base_url: None,
-        }
-    );
+    let provider = if let Some(config) = crate::llm::get_ai_settings_internal(&app) {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: config.provider,
+                api_key: if config.api_key_enc.is_empty() { api_key } else { config.api_key_enc },
+                model: config.ai_model,
+                base_url: None,
+            }
+        )
+    } else {
+        let m = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: if m.contains("gemini") { "gemini".to_string() } else if m.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
+                api_key,
+                model: m,
+                base_url: None,
+            }
+        )
+    };
 
     let db_path = store::db_path(&app);
     search_documents_core(&db_path, &provider, &query, limit, true).await

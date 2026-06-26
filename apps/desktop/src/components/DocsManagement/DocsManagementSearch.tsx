@@ -104,10 +104,14 @@ export default function DocsManagementSearch() {
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
+  const [aiConfig, setAiConfig] = useState<any>(null);
 
   useEffect(() => {
     loadCases();
+    invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
   }, []);
+
+  const showWarning = aiConfig ? (aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc) : !apiKey;
 
   async function loadCases() {
     try {
@@ -146,7 +150,7 @@ export default function DocsManagementSearch() {
   }
 
   async function handleSearch() {
-    if (!queryString.trim() || !apiKey) return;
+    if (!queryString.trim() || showWarning) return;
     setIsSearching(true);
     setError(null);
     try {
@@ -226,7 +230,7 @@ export default function DocsManagementSearch() {
             </button>
             <Button
               onClick={handleSearch}
-              disabled={!queryString.trim() || !apiKey || isSearching}
+              disabled={!queryString.trim() || showWarning || isSearching}
               size="sm"
             >
               {isSearching ? "Searching..." : "Search"}
@@ -294,9 +298,9 @@ export default function DocsManagementSearch() {
       )}
 
       {/* No API key hint */}
-      {!apiKey && (
+      {showWarning && (
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-800">
-          No API key is configured. Please navigate to the settings page to connect your Claude credentials.
+          No API key is configured. Please navigate to the settings page to connect your AI credentials.
         </div>
       )}
 

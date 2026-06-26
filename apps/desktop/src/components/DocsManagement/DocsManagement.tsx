@@ -30,9 +30,11 @@ export default function DocsManagement() {
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const [dbPath, setDbPath] = useState("");
+  const [aiConfig, setAiConfig] = useState<any>(null);
 
   useEffect(() => {
     invoke<string>("get_db_path").then(setDbPath).catch(() => { });
+    invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export default function DocsManagement() {
       />
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        <CheckApiKey apiKey={apiKey} />
+        {aiConfig ? (aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc && <CheckApiKey apiKey="" />) : (!apiKey && <CheckApiKey apiKey="" />)}
 
         <Routes>
           <Route path="/" element={<DocsManagementSearch />} />

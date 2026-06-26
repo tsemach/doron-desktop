@@ -46,31 +46,42 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
 }
 
+fn normalize_model_name(model: &str) -> String {
+    match model {
+        "claude-3-5-sonnet-online" => "claude-3-5-sonnet-20241022".to_string(),
+        "claude-3-5-opus-online" => "claude-3-opus-20240229".to_string(),
+        "gemini-1.5-pro-online" => "gemini-1.5-pro".to_string(),
+        "gpt-4o-online" => "gpt-4o".to_string(),
+        other => other.to_string(),
+    }
+}
+
 pub fn get_active_provider(config: ProviderConfig) -> LlmProvider {
+    let model = normalize_model_name(&config.model);
     match config.provider_type.to_lowercase().as_str() {
         "gemini" => LlmProvider::Gemini(GeminiProvider {
             api_key: config.api_key,
-            model: if config.model.is_empty() { "gemini-1.5-flash".to_string() } else { config.model },
+            model: if model.is_empty() { "gemini-1.5-flash".to_string() } else { model },
         }),
         "openai" => LlmProvider::OpenAi(OpenAiProvider {
             api_key: config.api_key,
-            model: if config.model.is_empty() { "gpt-4o-mini".to_string() } else { config.model },
+            model: if model.is_empty() { "gpt-4o-mini".to_string() } else { model },
             base_url: config.base_url,
         }),
         "local" | "ollama" => LlmProvider::OpenAi(OpenAiProvider {
             api_key: config.api_key,
-            model: if config.model.is_empty() { "phi-4".to_string() } else { config.model },
+            model: if model.is_empty() { "phi-4".to_string() } else { model },
             base_url: Some(config.base_url.unwrap_or_else(|| "http://localhost:11434/v1".to_string())),
         }),
         "byom" => LlmProvider::OpenAi(OpenAiProvider {
             api_key: config.api_key,
-            model: config.model,
+            model: model,
             base_url: config.base_url,
         }),
         "mock" => LlmProvider::Mock(MockProvider),
         _ => LlmProvider::Claude(ClaudeProvider {
             api_key: config.api_key,
-            model: if config.model.is_empty() { "claude-3-5-sonnet-20241022".to_string() } else { config.model },
+            model: if model.is_empty() { "claude-3-5-sonnet-20241022".to_string() } else { model },
         }),
     }
 }
