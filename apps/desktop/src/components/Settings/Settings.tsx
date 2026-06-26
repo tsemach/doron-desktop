@@ -44,6 +44,12 @@ export default function Settings() {
   const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
 
+  const [savedConfig, setSavedConfig] = useState<{
+    aiMode: string;
+    provider: string;
+    aiModel: string;
+  } | null>(null);
+
   // Mode-specific selection history to preserve UI selections on tab toggle
   const [localProvider, setLocalProvider] = useState("gemini");
   const [localModel, setLocalModel] = useState("gemini-1.5-flash-local");
@@ -163,6 +169,12 @@ export default function Settings() {
         setAiModel(model);
         setProviderApiKey(apiKey);
 
+        setSavedConfig({
+          aiMode: mode,
+          provider: provider,
+          aiModel: model,
+        });
+
         if (mode === "local") {
           setLocalProvider(provider);
           setLocalModel(model);
@@ -212,6 +224,11 @@ export default function Settings() {
             ai_model: aiModel,
             api_key_enc: providerApiKey.trim(),
           }
+        });
+        setSavedConfig({
+          aiMode,
+          provider: aiProvider,
+          aiModel,
         });
       } catch (e) {
         console.error("Failed to save AI configurations:", e);
@@ -307,6 +324,7 @@ export default function Settings() {
             onSave={handleSave}
             saved={saved}
             setSaved={setSaved}
+            savedConfig={savedConfig}
             onToggleHelp={() => {
               setHealthCheckResult(null);
               setActiveHelp(activeHelp === "ai" ? null : "ai");
