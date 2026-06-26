@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use crate::llm;
 use super::types::{QueryAnalysis, DocumentRow, RerankCandidate};
 use super::helpers::clean_json;
 
@@ -43,9 +42,9 @@ Candidates:
 
 // ── LLM query analysis ────────────────────────────────────────────────────────
 
-pub(crate) async fn analyze_query(query: &str, api_key: &str, model: &str) -> Result<QueryAnalysis, String> {
+pub(crate) async fn analyze_query(query: &str, provider: &crate::llm::llm_provider::LlmProvider) -> Result<QueryAnalysis, String> {
     let prompt = QUERY_ANALYSIS_PROMPT.replace("{query}", query);
-    let raw = llm::call_claude_simple(&prompt, api_key, model).await?;
+    let raw = provider.call_structured(&prompt, None).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<QueryAnalysis>(&json_str)
         .map_err(|e| format!("Failed to parse query analysis: {e}. Raw: {}", &json_str[..json_str.len().min(300)]))
@@ -55,8 +54,7 @@ pub(crate) async fn analyze_query(query: &str, api_key: &str, model: &str) -> Re
 pub(crate) async fn rerank_candidates(
     query: &str,
     candidates: Vec<DocumentRow>,
-    api_key: &str,
-    model: &str,
+    provider: &crate::llm::llm_provider::LlmProvider,
 ) -> Result<Vec<DocumentRow>, String> {
     if candidates.is_empty() {
         return Ok(vec![]);
@@ -82,7 +80,7 @@ pub(crate) async fn rerank_candidates(
         .replace("{query}", query)
         .replace("{candidates_json}", &candidates_json);
 
-    let response_raw = llm::call_claude_simple(&prompt, api_key, model).await?;
+    let response_raw = provider.call_structured(&prompt, None).await?;
     let cleaned = clean_json(&response_raw);
 
     let matched_ids: Vec<i64> = serde_json::from_str(&cleaned)
