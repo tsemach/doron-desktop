@@ -1,5 +1,7 @@
 mod run;
 mod generate;
+mod history;
+mod compare;
 
 use clap::Parser;
 
@@ -21,6 +23,12 @@ pub enum Commands {
 
     /// Generate a synthetic corpus of files for retrieval testing
     GenerateCorpus(generate::GenerateArgs),
+
+    /// List or inspect historical evaluation runs
+    History(history::HistoryArgs),
+
+    /// Compare two evaluation runs side-by-side
+    Compare(compare::CompareArgs),
 }
 
 #[tokio::main]
@@ -29,6 +37,8 @@ async fn main() {
     let result = match cli.command {
         Commands::Run(args) => run::execute(args).await,
         Commands::GenerateCorpus(args) => generate::execute(args).await,
+        Commands::History(args) => history::execute(args).await,
+        Commands::Compare(args) => compare::execute(args).await,
     };
 
     if let Err(e) = result {

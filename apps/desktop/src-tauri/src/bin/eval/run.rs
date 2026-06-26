@@ -166,7 +166,20 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let mut mrr_sum = 0.0;
 
     println!("\n{:<55} | {:<20} | {:<8} | {:<8} | {:<5}", "Query", "Top File Returned", "P@1", "R@3", "Latency");
-    println!("{}", "-".repeat(110));
+    println!("{}", "-".repeat(114));
+
+    struct QueryEvalResult {
+        query_text: String,
+        expected_files: Vec<String>,
+        returned_files: Vec<String>,
+        first_match_rank: Option<i64>,
+        reciprocal_rank: f64,
+        search_latency_ms: f64,
+        hit_at_1: i32,
+        hit_at_3: i32,
+    }
+
+    let mut query_results = Vec::new();
 
     for q in &queries {
         let start = Instant::now();
@@ -203,13 +216,26 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
 
         // Calculate Reciprocal Rank (RR)
         let mut rr = 0.0;
+        let mut first_match_rank = None;
         for (idx, filename) in returned_filenames.iter().enumerate() {
             if q.expected_files.contains(filename) {
                 rr = 1.0 / (idx + 1) as f64;
+                first_match_rank = Some((idx + 1) as i64);
                 break;
             }
         }
         mrr_sum += rr;
+
+        query_results.push(QueryEvalResult {
+            query_text: q.query.clone(),
+            expected_files: q.expected_files.clone(),
+            returned_files: returned_filenames.clone(),
+            first_match_rank,
+            reciprocal_rank: rr,
+            search_latency_ms: search_duration.as_secs_f64() * 1000.0,
+            hit_at_1,
+            hit_at_3,
+        });
 
         let top_returned = returned_filenames.first().cloned().unwrap_or_else(|| "NONE".to_string());
         println!(
@@ -247,5 +273,98 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     println!("Mean Reciprocal Rank:  {:.4}", final_mrr);
     println!("=======================================================");
 
+    // Log to history database
+    let history_db_path = store::cli_db_path("evaluation_history.db");
+    match rusqlite::Connection::open(&history_db_path) {
+        Ok(history_conn) => {
+            if let Err(e) = init_history_db(&history_conn) {
+                eprintln!("Warning: Failed to initialize history DB schema: {}", e);
+            } else {
+                let run_at = chrono::Utc::now().to_rfc3339();
+                let insert_run = history_conn.execute(
+                    "INSERT INTO evaluation_runs (run_at, provider, model, algorithm, corpus_size, query_count, avg_indexing_ms, avg_search_ms, hit_at_1, hit_at_3, mrr) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    rusqlite::params![
+                        run_at,
+                        args.provider,
+                        model,
+                        args.algorithm,
+                        files.len() as i64,
+                        queries.len() as i64,
+                        avg_indexing_ms,
+                        avg_search_ms,
+                        final_hit_at_1,
+                        final_hit_at_3,
+                        final_mrr,
+                    ],
+                );
+                
+                match insert_run {
+                    Ok(_) => {
+                        let run_id = history_conn.last_insert_rowid();
+                        for qr in query_results {
+                            let expected_json = serde_json::to_string(&qr.expected_files).unwrap_or_else(|_| "[]".to_string());
+                            let returned_json = serde_json::to_string(&qr.returned_files).unwrap_or_else(|_| "[]".to_string());
+                            let _ = history_conn.execute(
+                                "INSERT INTO evaluation_queries (run_id, query_text, expected_files, returned_files, first_match_rank, reciprocal_rank, search_latency_ms, hit_at_1, hit_at_3) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                                rusqlite::params![
+                                    run_id,
+                                    qr.query_text,
+                                    expected_json,
+                                    returned_json,
+                                    qr.first_match_rank,
+                                    qr.reciprocal_rank,
+                                    qr.search_latency_ms,
+                                    qr.hit_at_1,
+                                    qr.hit_at_3,
+                                ],
+                            );
+                        }
+                        println!("\x1b[32mSuccess!\x1b[0m Logged evaluation run #{} to history database.", run_id);
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to insert run into history DB: {}", e);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to open history DB: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+fn init_history_db(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+    conn.execute_batch("
+        CREATE TABLE IF NOT EXISTS evaluation_runs (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_at                TEXT NOT NULL,
+            provider              TEXT NOT NULL,
+            model                 TEXT NOT NULL,
+            algorithm             TEXT NOT NULL,
+            corpus_size           INTEGER NOT NULL,
+            query_count           INTEGER NOT NULL,
+            avg_indexing_ms       REAL NOT NULL,
+            avg_search_ms         REAL NOT NULL,
+            hit_at_1              REAL NOT NULL,
+            hit_at_3              REAL NOT NULL,
+            mrr                   REAL NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS evaluation_queries (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id                INTEGER NOT NULL,
+            query_text            TEXT NOT NULL,
+            expected_files        TEXT NOT NULL,
+            returned_files        TEXT NOT NULL,
+            first_match_rank      INTEGER,
+            reciprocal_rank       REAL NOT NULL,
+            search_latency_ms     REAL NOT NULL,
+            hit_at_1              INTEGER NOT NULL,
+            hit_at_3              INTEGER NOT NULL,
+            FOREIGN KEY (run_id) REFERENCES evaluation_runs(id) ON DELETE CASCADE
+        );
+    ")?;
     Ok(())
 }
