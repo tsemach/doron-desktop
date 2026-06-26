@@ -1,0 +1,22 @@
+[
+  {
+    "query": "מצא חוזה מכר דירה בתל אביב של רחל לוי",
+    "expected_files": ["chozeh_mecher_dira_levy.txt"]
+  },
+  {
+    "query": "הסכם גירושין משותף ירושלים משה אברהם",
+    "expected_files": ["heskem_gerushin_abraham.txt"]
+  },
+  {
+    "query": "רשלנות רפואית תביעה נגד בית חולים",
+    "expected_files": ["tviah_rashlanut_refuit.txt", "hospital_report.txt"]
+  },
+  {
+    "query": "מצא חוזה שכירות דירה ברחוב דיזנגוף אלי נחמיאס",
+    "expected_files": ["chozeh_schirut_nehmias.txt"]
+  },
+  {
+    "query": "צוואה אחרונה וירושה של יצחק כהן",
+    "expected_files": ["tzavaah_cohen.txt"]
+  }
+]
