@@ -30,7 +30,13 @@ interface SettingAiProviderProps {
     aiMode: string;
     provider: string;
     aiModel: string;
+    apiKey: string;
   } | null;
+  savedConfigStatus: "idle" | "verified" | "failed";
+  healthStatus: "idle" | "verified" | "failed";
+  setHealthStatus: (val: "idle" | "verified" | "failed") => void;
+  hasChanges: boolean;
+  isSaving: boolean;
 }
 
 export default function SettingAiProvider({
@@ -50,9 +56,13 @@ export default function SettingAiProvider({
   activeHelp,
   setHealthCheckResult,
   savedConfig,
+  savedConfigStatus,
+  healthStatus,
+  setHealthStatus,
+  hasChanges,
+  isSaving,
 }: SettingAiProviderProps) {
   const [checkingHealth, setCheckingHealth] = useState(false);
-  const [healthStatus, setHealthStatus] = useState<"idle" | "verified" | "failed">("idle");
 
   // Model lists mappings
   const localModels: Record<string, string[]> = {
@@ -139,7 +149,7 @@ export default function SettingAiProvider({
       {savedConfig && savedConfig.aiMode && (
         <SettingAiProviderStatusBar
           savedConfig={savedConfig}
-          healthStatus={healthStatus}
+          savedConfigStatus={savedConfigStatus}
         />
       )}
 
@@ -254,14 +264,16 @@ export default function SettingAiProvider({
       <div className="pt-2">
         <button
           onClick={onSave}
-          disabled={!aiMode}
+          disabled={!aiMode || !hasChanges || isSaving}
           className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all cursor-pointer shadow-md ${
             saved
               ? "bg-emerald-600 text-white hover:bg-emerald-700 animate-pulse"
               : "bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black shadow-neutral-950/10 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
           }`}
         >
-          {saved ? (
+          {isSaving ? (
+            "Saving & Verifying..."
+          ) : saved ? (
             <>
               <Check className="size-4" />
               Saved Settings

@@ -48,7 +48,19 @@ export default function Settings() {
     aiMode: string;
     provider: string;
     aiModel: string;
+    apiKey: string;
   } | null>(null);
+
+  const [savedConfigStatus, setSavedConfigStatus] = useState<"idle" | "verified" | "failed">("idle");
+  const [healthStatus, setHealthStatus] = useState<"idle" | "verified" | "failed">("idle");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  const hasChanges = !isLoadingSettings && (!savedConfig ||
+    aiMode !== savedConfig.aiMode ||
+    aiProvider !== savedConfig.provider ||
+    aiModel !== savedConfig.aiModel ||
+    providerApiKey !== savedConfig.apiKey);
 
   // Mode-specific selection history to preserve UI selections on tab toggle
   const [localProvider, setLocalProvider] = useState("gemini");
@@ -142,57 +154,66 @@ export default function Settings() {
   }, [language]);
 
   async function loadSettings() {
-    // Load email configurations
+    setIsLoadingSettings(true);
     try {
-      const res = await invoke<any>("get_email_settings");
-      if (res) {
-        setImapServer(res.imap_server);
-        setImapPort(res.imap_port);
-        setEmailUsername(res.username);
-        setEmailPassword(res.password_enc);
-      }
-    } catch (e) {
-      console.error("Failed to load email configurations:", e);
-    }
-
-    // Load AI configurations
-    try {
-      const res = await invoke<any>("get_ai_settings");
-      if (res) {
-        const mode = res.ai_mode || "";
-        const provider = res.provider || "gemini";
-        const model = res.ai_model || "";
-        const apiKey = res.api_key_enc || "";
-
-        setAiMode(mode);
-        setAiProvider(provider);
-        setAiModel(model);
-        setProviderApiKey(apiKey);
-
-        setSavedConfig({
-          aiMode: mode,
-          provider: provider,
-          aiModel: model,
-        });
-
-        if (mode === "local") {
-          setLocalProvider(provider);
-          setLocalModel(model);
-        } else if (mode === "online") {
-          setOnlineProvider(provider);
-          setOnlineModel(model);
-        } else if (mode === "byom") {
-          setByomProvider(provider);
-          setByomModel(model);
-          setByomApiKey(apiKey);
+      // Load email configurations
+      try {
+        const res = await invoke<any>("get_email_settings");
+        if (res) {
+          setImapServer(res.imap_server);
+          setImapPort(res.imap_port);
+          setEmailUsername(res.username);
+          setEmailPassword(res.password_enc);
         }
+      } catch (e) {
+        console.error("Failed to load email configurations:", e);
       }
-    } catch (e) {
-      console.error("Failed to load AI configurations:", e);
+
+      // Load AI configurations
+      try {
+        const res = await invoke<any>("get_ai_settings");
+        if (res) {
+          const mode = res.ai_mode || "";
+          const provider = res.provider || "gemini";
+          const model = res.ai_model || "";
+          const apiKey = res.api_key_enc || "";
+
+          setAiMode(mode);
+          setAiProvider(provider);
+          setAiModel(model);
+          setProviderApiKey(apiKey);
+
+          setSavedConfig({
+            aiMode: mode,
+            provider: provider,
+            aiModel: model,
+            apiKey: apiKey,
+          });
+
+          if (mode === "local") {
+            setLocalProvider(provider);
+            setLocalModel(model);
+          } else if (mode === "online") {
+            setOnlineProvider(provider);
+            setOnlineModel(model);
+          } else if (mode === "byom") {
+            setByomProvider(provider);
+            setByomModel(model);
+            setByomApiKey(apiKey);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load AI configurations:", e);
+      }
+    } finally {
+      setIsLoadingSettings(false);
     }
   }
 
   async function handleSave() {
+    setIsSaving(true);
+    setSaved(false);
+
     localStorage.setItem(API_KEY_STORAGE_KEY, providerApiKey.trim());
     localStorage.setItem(USER_NAME_STORAGE_KEY, username.trim());
     setLanguage(tempLang);
@@ -216,6 +237,36 @@ export default function Settings() {
 
     // Save AI Settings
     if (aiMode) {
+      // 1. Run health check
+      let checkSucceeded = false;
+      let checkMessage = "";
+      try {
+        const response = await invoke<string>("check_ai_health", {
+          config: {
+            ai_mode: aiMode,
+            provider: aiProvider,
+            ai_model: aiModel,
+            api_key_enc: providerApiKey,
+          }
+        });
+        checkSucceeded = true;
+        checkMessage = response;
+      } catch (e: any) {
+        checkSucceeded = false;
+        checkMessage = e.toString();
+      }
+
+      // Update states
+      setSavedConfigStatus(checkSucceeded ? "verified" : "failed");
+      setHealthStatus(checkSucceeded ? "verified" : "failed");
+      setHealthCheckResult({
+        success: checkSucceeded,
+        message: checkMessage,
+        modelName: aiModel,
+        providerName: aiProvider,
+        mode: aiMode,
+      });
+
       try {
         await invoke("save_ai_settings", {
           config: {
@@ -229,6 +280,7 @@ export default function Settings() {
           aiMode,
           provider: aiProvider,
           aiModel,
+          apiKey: providerApiKey.trim(),
         });
       } catch (e) {
         console.error("Failed to save AI configurations:", e);
@@ -236,6 +288,7 @@ export default function Settings() {
       }
     }
 
+    setIsSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -325,6 +378,11 @@ export default function Settings() {
             saved={saved}
             setSaved={setSaved}
             savedConfig={savedConfig}
+            savedConfigStatus={savedConfigStatus}
+            healthStatus={healthStatus}
+            setHealthStatus={setHealthStatus}
+            hasChanges={hasChanges}
+            isSaving={isSaving}
             onToggleHelp={() => {
               setHealthCheckResult(null);
               setActiveHelp(activeHelp === "ai" ? null : "ai");

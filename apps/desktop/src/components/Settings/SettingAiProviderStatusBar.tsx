@@ -6,15 +6,15 @@ interface SavedConfig {
 
 interface SettingAiProviderStatusBarProps {
   savedConfig: SavedConfig;
-  healthStatus: "idle" | "verified" | "failed";
+  savedConfigStatus: "idle" | "verified" | "failed";
 }
 
 export default function SettingAiProviderStatusBar({
   savedConfig,
-  healthStatus,
+  savedConfigStatus,
 }: SettingAiProviderStatusBarProps) {
   const getStatusLineStyles = () => {
-    switch (healthStatus) {
+    switch (savedConfigStatus) {
       case "verified":
         return {
           wrapper: "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300",
@@ -48,7 +48,7 @@ export default function SettingAiProviderStatusBar({
         <span>
           <strong>Active LLM Service: </strong>
           <span className={`capitalize ${statusStyles.label}`}>{savedConfig.provider}</span>{" "}
-          <span className={healthStatus === "idle" ? "text-foreground" : ""}>
+          <span className={savedConfigStatus === "idle" ? "text-foreground" : ""}>
             ({savedConfig.aiModel})
           </span>
         </span>
