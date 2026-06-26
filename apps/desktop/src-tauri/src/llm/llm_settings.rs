@@ -87,6 +87,7 @@ pub async fn check_ai_health(config: AiConfig) -> Result<String, String> {
             provider_type: config.provider.clone(),
             api_key: config.api_key_enc.clone(),
             model: config.ai_model.clone(),
+            base_url: None,
         }
     );
 

@@ -1,7 +1,9 @@
 use serde::Serialize;
+use std::path::Path;
 use tauri::{AppHandle, Emitter};
 
 use crate::{extractor, llm, store};
+use crate::llm::llm_provider::LlmProvider;
 
 #[derive(Serialize, Clone)]
 struct IndexProgress {
@@ -19,121 +21,63 @@ pub struct IndexSummary {
     pub failed: usize,
 }
 
-#[tauri::command]
-pub async fn index_folder(
-    app: AppHandle,
-    folder_path: String,
-    api_key: String,
-    model: Option<String>,
-    reindex: Option<bool>,
-) -> Result<IndexSummary, String> {
-    let model = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
-    let reindex = reindex.unwrap_or(false);
+pub struct IndexOptions {
+    pub run_llm_metadata: bool,
+    pub run_vector_embeddings: bool,
+}
 
-    let supported = ["docx", "pdf", "xlsx", "xls", "txt"];
-    let files: Vec<std::path::PathBuf> = walkdir::WalkDir::new(&folder_path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(|s| supported.contains(&s.to_lowercase().as_str()))
-                .unwrap_or(false)
-        })
-        .map(|e| e.path().to_path_buf())
-        .collect();
-
-    if files.is_empty() {
-        return Ok(IndexSummary { indexed: 0, skipped: 0, failed: 0 });
+/// Core decoupled document indexing function.
+/// Takes db_path instead of active Connection so it can drop SQLite locks before async awaits.
+pub async fn index_file_core(
+    db_path: &Path,
+    provider: &LlmProvider,
+    file_path: &Path,
+    options: &IndexOptions,
+    reindex: bool,
+) -> Result<String, String> {
+    let path_str = file_path.to_string_lossy().to_string();
+    
+    // Check if file is already indexed
+    if !reindex {
+        let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
+        if store::is_already_indexed(&conn, &path_str).map_err(|e| e.to_string())? {
+            return Ok("already indexed".to_string());
+        }
     }
 
-    let total = files.len();
-    let mut indexed = 0usize;
-    let mut skipped = 0usize;
-    let mut failed = 0usize;
+    let ext = file_path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
 
-    for (i, path) in files.iter().enumerate() {
-        let current = i + 1;
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
-        let path_str = path.to_string_lossy().to_string();
+    // Extract text from the file
+    let extracted = extractor::extract(file_path).map_err(|e| format!("extraction failed: {e}"))?;
+    if extracted.text.trim().is_empty() {
+        return Err("no text extracted".to_string());
+    }
 
-        let _ = app.emit("indexing-progress", IndexProgress {
-            current, total, file_name: file_name.clone(),
-            status: "processing".to_string(),
-            message: "scanning...".to_string(),
-        });
+    let file_name = file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
 
-        // skip check — conn dropped before any await
-        if !reindex {
-            let conn = store::open_db(&app)?;
-            if store::is_already_indexed(&conn, &path_str).map_err(|e| e.to_string())? {
-                skipped += 1;
-                let _ = app.emit("indexing-progress", IndexProgress {
-                    current, total, file_name,
-                    status: "skipped".to_string(),
-                    message: "already indexed".to_string(),
-                });
-                continue;
-            }
-        }
+    let mut doc_id_opt = {
+        let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
+        store::get_document_id_by_path(&conn, &path_str).map_err(|e| e.to_string())?
+    };
 
-        // extract text
-        let extracted = match extractor::extract(path) {
-            Ok(e) if !e.text.trim().is_empty() => e,
-            Ok(_) => {
-                skipped += 1;
-                let _ = app.emit("indexing-progress", IndexProgress {
-                    current, total, file_name,
-                    status: "skipped".to_string(),
-                    message: "no text extracted".to_string(),
-                });
-                continue;
-            }
-            Err(e) => {
-                failed += 1;
-                let _ = app.emit("indexing-progress", IndexProgress {
-                    current, total, file_name,
-                    status: "failed".to_string(),
-                    message: format!("extraction failed: {e}"),
-                });
-                continue;
-            }
-        };
-
-        // call Claude — no conn held across this await
-        let metadata = match llm::call_claude(&extracted.text, &api_key, &model).await {
-            Ok(m) => m,
-            Err(e) => {
-                failed += 1;
-                let _ = app.emit("indexing-progress", IndexProgress {
-                    current, total, file_name,
-                    status: "failed".to_string(),
-                    message: format!("API error: {e}"),
-                });
-                continue;
-            }
-        };
-
-        // build record
-        let file_size_kb = std::fs::metadata(path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
-        let file_ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    // Track 1: LLM Metadata extraction
+    if options.run_llm_metadata {
+        let metadata = llm::call_provider(provider, &extracted.text).await?;
+        let file_size_kb = std::fs::metadata(file_path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
         let raw_metadata = serde_json::to_string(&metadata).unwrap_or_default();
-        let msg = format!(
-            "[{}] {}",
-            metadata.doc_type.as_deref().unwrap_or("?"),
-            metadata.title.as_deref().unwrap_or("(no title)")
-        );
-
+        
         let record = store::DocumentRecord {
-            file_path: path_str,
+            file_path: path_str.clone(),
             file_name: file_name.clone(),
-            file_ext,
+            file_ext: ext.clone(),
             file_size_kb,
             doc_type: metadata.doc_type,
             title: metadata.title,
@@ -150,41 +94,65 @@ pub async fn index_folder(
             raw_text: extracted.text.clone(),
         };
 
-        // insert — fresh conn after the await
-        let conn = store::open_db(&app)?;
-        match store::insert_document(&conn, &record) {
-            Ok(_) => {
-                // Generate and save chunk embeddings
-                if let Ok(Some(doc_id)) = store::get_document_id_by_path(&conn, &record.file_path) {
-                    let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
-                    if !chunks.is_empty() {
-                        if let Ok(embeddings) = crate::embeddings::get_passage_embeddings(&chunks) {
-                            for (idx, (chunk, emb)) in chunks.iter().zip(embeddings.iter()).enumerate() {
-                                let emb_bytes = crate::embeddings::vec_to_bytes(emb);
-                                let _ = store::insert_document_chunk(&conn, doc_id, idx as i32, chunk, &emb_bytes);
-                            }
-                        }
-                    }
-                }
-                indexed += 1;
-                let _ = app.emit("indexing-progress", IndexProgress {
-                    current, total, file_name,
-                    status: "ok".to_string(),
-                    message: msg,
-                });
-            }
-            Err(e) => {
-                failed += 1;
-                let _ = app.emit("indexing-progress", IndexProgress {
-                    current, total, file_name,
-                    status: "failed".to_string(),
-                    message: format!("DB error: {e}"),
-                });
+        let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
+        store::insert_document(&conn, &record).map_err(|e| format!("DB insertion failed: {e}"))?;
+        doc_id_opt = store::get_document_id_by_path(&conn, &path_str).map_err(|e| e.to_string())?;
+    } else if doc_id_opt.is_none() {
+        // Fallback skeletal insertion so we have a document_id to map vector chunks to
+        let file_size_kb = std::fs::metadata(file_path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
+        let record = store::DocumentRecord {
+            file_path: path_str.clone(),
+            file_name: file_name.clone(),
+            file_ext: ext.clone(),
+            file_size_kb,
+            doc_type: Some("other".to_string()),
+            title: Some(file_name.clone()),
+            summary: Some("Skeletal document (indexed without LLM metadata)".to_string()),
+            authors: "[]".to_string(),
+            doc_date: None,
+            topics: "[]".to_string(),
+            entities: "[]".to_string(),
+            keywords: "[]".to_string(),
+            language: Some("he".to_string()),
+            page_count: extracted.page_count,
+            confidence: None,
+            raw_metadata: "{}".to_string(),
+            raw_text: extracted.text.clone(),
+        };
+        
+        let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
+        store::insert_document(&conn, &record).map_err(|e| format!("DB fallback insertion failed: {e}"))?;
+        doc_id_opt = store::get_document_id_by_path(&conn, &path_str).map_err(|e| e.to_string())?;
+    }
+
+    let doc_id = doc_id_opt.ok_or_else(|| "Failed to retrieve document ID".to_string())?;
+
+    // Track 2: Vector Embeddings generation
+    if options.run_vector_embeddings {
+        let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
+        if !chunks.is_empty() {
+            let embeddings = crate::embeddings::get_passage_embeddings(&chunks)
+                .map_err(|e| format!("Failed generating passage embeddings: {e}"))?;
+            
+            let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
+            // Clear any prior chunks
+            let _ = store::delete_document_chunks(&conn, doc_id);
+            for (idx, (chunk, emb)) in chunks.iter().zip(embeddings.iter()).enumerate() {
+                let emb_bytes = crate::embeddings::vec_to_bytes(emb);
+                store::insert_document_chunk(&conn, doc_id, idx as i32, chunk, &emb_bytes)
+                    .map_err(|e| format!("Failed storing chunk embedding: {e}"))?;
             }
         }
     }
 
-    Ok(IndexSummary { indexed, skipped, failed })
+    let status_str = match (options.run_llm_metadata, options.run_vector_embeddings) {
+        (true, true) => "Indexed with LLM metadata and vector chunks",
+        (true, false) => "Indexed with LLM metadata only",
+        (false, true) => "Indexed with vector chunks only (fallback metadata)",
+        (false, false) => "Text extracted only (no db update)",
+    };
+
+    Ok(format!("{status_str} for {file_name}"))
 }
 
 #[tauri::command]
@@ -228,90 +196,146 @@ pub async fn index_file(
     };
 
     emit_progress("processing", "starting...");
+    
+    let db_path = store::db_path(&app);
 
-    // skip check
+    // Skip check
     if !reindex {
-        let conn = store::open_db(&app)?;
+        let conn = store::open_db_by_path(&db_path)?;
         if store::is_already_indexed(&conn, &file_path).map_err(|e| e.to_string())? {
             emit_progress("skipped", "already indexed");
             return Ok(IndexSummary { indexed: 0, skipped: 1, failed: 0 });
         }
     }
 
-    // extract text
-    emit_progress("processing", "extracting text...");
-    let extracted = match extractor::extract(path) {
-        Ok(e) if !e.text.trim().is_empty() => e,
-        Ok(_) => {
-            emit_progress("skipped", "no text extracted");
-            return Ok(IndexSummary { indexed: 0, skipped: 1, failed: 0 });
+    // Set up provider configuration
+    let provider = crate::llm::llm_provider::get_active_provider(
+        crate::llm::llm_provider::ProviderConfig {
+            provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
+            api_key,
+            model,
+            base_url: None,
         }
-        Err(e) => {
-            emit_progress("failed", &format!("extraction failed: {e}"));
-            return Ok(IndexSummary { indexed: 0, skipped: 0, failed: 1 });
-        }
-    };
-
-    // call Claude
-    emit_progress("processing", "analyzing with AI...");
-    let metadata = match llm::call_claude(&extracted.text, &api_key, &model).await {
-        Ok(m) => m,
-        Err(e) => {
-            emit_progress("failed", &format!("API error: {e}"));
-            return Ok(IndexSummary { indexed: 0, skipped: 0, failed: 1 });
-        }
-    };
-
-    // build record
-    let file_size_kb = std::fs::metadata(path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
-    let raw_metadata = serde_json::to_string(&metadata).unwrap_or_default();
-    let msg = format!(
-        "[{}] {}",
-        metadata.doc_type.as_deref().unwrap_or("?"),
-        metadata.title.as_deref().unwrap_or("(no title)")
     );
 
-    let record = store::DocumentRecord {
-        file_path: file_path.clone(),
-        file_name: file_name.clone(),
-        file_ext: ext,
-        file_size_kb,
-        doc_type: metadata.doc_type,
-        title: metadata.title,
-        summary: metadata.summary,
-        authors:   serde_json::to_string(&metadata.authors.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
-        doc_date:  metadata.date,
-        topics:    serde_json::to_string(&metadata.topics.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
-        entities:  serde_json::to_string(&metadata.entities.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
-        keywords:  serde_json::to_string(&metadata.keywords.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
-        language:  metadata.language,
-        page_count: extracted.page_count,
-        confidence: metadata.confidence,
-        raw_metadata,
-        raw_text: extracted.text.clone(),
+    let options = IndexOptions {
+        run_llm_metadata: true,
+        run_vector_embeddings: true,
     };
 
-    let conn = store::open_db(&app)?;
-    match store::insert_document(&conn, &record) {
-        Ok(_) => {
-            // Generate and save chunk embeddings
-            if let Ok(Some(doc_id)) = store::get_document_id_by_path(&conn, &record.file_path) {
-                let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
-                if !chunks.is_empty() {
-                    if let Ok(embeddings) = crate::embeddings::get_passage_embeddings(&chunks) {
-                        for (idx, (chunk, emb)) in chunks.iter().zip(embeddings.iter()).enumerate() {
-                            let emb_bytes = crate::embeddings::vec_to_bytes(emb);
-                            let _ = store::insert_document_chunk(&conn, doc_id, idx as i32, chunk, &emb_bytes);
-                        }
-                    }
-                }
-            }
+    emit_progress("processing", "indexing tracks...");
+    match index_file_core(&db_path, &provider, path, &options, reindex).await {
+        Ok(msg) => {
             emit_progress("ok", &msg);
             Ok(IndexSummary { indexed: 1, skipped: 0, failed: 0 })
         }
         Err(e) => {
-            emit_progress("failed", &format!("DB error: {e}"));
+            emit_progress("failed", &e);
             Ok(IndexSummary { indexed: 0, skipped: 0, failed: 1 })
         }
     }
+}
+
+#[tauri::command]
+pub async fn index_folder(
+    app: AppHandle,
+    folder_path: String,
+    api_key: String,
+    model: Option<String>,
+    reindex: Option<bool>,
+) -> Result<IndexSummary, String> {
+    let model = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
+    let reindex = reindex.unwrap_or(false);
+
+    let supported = ["docx", "pdf", "xlsx", "xls", "txt"];
+    let files: Vec<std::path::PathBuf> = walkdir::WalkDir::new(&folder_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| supported.contains(&s.to_lowercase().as_str()))
+                .unwrap_or(false)
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    if files.is_empty() {
+        return Ok(IndexSummary { indexed: 0, skipped: 0, failed: 0 });
+    }
+
+    let total = files.len();
+    let mut indexed = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+
+    // Set up provider configuration
+    let provider = crate::llm::llm_provider::get_active_provider(
+        crate::llm::llm_provider::ProviderConfig {
+            provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
+            api_key,
+            model,
+            base_url: None,
+        }
+    );
+
+    let options = IndexOptions {
+        run_llm_metadata: true,
+        run_vector_embeddings: true,
+    };
+    
+    let db_path = store::db_path(&app);
+
+    for (i, path) in files.iter().enumerate() {
+        let current = i + 1;
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let path_str = path.to_string_lossy().to_string();
+
+        let _ = app.emit("indexing-progress", IndexProgress {
+            current, total, file_name: file_name.clone(),
+            status: "processing".to_string(),
+            message: "indexing...".to_string(),
+        });
+
+        // Check skipped status
+        if !reindex {
+            let conn = store::open_db_by_path(&db_path)?;
+            if let Ok(true) = store::is_already_indexed(&conn, &path_str) {
+                skipped += 1;
+                let _ = app.emit("indexing-progress", IndexProgress {
+                    current, total, file_name,
+                    status: "skipped".to_string(),
+                    message: "already indexed".to_string(),
+                });
+                continue;
+            }
+        }
+
+        match index_file_core(&db_path, &provider, path, &options, reindex).await {
+            Ok(msg) => {
+                indexed += 1;
+                let _ = app.emit("indexing-progress", IndexProgress {
+                    current, total, file_name,
+                    status: "ok".to_string(),
+                    message: msg,
+                });
+            }
+            Err(e) => {
+                failed += 1;
+                let _ = app.emit("indexing-progress", IndexProgress {
+                    current, total, file_name,
+                    status: "failed".to_string(),
+                    message: e,
+                });
+            }
+        }
+    }
+
+    Ok(IndexSummary { indexed, skipped, failed })
 }

@@ -12,7 +12,10 @@ pub fn db_path(app: &AppHandle) -> std::path::PathBuf {
 }
 
 pub fn open_db(app: &AppHandle) -> Result<Connection, String> {
-    let path = db_path(app);
+    open_db_by_path(&db_path(app))
+}
+
+pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }

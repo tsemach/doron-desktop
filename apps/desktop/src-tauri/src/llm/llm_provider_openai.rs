@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 pub struct OpenAiProvider {
     pub api_key: String,
     pub model: String,
+    pub base_url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -69,10 +70,18 @@ impl OpenAiProvider {
         };
 
         let client = reqwest::Client::new();
-        let response = client
-            .post("https://api.openai.com/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("content-type", "application/json")
+        let base_url = self.base_url.as_deref().unwrap_or("https://api.openai.com/v1");
+        let url = format!("{}/chat/completions", base_url);
+        
+        let mut request = client
+            .post(&url)
+            .header("content-type", "application/json");
+            
+        if !self.api_key.trim().is_empty() {
+            request = request.header("Authorization", format!("Bearer {}", self.api_key));
+        }
+
+        let response = request
             .json(&body)
             .send()
             .await

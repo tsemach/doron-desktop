@@ -111,6 +111,7 @@ async fn call_llm_classification(
         provider_type: config.provider.clone(),
         api_key: config.api_key_enc.clone(),
         model: config.ai_model.clone(),
+        base_url: None,
     });
 
     let mut candidate_list = String::new();

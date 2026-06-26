@@ -106,18 +106,29 @@ async fn post_message(prompt: String, api_key: &str, model: &str, max_tokens: u3
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Analyze a document and return structured metadata (JSON parsed).
-pub async fn call_claude(text: &str, api_key: &str, model: &str) -> Result<DocumentMetadata, String> {
+/// Analyze a document and return structured metadata (JSON parsed) using a unified provider.
+pub async fn call_provider(provider: &llm_provider::LlmProvider, text: &str) -> Result<DocumentMetadata, String> {
     let truncated = if text.len() > 12000 {
         format!("{}\n[... document truncated ...]", &text[..12000])
     } else {
         text.to_string()
     };
     let prompt = EXTRACTION_PROMPT.replace("{text}", &truncated);
-    let raw = post_message(prompt, api_key, model, 1024).await?;
+    let raw = provider.call_structured(&prompt, None).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<DocumentMetadata>(&json_str)
         .map_err(|e| format!("Failed to parse metadata JSON: {e}. Raw: {}", &json_str[..json_str.len().min(200)]))
+}
+
+/// Analyze a document and return structured metadata (JSON parsed) via Claude.
+pub async fn call_claude(text: &str, api_key: &str, model: &str) -> Result<DocumentMetadata, String> {
+    let provider = llm_provider::get_active_provider(llm_provider::ProviderConfig {
+        provider_type: "claude".to_string(),
+        api_key: api_key.to_string(),
+        model: model.to_string(),
+        base_url: None,
+    });
+    call_provider(&provider, text).await
 }
 
 /// Send a single user-turn message and return the raw text response.

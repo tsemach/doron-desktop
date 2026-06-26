@@ -6,6 +6,32 @@ mod llm;
 pub use types::DocumentRow;
 use tauri::AppHandle;
 use crate::store;
+use crate::llm::llm_provider::LlmProvider;
+
+use std::path::Path;
+
+/// Core decoupled search dispatcher.
+/// Executes query analysis, local FTS + Vector hybrid search, and LLM reranking.
+pub async fn search_documents_core(
+    db_path: &Path,
+    provider: &LlmProvider,
+    query: &str,
+    limit: usize,
+    use_rerank: bool,
+) -> Result<Vec<DocumentRow>, String> {
+    let analysis = llm::analyze_query(query, provider).await?;
+
+    let local_results = {
+        let conn = store::open_db_by_path(db_path)?;
+        queries::execute_smart_query(&conn, &analysis, query, limit * 2)
+    };
+
+    if use_rerank {
+        llm::rerank_candidates(query, local_results, provider).await
+    } else {
+        Ok(local_results)
+    }
+}
 
 #[tauri::command]
 pub async fn search_documents(
@@ -18,13 +44,18 @@ pub async fn search_documents(
     let model = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
     let limit = limit.unwrap_or(10);
 
-    let analysis = llm::analyze_query(&query, &api_key, &model).await?;
+    // Set up provider configuration
+    let provider = crate::llm::llm_provider::get_active_provider(
+        crate::llm::llm_provider::ProviderConfig {
+            provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
+            api_key,
+            model,
+            base_url: None,
+        }
+    );
 
-    let conn = store::open_db(&app)?;
-    let local_results = queries::execute_smart_query(&conn, &analysis, &query, limit * 2);
-
-    // Rerank candidates using Claude to discard generic boilerplate matches
-    llm::rerank_candidates(&query, local_results, &api_key, &model).await
+    let db_path = store::db_path(&app);
+    search_documents_core(&db_path, &provider, &query, limit, true).await
 }
 
 #[cfg(test)]
