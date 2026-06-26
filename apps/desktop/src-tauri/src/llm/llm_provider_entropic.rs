@@ -34,7 +34,7 @@ impl ClaudeProvider {
     async fn execute_request(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
         let body = ClaudeRequestBody {
             model: self.model.clone(),
-            max_tokens: 4096,
+            max_tokens: 2000,
             messages: vec![ClaudeMessage { role: "user", content: prompt.to_string() }],
             system: system.map(|s| s.to_string()),
         };
@@ -45,10 +45,11 @@ impl ClaudeProvider {
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
+            .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .json(&body)
             .send()
             .await
-            .map_err(|e| format!("Claude API request failed: {e}"))?;
+            .map_err(|e| format!("Claude API request failed: {e:?}"))?;
 
         if !response.status().is_success() {
             let status = response.status();

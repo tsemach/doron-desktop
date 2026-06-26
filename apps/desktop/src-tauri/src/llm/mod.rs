@@ -85,6 +85,7 @@ async fn post_message(prompt: String, api_key: &str, model: &str, max_tokens: u3
         .header("x-api-key", api_key)
         .header("anthropic-version", "2023-06-01")
         .header("content-type", "application/json")
+        .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .json(&body)
         .send()
         .await
@@ -144,7 +145,7 @@ pub async fn call_claude_raw(text: &str, api_key: &str, model: &str, system_prom
         text.to_string()
     };
     let prompt = format!("{system_prompt}\n\nDocument:\n---\n{truncated}\n---");
-    post_message(prompt, api_key, model, 4096).await
+    post_message(prompt, api_key, model, 2000).await
 }
 
 // strips markdown code fences and finds the JSON object boundaries
