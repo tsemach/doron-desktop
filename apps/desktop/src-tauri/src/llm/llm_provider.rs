@@ -4,15 +4,19 @@ pub mod llm_provider_gemini;
 pub mod llm_provider_openai;
 #[path = "llm_provider_entropic.rs"]
 pub mod llm_provider_entropic;
+#[path = "llm_provider_mock.rs"]
+pub mod llm_provider_mock;
 
 pub use llm_provider_gemini::GeminiProvider;
 pub use llm_provider_openai::OpenAiProvider;
 pub use llm_provider_entropic::ClaudeProvider;
+pub use llm_provider_mock::MockProvider;
 
 pub enum LlmProvider {
     Claude(ClaudeProvider),
     Gemini(GeminiProvider),
     OpenAi(OpenAiProvider),
+    Mock(MockProvider),
 }
 
 impl LlmProvider {
@@ -21,6 +25,7 @@ impl LlmProvider {
             Self::Claude(p) => p.call_simple(prompt, system).await,
             Self::Gemini(p) => p.call_simple(prompt, system).await,
             Self::OpenAi(p) => p.call_simple(prompt, system).await,
+            Self::Mock(p) => p.call_simple(prompt, system).await,
         }
     }
 
@@ -29,14 +34,16 @@ impl LlmProvider {
             Self::Claude(p) => p.call_structured(prompt, system).await,
             Self::Gemini(p) => p.call_structured(prompt, system).await,
             Self::OpenAi(p) => p.call_structured(prompt, system).await,
+            Self::Mock(p) => p.call_structured(prompt, system).await,
         }
     }
 }
 
 pub struct ProviderConfig {
-    pub provider_type: String, // "claude" | "gemini" | "openai"
+    pub provider_type: String, // "claude" | "gemini" | "openai" | "local" | "byom" | "mock"
     pub api_key: String,
     pub model: String,
+    pub base_url: Option<String>,
 }
 
 pub fn get_active_provider(config: ProviderConfig) -> LlmProvider {
@@ -48,7 +55,19 @@ pub fn get_active_provider(config: ProviderConfig) -> LlmProvider {
         "openai" => LlmProvider::OpenAi(OpenAiProvider {
             api_key: config.api_key,
             model: if config.model.is_empty() { "gpt-4o-mini".to_string() } else { config.model },
+            base_url: config.base_url,
         }),
+        "local" | "ollama" => LlmProvider::OpenAi(OpenAiProvider {
+            api_key: config.api_key,
+            model: if config.model.is_empty() { "phi-4".to_string() } else { config.model },
+            base_url: Some(config.base_url.unwrap_or_else(|| "http://localhost:11434/v1".to_string())),
+        }),
+        "byom" => LlmProvider::OpenAi(OpenAiProvider {
+            api_key: config.api_key,
+            model: config.model,
+            base_url: config.base_url,
+        }),
+        "mock" => LlmProvider::Mock(MockProvider),
         _ => LlmProvider::Claude(ClaudeProvider {
             api_key: config.api_key,
             model: if config.model.is_empty() { "claude-3-5-sonnet-20241022".to_string() } else { config.model },
