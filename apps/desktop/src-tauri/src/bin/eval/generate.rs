@@ -36,8 +36,10 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
 
     if args.ai {
         let api_key = args.api_key.unwrap_or_default();
-        let model = args.model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
-        
+        let model = args
+            .model
+            .unwrap_or_else(|| "claude-sonnet-4-6".to_string());
+
         let provider = get_active_provider(ProviderConfig {
             provider_type: args.provider.clone(),
             api_key,
@@ -55,17 +57,23 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
             );
 
             let text = provider.call_simple(&prompt, Some("You are a helpful assistant that writes realistic dummy legal documents in Hebrew.")).await?;
-            fs::write(&file_path, text).map_err(|e| format!("Failed to write {}: {}", filename, e))?;
+            fs::write(&file_path, text)
+                .map_err(|e| format!("Failed to write {}: {}", filename, e))?;
         }
     } else {
         for (filename, _, desc) in &documents {
             let file_path = out_dir.join(filename);
             let text = get_static_document_text(filename, desc);
-            fs::write(&file_path, text).map_err(|e| format!("Failed to write {}: {}", filename, e))?;
+            fs::write(&file_path, text)
+                .map_err(|e| format!("Failed to write {}: {}", filename, e))?;
         }
     }
 
-    println!("\x1b[32mSuccess!\x1b[0m Generated {} files in {}", documents.len(), out_dir.display());
+    println!(
+        "\x1b[32mSuccess!\x1b[0m Generated {} files in {}",
+        documents.len(),
+        out_dir.display()
+    );
     Ok(())
 }
 

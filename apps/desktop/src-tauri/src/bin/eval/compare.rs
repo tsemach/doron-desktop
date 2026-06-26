@@ -37,7 +37,10 @@ struct QuerySummary {
 pub async fn execute(args: CompareArgs) -> Result<(), String> {
     let db_path = store::cli_db_path(&args.db_name);
     if !db_path.exists() {
-        return Err(format!("History database file {} does not exist.", db_path.display()));
+        return Err(format!(
+            "History database file {} does not exist.",
+            db_path.display()
+        ));
     }
 
     let conn = rusqlite::Connection::open(&db_path)
@@ -50,22 +53,61 @@ pub async fn execute(args: CompareArgs) -> Result<(), String> {
     let q2_map = fetch_run_queries(&conn, args.run_id_2)?;
 
     println!("\n=========================================================================");
-    println!("             COMPARISON REPORT: RUN #{} vs RUN #{}                       ", r1.id, r2.id);
+    println!(
+        "             COMPARISON REPORT: RUN #{} vs RUN #{}                       ",
+        r1.id, r2.id
+    );
     println!("=========================================================================");
-    println!("{:<25} | {:<22} | {:<22}", "Metric", format!("Run #{} (Base)", r1.id), format!("Run #{} (Target)", r2.id));
+    println!(
+        "{:<25} | {:<22} | {:<22}",
+        "Metric",
+        format!("Run #{} (Base)", r1.id),
+        format!("Run #{} (Target)", r2.id)
+    );
     println!("{}", "-".repeat(73));
-    println!("{:<25} | {:<22} | {:<22}", "Timestamp", r1.run_at.chars().take(19).collect::<String>(), r2.run_at.chars().take(19).collect::<String>());
-    println!("{:<25} | {:<22} | {:<22}", "Algorithm", r1.algorithm, r2.algorithm);
-    println!("{:<25} | {:<22} | {:<22}", "Provider / Model", format!("{}/{}", r1.provider, r1.model), format!("{}/{}", r2.provider, r2.model));
-    println!("{:<25} | {:<22.2} ms | {:<22.2} ms", "Avg Search Latency", r1.avg_search_ms, r2.avg_search_ms);
-    println!("{:<25} | {:<22.2}% | {:<22.2}%", "Precision@1 (Hit@1)", r1.hit_at_1 * 100.0, r2.hit_at_1 * 100.0);
-    println!("{:<25} | {:<22.2}% | {:<22.2}%", "Recall@3 (Hit@3)", r1.hit_at_3 * 100.0, r2.hit_at_3 * 100.0);
-    println!("{:<25} | {:<22.4} | {:<22.4}", "Mean Reciprocal Rank", r1.mrr, r2.mrr);
+    println!(
+        "{:<25} | {:<22} | {:<22}",
+        "Timestamp",
+        r1.run_at.chars().take(19).collect::<String>(),
+        r2.run_at.chars().take(19).collect::<String>()
+    );
+    println!(
+        "{:<25} | {:<22} | {:<22}",
+        "Algorithm", r1.algorithm, r2.algorithm
+    );
+    println!(
+        "{:<25} | {:<22} | {:<22}",
+        "Provider / Model",
+        format!("{}/{}", r1.provider, r1.model),
+        format!("{}/{}", r2.provider, r2.model)
+    );
+    println!(
+        "{:<25} | {:<22.2} ms | {:<22.2} ms",
+        "Avg Search Latency", r1.avg_search_ms, r2.avg_search_ms
+    );
+    println!(
+        "{:<25} | {:<22.2}% | {:<22.2}%",
+        "Precision@1 (Hit@1)",
+        r1.hit_at_1 * 100.0,
+        r2.hit_at_1 * 100.0
+    );
+    println!(
+        "{:<25} | {:<22.2}% | {:<22.2}%",
+        "Recall@3 (Hit@3)",
+        r1.hit_at_3 * 100.0,
+        r2.hit_at_3 * 100.0
+    );
+    println!(
+        "{:<25} | {:<22.4} | {:<22.4}",
+        "Mean Reciprocal Rank", r1.mrr, r2.mrr
+    );
     println!("=========================================================================");
 
     println!("\n-- Query-by-Query Comparison --");
-    println!("{:<50} | {:<8} | {:<8} | {:<10} | {:<10} | {:<10} | {:<10}",
-             "Query", "R1 Rank", "R2 Rank", "Δ RR", "R1 Latency", "R2 Latency", "Δ Latency");
+    println!(
+        "{:<50} | {:<8} | {:<8} | {:<10} | {:<10} | {:<10} | {:<10}",
+        "Query", "R1 Rank", "R2 Rank", "Δ RR", "R1 Latency", "R2 Latency", "Δ Latency"
+    );
     println!("{}", "-".repeat(123));
 
     let mut queries: Vec<&String> = q1_map.keys().collect();
@@ -73,8 +115,14 @@ pub async fn execute(args: CompareArgs) -> Result<(), String> {
 
     for query in queries {
         if let (Some(q1), Some(q2)) = (q1_map.get(query), q2_map.get(query)) {
-            let r1_rank_str = q1.first_match_rank.map(|r| r.to_string()).unwrap_or_else(|| "FAIL".to_string());
-            let r2_rank_str = q2.first_match_rank.map(|r| r.to_string()).unwrap_or_else(|| "FAIL".to_string());
+            let r1_rank_str = q1
+                .first_match_rank
+                .map(|r| r.to_string())
+                .unwrap_or_else(|| "FAIL".to_string());
+            let r2_rank_str = q2
+                .first_match_rank
+                .map(|r| r.to_string())
+                .unwrap_or_else(|| "FAIL".to_string());
 
             let delta_rr = q2.reciprocal_rank - q1.reciprocal_rank;
             let delta_rr_str = if delta_rr > 0.0 {
@@ -94,16 +142,20 @@ pub async fn execute(args: CompareArgs) -> Result<(), String> {
                 "0.0ms".to_string()
             };
 
-            println!("{:<50} | {:<8} | {:<8} | {:<19} | {:<10.1} | {:<10.1} | {:<19}",
-                     if query.chars().count() > 47 {
-                         format!("{}...", query.chars().take(44).collect::<String>())
-                     } else {
-                         query.clone()
-                     },
-                     r1_rank_str, r2_rank_str,
-                     delta_rr_str,
-                     q1.search_latency_ms, q2.search_latency_ms,
-                     delta_lat_str);
+            println!(
+                "{:<50} | {:<8} | {:<8} | {:<19} | {:<10.1} | {:<10.1} | {:<19}",
+                if query.chars().count() > 47 {
+                    format!("{}...", query.chars().take(44).collect::<String>())
+                } else {
+                    query.clone()
+                },
+                r1_rank_str,
+                r2_rank_str,
+                delta_rr_str,
+                q1.search_latency_ms,
+                q2.search_latency_ms,
+                delta_lat_str
+            );
         }
     }
     println!();
@@ -130,21 +182,30 @@ fn fetch_run_summary(conn: &rusqlite::Connection, id: i64) -> Result<RunSummary,
     ).map_err(|_| format!("Evaluation run #{} not found in history database.", id))
 }
 
-fn fetch_run_queries(conn: &rusqlite::Connection, run_id: i64) -> Result<HashMap<String, QuerySummary>, String> {
-    let mut stmt = conn.prepare("
+fn fetch_run_queries(
+    conn: &rusqlite::Connection,
+    run_id: i64,
+) -> Result<HashMap<String, QuerySummary>, String> {
+    let mut stmt = conn
+        .prepare(
+            "
         SELECT query_text, first_match_rank, reciprocal_rank, search_latency_ms
         FROM evaluation_queries
         WHERE run_id = ?1
-    ").map_err(|e| e.to_string())?;
+    ",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([run_id], |row| {
-        Ok(QuerySummary {
-            query_text: row.get(0)?,
-            first_match_rank: row.get(1)?,
-            reciprocal_rank: row.get(2)?,
-            search_latency_ms: row.get(3)?,
+    let rows = stmt
+        .query_map([run_id], |row| {
+            Ok(QuerySummary {
+                query_text: row.get(0)?,
+                first_match_rank: row.get(1)?,
+                reciprocal_rank: row.get(2)?,
+                search_latency_ms: row.get(3)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
     let mut map = HashMap::new();
     for q in rows.flatten() {

@@ -1,0 +1,152 @@
+use clap::{Args, Subcommand};
+
+#[derive(Args, Debug, Clone)]
+pub struct ExamplesArgs {
+    #[command(subcommand)]
+    pub category: Option<ExampleCategory>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum ExampleCategory {
+    /// Examples for generating the synthetic Hebrew corpus
+    Generate,
+    /// Examples for running evaluation benchmarks
+    Run,
+    /// Examples for inspecting and comparing historical runs
+    History,
+}
+
+pub async fn execute(args: ExamplesArgs) -> Result<(), String> {
+    match args.category {
+        None => print_general_examples(),
+        Some(ExampleCategory::Generate) => print_generate_examples(),
+        Some(ExampleCategory::Run) => print_run_examples(),
+        Some(ExampleCategory::History) => print_history_examples(),
+    }
+    Ok(())
+}
+
+fn print_general_examples() {
+    println!(
+        r#"
+================================================================================
+                           EVAL CLI RUNNER EXAMPLES                             
+================================================================================
+General syntax overview and top commands:
+
+1. Standard Labeled Evaluation Workflow:
+   Step A: Generate a synthetic Hebrew corpus locally
+     $ cargo run --bin eval -- generate-corpus --corpus-dir my_test_corpus
+   
+   Step B: Run FTS evaluation on the corpus (saves as Run #1)
+     $ cargo run --bin eval -- run --corpus-dir my_test_corpus --provider mock --algorithm fts --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+   
+   Step C: Run Hybrid evaluation on the same corpus (saves as Run #2)
+     $ cargo run --bin eval -- run --corpus-dir my_test_corpus --provider mock --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+   
+   Step D: Compare FTS vs Hybrid accuracy & latency
+     $ cargo run --bin eval -- compare 1 2
+
+2. Listing run history:
+   $ cargo run --bin eval -- history
+
+3. Get category-specific detailed examples:
+   $ cargo run --bin eval -- examples generate
+   $ cargo run --bin eval -- examples run
+   $ cargo run --bin eval -- examples history
+================================================================================
+"#
+    );
+}
+
+fn print_generate_examples() {
+    println!(
+        r#"
+================================================================================
+                       CORPUS GENERATION EXAMPLES                               
+================================================================================
+Generate test documents for search indexing.
+
+1. Generate basic mock corpus (instantly & offline) in the default directory:
+   $ cargo run --bin eval -- generate-corpus
+
+2. Generate basic mock corpus in a custom output directory:
+   $ cargo run --bin eval -- generate-corpus --corpus-dir ./my_test_docs
+
+3. Generate rich synthetic legal documents via Claude LLM (Sonnet 3.5):
+   $ cargo run --bin eval -- generate-corpus --ai --provider claude --model claude-3-5-sonnet-20241022 --api-key YOUR_API_KEY --corpus-dir ./ai_docs
+
+4. Generate rich synthetic legal documents via Google Gemini:
+   $ cargo run --bin eval -- generate-corpus --ai --provider gemini --model gemini-1.5-pro --api-key YOUR_API_KEY --corpus-dir ./gemini_docs
+
+5. Generate rich synthetic legal documents via OpenAI (GPT-4o):
+   $ cargo run --bin eval -- generate-corpus --ai --provider openai --model gpt-4o --api-key YOUR_API_KEY --corpus-dir ./gpt_docs
+================================================================================
+"#
+    );
+}
+
+fn print_run_examples() {
+    println!(
+        r#"
+================================================================================
+                       BENCHMARK RUNNER EXAMPLES                                
+================================================================================
+Execute benchmarks against the ground-truth dataset and log results.
+
+1. Run Full-Text Search (FTS) evaluation (uses LLM metadata only, skips vector embeddings):
+   $ cargo run --bin eval -- run --provider mock --algorithm fts --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+2. Run Vector Retrieval evaluation (uses E5 passage embeddings only, skips LLM metadata):
+   $ cargo run --bin eval -- run --provider mock --algorithm vector --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+3. Run FTS + Vector Hybrid search evaluation:
+   $ cargo run --bin eval -- run --provider mock --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+4. Run Hybrid search with LLM Reranking (mock provider):
+   $ cargo run --bin eval -- run --provider mock --algorithm hybrid-rerank --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+5. Run evaluation using a local Ollama model (e.g. Phi-4) on a custom database:
+   $ cargo run --bin eval -- run --provider local --model phi-4 --algorithm hybrid --db-name test_phi4.db --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+6. Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
+   $ cargo run --bin eval -- run --provider openai --model my-custom-model --api-key MY_KEY --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+7. Run evaluation on a custom ground-truth dataset JSON:
+   $ cargo run --bin eval -- run --provider mock --algorithm hybrid --dataset-path /path/to/my_custom_ground_truth.json
+================================================================================
+"#
+    );
+}
+
+fn print_history_examples() {
+    println!(
+        r#"
+================================================================================
+                        RUN HISTORY & COMPARISONS                               
+================================================================================
+Inspect previous metrics and regression test changes.
+
+1. List all historical runs logged in the default database:
+   $ cargo run --bin eval -- history
+
+2. List all historical runs logged in a custom history database:
+   $ cargo run --bin eval -- history --db-name my_custom_history.db
+
+3. Detailed query-by-query analysis of a specific run (e.g. Run ID #1):
+   $ cargo run --bin eval -- history --run 1
+
+4. Detailed query-by-query analysis of a specific run from a custom database:
+   $ cargo run --bin eval -- history --run 1 --db-name my_custom_history.db
+
+5. Compare two runs (e.g. Base Run #1 vs Target Run #2) side-by-side:
+   $ cargo run --bin eval -- compare 1 2
+
+   Shows rank changes (Δ RR) and speed changes (Δ Latency) with red/green highlights.
+
+6. Compare two runs in a custom history database:
+   $ cargo run --bin eval -- compare 1 2 --db-name my_custom_history.db
+================================================================================
+"#
+    );
+}

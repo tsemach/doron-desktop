@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri_app_lib::{
     indexer::{index_file_core, IndexOptions},
-    query::search_documents_core,
     llm::llm_provider::{get_active_provider, ProviderConfig},
+    query::search_documents_core,
     store,
 };
 
@@ -79,7 +79,10 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         let _ = fs::remove_file(&db_path);
     }
 
-    println!("Initializing evaluation index database at: {}...", db_path.display());
+    println!(
+        "Initializing evaluation index database at: {}...",
+        db_path.display()
+    );
     // Create/initialize connection and migrations
     let _conn = store::open_db_by_path(&db_path)?;
 
@@ -92,12 +95,17 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         .collect();
 
     if files.is_empty() {
-        return Err(format!("No files found in corpus directory '{}'", args.corpus_dir));
+        return Err(format!(
+            "No files found in corpus directory '{}'",
+            args.corpus_dir
+        ));
     }
 
     // Setup AI provider
     let api_key = args.api_key.unwrap_or_default();
-    let model = args.model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
+    let model = args
+        .model
+        .unwrap_or_else(|| "claude-sonnet-4-6".to_string());
     let provider = get_active_provider(ProviderConfig {
         provider_type: args.provider.clone(),
         api_key,
@@ -157,7 +165,11 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     );
 
     // 2. Execute retrieval queries & evaluate metrics
-    println!("Running {} evaluation queries using algorithm: '{}'...", queries.len(), args.algorithm);
+    println!(
+        "Running {} evaluation queries using algorithm: '{}'...",
+        queries.len(),
+        args.algorithm
+    );
 
     let use_rerank = args.algorithm == "hybrid-rerank";
     let mut total_search_time = std::time::Duration::default();
@@ -165,7 +177,10 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let mut hit_at_3_sum = 0;
     let mut mrr_sum = 0.0;
 
-    println!("\n{:<55} | {:<20} | {:<8} | {:<8} | {:<5}", "Query", "Top File Returned", "P@1", "R@3", "Latency");
+    println!(
+        "\n{:<55} | {:<20} | {:<8} | {:<8} | {:<5}",
+        "Query", "Top File Returned", "P@1", "R@3", "Latency"
+    );
     println!("{}", "-".repeat(114));
 
     struct QueryEvalResult {
@@ -183,23 +198,24 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
 
     for q in &queries {
         let start = Instant::now();
-        let search_results = match search_documents_core(&db_path, &provider, &q.query, 5, use_rerank).await {
-            Ok(results) => results,
-            Err(e) => {
-                eprintln!("Error executing query '{}': {}", q.query, e);
-                continue;
-            }
-        };
+        let search_results =
+            match search_documents_core(&db_path, &provider, &q.query, 5, use_rerank).await {
+                Ok(results) => results,
+                Err(e) => {
+                    eprintln!("Error executing query '{}': {}", q.query, e);
+                    continue;
+                }
+            };
         let search_duration = start.elapsed();
         total_search_time += search_duration;
 
-        let returned_filenames: Vec<String> = search_results
-            .iter()
-            .map(|r| r.file_name.clone())
-            .collect();
+        let returned_filenames: Vec<String> =
+            search_results.iter().map(|r| r.file_name.clone()).collect();
 
         // Calculate Hit@1 (Precision@1)
-        let hit_at_1 = if !returned_filenames.is_empty() && q.expected_files.contains(&returned_filenames[0]) {
+        let hit_at_1 = if !returned_filenames.is_empty()
+            && q.expected_files.contains(&returned_filenames[0])
+        {
             1
         } else {
             0
@@ -207,7 +223,11 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         hit_at_1_sum += hit_at_1;
 
         // Calculate Hit@3 (Recall@3)
-        let hit_at_3 = if returned_filenames.iter().take(3).any(|f| q.expected_files.contains(f)) {
+        let hit_at_3 = if returned_filenames
+            .iter()
+            .take(3)
+            .any(|f| q.expected_files.contains(f))
+        {
             1
         } else {
             0
@@ -237,7 +257,10 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             hit_at_3,
         });
 
-        let top_returned = returned_filenames.first().cloned().unwrap_or_else(|| "NONE".to_string());
+        let top_returned = returned_filenames
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "NONE".to_string());
         println!(
             "{:<55} | {:<20} | {:<8} | {:<8} | {:.2}ms",
             if q.query.chars().count() > 50 {
@@ -246,8 +269,16 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
                 q.query.clone()
             },
             top_returned,
-            if hit_at_1 == 1 { "\x1b[32mPASS\x1b[0m" } else { "\x1b[31mFAIL\x1b[0m" },
-            if hit_at_3 == 1 { "\x1b[32mPASS\x1b[0m" } else { "\x1b[31mFAIL\x1b[0m" },
+            if hit_at_1 == 1 {
+                "\x1b[32mPASS\x1b[0m"
+            } else {
+                "\x1b[31mFAIL\x1b[0m"
+            },
+            if hit_at_3 == 1 {
+                "\x1b[32mPASS\x1b[0m"
+            } else {
+                "\x1b[31mFAIL\x1b[0m"
+            },
             search_duration.as_secs_f64() * 1000.0
         );
     }
@@ -265,11 +296,20 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     println!("Corpus Size:           {} documents", files.len());
     println!("Queries Evaluated:     {}", queries.len());
     println!("-------------------------------------------------------");
-    println!("Avg Indexing Latency:  {:.2} ms / document", avg_indexing_ms);
+    println!(
+        "Avg Indexing Latency:  {:.2} ms / document",
+        avg_indexing_ms
+    );
     println!("Avg Search Latency:    {:.2} ms / query", avg_search_ms);
     println!("-------------------------------------------------------");
-    println!("Precision@1 (Hit@1):   {:.2}%", final_hit_at_1 * 10000.0 / 100.0);
-    println!("Recall@3 (Hit@3):      {:.2}%", final_hit_at_3 * 10000.0 / 100.0);
+    println!(
+        "Precision@1 (Hit@1):   {:.2}%",
+        final_hit_at_1 * 10000.0 / 100.0
+    );
+    println!(
+        "Recall@3 (Hit@3):      {:.2}%",
+        final_hit_at_3 * 10000.0 / 100.0
+    );
     println!("Mean Reciprocal Rank:  {:.4}", final_mrr);
     println!("=======================================================");
 
@@ -297,13 +337,15 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
                         final_mrr,
                     ],
                 );
-                
+
                 match insert_run {
                     Ok(_) => {
                         let run_id = history_conn.last_insert_rowid();
                         for qr in query_results {
-                            let expected_json = serde_json::to_string(&qr.expected_files).unwrap_or_else(|_| "[]".to_string());
-                            let returned_json = serde_json::to_string(&qr.returned_files).unwrap_or_else(|_| "[]".to_string());
+                            let expected_json = serde_json::to_string(&qr.expected_files)
+                                .unwrap_or_else(|_| "[]".to_string());
+                            let returned_json = serde_json::to_string(&qr.returned_files)
+                                .unwrap_or_else(|_| "[]".to_string());
                             let _ = history_conn.execute(
                                 "INSERT INTO evaluation_queries (run_id, query_text, expected_files, returned_files, first_match_rank, reciprocal_rank, search_latency_ms, hit_at_1, hit_at_3) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                                 rusqlite::params![
@@ -336,7 +378,8 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
 }
 
 fn init_history_db(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
-    conn.execute_batch("
+    conn.execute_batch(
+        "
         CREATE TABLE IF NOT EXISTS evaluation_runs (
             id                    INTEGER PRIMARY KEY AUTOINCREMENT,
             run_at                TEXT NOT NULL,
@@ -365,6 +408,7 @@ fn init_history_db(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
             hit_at_3              INTEGER NOT NULL,
             FOREIGN KEY (run_id) REFERENCES evaluation_runs(id) ON DELETE CASCADE
         );
-    ")?;
+    ",
+    )?;
     Ok(())
 }

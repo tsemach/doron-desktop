@@ -1,7 +1,9 @@
-mod run;
+mod compare;
+mod examples;
 mod generate;
 mod history;
-mod compare;
+mod readme;
+mod run;
 
 use clap::Parser;
 
@@ -29,6 +31,12 @@ pub enum Commands {
 
     /// Compare two evaluation runs side-by-side
     Compare(compare::CompareArgs),
+
+    /// Show help examples of commands
+    Examples(examples::ExamplesArgs),
+
+    /// Show detailed readme explanation of the tool
+    Readme(readme::ReadmeArgs),
 }
 
 #[tokio::main]
@@ -39,6 +47,8 @@ async fn main() {
         Commands::GenerateCorpus(args) => generate::execute(args).await,
         Commands::History(args) => history::execute(args).await,
         Commands::Compare(args) => compare::execute(args).await,
+        Commands::Examples(args) => examples::execute(args).await,
+        Commands::Readme(args) => readme::execute(args).await,
     };
 
     if let Err(e) = result {
