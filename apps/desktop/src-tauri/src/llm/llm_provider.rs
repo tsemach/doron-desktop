@@ -71,7 +71,7 @@ pub fn get_active_provider(config: ProviderConfig) -> LlmProvider {
         "local" | "ollama" => LlmProvider::OpenAi(OpenAiProvider {
             api_key: config.api_key,
             model: if model.is_empty() { "phi-4".to_string() } else { model },
-            base_url: Some(config.base_url.unwrap_or_else(|| "http://localhost:11434/v1".to_string())),
+            base_url: Some(config.base_url.unwrap_or_else(|| "http://localhost:10086/v1".to_string())),
         }),
         "byom" => LlmProvider::OpenAi(OpenAiProvider {
             api_key: config.api_key,

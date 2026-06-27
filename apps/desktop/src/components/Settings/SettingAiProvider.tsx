@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Check, Activity } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { ProviderSelector, ModelSelector } from "./SettingAiComponents";
 import SettingAiProviderLocal from "./SettingAiProviderLocal";
 import SettingAiProviderOnline from "./SettingAiProviderOnline";
@@ -63,13 +64,19 @@ export default function SettingAiProvider({
   isSaving,
 }: SettingAiProviderProps) {
   const [checkingHealth, setCheckingHealth] = useState(false);
+  const isCancelledRef = useRef(false);
+
+  // Model download and installation states
+  const [isModelInstalled, setIsModelInstalled] = useState<boolean>(true);
+  const [isInstalling, setIsInstalling] = useState<boolean>(false);
+  const [downloadPercent, setDownloadPercent] = useState<number>(0);
+  const [installError, setInstallError] = useState<string | null>(null);
 
   // Model lists mappings
   const localModels: Record<string, string[]> = {
-    gemini: ["gemini-1.5-flash-local", "gemini-1.5-pro-local"],
-    openai: ["gpt-4o-mini-local", "gpt-4o-local"],
-    anthropic: ["claude-3-5-sonnet-local", "claude-3-haiku-local"],
-    other: ["llama3", "mistral", "custom-local"],
+    google: ["Gemma 4 E4B (Q4)"],
+    microsoft: ["Phi-4-mini-instruct (3.8B Q4)"],
+    alibaba: ["Qwen-2.5-1.5B-Instruct (Q4)", "Qwen-2.5-3B-Instruct (Q4)"],
   };
 
   const onlineModels: Record<string, string[]> = {
@@ -79,9 +86,95 @@ export default function SettingAiProvider({
     other: ["deepseek-chat", "perplexity"],
   };
 
-// Adjust model options when provider or mode changes
+  // Check if local model is downloaded when mode or model selection changes
+  useEffect(() => {
+    if (aiMode === "local") {
+      checkModelInstalled(aiModel);
+    } else {
+      setIsModelInstalled(true);
+      setIsInstalling(false);
+      setInstallError(null);
+    }
+  }, [aiMode, aiModel]);
+
+  const checkModelInstalled = async (model: string) => {
+    if (!model) return;
+    try {
+      const installed = await invoke<boolean>("check_local_model_status", { modelName: model });
+      setIsModelInstalled(installed);
+    } catch (err) {
+      console.error("Failed to check model status:", err);
+      setIsModelInstalled(false);
+    }
+  };
+
+  const handleInstallModel = async () => {
+    setIsInstalling(true);
+    setDownloadPercent(0);
+    setInstallError(null);
+    try {
+      let unlistenFn: (() => void) | null = null;
+      // Start listening to the progress event from Rust
+      const listenPromise = listen<any>("model-download-progress", (event) => {
+        const payload = event.payload;
+        if (payload.model_name === aiModel) {
+          setDownloadPercent(Math.round(payload.percent));
+          if (payload.status === "completed") {
+            setIsModelInstalled(true);
+            setIsInstalling(false);
+            setDownloadPercent(100);
+            if (unlistenFn) unlistenFn();
+          } else if (payload.status === "failed") {
+            setInstallError(payload.error || "Download failed");
+            setIsInstalling(false);
+            if (unlistenFn) unlistenFn();
+          }
+        }
+      });
+
+      listenPromise.then((cleanup) => {
+        unlistenFn = cleanup;
+      }).catch(err => {
+        console.error("Failed to subscribe to download progress:", err);
+      });
+
+      // Call Rust to start the installation
+      await invoke("install_local_model", { modelName: aiModel });
+    } catch (err: any) {
+      setInstallError(err.toString());
+      setIsInstalling(false);
+    }
+  };
+
+  // Adjust model options when provider or mode changes, and map names back and forth
   useEffect(() => {
     if (!aiProvider) return;
+
+    if (aiMode === "local") {
+      // Map old online provider names to local equivalents
+      if (aiProvider === "gemini") {
+        setAiProvider("google");
+        return;
+      } else if (aiProvider === "openai") {
+        setAiProvider("microsoft");
+        return;
+      } else if (aiProvider === "anthropic" || aiProvider === "other") {
+        setAiProvider("alibaba");
+        return;
+      }
+    } else if (aiMode === "online" || aiMode === "byom") {
+      // Map local provider names back to online equivalents
+      if (aiProvider === "google") {
+        setAiProvider("gemini");
+        return;
+      } else if (aiProvider === "microsoft") {
+        setAiProvider("openai");
+        return;
+      } else if (aiProvider === "alibaba") {
+        setAiProvider("gemini");
+        return;
+      }
+    }
     
     let list: string[] = [];
     if (aiMode === "local") {
@@ -96,6 +189,7 @@ export default function SettingAiProvider({
   }, [aiMode, aiProvider]);
 
   const handleHealthCheck = async () => {
+    isCancelledRef.current = false;
     setCheckingHealth(true);
     setHealthCheckResult(null);
     try {
@@ -107,6 +201,7 @@ export default function SettingAiProvider({
           api_key_enc: providerApiKey,
         },
       });
+      if (isCancelledRef.current) return;
       setHealthStatus("verified");
       setHealthCheckResult({
         success: true,
@@ -116,6 +211,7 @@ export default function SettingAiProvider({
         mode: aiMode,
       });
     } catch (err: any) {
+      if (isCancelledRef.current) return;
       setHealthStatus("failed");
       setHealthCheckResult({
         success: false,
@@ -125,7 +221,21 @@ export default function SettingAiProvider({
         mode: aiMode,
       });
     } finally {
-      setCheckingHealth(false);
+      if (!isCancelledRef.current) {
+        setCheckingHealth(false);
+      }
+    }
+  };
+
+  const handleCancelHealthCheck = async () => {
+    isCancelledRef.current = true;
+    setCheckingHealth(false);
+    setHealthStatus("idle");
+    setHealthCheckResult(null);
+    try {
+      await invoke("stop_llama_server");
+    } catch (err) {
+      console.error("Failed to stop llama server on cancel:", err);
     }
   };
 
@@ -135,6 +245,37 @@ export default function SettingAiProvider({
       return localModels[key] || [];
     }
     return onlineModels[key] || [];
+  };
+
+  const getAvailableProviders = () => {
+    if (aiMode === "local") {
+      return [
+        { id: "google", name: "Google" },
+        { id: "microsoft", name: "Microsoft" },
+        { id: "alibaba", name: "Alibaba" },
+      ];
+    }
+    return [
+      { id: "gemini", name: "Gemini" },
+      { id: "openai", name: "OpenAI" },
+      { id: "anthropic", name: "Anthropic" },
+      { id: "other", name: "Other" },
+    ];
+  };
+
+  const getModelDescription = (model: string) => {
+    switch (model) {
+      case "Qwen-2.5-1.5B-Instruct (Q4)":
+        return "Low Performance / Battery Saver Mode (RAM footprint: ~1.1 GB). Best for older or 8GB RAM machines. Fast execution on basic email classification, but may struggle with highly complex, lengthy contracts.";
+      case "Qwen-2.5-3B-Instruct (Q4)":
+        return "Balanced / Standard Mode (RAM footprint: ~1.9 GB). The standard baseline choice. Exceptional at structured JSON formatting and metadata parsing, runs smoothly on average CPUs.";
+      case "Phi-4-mini-instruct (3.8B Q4)":
+        return "Advanced / Long Documents Mode (RAM footprint: ~2.2 GB). Best for 16GB RAM machines. Features a native 128K context window, ideal for long trial transcripts or complex contracts.";
+      case "Gemma 4 E4B (Q4)":
+        return "Alternative Capable Mode (RAM footprint: ~2.5 GB). Strong multimodal and agentic capability, slightly higher memory overhead.";
+      default:
+        return "";
+    }
   };
 
 
@@ -209,6 +350,8 @@ export default function SettingAiProvider({
                   setSaved(false);
                   setHealthStatus("idle");
                 }}
+                disabled={isInstalling}
+                providers={getAvailableProviders()}
                 onToggleHelp={onToggleHelp}
                 activeHelp={activeHelp}
               />
@@ -223,6 +366,7 @@ export default function SettingAiProvider({
                   setSaved(false);
                   setHealthStatus("idle");
                 }}
+                disabled={isInstalling}
                 models={getAvailableModels()}
                 onToggleHelp={onToggleHelp}
                 activeHelp={activeHelp}
@@ -242,16 +386,101 @@ export default function SettingAiProvider({
             )}
           </div>
 
+          {/* Local Mode Details (Descriptions & Downloads) */}
+          {aiMode === "local" && (
+            <div className="space-y-3 pt-2">
+              {/* Hardware Requirements Description */}
+              {getModelDescription(aiModel) && (
+                <div className="p-3 bg-muted/40 border border-border/40 rounded-xl text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-bold text-foreground block mb-0.5">Resource Requirements:</span>
+                  {getModelDescription(aiModel)}
+                </div>
+              )}
+
+              {/* Model Not Installed warning and action banner */}
+              {!isModelInstalled && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 space-y-3 animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <div className="text-amber-500 mt-0.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 9v4" />
+                        <path d="M12 17h.01" />
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-amber-500">Model Not Installed</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        The selected model <span className="font-semibold text-foreground">{aiModel}</span> exists but is not yet downloaded. You must download it to use local mode.
+                      </p>
+                    </div>
+                  </div>
+
+                  {isInstalling ? (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-xs font-semibold text-foreground">
+                        <span className="flex items-center gap-2">
+                          <span className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+                          Downloading model...
+                        </span>
+                        <span>{downloadPercent}%</span>
+                      </div>
+                      <div className="w-full bg-accent rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${downloadPercent}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      {installError && (
+                        <span className="text-[10px] text-red-500 font-semibold truncate max-w-[200px]">
+                          Error: {installError}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleInstallModel}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition-all shadow-md cursor-pointer ml-auto"
+                      >
+                        Install Model
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action Row - Health Check */}
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end items-center gap-2 pt-2">
+            {checkingHealth && (
+              <button
+                type="button"
+                onClick={handleCancelHealthCheck}
+                className="flex items-center gap-1.5 px-3 py-2 border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm animate-fade-in"
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="button"
               onClick={handleHealthCheck}
-              disabled={checkingHealth || (aiMode === "byom" && !providerApiKey)}
+              disabled={checkingHealth || isInstalling || !isModelInstalled || (aiMode === "byom" && !providerApiKey)}
               className="flex items-center gap-1.5 px-4 py-2 border border-border bg-background hover:bg-accent disabled:opacity-50 text-foreground text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
             >
-              <Activity className={`size-3.5 ${checkingHealth ? "animate-pulse" : ""}`} />
-              {checkingHealth ? "Running check..." : "Run Health Check"}
+              {checkingHealth ? (
+                <>
+                  <span className="size-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin"></span>
+                  Running check...
+                </>
+              ) : (
+                <>
+                  <Activity className="size-3.5" />
+                  Run Health Check
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -264,7 +493,7 @@ export default function SettingAiProvider({
       <div className="pt-2">
         <button
           onClick={onSave}
-          disabled={!aiMode || !hasChanges || isSaving}
+          disabled={!aiMode || !hasChanges || isSaving || isInstalling || !isModelInstalled}
           className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all cursor-pointer shadow-md ${
             saved
               ? "bg-emerald-600 text-white hover:bg-emerald-700 animate-pulse"

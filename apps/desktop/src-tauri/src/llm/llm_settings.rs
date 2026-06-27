@@ -1,4 +1,4 @@
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use crate::store;
@@ -66,13 +66,34 @@ pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
 
 /// Tauri command to run the connection test/health check
 #[tauri::command]
-pub async fn check_ai_health(config: AiConfig) -> Result<String, String> {
+pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String, String> {
     if config.ai_mode == "online" {
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         return Ok(format!(
             "Online Pro model connection successful: verified account status, model '{}' is ready.",
             config.ai_model
         ));
+    }
+
+    // For local mode, ensure the background sidecar is started and responsive
+    if config.ai_mode == "local" {
+        let port = start_llama_server(&app, &config.ai_model)?;
+        
+        // Poll /health endpoint up to 45 seconds (90 * 500ms) to give the model time to load into memory
+        let client = reqwest::Client::new();
+        let health_url = format!("http://localhost:{}/health", port);
+        let mut responsive = false;
+        for _ in 0..90 {
+            if client.get(&health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+                responsive = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+        
+        if !responsive {
+            return Err("Local model server failed to start or did not become responsive within timeout.".to_string());
+        }
     }
 
     // For local or BYOM, perform a real network/service call!
@@ -82,7 +103,7 @@ pub async fn check_ai_health(config: AiConfig) -> Result<String, String> {
                 provider_type: "local".to_string(),
                 api_key: "".to_string(),
                 model: config.ai_model.clone(),
-                base_url: None,
+                base_url: Some("http://localhost:10086/v1".to_string()),
             }
         )
     } else {
@@ -105,3 +126,269 @@ pub async fn check_ai_health(config: AiConfig) -> Result<String, String> {
         }
     }
 }
+
+// ── Local Model Sidecar & Downloader implementation ─────────────────────────
+
+use std::sync::{Mutex, OnceLock};
+use tauri::Emitter;
+
+static LLAMA_SERVER_PROCESS: OnceLock<Mutex<Option<std::process::Child>>> = OnceLock::new();
+static RUNNING_MODEL: Mutex<Option<String>> = Mutex::new(None);
+
+#[derive(Serialize, Clone)]
+struct DownloadProgressPayload {
+    model_name: String,
+    percent: f64,
+    status: String, // "downloading" | "completed" | "failed"
+    error: Option<String>,
+}
+
+pub fn get_model_filename(model_name: &str) -> Result<&'static str, String> {
+    match model_name.to_lowercase().as_str() {
+        "qwen-2.5-1.5b-instruct (q4)" | "qwen2.5-1.5b-instruct-q4" | "qwen2.5-1.5b-instruct-local" => {
+            Ok("qwen2.5-1.5b-instruct-q4_k_m.gguf")
+        }
+        "qwen-2.5-3b-instruct (q4)" | "qwen2.5-3b-instruct-q4" | "qwen2.5-3b-instruct-local" => {
+            Ok("qwen2.5-3b-instruct-q4_k_m.gguf")
+        }
+        "phi-4-mini-instruct (3.8b q4)" | "phi-4-mini-instruct-q4" | "phi-4-mini-instruct-local" | "phi-4-mini-instruct-3.8b-q4" => {
+            Ok("Phi-4-mini-instruct-Q4_K_M.gguf")
+        }
+        "gemma 4 e4b (q4)" | "gemma-4-e4b-q4" | "gemma-2-2b-it-local" | "gemma-2-2b-it-q4" => {
+            Ok("gemma-2-2b-it-Q4_K_M.gguf")
+        }
+        _ => Err(format!("Unknown local model: {}", model_name)),
+    }
+}
+
+fn get_model_url(model_name: &str) -> Result<&'static str, String> {
+    match model_name.to_lowercase().as_str() {
+        "qwen-2.5-1.5b-instruct (q4)" | "qwen2.5-1.5b-instruct-q4" | "qwen2.5-1.5b-instruct-local" => {
+            Ok("https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf")
+        }
+        "qwen-2.5-3b-instruct (q4)" | "qwen2.5-3b-instruct-q4" | "qwen2.5-3b-instruct-local" => {
+            Ok("https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf")
+        }
+        "phi-4-mini-instruct (3.8b q4)" | "phi-4-mini-instruct-q4" | "phi-4-mini-instruct-local" | "phi-4-mini-instruct-3.8b-q4" => {
+            Ok("https://huggingface.co/second-state/Phi-4-mini-instruct-GGUF/resolve/main/Phi-4-mini-instruct-Q4_K_M.gguf")
+        }
+        "gemma 4 e4b (q4)" | "gemma-4-e4b-q4" | "gemma-2-2b-it-local" | "gemma-2-2b-it-q4" => {
+            Ok("https://huggingface.co/second-state/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf")
+        }
+        _ => Err(format!("Unknown local model URL for: {}", model_name)),
+    }
+}
+
+pub fn get_sidecar_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let target = match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+        ("macos", "x86_64") => "x86_64-apple-darwin",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        _ => return Err("Unsupported platform for local model execution".to_string()),
+    };
+    let suffix = if cfg!(windows) { ".exe" } else { "" };
+    let sidecar_filename = format!("llama-server-{}{}", target, suffix);
+
+    // Try relative paths in development environment first
+    let mut paths_to_try = vec![
+        std::env::current_dir().unwrap_or_default().join("apps/desktop/src-tauri/bin").join(&sidecar_filename),
+        std::env::current_dir().unwrap_or_default().join("src-tauri/bin").join(&sidecar_filename),
+    ];
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            paths_to_try.push(exe_dir.join(&sidecar_filename));
+            paths_to_try.push(exe_dir.join("bin").join(&sidecar_filename));
+            // target/debug/ -> target/ -> src-tauri/ -> src-tauri/bin/
+            if let Some(target_dir) = exe_dir.parent() {
+                if let Some(src_tauri_dir) = target_dir.parent() {
+                    paths_to_try.push(src_tauri_dir.join("bin").join(&sidecar_filename));
+                }
+            }
+        }
+    }
+
+    for path in paths_to_try {
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    let sidecar_name = format!("bin/{}", sidecar_filename);
+    app.path().resolve(&sidecar_name, tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("Failed to resolve sidecar path: {}", e))
+}
+
+pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, String> {
+    let sidecar_path = get_sidecar_path(app)?;
+    let model_file = get_model_filename(model_name)?;
+    let models_dir = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    let model_path = models_dir.join(model_file);
+    if !model_path.exists() {
+        return Err(format!("Model file not found. Please download it first."));
+    }
+
+    let mut model_guard = RUNNING_MODEL.lock().unwrap();
+    let process_lock = LLAMA_SERVER_PROCESS.get_or_init(|| Mutex::new(None));
+    let mut process_guard = process_lock.lock().unwrap();
+
+    // Check if running and is same model
+    let is_running = if let Some(ref mut child) = *process_guard {
+        child.try_wait().map(|status| status.is_none()).unwrap_or(false)
+    } else {
+        false
+    };
+
+    if is_running && model_guard.as_deref() == Some(model_name) {
+        return Ok(10086);
+    }
+
+    // Kill existing process
+    if let Some(mut child) = process_guard.take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    *model_guard = None;
+
+    let port = 10086;
+    let mut cmd = std::process::Command::new(&sidecar_path);
+    cmd.arg("--model").arg(&model_path)
+       .arg("--port").arg(port.to_string())
+       .arg("--threads").arg("4")
+       .arg("--host").arg("127.0.0.1");
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let child = cmd.spawn().map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
+    *process_guard = Some(child);
+    *model_guard = Some(model_name.to_string());
+
+    Ok(port)
+}
+
+#[tauri::command]
+pub fn stop_llama_server() {
+    if let Some(lock) = LLAMA_SERVER_PROCESS.get() {
+        if let Ok(mut process_guard) = lock.lock() {
+            if let Some(mut child) = process_guard.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+    if let Ok(mut model_guard) = RUNNING_MODEL.lock() {
+        *model_guard = None;
+    }
+}
+
+#[tauri::command]
+pub fn check_local_model_status(app: AppHandle, model_name: String) -> Result<bool, String> {
+    let model_file = get_model_filename(&model_name)?;
+    let models_dir = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    let model_path = models_dir.join(model_file);
+    if model_path.exists() {
+        if let Ok(metadata) = std::fs::metadata(&model_path) {
+            if metadata.len() < 10 * 1024 * 1024 {
+                println!("Warning: Local model file {:?} is too small ({} bytes). Deleting invalid file.", model_path, metadata.len());
+                let _ = std::fs::remove_file(&model_path);
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(), String> {
+    let url = get_model_url(&model_name)?;
+    let filename = get_model_filename(&model_name)?;
+    let models_dir = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    std::fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
+    let dest_path = models_dir.join(filename);
+    let temp_path = models_dir.join(format!("{}.download", filename));
+
+    let app_clone = app.clone();
+    let model_name_clone = model_name.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let runtime = tokio::runtime::Handle::current();
+        runtime.block_on(async {
+            let client = reqwest::Client::new();
+            let response = client.get(url).send().await
+                .map_err(|e| format!("Failed to connect to model host: {}", e))?;
+
+            if !response.status().is_success() {
+                return Err(format!(
+                    "Model host returned error status: {} ({})",
+                    response.status().as_u16(),
+                    response.status().canonical_reason().unwrap_or("Unknown Error")
+                ));
+            }
+
+            let total_size = response.content_length()
+                .ok_or_else(|| "Failed to get model file size".to_string())?;
+
+            let mut file = std::fs::File::create(&temp_path)
+                .map_err(|e| format!("Failed to create temporary file: {}", e))?;
+
+            let mut downloaded: u64 = 0;
+            let mut response = response;
+            
+            while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+                use std::io::Write;
+                file.write_all(&chunk).map_err(|e| e.to_string())?;
+                downloaded += chunk.len() as u64;
+
+                let percent = (downloaded as f64 / total_size as f64) * 100.0;
+                let _ = app_clone.emit("model-download-progress", DownloadProgressPayload {
+                    model_name: model_name_clone.clone(),
+                    percent,
+                    status: "downloading".to_string(),
+                    error: None,
+                });
+            }
+
+            std::fs::rename(&temp_path, &dest_path)
+                .map_err(|e| format!("Failed to finalize model file: {}", e))?;
+
+            let _ = app_clone.emit("model-download-progress", DownloadProgressPayload {
+                model_name: model_name_clone.clone(),
+                percent: 100.0,
+                status: "completed".to_string(),
+                error: None,
+            });
+
+            Ok::<(), String>(())
+        })
+    }).await.map_err(|e| format!("Download task panicked: {}", e))??;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_local_model(app: AppHandle, model_name: String) -> Result<(), String> {
+    let filename = get_model_filename(&model_name)?;
+    let models_dir = app.path().app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    let dest_path = models_dir.join(filename);
+    if dest_path.exists() {
+        std::fs::remove_file(dest_path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+

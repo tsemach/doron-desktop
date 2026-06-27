@@ -29,6 +29,13 @@
     "targets": [
       "nsis"
     ],
+    "externalBin": [
+      "bin/llama-server"
+    ],
+    "resources": [
+      "bin/*.so*",
+      "bin/*.dll"
+    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",

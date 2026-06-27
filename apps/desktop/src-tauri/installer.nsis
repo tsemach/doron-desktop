@@ -1,0 +1,5 @@
+!macro customUninstaller
+  # Delete local databases, downloaded models, and configurations
+  RMDir /r "$APPDATA\com.tsemach.doron-desktop"
+  RMDir /r "$LOCALAPPDATA\com.tsemach.doron-desktop"
+!macroend

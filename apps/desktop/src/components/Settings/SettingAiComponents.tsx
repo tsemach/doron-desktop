@@ -24,6 +24,7 @@ interface ProviderSelectorProps {
   activeHelp?: string | null;
   providers?: { id: string; name: string }[];
   label?: string;
+  disabled?: boolean;
 }
 
 export function ProviderSelector({
@@ -38,6 +39,7 @@ export function ProviderSelector({
     { id: "other", name: "Other" },
   ],
   label = "AI Provider",
+  disabled = false,
 }: ProviderSelectorProps) {
   return (
     <div className="space-y-2">
@@ -61,7 +63,8 @@ export function ProviderSelector({
           id="provider-select"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer appearance-none text-foreground"
+          disabled={disabled}
+          className="w-full pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer appearance-none text-foreground disabled:opacity-50"
         >
           {providers.map((p) => (
             <option key={p.id} value={p.id}>
@@ -86,6 +89,7 @@ interface ModelSelectorProps {
   activeHelp?: string | null;
   models: string[];
   label?: string;
+  disabled?: boolean;
 }
 
 export function ModelSelector({
@@ -95,6 +99,7 @@ export function ModelSelector({
   activeHelp,
   models,
   label = "Model",
+  disabled = false,
 }: ModelSelectorProps) {
   return (
     <div className="space-y-2">
@@ -118,7 +123,8 @@ export function ModelSelector({
           id="model-select"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer appearance-none text-foreground"
+          disabled={disabled}
+          className="w-full pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer appearance-none text-foreground disabled:opacity-50"
         >
           {models.map((m) => (
             <option key={m} value={m}>

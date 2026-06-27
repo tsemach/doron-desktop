@@ -38,6 +38,16 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 crate::email::poll_emails_background(handle).await;
             });
+            // Spawn local AI sidecar on startup if configured
+            let handle_sidecar = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(config) = crate::llm::get_ai_settings_internal(&handle_sidecar) {
+                    if config.ai_mode == "local" {
+                        println!("[Rust Backend] Starting local AI sidecar on startup for model: {}", config.ai_model);
+                        let _ = crate::llm::start_llama_server(&handle_sidecar, &config.ai_model);
+                    }
+                }
+            });
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -98,6 +108,10 @@ pub fn run() {
             llm::get_ai_settings,
             llm::save_ai_settings,
             llm::check_ai_health,
+            llm::check_local_model_status,
+            llm::install_local_model,
+            llm::delete_local_model,
+            llm::stop_llama_server,
             email::confirm_email_alert,
             email::delete_email_alert,
             email::list_case_emails,
@@ -107,6 +121,12 @@ pub fn run() {
             clipboard::read_clipboard,
             clipboard::write_clipboard
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                println!("[Rust Backend] Tauri app exiting. Terminating local sidecar...");
+                crate::llm::stop_llama_server();
+            }
+        });
 }
