@@ -24,6 +24,8 @@ struct OpenAiRequestBody {
     messages: Vec<OpenAiMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     response_format: Option<OpenAiResponseFormat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -63,10 +65,16 @@ impl OpenAiProvider {
             None
         };
 
+        let is_local = self.base_url.as_deref()
+            .map(|url| url.contains("localhost") || url.contains("127.0.0.1"))
+            .unwrap_or(false);
+        let max_tokens = if is_local { Some(2048) } else { None };
+
         let body = OpenAiRequestBody {
             model: self.model.clone(),
             messages,
             response_format,
+            max_tokens,
         };
 
         let client = reqwest::Client::new();

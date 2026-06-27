@@ -40,6 +40,24 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
             .model
             .unwrap_or_else(|| "claude-sonnet-4-6".to_string());
 
+        if args.provider.to_lowercase() == "local" {
+            println!("Waiting for local model server to finish loading and warm up (up to 120s)...");
+            let client = reqwest::Client::new();
+            let health_url = "http://localhost:10086/health";
+            let mut online = false;
+            for _ in 0..240 {
+                if client.get(health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+                    online = true;
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            if !online {
+                return Err("Local model server did not become responsive (warmup timeout). Please verify it is running.".to_string());
+            }
+            println!("Local model server is online and ready.");
+        }
+
         let provider = get_active_provider(ProviderConfig {
             provider_type: args.provider.clone(),
             api_key,
