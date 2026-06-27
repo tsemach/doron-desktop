@@ -81,6 +81,17 @@ Generate test documents for search indexing.
 
 5. Generate rich synthetic legal documents via OpenAI (GPT-4o):
    $ cargo run --bin eval -- generate-corpus --ai --provider openai --model gpt-4o --api-key YOUR_API_KEY --corpus-dir ./gpt_docs
+
+6. Generate rich synthetic legal documents via Local Microsoft Phi-4:
+   $ cargo run --bin eval -- generate-corpus --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
+
+7. Generate rich synthetic legal documents via Local Google Gemma:
+   $ cargo run --bin eval -- generate-corpus --ai --provider local --model "Gemma 4 E4B (Q4)" --corpus-dir ./gemma_docs
+
+8. Generate rich synthetic legal documents via Local Qwen 3B:
+   $ cargo run --bin eval -- generate-corpus --ai --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --corpus-dir ./qwen_docs
+
+Note: Running generation with local models requires your local llama-server to be active on port 10086 (e.g. by running the desktop app in local mode or starting the sidecar).
 ================================================================================
 "#
     );
@@ -106,13 +117,22 @@ Execute benchmarks against the ground-truth dataset and log results.
 4. Run Hybrid search with LLM Reranking (mock provider):
    $ cargo run --bin eval -- run --provider mock --algorithm hybrid-rerank --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
 
-5. Run evaluation using a local Ollama model (e.g. Phi-4) on a custom database:
-   $ cargo run --bin eval -- run --provider local --model phi-4 --algorithm hybrid --db-name test_phi4.db --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+5. Run evaluation using Local Microsoft Phi-4:
+   $ cargo run --bin eval -- run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
 
-6. Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
+6. Run evaluation using Local Microsoft Phi-3.5:
+   $ cargo run --bin eval -- run --provider local --model "Phi-3.5-mini-instruct (3.8B Q4)" --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+7. Run evaluation using Local Google Gemma:
+   $ cargo run --bin eval -- run --provider local --model "Gemma 4 E4B (Q4)" --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+8. Run evaluation using Local Qwen 3B:
+   $ cargo run --bin eval -- run --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+
+9. Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
    $ cargo run --bin eval -- run --provider openai --model my-custom-model --api-key MY_KEY --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
 
-7. Run evaluation on a custom ground-truth dataset JSON:
+10. Run evaluation on a custom ground-truth dataset JSON:
    $ cargo run --bin eval -- run --provider mock --algorithm hybrid --dataset-path /path/to/my_custom_ground_truth.json
 ================================================================================
 "#
