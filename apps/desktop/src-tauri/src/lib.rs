@@ -109,6 +109,8 @@ pub fn run() {
             llm::save_ai_settings,
             llm::check_ai_health,
             llm::check_local_model_status,
+            llm::check_model_downloading,
+            llm::cancel_model_download,
             llm::install_local_model,
             llm::delete_local_model,
             llm::stop_llama_server,

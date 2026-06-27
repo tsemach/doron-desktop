@@ -79,11 +79,11 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
     if config.ai_mode == "local" {
         let port = start_llama_server(&app, &config.ai_model)?;
         
-        // Poll /health endpoint up to 45 seconds (90 * 500ms) to give the model time to load into memory
+        // Poll /health endpoint up to 120 seconds (240 * 500ms) to give the model time to load into memory
         let client = reqwest::Client::new();
         let health_url = format!("http://localhost:{}/health", port);
         let mut responsive = false;
-        for _ in 0..90 {
+        for _ in 0..240 {
             if client.get(&health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
                 responsive = true;
                 break;
@@ -134,6 +134,33 @@ use tauri::Emitter;
 
 static LLAMA_SERVER_PROCESS: OnceLock<Mutex<Option<std::process::Child>>> = OnceLock::new();
 static RUNNING_MODEL: Mutex<Option<String>> = Mutex::new(None);
+static ACTIVE_DOWNLOADS: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
+static CANCELLED_DOWNLOADS: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
+
+fn get_active_downloads() -> &'static Mutex<std::collections::HashSet<String>> {
+    ACTIVE_DOWNLOADS.get_or_init(|| Mutex::new(std::collections::HashSet::new()))
+}
+
+fn get_cancelled_downloads() -> &'static Mutex<std::collections::HashSet<String>> {
+    CANCELLED_DOWNLOADS.get_or_init(|| Mutex::new(std::collections::HashSet::new()))
+}
+
+#[tauri::command]
+pub fn check_model_downloading(model_name: String) -> bool {
+    if let Ok(guard) = get_active_downloads().lock() {
+        guard.contains(&model_name)
+    } else {
+        false
+    }
+}
+
+#[tauri::command]
+pub fn cancel_model_download(model_name: String) -> Result<(), String> {
+    if let Ok(mut guard) = get_cancelled_downloads().lock() {
+        guard.insert(model_name);
+    }
+    Ok(())
+}
 
 #[derive(Serialize, Clone)]
 struct DownloadProgressPayload {
@@ -259,6 +286,20 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
     }
     *model_guard = None;
 
+    // Prior to spawning, kill any zombie sidecar processes of the same name running in the OS
+    let sidecar_filename = sidecar_path.file_name().unwrap().to_string_lossy().into_owned();
+    if cfg!(windows) {
+        let _ = std::process::Command::new("taskkill")
+            .args(&["/F", "/IM", &sidecar_filename])
+            .status();
+    } else {
+        let _ = std::process::Command::new("pkill")
+            .args(&["-f", &sidecar_filename])
+            .status();
+        // Give the OS kernel a brief moment (200ms) to clean up port/socket bindings
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
     let port = 10086;
     let mut cmd = std::process::Command::new(&sidecar_path);
     cmd.arg("--model").arg(&model_path)
@@ -318,6 +359,20 @@ pub fn check_local_model_status(app: AppHandle, model_name: String) -> Result<bo
 
 #[tauri::command]
 pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(), String> {
+    // Check if this model is already downloading
+    {
+        let downloads_guard = get_active_downloads().lock().unwrap();
+        if downloads_guard.contains(&model_name) {
+            return Err("A download for this model is already in progress in the background.".to_string());
+        }
+    }
+
+    // Mark as downloading
+    {
+        let mut downloads_guard = get_active_downloads().lock().unwrap();
+        downloads_guard.insert(model_name.clone());
+    }
+
     let url = get_model_url(&model_name)?;
     let filename = get_model_filename(&model_name)?;
     let models_dir = app.path().app_data_dir()
@@ -332,7 +387,7 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
 
     tokio::task::spawn_blocking(move || {
         let runtime = tokio::runtime::Handle::current();
-        runtime.block_on(async {
+        let res = runtime.block_on(async {
             let client = reqwest::Client::new();
             let response = client.get(url).send().await
                 .map_err(|e| format!("Failed to connect to model host: {}", e))?;
@@ -355,6 +410,13 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
             let mut response = response;
             
             while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+                // Check if this download has been cancelled
+                if let Ok(cancelled_guard) = get_cancelled_downloads().lock() {
+                    if cancelled_guard.contains(&model_name_clone) {
+                        return Err("Download cancelled by user".to_string());
+                    }
+                }
+
                 use std::io::Write;
                 file.write_all(&chunk).map_err(|e| e.to_string())?;
                 downloaded += chunk.len() as u64;
@@ -379,7 +441,33 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
             });
 
             Ok::<(), String>(())
-        })
+        });
+
+        // Always clean up the active and cancelled download status when finished, failed, or cancelled
+        if let Ok(mut downloads_guard) = get_active_downloads().lock() {
+            downloads_guard.remove(&model_name_clone);
+        }
+        if let Ok(mut cancelled_guard) = get_cancelled_downloads().lock() {
+            cancelled_guard.remove(&model_name_clone);
+        }
+
+        // If the task failed (or was cancelled), make sure to remove the temp file
+        if res.is_err() {
+            let _ = std::fs::remove_file(&temp_path);
+        }
+
+        // If the inner task failed, emit error and return it
+        if let Err(err) = res {
+            let _ = app_clone.emit("model-download-progress", DownloadProgressPayload {
+                model_name: model_name_clone.clone(),
+                percent: 0.0,
+                status: "failed".to_string(),
+                error: Some(err.clone()),
+            });
+            return Err(err);
+        }
+
+        Ok::<(), String>(())
     }).await.map_err(|e| format!("Download task panicked: {}", e))??;
 
     Ok(())
@@ -387,6 +475,16 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
 
 #[tauri::command]
 pub fn delete_local_model(app: AppHandle, model_name: String) -> Result<(), String> {
+    // If the model being deleted is currently running, stop the server first
+    if let Ok(running_guard) = RUNNING_MODEL.lock() {
+        if let Some(ref name) = *running_guard {
+            if name == &model_name {
+                drop(running_guard); // Release lock before stopping
+                stop_llama_server();
+            }
+        }
+    }
+
     let filename = get_model_filename(&model_name)?;
     let models_dir = app.path().app_data_dir()
         .map_err(|e| e.to_string())?

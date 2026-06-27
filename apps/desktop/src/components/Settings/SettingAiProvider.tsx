@@ -69,6 +69,7 @@ export default function SettingAiProvider({
   // Model download and installation states
   const [isModelInstalled, setIsModelInstalled] = useState<boolean>(true);
   const [isInstalling, setIsInstalling] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [downloadPercent, setDownloadPercent] = useState<number>(0);
   const [installError, setInstallError] = useState<string | null>(null);
 
@@ -89,6 +90,45 @@ export default function SettingAiProvider({
     other: ["deepseek-chat", "perplexity"],
   };
 
+  const aiModelRef = useRef(aiModel);
+  useEffect(() => {
+    aiModelRef.current = aiModel;
+  }, [aiModel]);
+
+  // Global mount listener for download progress events
+  useEffect(() => {
+    let unlistenFn: (() => void) | null = null;
+
+    const setupListener = async () => {
+      try {
+        unlistenFn = await listen<any>("model-download-progress", (event) => {
+          const payload = event.payload;
+          if (payload.model_name === aiModelRef.current) {
+            setDownloadPercent(Math.round(payload.percent));
+            if (payload.status === "completed") {
+              setIsModelInstalled(true);
+              setIsInstalling(false);
+              setDownloadPercent(100);
+            } else if (payload.status === "failed") {
+              setInstallError(payload.error || "Download failed");
+              setIsInstalling(false);
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to subscribe to download progress:", err);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, []);
+
   // Check if local model is downloaded when mode or model selection changes
   useEffect(() => {
     if (aiMode === "local") {
@@ -105,9 +145,22 @@ export default function SettingAiProvider({
     try {
       const installed = await invoke<boolean>("check_local_model_status", { modelName: model });
       setIsModelInstalled(installed);
+      
+      if (!installed) {
+        // Query if this model has a background download in progress
+        const downloading = await invoke<boolean>("check_model_downloading", { modelName: model });
+        if (downloading) {
+          setIsInstalling(true);
+        } else {
+          setIsInstalling(false);
+        }
+      } else {
+        setIsInstalling(false);
+      }
     } catch (err) {
       console.error("Failed to check model status:", err);
       setIsModelInstalled(false);
+      setIsInstalling(false);
     }
   };
 
@@ -116,36 +169,36 @@ export default function SettingAiProvider({
     setDownloadPercent(0);
     setInstallError(null);
     try {
-      let unlistenFn: (() => void) | null = null;
-      // Start listening to the progress event from Rust
-      const listenPromise = listen<any>("model-download-progress", (event) => {
-        const payload = event.payload;
-        if (payload.model_name === aiModel) {
-          setDownloadPercent(Math.round(payload.percent));
-          if (payload.status === "completed") {
-            setIsModelInstalled(true);
-            setIsInstalling(false);
-            setDownloadPercent(100);
-            if (unlistenFn) unlistenFn();
-          } else if (payload.status === "failed") {
-            setInstallError(payload.error || "Download failed");
-            setIsInstalling(false);
-            if (unlistenFn) unlistenFn();
-          }
-        }
-      });
-
-      listenPromise.then((cleanup) => {
-        unlistenFn = cleanup;
-      }).catch(err => {
-        console.error("Failed to subscribe to download progress:", err);
-      });
-
       // Call Rust to start the installation
       await invoke("install_local_model", { modelName: aiModel });
     } catch (err: any) {
       setInstallError(err.toString());
       setIsInstalling(false);
+    }
+  };
+
+  const handleCancelDownload = async () => {
+    try {
+      await invoke("cancel_model_download", { modelName: aiModel });
+    } catch (err) {
+      console.error("Failed to cancel download:", err);
+    }
+  };
+
+  const handleDeleteModel = async () => {
+    if (window.confirm(`Are you sure you want to delete the model '${aiModel}'? This will free up disk space.`)) {
+      setIsDeleting(true);
+      try {
+        await invoke("delete_local_model", { modelName: aiModel });
+        setIsModelInstalled(false);
+        setHealthStatus("idle");
+        setHealthCheckResult(null);
+      } catch (err: any) {
+        console.error("Failed to delete model:", err);
+        alert(`Failed to delete model: ${err.toString()}`);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -422,13 +475,22 @@ export default function SettingAiProvider({
                   </div>
 
                   {isInstalling ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center text-xs font-semibold text-foreground">
                         <span className="flex items-center gap-2">
                           <span className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
                           Downloading model...
                         </span>
-                        <span>{downloadPercent}%</span>
+                        <div className="flex items-center gap-3">
+                          <span>{downloadPercent}%</span>
+                          <button
+                            type="button"
+                            onClick={handleCancelDownload}
+                            className="px-2 py-1 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded transition-all cursor-pointer shadow-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                       <div className="w-full bg-accent rounded-full h-1.5 overflow-hidden">
                         <div 
@@ -455,20 +517,42 @@ export default function SettingAiProvider({
                   )}
                 </div>
               )}
+
+              {/* Model Installed info and remove action banner */}
+              {isModelInstalled && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 space-y-3 animate-fade-in">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="text-emerald-500 mt-0.5">
+                        <Check className="size-4.5" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-bold text-emerald-500">Model Installed</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          The selected model <span className="font-semibold text-foreground">{aiModel}</span> is fully downloaded and ready to use locally.
+                        </p>
+                      </div>
+                    </div>
+                    {isDeleting ? (
+                      <span className="size-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin self-center"></span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleDeleteModel}
+                        disabled={checkingHealth}
+                        className="px-3 py-1.5 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 text-red-500 font-semibold text-xs rounded-lg transition-all shadow-sm cursor-pointer self-center"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Action Row - Health Check */}
           <div className="flex justify-end items-center gap-2 pt-2">
-            {checkingHealth && (
-              <button
-                type="button"
-                onClick={handleCancelHealthCheck}
-                className="flex items-center gap-1.5 px-3 py-2 border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm animate-fade-in"
-              >
-                Cancel
-              </button>
-            )}
             <button
               type="button"
               onClick={handleHealthCheck}
