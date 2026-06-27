@@ -8,6 +8,8 @@ import DocsManagementHeader from "./DocsManagementHeader";
 import DocsManagementScan, { type ProgressItem, type ProgressStatus, type IndexSummary } from "./DocsManagementScan";
 import DocsManagementTemplates from "./DocsManagementTemplates/DocsManagementTemplates";
 import DocsManagementSearch from "./DocsManagementSearch";
+import { useAtom, useAtomValue } from "jotai";
+import { aiConfigAtom, aiConfigStatusAtom } from "../../store/aiStore";
 
 type IndexProgressEvent = {
   file_name: string;
@@ -30,12 +32,13 @@ export default function DocsManagement() {
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const [dbPath, setDbPath] = useState("");
-  const [aiConfig, setAiConfig] = useState<any>(null);
+  const [aiConfig, setAiConfig] = useAtom(aiConfigAtom);
+  const aiHealthStatus = useAtomValue(aiConfigStatusAtom);
 
   useEffect(() => {
     invoke<string>("get_db_path").then(setDbPath).catch(() => { });
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
-  }, []);
+  }, [setAiConfig]);
 
   useEffect(() => {
     return () => {
@@ -86,11 +89,12 @@ export default function DocsManagement() {
   }
 
   const currentItem = items.find((i) => i.status === "processing");
+  const isAiConnected = aiHealthStatus === "verified";
 
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       <DocsManagementHeader
-        apiKey={apiKey}
+        isAiConnected={isAiConnected}
         dbPath={dbPath}
         isProcessing={isProcessing}
         scanCount={
@@ -101,7 +105,7 @@ export default function DocsManagement() {
       />
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {aiConfig ? (aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc && <CheckApiKey apiKey="" />) : (!apiKey && <CheckApiKey apiKey="" />)}
+        {aiConfig ? (aiConfig.aiMode === "byom" && !aiConfig.apiKey && <CheckApiKey apiKey="" />) : (!apiKey && <CheckApiKey apiKey="" />)}
 
         <Routes>
           <Route path="/" element={<DocsManagementSearch />} />

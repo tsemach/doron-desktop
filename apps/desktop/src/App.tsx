@@ -7,6 +7,7 @@ import { getCurrentWindow  } from "@tauri-apps/api/window";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { invoke } from "@tauri-apps/api/core";
 import UpdateBanner from "./components/Updater/UpdateBanner";
+import { triggerGlobalHealthCheck } from "./store/aiStore";
 
 function Home() {
   const navigate = useNavigate();
@@ -118,6 +119,10 @@ function Home() {
 }
 
 function App() {
+  useEffect(() => {
+    triggerGlobalHealthCheck();
+  }, []);
+
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const target = e.target;

@@ -3,14 +3,14 @@ import BackButton from "../ui/back-button";
 import { useLanguage } from "../../context/LanguageContext";
 
 type DocsManagementHeaderProps = {
-  apiKey: string;
+  isAiConnected: boolean;
   dbPath: string;
   isProcessing: boolean;
   scanCount?: { current: number; total: number };
 };
 
 export default function DocsManagementHeader({
-  apiKey,
+  isAiConnected,
   dbPath,
   isProcessing,
   scanCount,
@@ -185,7 +185,7 @@ export default function DocsManagementHeader({
           )}
 
           {/* Claude API Key Status */}
-          {apiKey ? (
+          {isAiConnected ? (
             <div className="flex items-center gap-1.5 bg-green-50/60 border border-green-200 rounded-full px-3 py-1 text-xs font-medium text-green-700">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
               <span>AI Connected</span>

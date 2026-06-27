@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { Language } from "../../locales/translations";
 import { invoke } from "@tauri-apps/api/core";
-import { check } from "@tauri-apps/plugin-updater";
+import { useAtom } from "jotai";
+import { aiConfigAtom, aiConfigStatusAtom } from "../../store/aiStore";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
+import { check } from "@tauri-apps/plugin-updater";
 
 import SettingPreferences from "./SettingPreferences";
 import SettingEmailIntegration from "./SettingEmailIntegration";
@@ -44,17 +46,16 @@ export default function Settings() {
   const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
 
-  const [savedConfig, setSavedConfig] = useState<{
-    aiMode: string;
-    provider: string;
-    aiModel: string;
-    apiKey: string;
-  } | null>(null);
-
-  const [savedConfigStatus, setSavedConfigStatus] = useState<"idle" | "verified" | "failed">("idle");
+  const [savedConfig, setSavedConfig] = useAtom(aiConfigAtom);
+  const [savedConfigStatus, setSavedConfigStatus] = useAtom(aiConfigStatusAtom);
   const [healthStatus, setHealthStatus] = useState<"idle" | "verified" | "failed">("idle");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  // Sync healthStatus with savedConfigStatus on mount or startup check completion
+  useEffect(() => {
+    setHealthStatus(savedConfigStatus);
+  }, [savedConfigStatus]);
 
   const hasChanges = !isLoadingSettings && (!savedConfig ||
     aiMode !== savedConfig.aiMode ||
