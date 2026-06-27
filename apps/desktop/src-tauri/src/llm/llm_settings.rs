@@ -154,6 +154,9 @@ pub fn get_model_filename(model_name: &str) -> Result<&'static str, String> {
         "phi-4-mini-instruct (3.8b q4)" | "phi-4-mini-instruct-q4" | "phi-4-mini-instruct-local" | "phi-4-mini-instruct-3.8b-q4" => {
             Ok("Phi-4-mini-instruct-Q4_K_M.gguf")
         }
+        "phi-3.5-mini-instruct (3.8b q4)" | "phi-3.5-mini-instruct-q4" | "phi-3.5-mini-instruct-local" | "phi-3.5-mini-instruct-3.8b-q4" => {
+            Ok("Phi-3.5-mini-instruct-Q4_K_M.gguf")
+        }
         "gemma 4 e4b (q4)" | "gemma-4-e4b-q4" | "gemma-2-2b-it-local" | "gemma-2-2b-it-q4" => {
             Ok("gemma-2-2b-it-Q4_K_M.gguf")
         }
@@ -171,6 +174,9 @@ fn get_model_url(model_name: &str) -> Result<&'static str, String> {
         }
         "phi-4-mini-instruct (3.8b q4)" | "phi-4-mini-instruct-q4" | "phi-4-mini-instruct-local" | "phi-4-mini-instruct-3.8b-q4" => {
             Ok("https://huggingface.co/second-state/Phi-4-mini-instruct-GGUF/resolve/main/Phi-4-mini-instruct-Q4_K_M.gguf")
+        }
+        "phi-3.5-mini-instruct (3.8b q4)" | "phi-3.5-mini-instruct-q4" | "phi-3.5-mini-instruct-local" | "phi-3.5-mini-instruct-3.8b-q4" => {
+            Ok("https://huggingface.co/second-state/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf")
         }
         "gemma 4 e4b (q4)" | "gemma-4-e4b-q4" | "gemma-2-2b-it-local" | "gemma-2-2b-it-q4" => {
             Ok("https://huggingface.co/second-state/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf")
