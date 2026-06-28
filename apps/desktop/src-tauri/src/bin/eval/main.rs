@@ -4,6 +4,7 @@ mod generate;
 mod history;
 mod readme;
 mod run;
+mod show;
 
 use clap::Parser;
 
@@ -32,6 +33,9 @@ pub enum Commands {
     /// Compare two evaluation runs side-by-side
     Compare(compare::CompareArgs),
 
+    /// Show detailed query-by-query analysis of a specific evaluation run
+    Show(show::ShowArgs),
+
     /// Show help examples of commands
     Examples(examples::ExamplesArgs),
 
@@ -47,6 +51,7 @@ async fn main() {
         Commands::GenerateCorpus(args) => generate::execute(args).await,
         Commands::History(args) => history::execute(args).await,
         Commands::Compare(args) => compare::execute(args).await,
+        Commands::Show(args) => show::execute(args).await,
         Commands::Examples(args) => examples::execute(args).await,
         Commands::Readme(args) => readme::execute(args).await,
     };

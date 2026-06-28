@@ -32,10 +32,7 @@
     "externalBin": [
       "bin/llama-server"
     ],
-    "resources": [
-      "bin/*.so*",
-      "bin/*.dll"
-    ],
+    "resources": [],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",

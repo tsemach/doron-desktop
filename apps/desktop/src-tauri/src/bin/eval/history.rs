@@ -98,7 +98,7 @@ fn list_runs(conn: &rusqlite::Connection) -> Result<(), String> {
     Ok(())
 }
 
-fn show_run_details(conn: &rusqlite::Connection, run_id: i64) -> Result<(), String> {
+pub fn show_run_details(conn: &rusqlite::Connection, run_id: i64) -> Result<(), String> {
     let run_summary = conn.query_row(
         "SELECT run_at, provider, model, algorithm, corpus_size, query_count, avg_indexing_ms, avg_search_ms, hit_at_1, hit_at_3, mrr FROM evaluation_runs WHERE id = ?1",
         rusqlite::params![run_id],

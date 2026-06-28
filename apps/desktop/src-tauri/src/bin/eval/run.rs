@@ -139,11 +139,11 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         let child = cmd.spawn().map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
         sidecar_guard.child = Some(child);
 
-        // Poll /health endpoint up to 15 seconds (30 * 500ms) to allow the model to load into memory
+        // Poll /health endpoint up to 120 seconds (240 * 500ms) to allow the model to load into memory
         let client = reqwest::Client::new();
         let health_url = format!("http://localhost:{}/health", port);
         let mut responsive = false;
-        for _ in 0..30 {
+        for _ in 0..240 {
             if client.get(&health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
                 responsive = true;
                 break;
