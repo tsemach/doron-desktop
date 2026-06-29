@@ -388,9 +388,46 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
     tokio::task::spawn_blocking(move || {
         let runtime = tokio::runtime::Handle::current();
         let res = runtime.block_on(async {
-            let client = reqwest::Client::new();
-            let response = client.get(url).send().await
+            let client = reqwest::Client::builder()
+                .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .build()
+                .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+
+            let mut current_size = std::fs::metadata(&temp_path).map(|m| m.len()).unwrap_or(0);
+            let mut req = client.get(url);
+            if current_size > 0 {
+                req = req.header(reqwest::header::RANGE, format!("bytes={}-", current_size));
+            }
+
+            let mut response = req.send().await
                 .map_err(|e| format!("Failed to connect to model host: {}", e))?;
+
+            let expected_sha256 = {
+                let mut sha = None;
+                if let Some(etag_header) = response.headers().get("etag") {
+                    let etag_str = etag_header.to_str().unwrap_or("").trim_matches('"');
+                    if etag_str.len() == 64 && etag_str.chars().all(|c| c.is_ascii_hexdigit()) {
+                        sha = Some(etag_str.to_string());
+                    }
+                }
+                if sha.is_none() {
+                    if let Some(x_etag) = response.headers().get("x-linked-etag") {
+                        let etag_str = x_etag.to_str().unwrap_or("").trim_matches('"');
+                        if etag_str.len() == 64 && etag_str.chars().all(|c| c.is_ascii_hexdigit()) {
+                            sha = Some(etag_str.to_string());
+                        }
+                    }
+                }
+                sha
+            };
+
+            // If the range was invalid or out of bounds (e.g. server range error), delete the file and start over
+            if response.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+                let _ = std::fs::remove_file(&temp_path);
+                current_size = 0;
+                response = client.get(url).send().await
+                    .map_err(|e| format!("Failed to connect to model host: {}", e))?;
+            }
 
             if !response.status().is_success() {
                 return Err(format!(
@@ -400,13 +437,41 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
                 ));
             }
 
-            let total_size = response.content_length()
-                .ok_or_else(|| "Failed to get model file size".to_string())?;
+            // Determine total file size
+            let total_size = if response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+                let parsed_total = if let Some(content_range) = response.headers().get(reqwest::header::CONTENT_RANGE) {
+                    let range_str = content_range.to_str().unwrap_or("");
+                    if let Some(slash_idx) = range_str.rfind('/') {
+                        range_str[slash_idx + 1..].parse::<u64>().ok()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                parsed_total.or_else(|| {
+                    response.content_length().map(|len| len + current_size)
+                })
+            } else {
+                current_size = 0; // Server returned 200 OK, full file is being sent from 0
+                response.content_length()
+            };
 
-            let mut file = std::fs::File::create(&temp_path)
-                .map_err(|e| format!("Failed to create temporary file: {}", e))?;
+            let total_size = total_size.ok_or_else(|| "Failed to get model file size".to_string())?;
 
-            let mut downloaded: u64 = 0;
+            // Open the file in the correct mode (append if partial content, create if starting over)
+            let mut file = if current_size > 0 {
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .append(true)
+                    .open(&temp_path)
+                    .map_err(|e| format!("Failed to open temporary file for appending: {}", e))?
+            } else {
+                std::fs::File::create(&temp_path)
+                    .map_err(|e| format!("Failed to create temporary file: {}", e))?
+            };
+
+            let mut downloaded: u64 = current_size;
             let mut response = response;
             
             while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
@@ -433,6 +498,14 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
             std::fs::rename(&temp_path, &dest_path)
                 .map_err(|e| format!("Failed to finalize model file: {}", e))?;
 
+            if let Some(ref expected_hex) = expected_sha256 {
+                let is_valid = verify_file_sha256(&dest_path, expected_hex)?;
+                if !is_valid {
+                    let _ = std::fs::remove_file(&dest_path);
+                    return Err("Downloaded model file checksum validation failed (SHA256 mismatch).".to_string());
+                }
+            }
+
             let _ = app_clone.emit("model-download-progress", DownloadProgressPayload {
                 model_name: model_name_clone.clone(),
                 percent: 100.0,
@@ -449,11 +522,6 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
         }
         if let Ok(mut cancelled_guard) = get_cancelled_downloads().lock() {
             cancelled_guard.remove(&model_name_clone);
-        }
-
-        // If the task failed (or was cancelled), make sure to remove the temp file
-        if res.is_err() {
-            let _ = std::fs::remove_file(&temp_path);
         }
 
         // If the inner task failed, emit error and return it
@@ -494,5 +562,26 @@ pub fn delete_local_model(app: AppHandle, model_name: String) -> Result<(), Stri
         std::fs::remove_file(dest_path).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+fn verify_file_sha256(path: &std::path::Path, expected_hex: &str) -> Result<bool, String> {
+    use sha2::{Sha256, Digest};
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path)
+        .map_err(|e| format!("Failed to open file for checksum: {}", e))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0; 64 * 1024]; // 64KB chunks
+    loop {
+        let count = file.read(&mut buffer)
+            .map_err(|e| format!("Failed to read file for checksum: {}", e))?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    let result = hasher.finalize();
+    let hex_result = format!("{:x}", result);
+    Ok(hex_result == expected_hex)
 }
 
