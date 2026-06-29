@@ -25,10 +25,10 @@ pub enum Commands {
     Run(run::RunArgs),
 
     /// Generate a synthetic corpus of files for retrieval testing
-    GenerateCorpus(generate::GenerateArgs),
+    Generate(generate::GenerateArgs),
 
-    /// List or inspect historical evaluation runs
-    History(history::HistoryArgs),
+    /// List all historical evaluation runs
+    List(history::HistoryArgs),
 
     /// Compare two evaluation runs side-by-side
     Compare(compare::CompareArgs),
@@ -48,8 +48,8 @@ async fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
         Commands::Run(args) => run::execute(args).await,
-        Commands::GenerateCorpus(args) => generate::execute(args).await,
-        Commands::History(args) => history::execute(args).await,
+        Commands::Generate(args) => generate::execute(args).await,
+        Commands::List(args) => history::execute(args).await,
         Commands::Compare(args) => compare::execute(args).await,
         Commands::Show(args) => show::execute(args).await,
         Commands::Examples(args) => examples::execute(args).await,

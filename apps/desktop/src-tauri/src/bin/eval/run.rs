@@ -124,10 +124,14 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
 
         let port = 10086;
         let mut cmd = std::process::Command::new(&sidecar_path);
-        cmd.arg("--model").arg(&model_path)
-           .arg("--port").arg(port.to_string())
-           .arg("--threads").arg("4")
-           .arg("--host").arg("127.0.0.1");
+        cmd.arg("--model")
+            .arg(&model_path)
+            .arg("--port")
+            .arg(port.to_string())
+            .arg("--threads")
+            .arg("4")
+            .arg("--host")
+            .arg("127.0.0.1");
 
         #[cfg(target_os = "windows")]
         {
@@ -136,7 +140,9 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
-        let child = cmd.spawn().map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
         sidecar_guard.child = Some(child);
 
         // Poll /health endpoint up to 120 seconds (240 * 500ms) to allow the model to load into memory
@@ -144,7 +150,13 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         let health_url = format!("http://localhost:{}/health", port);
         let mut responsive = false;
         for _ in 0..240 {
-            if client.get(&health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+            if client
+                .get(&health_url)
+                .send()
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false)
+            {
                 responsive = true;
                 break;
             }
@@ -161,7 +173,11 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         provider_type: args.provider.clone(),
         api_key,
         model: model.clone(),
-        base_url: if args.provider.to_lowercase() == "local" { Some("http://localhost:10086/v1".to_string()) } else { None },
+        base_url: if args.provider.to_lowercase() == "local" {
+            Some("http://localhost:10086/v1".to_string())
+        } else {
+            None
+        },
     });
 
     // Configure indexing tracks based on target algorithm
@@ -412,7 +428,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
                                 ],
                             );
                         }
-                        println!("\x1b[32mSuccess!\x1b[0m Logged evaluation run #{} to history database.", run_id);
+                        println!("\x1b[32mSuccess!\x1b[0m Logged evaluation run #{} to history database. Use 'eval list' to see all runs.", run_id);
                     }
                     Err(e) => {
                         eprintln!("Warning: Failed to insert run into history DB: {}", e);
@@ -493,9 +509,19 @@ fn get_cli_sidecar_path() -> Result<std::path::PathBuf, String> {
 
     // Try relative paths in development environment first
     let paths_to_try = vec![
-        std::env::current_dir().unwrap_or_default().join("apps/desktop/src-tauri/bin").join(&sidecar_filename),
-        std::env::current_dir().unwrap_or_default().join("src-tauri/bin").join(&sidecar_filename),
-        std::env::current_exe().unwrap_or_default().parent().unwrap_or(&std::path::PathBuf::from(".")).join(&sidecar_filename),
+        std::env::current_dir()
+            .unwrap_or_default()
+            .join("apps/desktop/src-tauri/bin")
+            .join(&sidecar_filename),
+        std::env::current_dir()
+            .unwrap_or_default()
+            .join("src-tauri/bin")
+            .join(&sidecar_filename),
+        std::env::current_exe()
+            .unwrap_or_default()
+            .parent()
+            .unwrap_or(&std::path::PathBuf::from("."))
+            .join(&sidecar_filename),
     ];
 
     for path in paths_to_try {

@@ -20,24 +20,28 @@ This skill provides a standard operating procedure for using the evaluation CLI 
 >   ```bash
 >   $env:CARGO_INCREMENTAL=0; cargo run ...
 >   ```
+> * **Cargo Manifest Path from Workspace Root:** If running `cargo` commands from the root of the project, you must point to the Tauri project manifest:
+>   ```bash
+>   cargo run --manifest-path apps/desktop/src-tauri/Cargo.toml --bin eval ...
+>   ```
 
 ---
 
-## 1. Corpus Generation (`generate-corpus`)
+## 1. Corpus Generation (`generate`)
 Generates synthetic documents (mock or AI-generated) in a target directory to build the search corpus.
 
 * **Offline Mock Generation (Fast & Offline):**
   ```bash
-  cargo run --bin eval generate-corpus --corpus-dir ./my_test_docs
+  cargo run --bin eval generate --corpus-dir ./my_test_docs
   ```
 * **AI Generation via Local Model (Phi-4/Qwen/Gemma):**
   Requires local model sidecar (`llama-server`) active on port 10086:
   ```bash
-  cargo run --bin eval generate-corpus --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
+  cargo run --bin eval generate --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
   ```
 * **AI Generation via Claude (Online):**
   ```bash
-  cargo run --bin eval generate-corpus --ai --provider claude --model claude-3-5-sonnet-20241022 --api-key YOUR_API_KEY --corpus-dir ./ai_docs
+  cargo run --bin eval generate --ai --provider claude --model claude-3-5-sonnet-20241022 --api-key YOUR_API_KEY --corpus-dir ./ai_docs
   ```
 
 ---
@@ -49,6 +53,10 @@ Indexes the generated corpus, runs evaluation queries, measures latencies, and c
   ```bash
   cargo run --bin eval run --provider mock --algorithm fts --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
   ```
+* **Run Vector Retrieval Evaluation:**
+  ```bash
+  cargo run --bin eval run --provider mock --algorithm vector --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+  ```
 * **Run Hybrid Search with E5 Embeddings & Local Phi-4 Reranking:**
   *(Note: The local model health-check polling timeout is configured up to 120 seconds to allow weights to load into memory.)*
   ```bash
@@ -57,12 +65,12 @@ Indexes the generated corpus, runs evaluation queries, measures latencies, and c
 
 ---
 
-## 3. History & Query Inspection (`history` / `show` / `compare`)
+## 3. History & Query Inspection (`list` / `show` / `compare`)
 
 ### List Evaluation Runs History
 Display summary metrics (P@1, R@3, MRR, indexing/search speed) for all completed runs:
 ```bash
-cargo run --bin eval history
+cargo run --bin eval list
 ```
 
 ### Show Specific Run Details
@@ -93,7 +101,7 @@ The evaluation tool operates with two SQLite database files:
 ---
 
 ## Common Mistake Troubleshooting
-* **Pointing `show` or `history` to `evaluation_index.db`:**
+* **Pointing `show` or `history` (now `list`) to `evaluation_index.db`:**
   If you attempt to load run details pointing `--db-name` to `evaluation_index.db`, it will fail with `Error: Evaluation run #X not found.` because `evaluation_index.db` does not store evaluation history. Always point to `evaluation_history.db`.
 * **Argument Separators (`--`):**
   You can execute CLI subcommands directly without specifying double dashes:

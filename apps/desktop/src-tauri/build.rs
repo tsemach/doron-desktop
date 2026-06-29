@@ -4,7 +4,10 @@ use std::process::Command;
 fn main() {
     // Check if sidecar llama-server is present for the current target, download if missing
     if let Err(e) = ensure_sidecar_binary() {
-        println!("cargo:warning=Failed to check/download sidecar binary: {}", e);
+        println!(
+            "cargo:warning=Failed to check/download sidecar binary: {}",
+            e
+        );
     }
 
     // Run normal Tauri build step
@@ -12,20 +15,19 @@ fn main() {
 }
 
 fn ensure_sidecar_binary() -> Result<(), String> {
-    let target = std::env::var("TARGET")
-        .map_err(|e| format!("Could not read TARGET env var: {}", e))?;
-    
+    let target =
+        std::env::var("TARGET").map_err(|e| format!("Could not read TARGET env var: {}", e))?;
+
     let is_windows = target.contains("windows");
     let suffix = if is_windows { ".exe" } else { "" };
-    
+
     let sidecar_filename = format!("bin/llama-server-{}{}", target, suffix);
     let out_dir = std::env::var("CARGO_MANIFEST_DIR")
         .map_err(|e| format!("Could not read CARGO_MANIFEST_DIR: {}", e))?;
-    
+
     let dest_path = PathBuf::from(out_dir).join(&sidecar_filename);
     let dest_dir = dest_path.parent().unwrap();
-    std::fs::create_dir_all(dest_dir)
-        .map_err(|e| format!("Failed to create bin dir: {}", e))?;
+    std::fs::create_dir_all(dest_dir).map_err(|e| format!("Failed to create bin dir: {}", e))?;
 
     // Create placeholder files to satisfy Tauri's strict glob checks for DLLs and SOs on all build systems
     let placeholder_dll = dest_dir.join("placeholder.dll");
@@ -56,12 +58,16 @@ fn ensure_sidecar_binary() -> Result<(), String> {
 
     let url = match url {
         Some(u) => u,
-        None => return Err(format!("Unsupported compile target for sidecar: {}", target)),
+        None => {
+            return Err(format!(
+                "Unsupported compile target for sidecar: {}",
+                target
+            ))
+        }
     };
 
     let dest_dir = dest_path.parent().unwrap();
-    std::fs::create_dir_all(dest_dir)
-        .map_err(|e| format!("Failed to create bin dir: {}", e))?;
+    std::fs::create_dir_all(dest_dir).map_err(|e| format!("Failed to create bin dir: {}", e))?;
 
     let temp_extracted = dest_dir.join("temp_extracted");
 
@@ -89,7 +95,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
         );
 
         let status = Command::new("powershell")
-            .args(&["-Command", &script])
+            .args(["-Command", &script])
             .status()
             .map_err(|e| format!("Failed to run powershell command: {}", e))?;
 
@@ -123,7 +129,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
         );
 
         let status = Command::new("sh")
-            .args(&["-c", &script])
+            .args(["-c", &script])
             .status()
             .map_err(|e| format!("Failed to run shell script: {}", e))?;
 
@@ -132,7 +138,9 @@ fn ensure_sidecar_binary() -> Result<(), String> {
         }
     }
 
-    println!("cargo:warning=Sidecar binary successfully downloaded and placed at {:?}", dest_path);
+    println!(
+        "cargo:warning=Sidecar binary successfully downloaded and placed at {:?}",
+        dest_path
+    );
     Ok(())
 }
-

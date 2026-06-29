@@ -82,24 +82,28 @@ pub async fn execute(args: CompareArgs) -> Result<(), String> {
         format!("{}/{}", r2.provider, r2.model)
     );
     println!(
-        "{:<25} | {:<22.2} ms | {:<22.2} ms",
-        "Avg Search Latency", r1.avg_search_ms, r2.avg_search_ms
+        "{:<25} | {:<22} | {:<22}",
+        "Avg Search Latency",
+        format!("{:.2} ms", r1.avg_search_ms),
+        format!("{:.2} ms", r2.avg_search_ms)
     );
     println!(
-        "{:<25} | {:<22.2}% | {:<22.2}%",
+        "{:<25} | {:<22} | {:<22}",
         "Precision@1 (Hit@1)",
-        r1.hit_at_1 * 100.0,
-        r2.hit_at_1 * 100.0
+        format!("{:.2}%", r1.hit_at_1 * 100.0),
+        format!("{:.2}%", r2.hit_at_1 * 100.0)
     );
     println!(
-        "{:<25} | {:<22.2}% | {:<22.2}%",
+        "{:<25} | {:<22} | {:<22}",
         "Recall@3 (Hit@3)",
-        r1.hit_at_3 * 100.0,
-        r2.hit_at_3 * 100.0
+        format!("{:.2}%", r1.hit_at_3 * 100.0),
+        format!("{:.2}%", r2.hit_at_3 * 100.0)
     );
     println!(
-        "{:<25} | {:<22.4} | {:<22.4}",
-        "Mean Reciprocal Rank", r1.mrr, r2.mrr
+        "{:<25} | {:<22} | {:<22}",
+        "Mean Reciprocal Rank",
+        format!("{:.4}", r1.mrr),
+        format!("{:.4}", r2.mrr)
     );
     println!("=========================================================================");
 
@@ -125,25 +129,41 @@ pub async fn execute(args: CompareArgs) -> Result<(), String> {
                 .unwrap_or_else(|| "FAIL".to_string());
 
             let delta_rr = q2.reciprocal_rank - q1.reciprocal_rank;
-            let delta_rr_str = if delta_rr > 0.0 {
-                format!("\x1b[32m+{:.2}\x1b[0m", delta_rr)
+            let delta_rr_val = if delta_rr > 0.0 {
+                format!("+{:.2}", delta_rr)
             } else if delta_rr < 0.0 {
-                format!("\x1b[31m{:.2}\x1b[0m", delta_rr)
+                format!("{:.2}", delta_rr)
             } else {
                 "0.00".to_string()
             };
+            let padded_rr = format!("{:<10}", delta_rr_val);
+            let delta_rr_str = if delta_rr > 0.0 {
+                format!("\x1b[32m{}\x1b[0m", padded_rr)
+            } else if delta_rr < 0.0 {
+                format!("\x1b[31m{}\x1b[0m", padded_rr)
+            } else {
+                padded_rr
+            };
 
             let delta_lat = q2.search_latency_ms - q1.search_latency_ms;
-            let delta_lat_str = if delta_lat < 0.0 {
-                format!("\x1b[32m{:.1}ms\x1b[0m", delta_lat)
+            let delta_lat_val = if delta_lat < 0.0 {
+                format!("{:.1}ms", delta_lat)
             } else if delta_lat > 0.0 {
-                format!("\x1b[31m+{:.1}ms\x1b[0m", delta_lat)
+                format!("+{:.1}ms", delta_lat)
             } else {
                 "0.0ms".to_string()
             };
+            let padded_lat = format!("{:<10}", delta_lat_val);
+            let delta_lat_str = if delta_lat < 0.0 {
+                format!("\x1b[32m{}\x1b[0m", padded_lat)
+            } else if delta_lat > 0.0 {
+                format!("\x1b[31m{}\x1b[0m", padded_lat)
+            } else {
+                padded_lat
+            };
 
             println!(
-                "{:<50} | {:<8} | {:<8} | {:<19} | {:<10.1} | {:<10.1} | {:<19}",
+                "{:<50} | {:<8} | {:<8} | {} | {:<10.1} | {:<10.1} | {}",
                 if query.chars().count() > 47 {
                     format!("{}...", query.chars().take(44).collect::<String>())
                 } else {

@@ -61,9 +61,24 @@ All evaluation results are stored in `evaluation_history.db` within the applicat
 * **Linux/WSL**: `~/.local/share/com.tsemach.doron-desktop/evaluation_history.db`
 
 Commands:
-* `eval history`: Lists summary scores of all historical runs.
-* `eval history --run <ID>`: Displays query-by-query ranks and latencies for that run.
+* `eval list`: Lists summary scores of all historical runs.
+* `eval show <ID>`: Displays query-by-query ranks and latencies for that run.
 * `eval compare <ID_1> <ID_2>`: Performs a side-by-side delta comparison of run scores and latencies (highlighting regressions in red/green).
+
+---
+
+## 4. Query-by-Query Comparison Columns Explained
+
+* **Query**: The specific Hebrew search string executed.
+* **R1 Rank**: The search rank where the expected document was found in Run #1 (Base). `1` means top result, `FAIL` means not found.
+* **R2 Rank**: The search rank where the expected document was found in Run #2 (Target).
+* **Δ RR (Delta Reciprocal Rank)**: The difference in search accuracy between Run #2 and Run #1.
+  - Green positive (e.g. `+0.50`): Search accuracy improved.
+  - Red negative: Search accuracy got worse.
+  - `0.00`: No change.
+* **R1 Latency**: Query execution time in milliseconds (ms) in Run #1.
+* **R2 Latency**: Query execution time in milliseconds (ms) in Run #2.
+* **Δ Latency**: Speed difference between Run #2 and Run #1 (negative values in green mean Run #2 is faster).
 "#
     );
 }
