@@ -5,6 +5,7 @@ mod history;
 mod readme;
 mod run;
 mod show;
+mod sidecar;
 
 use clap::Parser;
 

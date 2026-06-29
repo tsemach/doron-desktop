@@ -40,22 +40,68 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
             .model
             .unwrap_or_else(|| "claude-sonnet-4-6".to_string());
 
+        let mut _sidecar_guard = crate::sidecar::SidecarGuard { child: None };
+
         if args.provider.to_lowercase() == "local" {
-            println!("Waiting for local model server to finish loading and warm up (up to 120s)...");
             let client = reqwest::Client::new();
             let health_url = "http://localhost:10086/health";
-            let mut online = false;
-            for _ in 0..240 {
-                if client.get(health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
-                    online = true;
-                    break;
+            
+            // Check if already online first
+            let already_online = client.get(health_url).send().await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false);
+
+            if already_online {
+                println!("Local model server is already online and ready.");
+            } else {
+                println!("Local model server is offline. Spawning sidecar automatically... ");
+                let sidecar_path = crate::sidecar::get_cli_sidecar_path()?;
+                let model_file = tauri_app_lib::llm::get_model_filename(&model)?;
+                let model_path = tauri_app_lib::store::cli_app_data_dir().join("models").join(model_file);
+
+                if !model_path.exists() {
+                    return Err(format!(
+                        "Local model not found at {:?}. Please download it via the desktop application settings first.",
+                        model_path
+                    ));
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+                let port = 10086;
+                let mut cmd = std::process::Command::new(&sidecar_path);
+                cmd.arg("--model")
+                    .arg(&model_path)
+                    .arg("--port")
+                    .arg(port.to_string())
+                    .arg("--threads")
+                    .arg("4")
+                    .arg("--host")
+                    .arg("127.0.0.1");
+
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    const CREATE_NO_WINDOW: u32 = 0x08000000;
+                    cmd.creation_flags(CREATE_NO_WINDOW);
+                }
+
+                let child = cmd.spawn()
+                    .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
+                _sidecar_guard.child = Some(child);
+
+                println!("Waiting for local model server to finish loading and warm up (up to 120s)...");
+                let mut online = false;
+                for _ in 0..240 {
+                    if client.get(health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+                        online = true;
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
+                if !online {
+                    return Err("Local model server did not become responsive (warmup timeout). Please verify it is running.".to_string());
+                }
+                println!("Local model server is online and ready.");
             }
-            if !online {
-                return Err("Local model server did not become responsive (warmup timeout). Please verify it is running.".to_string());
-            }
-            println!("Local model server is online and ready.");
         }
 
         let provider = get_active_provider(ProviderConfig {
