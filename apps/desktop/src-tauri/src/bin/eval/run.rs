@@ -20,10 +20,6 @@ pub struct RunArgs {
     #[arg(long, default_value = "evaluation_index.db")]
     pub db_name: String,
 
-    /// Path to the ground-truth labeled JSON dataset
-    #[arg(long, default_value = "tests/evaluation_dataset.json")]
-    pub dataset_path: String,
-
     /// LLM provider type (e.g., mock, claude, gemini, openai, local, byom)
     #[arg(long, default_value = "mock")]
     pub provider: String,
@@ -51,20 +47,28 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let corpus_path = Path::new(&args.corpus_dir);
     if !corpus_path.exists() || !corpus_path.is_dir() {
         return Err(format!(
-            "Corpus directory '{}' does not exist. Please run 'eval generate-corpus' first.",
+            "Corpus directory '{}' does not exist. Please run 'eval generate' first.",
             args.corpus_dir
         ));
     }
 
-    let dataset_file = Path::new(&args.dataset_path);
+    let dataset_file = {
+        let path_in_corpus = corpus_path.join("evaluation_dataset.json");
+        if path_in_corpus.exists() {
+            path_in_corpus
+        } else {
+            PathBuf::from("tests/evaluation_dataset.json")
+        }
+    };
+
     if !dataset_file.exists() {
         return Err(format!(
             "Dataset JSON file '{}' does not exist.",
-            args.dataset_path
+            dataset_file.display()
         ));
     }
 
-    let dataset_data = fs::read_to_string(dataset_file)
+    let dataset_data = fs::read_to_string(&dataset_file)
         .map_err(|e| format!("Failed to read dataset file: {e}"))?;
     let queries: Vec<LabeledQuery> = serde_json::from_str(&dataset_data)
         .map_err(|e| format!("Failed to parse dataset JSON: {e}"))?;
@@ -92,6 +96,11 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .map(|e| e.path().to_path_buf())
+        .filter(|p| {
+            p.file_name()
+                .map(|n| n != "evaluation_dataset.json")
+                .unwrap_or(true)
+        })
         .collect();
 
     if files.is_empty() {

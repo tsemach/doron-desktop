@@ -20,47 +20,43 @@ This skill provides a standard operating procedure for using the evaluation CLI 
 >   ```bash
 >   $env:CARGO_INCREMENTAL=0; cargo run ...
 >   ```
-> * **Cargo Manifest Path from Workspace Root:** If running `cargo` commands from the root of the project, you must point to the Tauri project manifest:
->   ```bash
->   cargo run --manifest-path apps/desktop/src-tauri/Cargo.toml --bin eval ...
->   ```
 
 ---
 
 ## 1. Corpus Generation (`generate`)
-Generates synthetic documents (mock or AI-generated) in a target directory to build the search corpus.
+Generates synthetic documents (mock or AI-generated) in a target directory to build the search corpus, and generates 3 custom Hebrew search queries for each document inside a local `evaluation_dataset.json` file.
 
 * **Offline Mock Generation (Fast & Offline):**
   ```bash
-  cargo run --bin eval generate --corpus-dir ./my_test_docs
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --corpus-dir ./my_test_docs
   ```
 * **AI Generation via Local Model (Phi-4/Qwen/Gemma):**
   Requires local model sidecar (`llama-server`) active on port 10086:
   ```bash
-  cargo run --bin eval generate --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
   ```
 * **AI Generation via Claude (Online):**
   ```bash
-  cargo run --bin eval generate --ai --provider claude --model claude-3-5-sonnet-20241022 --api-key YOUR_API_KEY --corpus-dir ./ai_docs
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --ai --provider claude --model claude-3-5-sonnet-20241022 --api-key YOUR_API_KEY --corpus-dir ./ai_docs
   ```
 
 ---
 
 ## 2. Running Benchmark Evaluations (`run`)
-Indexes the generated corpus, runs evaluation queries, measures latencies, and computes Precision@1, Recall@3, and Mean Reciprocal Rank (MRR).
+Indexes the generated corpus, autodetects `evaluation_dataset.json` in the corpus directory, runs queries, measures latencies, and computes Precision@1, Recall@3, and Mean Reciprocal Rank (MRR).
 
 * **Run Full-Text Search (FTS) Evaluation:**
   ```bash
-  cargo run --bin eval run --provider mock --algorithm fts --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider mock --algorithm fts --corpus-dir ./my_test_docs
   ```
 * **Run Vector Retrieval Evaluation:**
   ```bash
-  cargo run --bin eval run --provider mock --algorithm vector --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider mock --algorithm vector --corpus-dir ./my_test_docs
   ```
 * **Run Hybrid Search with E5 Embeddings & Local Phi-4 Reranking:**
   *(Note: The local model health-check polling timeout is configured up to 120 seconds to allow weights to load into memory.)*
   ```bash
-  cargo run --bin eval run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid --dataset-path apps/desktop/src-tauri/tests/evaluation_dataset.json
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./my_test_docs
   ```
 
 ---
@@ -70,19 +66,19 @@ Indexes the generated corpus, runs evaluation queries, measures latencies, and c
 ### List Evaluation Runs History
 Display summary metrics (P@1, R@3, MRR, indexing/search speed) for all completed runs:
 ```bash
-cargo run --bin eval list
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml list
 ```
 
 ### Show Specific Run Details
 Query-by-query breakdown of rank matches, latencies, and success/fail status for a specific run (e.g. Run `#4`):
 ```bash
-cargo run --bin eval show 4
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml show 4
 ```
 
 ### Compare Runs
 Compare retrieval performance and speed changes side-by-side between two runs (e.g. Base `#1` vs Target `#2`):
 ```bash
-cargo run --bin eval compare 1 2
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml compare 1 2
 ```
 
 ---
@@ -101,7 +97,7 @@ The evaluation tool operates with two SQLite database files:
 ---
 
 ## Common Mistake Troubleshooting
-* **Pointing `show` or `history` (now `list`) to `evaluation_index.db`:**
+* **Pointing `show` or `list` to `evaluation_index.db`:**
   If you attempt to load run details pointing `--db-name` to `evaluation_index.db`, it will fail with `Error: Evaluation run #X not found.` because `evaluation_index.db` does not store evaluation history. Always point to `evaluation_history.db`.
 * **Argument Separators (`--`):**
   You can execute CLI subcommands directly without specifying double dashes:

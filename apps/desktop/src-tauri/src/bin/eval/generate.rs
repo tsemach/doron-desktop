@@ -87,12 +87,76 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
         }
     }
 
+    // Generate evaluation dataset json containing 3 queries per document
+    let mut dataset = Vec::new();
+    for (filename, doc_type, desc) in &documents {
+        let queries = generate_queries(filename, doc_type, desc);
+        for q in queries {
+            dataset.push(serde_json::json!({
+                "query": q,
+                "expected_files": vec![filename.clone()]
+            }));
+        }
+    }
+    let dataset_path = out_dir.join("evaluation_dataset.json");
+    let dataset_json = serde_json::to_string_pretty(&dataset)
+        .map_err(|e| format!("Failed to serialize dataset JSON: {e}"))?;
+    fs::write(&dataset_path, dataset_json)
+        .map_err(|e| format!("Failed to write evaluation_dataset.json: {e}"))?;
+
     println!(
         "\x1b[32mSuccess!\x1b[0m Generated {} files in {}",
         documents.len(),
         out_dir.display()
     );
     Ok(())
+}
+
+fn generate_queries(filename: &str, doc_type: &str, desc: &str) -> Vec<String> {
+    let hebrew_type = match doc_type {
+        "contract" => "חוזה",
+        "report" => "דוח",
+        "will" => "צוואה",
+        "letter" => "מכתב",
+        "invoice" => "חשבונית",
+        "memo" => "תזכיר",
+        _ => "מסמך",
+    };
+
+    let parts: Vec<&str> = desc
+        .split(|c| c == '.' || c == ',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let q1 = if !parts.is_empty() {
+        parts[0].to_string()
+    } else {
+        format!("חיפוש {} {}", hebrew_type, filename.replace(".txt", "").replace('_', " "))
+    };
+
+    let q2 = if parts.len() > 1 {
+        let clean_part = parts[1].replace(':', " ");
+        format!("{} {}", hebrew_type, clean_part)
+    } else {
+        format!("{} קובץ {}", hebrew_type, filename.replace(".txt", "").replace('_', " "))
+    };
+
+    let q3 = if parts.len() > 2 {
+        let clean_part = parts[2].replace(':', " ");
+        format!("{} {}", hebrew_type, clean_part)
+    } else if !parts.is_empty() {
+        let words: Vec<&str> = parts[0].split_whitespace().collect();
+        if words.len() > 2 {
+            format!("{} {}", hebrew_type, words[words.len() - 2..].join(" "))
+        } else {
+            format!("{} חיפוש", hebrew_type)
+        }
+    } else {
+        format!("{} מסמך", hebrew_type)
+    };
+
+    vec![q1, q2, q3]
 }
 
 fn get_corpus_templates() -> Vec<(String, String, String)> {
