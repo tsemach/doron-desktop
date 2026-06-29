@@ -19,6 +19,18 @@ async fn test_download_core(
         .map_err(|e| format!("Failed to build client: {}", e))?;
 
     let mut current_size = std::fs::metadata(temp_path).map(|m| m.len()).unwrap_or(0);
+
+    // Test-specific safe margin of 16KB to verify the backtracking and truncation logic
+    let safe_margin = 16 * 1024; // 16KB
+    if current_size > safe_margin {
+        current_size -= safe_margin;
+        if let Ok(file) = std::fs::OpenOptions::new().write(true).open(temp_path) {
+            let _ = file.set_len(current_size);
+        }
+    } else {
+        current_size = 0;
+    }
+
     let mut req = client.get(url);
     if current_size > 0 {
         req = req.header(reqwest::header::RANGE, format!("bytes={}-", current_size));
@@ -304,8 +316,8 @@ async fn test_range_error_fallback() {
     let _ = fs::remove_file(&temp_file);
     let _ = fs::remove_file(&dest_file);
 
-    // Write invalid/too-large mock temp file to trigger RANGE_NOT_SATISFIABLE (size 60KB > server size 50KB)
-    fs::write(&temp_file, vec![0; 60 * 1024]).unwrap();
+    // Write invalid/too-large mock temp file to trigger RANGE_NOT_SATISFIABLE (size 70KB > server size 50KB)
+    fs::write(&temp_file, vec![0; 70 * 1024]).unwrap();
 
     let res = test_download_core(&server_url, &temp_file, &dest_file, None).await;
     assert!(res.is_ok(), "Fallback failed: {:?}", res);
@@ -341,3 +353,49 @@ async fn test_checksum_mismatch_failure() {
     let _ = fs::remove_file(&temp_file);
     server_handle.abort();
 }
+
+#[tokio::test]
+async fn test_multiple_resumes_success() {
+    let test_data = (0..200 * 1024).map(|i| (i % 256) as u8).collect::<Vec<u8>>(); // 200KB patterned bytes
+    let mut hasher = Sha256::new();
+    hasher.update(&test_data);
+    let expected_sha256 = format!("{:x}", hasher.finalize());
+
+    let (server_url, server_handle) = run_mock_server(test_data.clone(), expected_sha256.clone()).await;
+    
+    let temp_dir = std::env::temp_dir();
+    let temp_file = temp_dir.join("test_multi_resume.download");
+    let dest_file = temp_dir.join("test_multi_resume.gguf");
+    
+    let _ = fs::remove_file(&temp_file);
+    let _ = fs::remove_file(&dest_file);
+
+    // 1. First attempt: fail at 30KB
+    let res = test_download_core(&server_url, &temp_file, &dest_file, Some(30 * 1024)).await;
+    assert!(res.is_err());
+    assert_eq!(fs::metadata(&temp_file).unwrap().len(), 30 * 1024);
+
+    // 2. Second attempt: fail at 75KB
+    let res = test_download_core(&server_url, &temp_file, &dest_file, Some(75 * 1024)).await;
+    assert!(res.is_err());
+    assert_eq!(fs::metadata(&temp_file).unwrap().len(), 75 * 1024);
+
+    // 3. Third attempt: fail at 140KB
+    let res = test_download_core(&server_url, &temp_file, &dest_file, Some(140 * 1024)).await;
+    assert!(res.is_err());
+    assert_eq!(fs::metadata(&temp_file).unwrap().len(), 140 * 1024);
+
+    // 4. Final attempt: complete download
+    let res = test_download_core(&server_url, &temp_file, &dest_file, None).await;
+    assert!(res.is_ok(), "Final resume failed: {:?}", res);
+    assert!(dest_file.exists());
+    assert!(!temp_file.exists());
+
+    let downloaded_data = fs::read(&dest_file).unwrap();
+    assert_eq!(downloaded_data, test_data);
+
+    let _ = fs::remove_file(&temp_file);
+    let _ = fs::remove_file(&dest_file);
+    server_handle.abort();
+}
+

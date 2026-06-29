@@ -175,43 +175,78 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
         let res = runtime.block_on(async {
             let client = reqwest::Client::builder()
                 .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .redirect(reqwest::redirect::Policy::none()) // Handle redirects manually
                 .build()
                 .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
             let mut current_size = std::fs::metadata(&temp_path).map(|m| m.len()).unwrap_or(0);
-            let mut req = client.get(url);
-            if current_size > 0 {
-                req = req.header(reqwest::header::RANGE, format!("bytes={}-", current_size));
+
+            // To prevent corruption from partially-written or zero-padded blocks when the app was closed abruptly,
+            // we backtrack and truncate the temporary file by a safe margin of 2MB and resume from there.
+            let safe_margin = 2 * 1024 * 1024; // 2MB
+            if current_size > safe_margin {
+                current_size -= safe_margin;
+                if let Ok(file) = std::fs::OpenOptions::new().write(true).open(&temp_path) {
+                    let _ = file.set_len(current_size);
+                }
+            } else {
+                current_size = 0;
             }
 
-            let mut response = req.send().await
-                .map_err(|e| format!("Failed to connect to model host: {}", e))?;
+            let mut current_url = url.to_string();
+            let mut expected_sha256 = None;
+            let mut response = loop {
+                let mut req = client.get(&current_url);
+                if current_size > 0 {
+                    req = req.header(reqwest::header::RANGE, format!("bytes={}-", current_size));
+                }
 
-            let expected_sha256 = {
-                let mut sha = None;
-                if let Some(etag_header) = response.headers().get("etag") {
-                    let etag_str = etag_header.to_str().unwrap_or("").trim_matches('"');
+                let resp = req.send().await
+                    .map_err(|e| format!("Failed to connect to model host: {}", e))?;
+
+                // Extract expected SHA256 from x-linked-etag or etag in any response header
+                if let Some(x_etag) = resp.headers().get("x-linked-etag") {
+                    let etag_str = x_etag.to_str().unwrap_or("").trim_matches('"');
                     if etag_str.len() == 64 && etag_str.chars().all(|c| c.is_ascii_hexdigit()) {
-                        sha = Some(etag_str.to_string());
+                        expected_sha256 = Some(etag_str.to_string());
                     }
                 }
-                if sha.is_none() {
-                    if let Some(x_etag) = response.headers().get("x-linked-etag") {
-                        let etag_str = x_etag.to_str().unwrap_or("").trim_matches('"');
+                if expected_sha256.is_none() {
+                    if let Some(etag_header) = resp.headers().get("etag") {
+                        let etag_str = etag_header.to_str().unwrap_or("").trim_matches('"');
                         if etag_str.len() == 64 && etag_str.chars().all(|c| c.is_ascii_hexdigit()) {
-                            sha = Some(etag_str.to_string());
+                            expected_sha256 = Some(etag_str.to_string());
                         }
                     }
                 }
-                sha
+
+                if resp.status().is_redirection() {
+                    if let Some(location) = resp.headers().get(reqwest::header::LOCATION) {
+                        current_url = location.to_str()
+                            .map_err(|e| format!("Invalid redirect URI: {}", e))?.to_string();
+                        continue;
+                    }
+                }
+                break resp;
             };
 
             // If the range was invalid or out of bounds (e.g. server range error), delete the file and start over
             if response.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
                 let _ = std::fs::remove_file(&temp_path);
                 current_size = 0;
-                response = client.get(url).send().await
-                    .map_err(|e| format!("Failed to connect to model host: {}", e))?;
+                current_url = url.to_string();
+                response = loop {
+                    let resp = client.get(&current_url).send().await
+                        .map_err(|e| format!("Failed to connect to model host: {}", e))?;
+                    if resp.status().is_redirection() {
+                        if let Some(location) = resp.headers().get(reqwest::header::LOCATION) {
+                            current_url = location.to_str()
+                                .map_err(|e| format!("Invalid redirect URI: {}", e))?.to_string();
+                            continue;
+                        }
+                    }
+                    break resp;
+                };
             }
 
             if !response.status().is_success() {
@@ -279,6 +314,9 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
                     error: None,
                 });
             }
+
+            // Drop write handle to close the file and flush all pending buffers to disk on Windows
+            drop(file);
 
             std::fs::rename(&temp_path, &dest_path)
                 .map_err(|e| format!("Failed to finalize model file: {}", e))?;
