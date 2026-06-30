@@ -150,6 +150,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
+        println!("Spawning local sidecar: {:?}", cmd);
         let child = cmd
             .spawn()
             .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
