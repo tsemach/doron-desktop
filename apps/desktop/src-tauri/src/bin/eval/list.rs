@@ -2,7 +2,7 @@ use clap::Args;
 use tauri_app_lib::store;
 
 #[derive(Args, Debug, Clone)]
-pub struct HistoryArgs {
+pub struct ListArgs {
     /// Name/path of the SQLite database to read history from
     #[arg(long, default_value = "evaluation_history.db")]
     pub db_name: String,
@@ -12,7 +12,7 @@ pub struct HistoryArgs {
     pub run: Option<i64>,
 }
 
-pub async fn execute(args: HistoryArgs) -> Result<(), String> {
+pub async fn execute(args: ListArgs) -> Result<(), String> {
     let db_path = store::cli_db_path(&args.db_name);
     if !db_path.exists() {
         println!(

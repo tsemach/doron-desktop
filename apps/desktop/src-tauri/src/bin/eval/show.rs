@@ -23,5 +23,5 @@ pub async fn execute(args: ShowArgs) -> Result<(), String> {
     let conn = rusqlite::Connection::open(&db_path)
         .map_err(|e| format!("Failed to open history database: {}", e))?;
 
-    super::history::show_run_details(&conn, args.run_id)
+    super::list::show_run_details(&conn, args.run_id)
 }

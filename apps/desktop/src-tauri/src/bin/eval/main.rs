@@ -1,7 +1,7 @@
 mod compare;
 mod examples;
 mod generate;
-mod history;
+mod list;
 mod readme;
 mod run;
 mod show;
@@ -29,7 +29,7 @@ pub enum Commands {
     Generate(generate::GenerateArgs),
 
     /// List all historical evaluation runs
-    List(history::HistoryArgs),
+    List(list::ListArgs),
 
     /// Compare two evaluation runs side-by-side
     Compare(compare::CompareArgs),
@@ -50,7 +50,7 @@ async fn main() {
     let result = match cli.command {
         Commands::Run(args) => run::execute(args).await,
         Commands::Generate(args) => generate::execute(args).await,
-        Commands::List(args) => history::execute(args).await,
+        Commands::List(args) => list::execute(args).await,
         Commands::Compare(args) => compare::execute(args).await,
         Commands::Show(args) => show::execute(args).await,
         Commands::Examples(args) => examples::execute(args).await,
