@@ -158,6 +158,9 @@ pub async fn install_local_model(app: AppHandle, model_name: String) -> Result<(
         downloads_guard.insert(model_name.clone());
     }
 
+    // Prevent system sleep during download
+    let _guard = crate::power::SleepPreventionGuard::new(false);
+
     let url = get_model_url(&model_name)?;
     let filename = get_model_filename(&model_name)?;
     let models_dir = app.path().app_data_dir()

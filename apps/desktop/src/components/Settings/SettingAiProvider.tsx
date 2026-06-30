@@ -283,6 +283,8 @@ export default function SettingAiProvider({
     }
   };
 
+  // Note: Commented out because TS6133 (unused local) is enabled and this is currently not called in the UI.
+  /*
   const handleCancelHealthCheck = async () => {
     isCancelledRef.current = true;
     setCheckingHealth(false);
@@ -294,6 +296,7 @@ export default function SettingAiProvider({
       console.error("Failed to stop llama server on cancel:", err);
     }
   };
+  */
 
   const getAvailableModels = () => {
     const key = aiProvider.toLowerCase();

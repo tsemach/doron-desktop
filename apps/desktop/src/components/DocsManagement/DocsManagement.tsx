@@ -75,6 +75,9 @@ export default function DocsManagement() {
     });
 
     try {
+      await invoke("prevent_sleep", { keepDisplayOn: false }).catch((err) => {
+        console.error("Failed to prevent sleep:", err);
+      });
       const result = folder
         ? await invoke<IndexSummary>("index_folder", { folderPath: path, apiKey })
         : await invoke<IndexSummary>("index_file", { filePath: path, apiKey });
@@ -85,6 +88,9 @@ export default function DocsManagement() {
       setIsProcessing(false);
       unlistenRef.current?.();
       unlistenRef.current = null;
+      await invoke("allow_sleep").catch((err) => {
+        console.error("Failed to allow sleep:", err);
+      });
     }
   }
 

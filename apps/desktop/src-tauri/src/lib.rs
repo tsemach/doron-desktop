@@ -12,6 +12,7 @@ pub mod embeddings;
 pub mod email;
 pub mod documents;
 pub mod clipboard;
+pub mod power;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -121,7 +122,9 @@ pub fn run() {
             email::list_case_attachments,
             email::remove_attachment,
             clipboard::read_clipboard,
-            clipboard::write_clipboard
+            clipboard::write_clipboard,
+            power::prevent_sleep,
+            power::allow_sleep
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

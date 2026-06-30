@@ -44,6 +44,7 @@ struct LabeledQuery {
 }
 
 pub async fn execute(args: RunArgs) -> Result<(), String> {
+    let _guard = tauri_app_lib::power::SleepPreventionGuard::new(false);
     let corpus_path = Path::new(&args.corpus_dir);
     if !corpus_path.exists() || !corpus_path.is_dir() {
         return Err(format!(
