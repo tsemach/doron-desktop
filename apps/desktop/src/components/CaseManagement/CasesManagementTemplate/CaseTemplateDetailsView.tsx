@@ -56,7 +56,7 @@ export default function CaseTemplateDetailsView({
       return;
     }
     try {
-      await invoke("open_template_file", { path });
+      await invoke("open_path", { path });
     } catch (err) {
       alert(`Failed to open template file: ${err}`);
     }

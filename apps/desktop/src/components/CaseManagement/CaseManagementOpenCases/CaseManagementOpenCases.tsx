@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { openPath } from "@tauri-apps/plugin-opener";
+
 import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsModal";
 import OpenCasesCaseAnnotationsModal from "./OpenCasesCaseAnnotationsModal";
 import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
@@ -149,7 +149,7 @@ export default function CaseManagementOpenCases() {
 
   async function handleOpenFile(filePath: string) {
     try {
-      await openPath(filePath);
+      await invoke("open_path", { path: filePath });
     } catch (e) {
       console.error("Failed to open file:", e);
       alert(`Failed to open file: ${e}`);
@@ -158,7 +158,7 @@ export default function CaseManagementOpenCases() {
 
   async function handleOpenFolder(folderPath: string) {
     try {
-      await openPath(folderPath);
+      await invoke("open_path", { path: folderPath });
     } catch (e) {
       console.error("Failed to open folder:", e);
       alert(`Failed to open folder: ${e}`);

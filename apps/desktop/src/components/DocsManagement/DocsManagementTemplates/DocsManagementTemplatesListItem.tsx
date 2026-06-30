@@ -28,7 +28,7 @@ export default function DocsManagementTemplatesListItem({
   const handleOpenDoc = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await invoke("open_template_file", { path: template.marked_path });
+      await invoke("open_path", { path: template.marked_path });
     } catch (err) {
       console.error("Failed to open template document:", err);
     }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { openPath } from "@tauri-apps/plugin-opener";
+
 import { useLanguage } from "../../../context/LanguageContext";
 
 interface CaseEmail {
@@ -128,7 +128,7 @@ export default function CaseEmailsChat({ caseId, caseFolder }: CaseEmailsChatPro
       if (att.is_imported && caseFolder && !filePath.toLowerCase().includes(caseFolder.toLowerCase().replace(/\\/g, "/"))) {
         filePath = `${caseFolder}/${att.name}`.replace(/\\/g, "/");
       }
-      await openPath(filePath);
+      await invoke("open_path", { path: filePath });
     } catch (e) {
       console.error("Failed to open attachment:", e);
       alert(`Failed to open file: ${e}`);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { openPath } from "@tauri-apps/plugin-opener";
+
 import { Button } from "../ui/button";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
 
@@ -142,7 +142,7 @@ export default function DocsManagementSearch() {
 
   async function handleOpenFile(path: string) {
     try {
-      await openPath(path);
+      await invoke("open_path", { path });
     } catch (e) {
       console.error("Failed to open file:", e);
       alert(`Failed to open file: ${e}`);

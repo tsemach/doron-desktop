@@ -5,8 +5,6 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { CaseTemplate, DocTemplate } from "./CaseManagementTypes";
 import mammoth from "mammoth";
-import { openPath } from "@tauri-apps/plugin-opener";
-
 
 
 export default function CaseManagementCaseCreate() {
@@ -242,7 +240,7 @@ export default function CaseManagementCaseCreate() {
   const handleOpenTemplateFile = async (e: React.MouseEvent, filePath: string) => {
     e.stopPropagation();
     try {
-      await openPath(filePath);
+      await invoke("open_path", { path: filePath });
     } catch (err) {
       console.error("Failed to open template file:", err);
       alert(`Failed to open template file: ${err}`);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "../../../context/LanguageContext";
 
 import { Case } from "../CaseManagementTypes";
@@ -45,7 +45,7 @@ export default function OpenDocumentsPanelTopMenu({
 
   async function handleOpenFolder(folderPath: string) {
     try {
-      await openPath(folderPath);
+      await invoke("open_path", { path: folderPath });
     } catch (e) {
       console.error("Failed to open folder:", e);
       alert(`Failed to open folder: ${e}`);

@@ -378,7 +378,7 @@ pub async fn process_template(
     let id = store::insert_template(&conn, &record).map_err(|e| e.to_string())?;
 
     emit_progress(&app, "processing", "opening template editor...");
-    if let Err(e) = open_template_file(marked_path_str.clone()) {
+    if let Err(e) = open_path(marked_path_str.clone()) {
         eprintln!("Failed to open template file: {e}");
     }
 
@@ -683,24 +683,25 @@ pub async fn fill_document_placeholders(
 }
 
 #[tauri::command]
-pub fn open_template_file(path: String) -> Result<(), String> {
-    println!("[open_template_file] Attempting to open path: {}", path);
+pub fn open_path(path: String) -> Result<(), String> {
+    println!("[open_path] Attempting to open path: {}", path);
 
     #[cfg(target_os = "linux")]
     {
-        let is_wsl = std::path::Path::new("/proc/sys/fs/binfmt_misc/WSLInterop").exists()
+        let is_wsl = std::path::Path::new("/proc/sys/fs/binfmt_misc/WSInterop").exists()
+            || std::path::Path::new("/proc/sys/fs/binfmt_misc/WSLInterop").exists()
             || std::env::var("WSL_DISTRO_NAME").is_ok();
-        println!("[open_template_file] target_os = linux, is_wsl = {}", is_wsl);
+        println!("[open_path] target_os = linux, is_wsl = {}", is_wsl);
 
         if is_wsl {
-            println!("[open_template_file] Detected WSL. Trying wslpath + powershell...");
+            println!("[open_path] Detected WSL. Trying wslpath + powershell...");
             match std::process::Command::new("wslpath")
                 .args(&["-w", &path])
                 .output()
             {
                 Ok(output) if output.status.success() => {
                     let win_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    println!("[open_template_file] Resolved Windows path: {}", win_path);
+                    println!("[open_path] Resolved Windows path: {}", win_path);
                     if !win_path.is_empty() {
                         match std::process::Command::new("powershell.exe")
                             .args(&["-NoProfile", "-Command", &format!("Start-Process '{}'", win_path)])
@@ -708,105 +709,105 @@ pub fn open_template_file(path: String) -> Result<(), String> {
                         {
                             Ok(ps_out) => {
                                 if ps_out.status.success() {
-                                    println!("[open_template_file] Successfully opened via powershell Start-Process");
+                                    println!("[open_path] Successfully opened via powershell Start-Process");
                                     return Ok(());
                                 } else {
                                     let err_msg = String::from_utf8_lossy(&ps_out.stderr).trim().to_string();
-                                    eprintln!("[open_template_file] powershell exit code failed. Stderr: {}", err_msg);
+                                    eprintln!("[open_path] powershell exit code failed. Stderr: {}", err_msg);
                                 }
                             }
                             Err(e) => {
-                                eprintln!("[open_template_file] Failed to spawn powershell.exe: {}", e);
+                                eprintln!("[open_path] Failed to spawn powershell.exe: {}", e);
                             }
                         }
                     } else {
-                        eprintln!("[open_template_file] Resolved Windows path is empty");
+                        eprintln!("[open_path] Resolved Windows path is empty");
                     }
                 }
                 Ok(output) => {
                     let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                    eprintln!("[open_template_file] wslpath failed. Stderr: {}", err_msg);
+                    eprintln!("[open_path] wslpath failed. Stderr: {}", err_msg);
                 }
                 Err(e) => {
-                    eprintln!("[open_template_file] Failed to spawn wslpath: {}", e);
+                    eprintln!("[open_path] Failed to spawn wslpath: {}", e);
                 }
             }
 
-            println!("[open_template_file] Falling back to wslview...");
+            println!("[open_path] Falling back to wslview...");
             match std::process::Command::new("wslview")
                 .arg(&path)
                 .output()
             {
                 Ok(output) => {
                     if output.status.success() {
-                        println!("[open_template_file] Successfully opened via wslview");
+                        println!("[open_path] Successfully opened via wslview");
                         return Ok(());
                     } else {
                         let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                        eprintln!("[open_template_file] wslview failed. Stderr: {}", err_msg);
+                        eprintln!("[open_path] wslview failed. Stderr: {}", err_msg);
                     }
                 }
                 Err(e) => {
-                    eprintln!("[open_template_file] Failed to spawn wslview: {}", e);
+                    eprintln!("[open_path] Failed to spawn wslview: {}", e);
                 }
             }
         }
 
-        println!("[open_template_file] Trying xdg-open...");
+        println!("[open_path] Trying xdg-open...");
         match std::process::Command::new("xdg-open")
             .arg(&path)
             .output()
         {
             Ok(output) => {
                 if output.status.success() {
-                    println!("[open_template_file] Successfully opened via xdg-open");
+                    println!("[open_path] Successfully opened via xdg-open");
                     return Ok(());
                 } else {
                     let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                    eprintln!("[open_template_file] xdg-open failed. Stderr: {}", err_msg);
+                    eprintln!("[open_path] xdg-open failed. Stderr: {}", err_msg);
                 }
             }
             Err(e) => {
-                eprintln!("[open_template_file] Failed to spawn xdg-open: {}", e);
+                eprintln!("[open_path] Failed to spawn xdg-open: {}", e);
             }
         }
 
-        Err("Failed to open template file via powershell, wslview, or xdg-open".to_string())
+        Err("Failed to open file via powershell, wslview, or xdg-open".to_string())
     }
 
     #[cfg(target_os = "windows")]
     {
-        println!("[open_template_file] target_os = windows. Trying cmd start...");
+        println!("[open_path] target_os = windows. Trying cmd start...");
         let status = std::process::Command::new("cmd")
             .args(&["/C", "start", "", &path])
             .status();
         if let Ok(s) = status {
             if s.success() {
-                println!("[open_template_file] Successfully opened via cmd start");
+                println!("[open_path] Successfully opened via cmd start");
                 return Ok(());
             }
         }
-        Err("Failed to open template file via cmd.exe".to_string())
+        Err("Failed to open file via cmd.exe".to_string())
     }
 
     #[cfg(target_os = "macos")]
     {
-        println!("[open_template_file] target_os = macos. Trying open command...");
+        println!("[open_path] target_os = macos. Trying open command...");
         let status = std::process::Command::new("open")
             .arg(&path)
             .status();
         if let Ok(s) = status {
             if s.success() {
-                println!("[open_template_file] Successfully opened via open command");
+                println!("[open_path] Successfully opened via open command");
                 return Ok(());
             }
         }
-        Err("Failed to open template file via open".to_string())
+        Err("Failed to open file via open".to_string())
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
-        eprintln!("[open_template_file] Unsupported OS");
+        eprintln!("[open_path] Unsupported OS");
         Err("Unsupported operating system".to_string())
     }
 }

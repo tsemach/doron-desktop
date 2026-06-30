@@ -71,7 +71,7 @@ export default function OpenCasesDocumentHistory({
 
   async function handleOpenVersion(version: DocumentVersion) {
     try {
-      await invoke("open_template_file", { path: version.version_path });
+      await invoke("open_path", { path: version.version_path });
     } catch (e) {
       console.error("Failed to open version file:", e);
       alert(`Failed to open version file: ${e}`);
