@@ -13,6 +13,7 @@ import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
 import CaseEmailsChat from "./OpenCasesEmailsChat";
 import OpenCasesDocumentPreview from "./OpenCasesDocumentPreview";
 import OpenCasesDocumentHistory from "./OpenCasesDocumentHistory";
+import OpenCasesDocumentFields from "./OpenCasesDocumentFields";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
 
@@ -37,7 +38,7 @@ export default function CaseManagementOpenCasesDetails() {
 
   // Right side panel tab state
   const [activeRightTab, setActiveRightTab] = useState<"preview" | "emails">("preview");
-  const [docSubTab, setDocSubTab] = useState<"preview" | "history">("preview");
+  const [docSubTab, setDocSubTab] = useState<"preview" | "history" | "fields">("preview");
 
   // Document preview states
   const [selectedDocument, setSelectedDocument] = useState<CaseFile | null>(null);
@@ -551,6 +552,16 @@ export default function CaseManagementOpenCasesDetails() {
                 >
                   Version History
                 </button>
+                <button
+                  onClick={() => setDocSubTab("fields")}
+                  className={`text-xs font-semibold pb-1 border-b-2 px-1 transition-all focus:outline-none focus:ring-0 cursor-pointer ${
+                    docSubTab === "fields"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t("document_fields") || "Document fields"}
+                </button>
               </div>
             )}
 
@@ -568,6 +579,20 @@ export default function CaseManagementOpenCasesDetails() {
                       loadDocuments(selectedCase.folder);
                     }
                     setDocSubTab("preview"); // Switch back to preview
+                  }}
+                />
+              ) : docSubTab === "fields" && selectedDocument ? (
+                <OpenCasesDocumentFields
+                  selectedDocument={selectedDocument}
+                  caseId={Number(selectedCase?.id || 0)}
+                  onSaved={() => {
+                    if (selectedCase?.folder) {
+                      loadDocuments(selectedCase.folder);
+                    }
+                    setDocSubTab("preview");
+                  }}
+                  onCancel={() => {
+                    setDocSubTab("preview");
                   }}
                 />
               ) : (

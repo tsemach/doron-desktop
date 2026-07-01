@@ -37,11 +37,14 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let uri = format!("file:{}?nolock=1", path.to_string_lossy());
     let conn = Connection::open_with_flags(
-        uri,
-        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_URI,
+        path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
     ).map_err(|e| e.to_string())?;
+    
+    // Enable WAL journal mode and busy timeout for safe concurrent writes
+    let _ = conn.execute("PRAGMA journal_mode = WAL;", []);
+    let _ = conn.execute("PRAGMA busy_timeout = 5000;", []);
     conn.execute("PRAGMA foreign_keys = ON;", []).map_err(|e| e.to_string())?;
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS cases (

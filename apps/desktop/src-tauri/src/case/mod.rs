@@ -719,4 +719,148 @@ pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|e| format!("Failed to read file from disk: {e}"))
 }
 
+#[tauri::command]
+pub async fn save_case_document_fields(
+    app: AppHandle,
+    case_id: i64,
+    file_name: String,
+    fields: std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+
+    // 1. Open DB first
+    let conn = store::open_db(&app)?;
+
+    // 2. Save fields to case_fields
+    for (key, val) in &fields {
+        conn.execute(
+            "INSERT OR REPLACE INTO case_fields (case_id, field_name, field_value) VALUES (?1, ?2, ?3)",
+            params![case_id, key, val],
+        ).map_err(|e| format!("[save_case_document_fields] {e}"))?;
+    }
+
+    // 3. Load all fields for this case to merge them
+    let mut all_fields = std::collections::HashMap::new();
+    let mut stmt = conn
+        .prepare("SELECT field_name, field_value FROM case_fields WHERE case_id = ?1")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![case_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+    for r in rows {
+        if let Ok((name, val)) = r {
+            all_fields.insert(name, val);
+        }
+    }
+
+    // 4. Find the template path for this file name
+    let mut doc_stmt = conn
+        .prepare("SELECT marked_path, file_ext FROM doc_templates WHERE file_name = ?1")
+        .map_err(|e| e.to_string())?;
+    let (marked_path_str, file_ext): (String, String) = doc_stmt
+        .query_row(params![file_name], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .map_err(|e| format!("Failed to find doc template with file_name {file_name}: {e}"))?;
+
+    // 5. Get folder path for the case
+    let folder_path: String = conn.query_row(
+        "SELECT folder FROM cases WHERE id = ?1",
+        params![case_id],
+        |row| row.get(0)
+    ).map_err(|e| format!("Failed to find case: {e}"))?;
+
+    let dest_path = Path::new(&folder_path).join(&file_name);
+
+    // 6. Create version backup of the active file before overwriting (if it exists)
+    if dest_path.exists() {
+        if let Err(e) = crate::documents::versioning::create_document_backup_if_exists(
+            &app,
+            &dest_path,
+            Some("State before document fields update".to_string()),
+            true,
+            false,
+        ) {
+            println!("Failed to create document version backup before update: {}", e);
+        }
+    }
+
+    // 7. Regenerate the file from template with updated merged fields
+    let marked_path = Path::new(&marked_path_str);
+    if !marked_path.exists() {
+        return Err(format!("Template file not found at {marked_path_str}"));
+    }
+
+    if file_ext == "docx" {
+        let original_bytes = std::fs::read(marked_path)
+            .map_err(|e| format!("Failed to read marked docx: {e}"))?;
+
+        let cursor = std::io::Cursor::new(original_bytes);
+        let mut archive = zip::ZipArchive::new(cursor)
+            .map_err(|e| format!("Cannot open marked docx ZIP: {e}"))?;
+
+        let doc_xml = {
+            let mut f = archive
+                .by_name("word/document.xml")
+                .map_err(|_| "word/document.xml not found".to_string())?;
+            let mut s = String::new();
+            f.read_to_string(&mut s).map_err(|e| e.to_string())?;
+            s
+        };
+
+        let mut new_doc_xml = doc_xml;
+        new_doc_xml = crate::doc_template::replace_docx_placeholders(&new_doc_xml, &all_fields);
+
+        let out_buf: Vec<u8> = Vec::new();
+        let out_cursor = std::io::Cursor::new(out_buf);
+        let mut new_zip = zip::ZipWriter::new(out_cursor);
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+            let opts = zip::write::FileOptions::<()>::default()
+                .compression_method(file.compression());
+
+            if file.is_dir() {
+                new_zip.add_directory(&name, opts).map_err(|e| e.to_string())?;
+            } else {
+                new_zip.start_file(&name, opts).map_err(|e| e.to_string())?;
+                if name == "word/document.xml" {
+                    new_zip
+                        .write_all(new_doc_xml.as_bytes())
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    let mut content = Vec::new();
+                    file.read_to_end(&mut content).map_err(|e| e.to_string())?;
+                    new_zip.write_all(&content).map_err(|e| e.to_string())?;
+                }
+            }
+        }
+
+        let out_cursor = new_zip.finish().map_err(|e| e.to_string())?;
+        let output_bytes = out_cursor.into_inner();
+
+        std::fs::write(&dest_path, &output_bytes)
+            .map_err(|e| format!("Failed to write generated DOCX: {e}"))?;
+    } else {
+        let mut text = std::fs::read_to_string(marked_path)
+            .map_err(|e| format!("Failed to read marked text template: {e}"))?;
+
+        for (key, val) in &all_fields {
+            text = text.replace(&format!("[[{key}]]"), val);
+        }
+
+        std::fs::write(&dest_path, text)
+            .map_err(|e| format!("Failed to write generated text: {e}"))?;
+    }
+
+    // 8. Emit change notification to frontend
+    let _ = app.emit("case-files-changed", ());
+
+    Ok(())
+}
+
+
 

@@ -93,6 +93,7 @@ pub fn run() {
             case::add_file_to_case,
             case::get_case_fields,
             case::save_case_fields,
+            case::save_case_document_fields,
             case::remove_file_from_case,
             case::read_file_bytes,
             // documents versioning

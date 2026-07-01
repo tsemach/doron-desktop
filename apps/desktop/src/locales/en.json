@@ -70,6 +70,7 @@
   "settings_footer": "⚙ Settings",
   "save": "Save",
   "emails_exchange": "Case Email Correspondence",
+  "document_fields": "Document Fields",
   "messages": "messages",
   "no_emails": "No email correspondence found for this case.",
   "no_emails_desc": "Once configured, matched case emails will show up here in a chat-style history.",
