@@ -27,9 +27,38 @@ export default function OpenCasesDocumentFields({
   const [showOnlyEmpty, setShowOnlyEmpty] = useState(false);
   const [initiallyEmptyFields, setInitiallyEmptyFields] = useState<string[]>([]);
   
+  const [previewHeight, setPreviewHeight] = useState(220);
+  const [isDragging, setIsDragging] = useState(false);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle live preview panel resizing
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = document.getElementById("document-fields-container");
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const height = rect.bottom - e.clientY - 60; // offset for the bottom action buttons height
+      const clamped = Math.max(100, Math.min(600, height));
+      setPreviewHeight(clamped);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
 
   useEffect(() => {
     let active = true;
@@ -189,7 +218,10 @@ export default function OpenCasesDocumentFields({
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background/30 p-4 space-y-4">
       {/* Fields Editing Section */}
-      <div className="flex flex-col min-h-0 bg-card border border-border rounded-xl p-4 shadow-xs space-y-3 flex-1">
+      <div 
+        id="document-fields-container"
+        className="flex flex-col min-h-0 bg-card border border-border rounded-xl p-4 shadow-xs space-y-3 flex-1"
+      >
         <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
@@ -300,8 +332,29 @@ export default function OpenCasesDocumentFields({
 
         {/* Live Preview Box */}
         {docHtml && (
-          <div className="flex flex-col min-h-0 pt-3 border-t border-border/60">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
+          <div className="flex flex-col min-h-0 relative select-none shrink-0">
+            {/* Horizontal Resize Grab Handle */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              className={`h-[1px] cursor-row-resize z-20 shrink-0 ${
+                isDragging ? "bg-primary" : "bg-border/60 hover:bg-primary/50"
+              } transition-colors relative flex items-center justify-center`}
+            >
+              {/* grab handle indicator bar */}
+              <div className={`absolute w-12 h-3.5 -top-1.75 flex items-center justify-center rounded-md border border-border bg-card shadow-xs cursor-row-resize ${
+                isDragging ? "text-primary border-primary" : "text-muted-foreground"
+              }`}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m18 15-6 6-6-6" />
+                  <path d="m6 9 6-6 6 6" />
+                </svg>
+              </div>
+            </div>
+
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-4 mb-2 shrink-0 select-none">
               Live Preview
             </span>
             <DocumentPlaceholderPreview
@@ -309,7 +362,8 @@ export default function OpenCasesDocumentFields({
               fields={fields}
               fieldValues={editedValues}
               focusedField={focusedField}
-              className="bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto max-h-[220px] min-h-[160px] relative select-text"
+              style={{ height: `${previewHeight}px` }}
+              className="bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto relative select-text"
             />
           </div>
         )}

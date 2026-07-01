@@ -6,6 +6,7 @@ interface DocumentPlaceholderPreviewProps {
   fieldValues: Record<string, string>;
   focusedField: string | null;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export default function DocumentPlaceholderPreview({
@@ -14,6 +15,7 @@ export default function DocumentPlaceholderPreview({
   fieldValues,
   focusedField,
   className,
+  style,
 }: DocumentPlaceholderPreviewProps) {
   
   const isRtlText = (text: string | null | undefined): boolean => {
@@ -65,7 +67,10 @@ export default function DocumentPlaceholderPreview({
   }, [focusedField, html]);
 
   return (
-    <div className={className || "bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto max-h-[300px] min-h-[220px] relative select-text"}>
+    <div 
+      className={className || "bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto max-h-[300px] min-h-[220px] relative select-text"}
+      style={style}
+    >
       <div 
         className="word-preview-page bg-white text-black p-6 sm:p-10 shadow-[0_4px_16px_rgba(0,0,0,0.06),_0_2px_4px_rgba(0,0,0,0.03)] border border-gray-100 mx-auto max-w-[800px] prose prose-sm max-w-none prose-headings:text-black prose-p:text-black text-xs sm:text-sm leading-relaxed font-serif"
         dir={isRtlText(html) ? "rtl" : "ltr"}
