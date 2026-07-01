@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 
 interface DocumentPlaceholderPreviewProps {
   html: string;
@@ -9,14 +9,15 @@ interface DocumentPlaceholderPreviewProps {
   style?: React.CSSProperties;
 }
 
-export default function DocumentPlaceholderPreview({
-  html,
-  fields,
-  fieldValues,
-  focusedField,
-  className,
-  style,
-}: DocumentPlaceholderPreviewProps) {
+const DocumentPlaceholderPreview = React.memo(
+  function DocumentPlaceholderPreview({
+    html,
+    fields,
+    fieldValues,
+    focusedField,
+    className,
+    style,
+  }: DocumentPlaceholderPreviewProps) {
   
   const isRtlText = (text: string | null | undefined): boolean => {
     if (!text) return false;
@@ -78,4 +79,15 @@ export default function DocumentPlaceholderPreview({
       />
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.html === nextProps.html &&
+    prevProps.fields === nextProps.fields &&
+    prevProps.fieldValues === nextProps.fieldValues &&
+    prevProps.focusedField === nextProps.focusedField &&
+    prevProps.className === nextProps.className &&
+    prevProps.style?.height === nextProps.style?.height
+  );
+});
+
+export default DocumentPlaceholderPreview;

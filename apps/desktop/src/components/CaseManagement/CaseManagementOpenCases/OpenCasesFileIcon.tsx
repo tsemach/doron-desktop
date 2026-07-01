@@ -13,8 +13,8 @@ export default function OpenCasesFileIcon({ ext }: OpenCasesFileIconProps) {
     symbol = "📕";
     label = "PDF";
   } else if (["docx", "doc"].includes(normalized)) {
-    bgColor = "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-900/50";
-    symbol = "📘";
+    bgColor = "bg-zinc-50 text-zinc-700 dark:bg-zinc-900/30 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800/50";
+    symbol = "📓";
     label = "DOCX";
   } else if (["xlsx", "xls"].includes(normalized)) {
     bgColor = "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50";
