@@ -335,21 +335,55 @@
 }
 
 /* Style single-cell table rows in multi-column tables as full-width block elements with no border (fixes merged paragraph/title/footnote text) */
-.docx-content-view table:has(td + td, th + th, td + th, th + td) tr:has(> td:only-child:not([colspan])),
-.docx-content-view table:has(td + td, th + th, td + th, th + td) tr:has(> th:only-child:not([colspan])),
-.word-preview-page table:has(td + td, th + th, td + th, th + td) tr:has(> td:only-child:not([colspan])),
-.word-preview-page table:has(td + td, th + th, td + th, th + td) tr:has(> th:only-child:not([colspan])) {
+/* Only apply to tables without rowspan to prevent breaking tables that use rowspan for layout grids */
+.docx-content-view table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr:has(> td:only-child:not([colspan])),
+.docx-content-view table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr:has(> th:only-child:not([colspan])),
+.word-preview-page table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr:has(> td:only-child:not([colspan])),
+.word-preview-page table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr:has(> th:only-child:not([colspan])) {
   display: block !important;
   border: none !important;
 }
 
-.docx-content-view table:has(td + td, th + th, td + th, th + td) tr > td:only-child:not([colspan]),
-.docx-content-view table:has(td + td, th + th, td + th, th + td) tr > th:only-child:not([colspan]),
-.word-preview-page table:has(td + td, th + th, td + th, th + td) tr > td:only-child:not([colspan]),
-.word-preview-page table:has(td + td, th + th, td + th, th + td) tr > th:only-child:not([colspan]) {
+.docx-content-view table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr > td:only-child:not([colspan]),
+.docx-content-view table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr > th:only-child:not([colspan]),
+.word-preview-page table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr > td:only-child:not([colspan]),
+.word-preview-page table:has(td + td, th + th, td + th, th + td):not(:has([rowspan])) tr > th:only-child:not([colspan]) {
   display: block !important;
   border: none !important;
   width: 100% !important;
   background-color: transparent !important;
   padding: 8px 0 !important;
+}
+
+/* Clean up layout grid and style header table for Israeli Land Registry (Tabu) forms (e.g. forms_tabu-003.docx) */
+.docx-content-view table:has(h1),
+.word-preview-page table:has(h1) {
+  border: none !important;
+  margin-top: 0 !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.docx-content-view table:has(h1) td,
+.word-preview-page table:has(h1) td {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* Re-style the "לשימוש משרדי" box in Tabu form headers to have clean borders and padding */
+.docx-content-view table:has(h1) tr:nth-child(3) td:last-child,
+.docx-content-view table:has(h1) tr:nth-child(4) td:nth-last-child(-n+3),
+.docx-content-view table:has(h1) tr:nth-child(5) td:last-child,
+.docx-content-view table:has(h1) tr:nth-child(6) td:nth-last-child(-n+3),
+.docx-content-view table:has(h1) tr:nth-child(7) td:last-child,
+.docx-content-view table:has(h1) tr:nth-child(8) td:last-child,
+.word-preview-page table:has(h1) tr:nth-child(3) td:last-child,
+.word-preview-page table:has(h1) tr:nth-child(4) td:nth-last-child(-n+3),
+.word-preview-page table:has(h1) tr:nth-child(5) td:last-child,
+.word-preview-page table:has(h1) tr:nth-child(6) td:nth-last-child(-n+3),
+.word-preview-page table:has(h1) tr:nth-child(7) td:last-child,
+.word-preview-page table:has(h1) tr:nth-child(8) td:last-child {
+  border: 1px solid #000000 !important;
+  background-color: #ffffff !important;
+  padding: 8px 12px !important;
 }
