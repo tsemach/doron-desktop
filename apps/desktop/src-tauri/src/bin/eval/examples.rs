@@ -129,22 +129,49 @@ The evaluation dataset JSON is automatically autodetected from the corpus direct
 4. Run Hybrid search with LLM Reranking (mock provider):
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider mock --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
 
-5. Run evaluation using Local Microsoft Phi-4:
+5. Run evaluation using Google Gemini (defaults to gemini-1.5-pro):
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider gemini --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+6. Run evaluation using Gemini 1.5 Flash (choosing a specific model):
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider gemini --model gemini-1.5-flash --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+7. Run evaluation using Anthropic Claude 3.5 Sonnet:
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider claude --model claude-3-5-sonnet-online --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+8. Run evaluation using Anthropic Claude 3.5 Opus:
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider claude --model claude-3-5-opus-online --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+9. Run evaluation using Anthropic Claude Sonnet 4.6 (4.x generation):
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider claude --model claude-sonnet-4-6 --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+10. Run evaluation using Anthropic Claude Opus 4.6 (4.x generation):
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider claude --model claude-opus-4-6 --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+11. Run evaluation using Anthropic Claude Sonnet 5 (latest generation):
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider claude --model claude-sonnet-5 --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+12. Run evaluation using Claude 3.5 Haiku (fastest Claude model):
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider claude --model claude-3-5-haiku-20241022 --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+13. Run evaluation using OpenAI GPT-4o Mini (choosing a specific model):
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider openai --model gpt-4o-mini --api-key YOUR_API_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+14. Run evaluation using Local Microsoft Phi-4:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-6. Run evaluation using Local Microsoft Phi-3.5:
+15. Run evaluation using Local Microsoft Phi-3.5:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Phi-3.5-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-7. Run evaluation using Local Google Gemma:
+16. Run evaluation using Local Google Gemma:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Gemma 4 E4B (Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-8. Run evaluation using Local Qwen 3B:
+17. Run evaluation using Local Qwen 3B:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-9. Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
+18. Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider openai --model my-custom-model --api-key MY_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-10. Run evaluation on a custom corpus output directory:
+19. Run evaluation on a custom corpus output directory:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider mock --algorithm hybrid --corpus-dir /path/to/my_custom_corpus
 ================================================================================
 "#

@@ -2,6 +2,7 @@ use clap::Args;
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::io::Write;
 use std::time::Instant;
 use tauri_app_lib::{
     indexer::{index_file_core, IndexOptions},
@@ -218,6 +219,17 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let mut failed_count = 0;
 
     for file in &files {
+        let current_index = indexed_count + failed_count + 1;
+        let file_name = file.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        print!(
+            "\rIndexing document \x1b[36m{}/{}\x1b[0m (\x1b[36m{:.0}%\x1b[0m): {} \x1b[K",
+            current_index,
+            files.len(),
+            (current_index as f64 / files.len() as f64) * 100.0,
+            file_name
+        );
+        let _ = std::io::stdout().flush();
+
         let start = Instant::now();
         match index_file_core(&db_path, &provider, file, &index_options, true).await {
             Ok(_) => {
@@ -225,7 +237,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
                 indexed_count += 1;
             }
             Err(e) => {
-                eprintln!("Warning: Failed to index file {}: {}", file.display(), e);
+                eprintln!("\nWarning: Failed to index file {}: {}", file.display(), e);
                 failed_count += 1;
             }
         }
@@ -238,7 +250,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     };
 
     println!(
-        "\x1b[32mIndexing Complete!\x1b[0m Indexed: {}, Failed: {}. Avg latency per file: {:.2}ms",
+        "\r\x1b[K\x1b[32mIndexing Complete!\x1b[0m Indexed: {}, Failed: {}. Avg latency per file: {:.2}ms",
         indexed_count, failed_count, avg_indexing_ms
     );
 

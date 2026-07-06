@@ -11,20 +11,30 @@ fn get_filtered_document_ids(
     date_to: Option<&str>,
     entities: Option<&Vec<String>>,
 ) -> Option<HashSet<i64>> {
+    let has_metadata: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM documents WHERE doc_type IS NOT NULL AND doc_type != 'other')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
     let mut clauses = Vec::new();
     let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
-    if let Some(types) = doc_types {
-        if !types.is_empty() {
-            let placeholders = types
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format!("?{}", params.len() + i + 1))
-                .collect::<Vec<_>>()
-                .join(",");
-            clauses.push(format!("doc_type IN ({placeholders})"));
-            for t in types {
-                params.push(Box::new(t.clone()));
+    if has_metadata {
+        if let Some(types) = doc_types {
+            if !types.is_empty() {
+                let placeholders = types
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| format!("?{}", params.len() + i + 1))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                clauses.push(format!("doc_type IN ({placeholders})"));
+                for t in types {
+                    params.push(Box::new(t.clone()));
+                }
             }
         }
     }
@@ -43,24 +53,26 @@ fn get_filtered_document_ids(
         }
     }
 
-    if let Some(ents) = entities {
-        if !ents.is_empty() {
-            let or_clauses: Vec<String> = ents
-                .iter()
-                .enumerate()
-                .map(|(i, _)| {
-                    format!(
-                        "(entities LIKE ?{} OR authors LIKE ?{})",
-                        params.len() + i * 2 + 1,
-                        params.len() + i * 2 + 2
-                    )
-                })
-                .collect();
-            clauses.push(format!("({})", or_clauses.join(" OR ")));
-            for ent in ents {
-                let pattern = format!("%{ent}%");
-                params.push(Box::new(pattern.clone()));
-                params.push(Box::new(pattern));
+    if has_metadata {
+        if let Some(ents) = entities {
+            if !ents.is_empty() {
+                let or_clauses: Vec<String> = ents
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| {
+                        format!(
+                            "(entities LIKE ?{} OR authors LIKE ?{})",
+                            params.len() + i * 2 + 1,
+                            params.len() + i * 2 + 2
+                        )
+                    })
+                    .collect();
+                clauses.push(format!("({})", or_clauses.join(" OR ")));
+                for ent in ents {
+                    let pattern = format!("%{ent}%");
+                    params.push(Box::new(pattern.clone()));
+                    params.push(Box::new(pattern));
+                }
             }
         }
     }
