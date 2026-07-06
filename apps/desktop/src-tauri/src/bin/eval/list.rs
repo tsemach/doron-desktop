@@ -57,9 +57,9 @@ fn list_runs(conn: &rusqlite::Connection) -> Result<(), String> {
         })
         .map_err(|e| format!("Query failed: {}", e))?;
 
-    println!("\n{:<4} | {:<20} | {:<8} | {:<15} | {:<12} | {:<6} | {:<5} | {:<8} | {:<8} | {:<6} | {:<6} | {:<6}",
+    println!("\n{:<4} | {:<20} | {:<8} | {:<30} | {:<12} | {:<6} | {:<5} | {:<8} | {:<8} | {:<6} | {:<6} | {:<6}",
              "ID", "Timestamp", "Provider", "Model", "Algorithm", "Corpus", "Query", "Idx (ms)", "Sch (ms)", "P@1", "R@3", "MRR");
-    println!("{}", "-".repeat(137));
+    println!("{}", "-".repeat(152));
 
     let mut count = 0;
     for row in rows.flatten() {
@@ -83,9 +83,9 @@ fn list_runs(conn: &rusqlite::Connection) -> Result<(), String> {
             &run_at
         };
 
-        println!("{:<4} | {:<20} | {:<8} | {:<15} | {:<12} | {:<6} | {:<5} | {:<8.2} | {:<8.2} | {:<5.1}% | {:<5.1}% | {:<6.4}",
+        println!("{:<4} | {:<20} | {:<8} | {:<30} | {:<12} | {:<6} | {:<5} | {:<8.2} | {:<8.2} | {:<5.1}% | {:<5.1}% | {:<6.4}",
                  id, short_date, provider,
-                 if model.len() > 15 { format!("{}...", &model[..12]) } else { model },
+                 if model.len() > 30 { format!("{}...", &model[..27]) } else { model },
                  algorithm, corpus_size, query_count, avg_idx, avg_sch,
                  p1 * 100.0, r3 * 100.0, mrr);
         count += 1;
