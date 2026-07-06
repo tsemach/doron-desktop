@@ -122,6 +122,24 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
 
     if args.provider.to_lowercase() == "local" {
         println!("Initializing local model sidecar for evaluation...");
+
+        // Kill any existing running local server to release the port
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = std::process::Command::new("pkill")
+                .arg("-f")
+                .arg("llama-server")
+                .status();
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(&["/F", "/IM", "llama-server.exe"])
+                .status();
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+
         let sidecar_path = crate::sidecar::get_cli_sidecar_path()?;
         let model_file = tauri_app_lib::llm::get_model_filename(&model)?;
         let model_path = store::cli_app_data_dir().join("models").join(model_file);
@@ -141,8 +159,21 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             .arg(port.to_string())
             .arg("--threads")
             .arg("4")
+            .arg("-c")
+            .arg("8192")
             .arg("--host")
             .arg("127.0.0.1");
+
+        let template = if model.to_lowercase().contains("qwen") {
+            "chatml"
+        } else if model.to_lowercase().contains("gemma") {
+            "gemma"
+        } else if model.to_lowercase().contains("phi-4") {
+            "phi4"
+        } else {
+            "chatml"
+        };
+        cmd.arg("--chat-template").arg(template);
 
         #[cfg(target_os = "windows")]
         {

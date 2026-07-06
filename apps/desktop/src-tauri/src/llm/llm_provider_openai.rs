@@ -77,7 +77,10 @@ impl OpenAiProvider {
             max_tokens,
         };
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(180))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
         let base_url = self.base_url.as_deref().unwrap_or("https://api.openai.com/v1");
         let url = format!("{}/chat/completions", base_url);
         

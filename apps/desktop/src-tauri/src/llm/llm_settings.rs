@@ -187,7 +187,19 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
     cmd.arg("--model").arg(&model_path)
        .arg("--port").arg(port.to_string())
        .arg("--threads").arg("4")
+       .arg("-c").arg("8192")
        .arg("--host").arg("127.0.0.1");
+
+    let template = if model_name.to_lowercase().contains("qwen") {
+        "chatml"
+    } else if model_name.to_lowercase().contains("gemma") {
+        "gemma"
+    } else if model_name.to_lowercase().contains("phi-4") {
+        "phi4"
+    } else {
+        "chatml"
+    };
+    cmd.arg("--chat-template").arg(template);
 
     #[cfg(target_os = "windows")]
     {
