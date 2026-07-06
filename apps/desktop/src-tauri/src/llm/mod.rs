@@ -12,7 +12,7 @@ IMPORTANT: Your response must be ONLY valid JSON. Do not include any explanatory
 
 Required JSON fields:
 {
-  "doc_type": one of: "contract" | "report" | "invoice" | "memo" | "specification" | "presentation" | "spreadsheet" | "letter" | "policy" | "manual" | "other",
+  "doc_type": { "type_name": probability_float, ... } (e.g. {"contract": 0.8, "letter": 0.2}) where type_name must be one of: "contract", "report", "invoice", "memo", "specification", "presentation", "spreadsheet", "letter", "policy", "manual", "will", "other". Include up to 3 highest matching types, and probabilities must sum to approximately 1.0.
   "title": "the document title or best inferred title",
   "summary": "2-3 sentence summary of what this document is about, written in the same language as the document",
   "authors": ["list of author names if found, else empty list"],
@@ -58,7 +58,7 @@ struct ClaudeResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DocumentMetadata {
-    pub doc_type: Option<String>,
+    pub doc_type: Option<serde_json::Value>,
     pub title: Option<String>,
     pub summary: Option<String>,
     pub authors: Option<Vec<String>>,

@@ -151,7 +151,19 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
-        println!("Spawning local sidecar: {:?}", cmd);
+        let app_data_dir = store::cli_app_data_dir();
+        let log_file_path = app_data_dir.join("llama_sidecar.log");
+        let log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&log_file_path)
+            .map_err(|e| format!("Failed to create log file {:?}: {}", log_file_path, e))?;
+
+        cmd.stdout(log_file.try_clone().map_err(|e| e.to_string())?);
+        cmd.stderr(log_file);
+
+        println!("Spawning local sidecar (logs redirected to {:?})", log_file_path);
         let child = cmd
             .spawn()
             .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;

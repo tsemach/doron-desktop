@@ -74,12 +74,19 @@ pub async fn index_file_core(
         let file_size_kb = std::fs::metadata(file_path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
         let raw_metadata = serde_json::to_string(&metadata).unwrap_or_default();
         
+        let doc_type_str = match &metadata.doc_type {
+            Some(serde_json::Value::Object(map)) => serde_json::to_string(map).ok(),
+            Some(serde_json::Value::String(s)) => Some(s.clone()),
+            Some(other) => Some(other.to_string()),
+            None => None,
+        };
+
         let record = store::DocumentRecord {
             file_path: path_str.clone(),
             file_name: file_name.clone(),
             file_ext: ext.clone(),
             file_size_kb,
-            doc_type: metadata.doc_type,
+            doc_type: doc_type_str,
             title: metadata.title,
             summary: metadata.summary,
             authors:   serde_json::to_string(&metadata.authors.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),

@@ -6,38 +6,11 @@ use super::helpers::{fts_term, row_to_doc, has_embeddings};
 /// Formulate and run a dynamic SQL query to get document IDs passing hard filters
 fn get_filtered_document_ids(
     conn: &Connection,
-    doc_types: Option<&Vec<String>>,
     date_from: Option<&str>,
     date_to: Option<&str>,
-    entities: Option<&Vec<String>>,
 ) -> Option<HashSet<i64>> {
-    let has_metadata: bool = conn
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM documents WHERE doc_type IS NOT NULL AND doc_type != 'other')",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(false);
-
     let mut clauses = Vec::new();
     let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-
-    if has_metadata {
-        if let Some(types) = doc_types {
-            if !types.is_empty() {
-                let placeholders = types
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| format!("?{}", params.len() + i + 1))
-                    .collect::<Vec<_>>()
-                    .join(",");
-                clauses.push(format!("doc_type IN ({placeholders})"));
-                for t in types {
-                    params.push(Box::new(t.clone()));
-                }
-            }
-        }
-    }
 
     if let Some(df) = date_from {
         if !df.trim().is_empty() {
@@ -50,30 +23,6 @@ fn get_filtered_document_ids(
         if !dt.trim().is_empty() {
             clauses.push(format!("doc_date <= ?{}", params.len() + 1));
             params.push(Box::new(dt.to_string()));
-        }
-    }
-
-    if has_metadata {
-        if let Some(ents) = entities {
-            if !ents.is_empty() {
-                let or_clauses: Vec<String> = ents
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| {
-                        format!(
-                            "(entities LIKE ?{} OR authors LIKE ?{})",
-                            params.len() + i * 2 + 1,
-                            params.len() + i * 2 + 2
-                        )
-                    })
-                    .collect();
-                clauses.push(format!("({})", or_clauses.join(" OR ")));
-                for ent in ents {
-                    let pattern = format!("%{ent}%");
-                    params.push(Box::new(pattern.clone()));
-                    params.push(Box::new(pattern));
-                }
-            }
         }
     }
 
@@ -99,6 +48,62 @@ fn get_filtered_document_ids(
         }
     }
     Some(set)
+}
+
+fn parse_distribution(val_opt: &Option<String>) -> HashMap<String, f64> {
+    let mut dist = HashMap::new();
+    if let Some(s) = val_opt {
+        let trimmed = s.trim();
+        if trimmed.starts_with('{') {
+            if let Ok(map) = serde_json::from_str::<HashMap<String, f64>>(trimmed) {
+                return map;
+            }
+        }
+        if !trimmed.is_empty() {
+            dist.insert(trimmed.to_string(), 1.0);
+        }
+    }
+    dist
+}
+
+fn parse_query_distribution(val_opt: &Option<serde_json::Value>) -> HashMap<String, f64> {
+    let mut dist = HashMap::new();
+    if let Some(val) = val_opt {
+        match val {
+            serde_json::Value::Object(map) => {
+                for (k, v) in map {
+                    if let Some(prob) = v.as_f64() {
+                        dist.insert(k.clone(), prob);
+                    }
+                }
+            }
+            serde_json::Value::Array(arr) => {
+                let count = arr.len() as f64;
+                if count > 0.0 {
+                    for item in arr {
+                        if let Some(s) = item.as_str() {
+                            dist.insert(s.to_string(), 1.0 / count);
+                        }
+                    }
+                }
+            }
+            serde_json::Value::String(s) => {
+                dist.insert(s.clone(), 1.0);
+            }
+            _ => {}
+        }
+    }
+    dist
+}
+
+fn compute_type_overlap(query_dist: &HashMap<String, f64>, doc_dist: &HashMap<String, f64>) -> f64 {
+    let mut score = 0.0;
+    for (k, q_p) in query_dist {
+        if let Some(d_p) = doc_dist.get(k) {
+            score += q_p * d_p;
+        }
+    }
+    score
 }
 
 /// Retrieve documents matching the FTS query and filter them by ID set
@@ -204,21 +209,20 @@ pub(crate) fn execute_smart_query(
     query_text: &str,
     limit: usize,
 ) -> Vec<DocumentRow> {
-    // 1. Resolve structured filters
+    // 1. Resolve structured filters (dates only)
     let date_range_from = analysis.date_range.as_ref().and_then(|r| r.from.as_deref());
     let date_range_to = analysis.date_range.as_ref().and_then(|r| r.to.as_deref());
-    let filter_ids = get_filtered_document_ids(
+    let mut filter_ids = get_filtered_document_ids(
         conn,
-        analysis.doc_types.as_ref(),
         date_range_from,
         date_range_to,
-        analysis.entities.as_ref(),
     );
 
-    // If hard filters are specified but found nothing, return empty immediately.
+    // Resilient Fallback: If hard filters (dates only) matched 0 documents,
+    // fallback to searching everything instead of returning empty results immediately.
     if let Some(ref set) = filter_ids {
         if set.is_empty() {
-            return vec![];
+            filter_ids = None;
         }
     }
 
@@ -261,9 +265,19 @@ pub(crate) fn execute_smart_query(
         }
     } else {
         let mut combined_scores = HashMap::new();
+        let query_type_dist = parse_query_distribution(&analysis.doc_types);
+
         for id in all_ids {
             let vec_score = vec_scores.get(&id).copied().unwrap_or(0.0);
             let fts_score = fts_scores.get(&id).copied().unwrap_or(0.0);
+
+            // Fetch document metadata to extract its doc_type distribution
+            let doc_type_val = {
+                let stmt = conn.prepare("SELECT doc_type FROM documents WHERE id = ?1").ok();
+                stmt.and_then(|mut s| s.query_row(rusqlite::params![id], |r| r.get::<_, Option<String>>(0)).ok()).flatten()
+            };
+            let doc_type_dist = parse_distribution(&doc_type_val);
+            let type_score = compute_type_overlap(&query_type_dist, &doc_type_dist);
 
             // Stricter Relevance Verification:
             let is_relevant = if has_embs {
@@ -273,8 +287,8 @@ pub(crate) fn execute_smart_query(
             };
 
             if is_relevant {
-                // Combine: vector similarity + normalized FTS score (fts_score / 200.0)
-                let combined = vec_score + (fts_score / 200.0);
+                // Combine: vector similarity + normalized FTS score + type overlap score (weighted at 0.20)
+                let combined = vec_score + (fts_score / 200.0) + (type_score as f32 * 0.20);
                 combined_scores.insert(id, combined);
             }
         }

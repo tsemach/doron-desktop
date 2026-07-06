@@ -91,6 +91,18 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
                     cmd.creation_flags(CREATE_NO_WINDOW);
                 }
 
+                let app_data_dir = tauri_app_lib::store::cli_app_data_dir();
+                let log_file_path = app_data_dir.join("llama_sidecar.log");
+                let log_file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(&log_file_path)
+                    .map_err(|e| format!("Failed to create log file {:?}: {}", log_file_path, e))?;
+
+                cmd.stdout(log_file.try_clone().map_err(|e| e.to_string())?);
+                cmd.stderr(log_file);
+
                 let child = cmd.spawn()
                     .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
                 _sidecar_guard.child = Some(child);

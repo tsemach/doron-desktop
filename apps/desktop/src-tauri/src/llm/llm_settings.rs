@@ -196,6 +196,18 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let log_file_path = app_data_dir.join("llama_sidecar.log");
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&log_file_path)
+        .map_err(|e| format!("Failed to create log file {:?}: {}", log_file_path, e))?;
+
+    cmd.stdout(log_file.try_clone().map_err(|e| e.to_string())?);
+    cmd.stderr(log_file);
+
     let child = cmd.spawn().map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
     *process_guard = Some(child);
     *model_guard = Some(model_name.to_string());

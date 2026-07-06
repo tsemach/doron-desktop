@@ -11,7 +11,7 @@ Return a JSON object with:
   "intent": "what the user is looking for",
   "keywords": ["content terms that would literally appear inside the documents — always include the subject nouns; EXCLUDE only pure query-intent verbs such as מצא, חפש, הצג, find, search, show, list"],
   "entities": ["specific company names, people names, or places explicitly mentioned"],
-  "doc_types": ["document type ONLY when explicitly stated: contract, report, invoice, memo, specification, presentation, spreadsheet, letter, policy, manual, other"],
+  "doc_types": { "type_name": probability_float, ... } (e.g. {"contract": 0.8, "letter": 0.2}) where type_name must be one of: "contract", "report", "invoice", "memo", "specification", "presentation", "spreadsheet", "letter", "policy", "manual", "will", "other". Include up to 3 highest matching types, and probabilities must sum to approximately 1.0.
   "language": "ISO 639-1 code if specified, else null",
   "date_range": {"from": "YYYY-MM-DD or null", "to": "YYYY-MM-DD or null"},
   "summary_importance": true or false
