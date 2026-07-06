@@ -255,9 +255,14 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let mut hit_at_3_sum = 0;
     let mut mrr_sum = 0.0;
 
+    let h_query = format!("{:<50}", "Query");
+    let h_top = format!("{:<30}", "Top File Returned");
+    let h_r3 = format!("{:<5}", "R@3");
+    let h_p1 = format!("{:<5}", "P@1");
+    let h_latency = format!("{:<10}", "Latency");
     println!(
-        "\n{:<55} | {:<20} | {:<8} | {:<8} | {:<5}",
-        "Query", "Top File Returned", "P@1", "R@3", "Latency"
+        "\n\u{200e}{} \u{200e}| {} \u{200e}| {} \u{200e}| {} \u{200e}| {}",
+        h_query, h_top, h_r3, h_p1, h_latency
     );
     println!("{}", "-".repeat(114));
 
@@ -339,25 +344,43 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             .first()
             .cloned()
             .unwrap_or_else(|| "NONE".to_string());
+
+        let p1_str = if hit_at_1 == 1 { "PASS" } else { "FAIL" };
+        let r3_str = if hit_at_3 == 1 { "PASS" } else { "FAIL" };
+        let p1_padded = format!("{:<5}", p1_str);
+        let r3_padded = format!("{:<5}", r3_str);
+        let p1_colored = if hit_at_1 == 1 { format!("\x1b[32m{}\x1b[0m", p1_padded) } else { format!("\x1b[31m{}\x1b[0m", p1_padded) };
+        let r3_colored = if hit_at_3 == 1 { format!("\x1b[32m{}\x1b[0m", r3_padded) } else { format!("\x1b[31m{}\x1b[0m", r3_padded) };
+
+        let latency_str = format!("{:.2}ms", search_duration.as_secs_f64() * 1000.0);
+        let latency_padded = format!("{:<10}", latency_str);
+
+        let top_returned_trimmed = if top_returned.len() > 30 {
+            format!("{}...", &top_returned[..27])
+        } else {
+            top_returned
+        };
+        let top_returned_padded = format!("{:<30}", top_returned_trimmed);
+
+        let clean_query = if q.query.chars().count() > 47 {
+            format!("{}...", q.query.chars().take(44).collect::<String>())
+        } else {
+            q.query.clone()
+        };
+        let query_len = clean_query.chars().count();
+        let query_padded = if query_len < 50 {
+            format!("{}{}", clean_query, " ".repeat(50 - query_len))
+        } else {
+            clean_query
+        };
+
         println!(
-            "{:<55} | {:<20} | {:<8} | {:<8} | {:.2}ms",
-            if q.query.chars().count() > 50 {
-                format!("{}...", q.query.chars().take(47).collect::<String>())
-            } else {
-                q.query.clone()
-            },
-            top_returned,
-            if hit_at_1 == 1 {
-                "\x1b[32mPASS\x1b[0m"
-            } else {
-                "\x1b[31mFAIL\x1b[0m"
-            },
-            if hit_at_3 == 1 {
-                "\x1b[32mPASS\x1b[0m"
-            } else {
-                "\x1b[31mFAIL\x1b[0m"
-            },
-            search_duration.as_secs_f64() * 1000.0
+            "\u{200e}{} \u{200e}| {} \u{200e}| {} \u{200e}| {} \u{200e}| {}",
+            query_padded,
+            top_returned_padded,
+            r3_colored,
+            p1_colored,
+            latency_padded
         );
     }
 

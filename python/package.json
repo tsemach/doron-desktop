@@ -1,0 +1,10 @@
+{
+  "name": "python-tools",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "uv sync",
+    "lint": "echo 'No linting configured for Python'",
+    "test": "echo 'No tests configured for Python'"
+  }
+}
