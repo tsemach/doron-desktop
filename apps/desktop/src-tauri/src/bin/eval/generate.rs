@@ -27,7 +27,7 @@ pub struct GenerateArgs {
 }
 
 pub async fn execute(args: GenerateArgs) -> Result<(), String> {
-    let _guard = tauri_app_lib::power::SleepPreventionGuard::new(false);
+    let _guard = tauri_app_lib::power::SleepPreventionGuard::new(true);
     let out_dir = Path::new(&args.corpus_dir);
     fs::create_dir_all(out_dir).map_err(|e| format!("Failed to create corpus dir: {e}"))?;
 
