@@ -29,6 +29,29 @@ Document text (may be truncated):
 {text}
 ---"#;
 
+const EXTRACTION_PROMPT_LOCAL: &str = r#"You are a document analyst. Read the document text below and extract metadata as a single JSON object. Be concise and precise. Use null for any field you cannot determine.
+
+IMPORTANT: Your response must be ONLY valid JSON. Do not include any explanatory text, markdown formatting, or code blocks. Start your response directly with { and end with }.
+
+Required JSON fields:
+{
+  "doc_type": "one of: contract, report, invoice, memo, specification, presentation, spreadsheet, letter, policy, manual, will, other",
+  "title": "the document title or best inferred title (written in the same language as the document, e.g. Hebrew)",
+  "summary": "2-3 sentence summary of what this document is about (written in the same language as the document, e.g. Hebrew)",
+  "authors": ["list of author names if found, else empty list"],
+  "date": "YYYY-MM-DD if a clear document date exists, else null",
+  "topics": ["up to 6 key topics or subject areas"],
+  "entities": ["notable companies, people, products, or places mentioned"],
+  "language": "ISO 639-1 code e.g. en, he, fr",
+  "keywords": ["up to 10 important keywords for search"],
+  "confidence": a float 0.0-1.0 reflecting how confident you are in the extraction
+}
+
+Document text (may be truncated):
+---
+{text}
+---"#;
+
 // ── request / response shapes ─────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -116,7 +139,18 @@ pub async fn call_provider(provider: &llm_provider::LlmProvider, text: &str) -> 
     } else {
         text.to_string()
     };
-    let prompt = EXTRACTION_PROMPT.replace("{text}", &truncated);
+    
+    let is_local = match provider {
+        llm_provider::LlmProvider::OpenAi(_) => true,
+        _ => false,
+    };
+    let prompt_template = if is_local {
+        EXTRACTION_PROMPT_LOCAL
+    } else {
+        EXTRACTION_PROMPT
+    };
+
+    let prompt = prompt_template.replace("{text}", &truncated);
     let raw = provider.call_structured(&prompt, None).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<DocumentMetadata>(&json_str)
