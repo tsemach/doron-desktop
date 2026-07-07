@@ -2,6 +2,7 @@ use clap::Args;
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::io::Write;
 use std::time::Instant;
 use tauri_app_lib::{
     indexer::{index_file_core, IndexOptions},
@@ -121,6 +122,24 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
 
     if args.provider.to_lowercase() == "local" {
         println!("Initializing local model sidecar for evaluation...");
+
+        // Kill any existing running local server to release the port
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = std::process::Command::new("pkill")
+                .arg("-f")
+                .arg("llama-server")
+                .status();
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(&["/F", "/IM", "llama-server.exe"])
+                .status();
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+
         let sidecar_path = crate::sidecar::get_cli_sidecar_path()?;
         let model_file = tauri_app_lib::llm::get_model_filename(&model)?;
         let model_path = store::cli_app_data_dir().join("models").join(model_file);
@@ -140,8 +159,21 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             .arg(port.to_string())
             .arg("--threads")
             .arg("4")
+            .arg("-c")
+            .arg("8192")
             .arg("--host")
             .arg("127.0.0.1");
+
+        let template = if model.to_lowercase().contains("qwen") {
+            "chatml"
+        } else if model.to_lowercase().contains("gemma") {
+            "gemma"
+        } else if model.to_lowercase().contains("phi-4") {
+            "phi4"
+        } else {
+            "chatml"
+        };
+        cmd.arg("--chat-template").arg(template);
 
         #[cfg(target_os = "windows")]
         {
@@ -150,7 +182,19 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
-        println!("Spawning local sidecar: {:?}", cmd);
+        let app_data_dir = store::cli_app_data_dir();
+        let log_file_path = app_data_dir.join("llama_sidecar.log");
+        let log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&log_file_path)
+            .map_err(|e| format!("Failed to create log file {:?}: {}", log_file_path, e))?;
+
+        cmd.stdout(log_file.try_clone().map_err(|e| e.to_string())?);
+        cmd.stderr(log_file);
+
+        println!("Spawning local sidecar (logs redirected to {:?})", log_file_path);
         let child = cmd
             .spawn()
             .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
@@ -218,6 +262,17 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let mut failed_count = 0;
 
     for file in &files {
+        let current_index = indexed_count + failed_count + 1;
+        let file_name = file.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        print!(
+            "\rIndexing document \x1b[36m{}/{}\x1b[0m (\x1b[36m{:.0}%\x1b[0m): {} \x1b[K",
+            current_index,
+            files.len(),
+            (current_index as f64 / files.len() as f64) * 100.0,
+            file_name
+        );
+        let _ = std::io::stdout().flush();
+
         let start = Instant::now();
         match index_file_core(&db_path, &provider, file, &index_options, true).await {
             Ok(_) => {
@@ -225,7 +280,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
                 indexed_count += 1;
             }
             Err(e) => {
-                eprintln!("Warning: Failed to index file {}: {}", file.display(), e);
+                eprintln!("\nWarning: Failed to index file {}: {}", file.display(), e);
                 failed_count += 1;
             }
         }
@@ -238,7 +293,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     };
 
     println!(
-        "\x1b[32mIndexing Complete!\x1b[0m Indexed: {}, Failed: {}. Avg latency per file: {:.2}ms",
+        "\r\x1b[K\x1b[32mIndexing Complete!\x1b[0m Indexed: {}, Failed: {}. Avg latency per file: {:.2}ms",
         indexed_count, failed_count, avg_indexing_ms
     );
 
@@ -255,9 +310,14 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let mut hit_at_3_sum = 0;
     let mut mrr_sum = 0.0;
 
+    let h_query = format!("{:<50}", "Query");
+    let h_top = format!("{:<30}", "Top File Returned");
+    let h_r3 = format!("{:<5}", "R@3");
+    let h_p1 = format!("{:<5}", "P@1");
+    let h_latency = format!("{:<10}", "Latency");
     println!(
-        "\n{:<55} | {:<20} | {:<8} | {:<8} | {:<5}",
-        "Query", "Top File Returned", "P@1", "R@3", "Latency"
+        "\n\u{200e}{} \u{200e}| {} \u{200e}| {} \u{200e}| {} \u{200e}| {}",
+        h_query, h_top, h_r3, h_p1, h_latency
     );
     println!("{}", "-".repeat(114));
 
@@ -339,25 +399,43 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             .first()
             .cloned()
             .unwrap_or_else(|| "NONE".to_string());
+
+        let p1_str = if hit_at_1 == 1 { "PASS" } else { "FAIL" };
+        let r3_str = if hit_at_3 == 1 { "PASS" } else { "FAIL" };
+        let p1_padded = format!("{:<5}", p1_str);
+        let r3_padded = format!("{:<5}", r3_str);
+        let p1_colored = if hit_at_1 == 1 { format!("\x1b[32m{}\x1b[0m", p1_padded) } else { format!("\x1b[31m{}\x1b[0m", p1_padded) };
+        let r3_colored = if hit_at_3 == 1 { format!("\x1b[32m{}\x1b[0m", r3_padded) } else { format!("\x1b[31m{}\x1b[0m", r3_padded) };
+
+        let latency_str = format!("{:.2}ms", search_duration.as_secs_f64() * 1000.0);
+        let latency_padded = format!("{:<10}", latency_str);
+
+        let top_returned_trimmed = if top_returned.len() > 30 {
+            format!("{}...", &top_returned[..27])
+        } else {
+            top_returned
+        };
+        let top_returned_padded = format!("{:<30}", top_returned_trimmed);
+
+        let clean_query = if q.query.chars().count() > 47 {
+            format!("{}...", q.query.chars().take(44).collect::<String>())
+        } else {
+            q.query.clone()
+        };
+        let query_len = clean_query.chars().count();
+        let query_padded = if query_len < 50 {
+            format!("{}{}", clean_query, " ".repeat(50 - query_len))
+        } else {
+            clean_query
+        };
+
         println!(
-            "{:<55} | {:<20} | {:<8} | {:<8} | {:.2}ms",
-            if q.query.chars().count() > 50 {
-                format!("{}...", q.query.chars().take(47).collect::<String>())
-            } else {
-                q.query.clone()
-            },
-            top_returned,
-            if hit_at_1 == 1 {
-                "\x1b[32mPASS\x1b[0m"
-            } else {
-                "\x1b[31mFAIL\x1b[0m"
-            },
-            if hit_at_3 == 1 {
-                "\x1b[32mPASS\x1b[0m"
-            } else {
-                "\x1b[31mFAIL\x1b[0m"
-            },
-            search_duration.as_secs_f64() * 1000.0
+            "\u{200e}{} \u{200e}| {} \u{200e}| {} \u{200e}| {} \u{200e}| {}",
+            query_padded,
+            top_returned_padded,
+            r3_colored,
+            p1_colored,
+            latency_padded
         );
     }
 

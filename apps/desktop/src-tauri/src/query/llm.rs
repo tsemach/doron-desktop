@@ -11,7 +11,30 @@ Return a JSON object with:
   "intent": "what the user is looking for",
   "keywords": ["content terms that would literally appear inside the documents — always include the subject nouns; EXCLUDE only pure query-intent verbs such as מצא, חפש, הצג, find, search, show, list"],
   "entities": ["specific company names, people names, or places explicitly mentioned"],
-  "doc_types": ["document type ONLY when explicitly stated: contract, report, invoice, memo, specification, presentation, spreadsheet, letter, policy, manual, other"],
+  "doc_types": { "type_name": probability_float, ... } (e.g. {"contract": 0.8, "letter": 0.2}) where type_name must be one of: "contract", "report", "invoice", "memo", "specification", "presentation", "spreadsheet", "letter", "policy", "manual", "will", "other". Include up to 3 highest matching types, and probabilities must sum to approximately 1.0.
+  "language": "ISO 639-1 code if specified, else null",
+  "date_range": {"from": "YYYY-MM-DD or null", "to": "YYYY-MM-DD or null"},
+  "summary_importance": true or false
+}
+
+Rules:
+- Always extract content nouns as keywords (e.g. "חוזה שכירות" → keywords: ["חוזה", "שכירות"])
+- Strip only the verb wrapper (מצא/find/חפש) — keep everything else as keywords
+- doc_types is supplemental metadata, not a replacement for keywords
+- keep keywords to the 1-3 most distinctive terms
+
+Respond ONLY with valid JSON. No markdown or explanation.
+
+Query: {query}"#;
+
+const QUERY_ANALYSIS_PROMPT_LOCAL: &str = r#"You are a document search expert. Analyze the following query and extract search parameters for a full-text document index.
+
+Return a JSON object with:
+{
+  "intent": "what the user is looking for",
+  "keywords": ["content terms that would literally appear inside the documents — always include the subject nouns; EXCLUDE only pure query-intent verbs such as מצא, חפש, הצג, find, search, show, list"],
+  "entities": ["specific company names, people names, or places explicitly mentioned"],
+  "doc_types": ["one or more of: contract, report, invoice, memo, specification, presentation, spreadsheet, letter, policy, manual, will, other"],
   "language": "ISO 639-1 code if specified, else null",
   "date_range": {"from": "YYYY-MM-DD or null", "to": "YYYY-MM-DD or null"},
   "summary_importance": true or false
@@ -43,11 +66,20 @@ Candidates:
 // ── LLM query analysis ────────────────────────────────────────────────────────
 
 pub(crate) async fn analyze_query(query: &str, provider: &crate::llm::llm_provider::LlmProvider) -> Result<QueryAnalysis, String> {
-    let prompt = QUERY_ANALYSIS_PROMPT.replace("{query}", query);
+    let is_local = match provider {
+        crate::llm::llm_provider::LlmProvider::OpenAi(_) => true,
+        _ => false,
+    };
+    let prompt_template = if is_local {
+        QUERY_ANALYSIS_PROMPT_LOCAL
+    } else {
+        QUERY_ANALYSIS_PROMPT
+    };
+    let prompt = prompt_template.replace("{query}", query);
     let raw = provider.call_structured(&prompt, None).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<QueryAnalysis>(&json_str)
-        .map_err(|e| format!("Failed to parse query analysis: {e}. Raw: {}", &json_str[..json_str.len().min(300)]))
+        .map_err(|e| format!("Failed to parse query analysis: {e}. Raw: {}", json_str.chars().take(300).collect::<String>()))
 }
 
 // Rerank candidates using Claude

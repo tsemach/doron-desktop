@@ -1,79 +1,84 @@
 use serde::{Deserialize, Serialize};
 
-pub struct OpenAiProvider {
+pub struct LocalProvider {
     pub api_key: String,
     pub model: String,
     pub base_url: Option<String>,
 }
 
 #[derive(Serialize)]
-struct OpenAiMessage {
+struct LocalMessage {
     role: String,
     content: String,
 }
 
 #[derive(Serialize)]
-struct OpenAiResponseFormat {
+struct LocalResponseFormat {
     #[serde(rename = "type")]
     format_type: String, // "json_object"
 }
 
 #[derive(Serialize)]
-struct OpenAiRequestBody {
+struct LocalRequestBody {
     model: String,
-    messages: Vec<OpenAiMessage>,
+    messages: Vec<LocalMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    response_format: Option<OpenAiResponseFormat>,
+    response_format: Option<LocalResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
 }
 
 #[derive(Deserialize)]
-struct OpenAiChoiceMessage {
+struct LocalChoiceMessage {
     content: Option<String>,
 }
 
 #[derive(Deserialize)]
-struct OpenAiChoice {
-    message: Option<OpenAiChoiceMessage>,
+struct LocalChoice {
+    message: Option<LocalChoiceMessage>,
 }
 
 #[derive(Deserialize)]
-struct OpenAiResponseBody {
-    choices: Option<Vec<OpenAiChoice>>,
+struct LocalResponseBody {
+    choices: Option<Vec<LocalChoice>>,
 }
 
-impl OpenAiProvider {
+impl LocalProvider {
     async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool) -> Result<String, String> {
         let mut messages = Vec::new();
         if let Some(sys) = system {
-            messages.push(OpenAiMessage {
+            messages.push(LocalMessage {
                 role: "system".to_string(),
                 content: sys.to_string(),
             });
         }
-        messages.push(OpenAiMessage {
+        messages.push(LocalMessage {
             role: "user".to_string(),
             content: prompt.to_string(),
         });
 
         let response_format = if json_mode {
-            Some(OpenAiResponseFormat {
+            Some(LocalResponseFormat {
                 format_type: "json_object".to_string(),
             })
         } else {
             None
         };
 
-        let body = OpenAiRequestBody {
+        let max_tokens = Some(2048);
+
+        let body = LocalRequestBody {
             model: self.model.clone(),
             messages,
             response_format,
-            max_tokens: None,
+            max_tokens,
         };
 
-        let client = reqwest::Client::new();
-        let base_url = self.base_url.as_deref().unwrap_or("https://api.openai.com/v1");
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(180))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+        let base_url = self.base_url.as_deref().unwrap_or("http://localhost:10086/v1");
         let url = format!("{}/chat/completions", base_url);
         
         let mut request = client
@@ -88,18 +93,18 @@ impl OpenAiProvider {
             .json(&body)
             .send()
             .await
-            .map_err(|e| format!("OpenAI API request failed: {e}"))?;
+            .map_err(|e| format!("Local model API request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("OpenAI API error {status}: {body}"));
+            return Err(format!("Local model API error {status}: {body}"));
         }
 
-        let resp: OpenAiResponseBody = response
+        let resp: LocalResponseBody = response
             .json()
             .await
-            .map_err(|e| format!("Failed to parse OpenAI response: {e}"))?;
+            .map_err(|e| format!("Failed to parse local model response: {e}"))?;
 
         let text = resp
             .choices

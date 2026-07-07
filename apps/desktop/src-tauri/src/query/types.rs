@@ -9,8 +9,9 @@ pub struct DateRange {
 #[derive(Deserialize, Debug, Default)]
 pub struct QueryAnalysis {
     pub keywords: Option<Vec<String>>,
+    #[allow(dead_code)]
     pub entities: Option<Vec<String>>,
-    pub doc_types: Option<Vec<String>>,
+    pub doc_types: Option<serde_json::Value>,
     pub date_range: Option<DateRange>,
     #[allow(dead_code)]
     pub summary_importance: Option<bool>,

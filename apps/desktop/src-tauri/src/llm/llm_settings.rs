@@ -187,7 +187,19 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
     cmd.arg("--model").arg(&model_path)
        .arg("--port").arg(port.to_string())
        .arg("--threads").arg("4")
+       .arg("-c").arg("8192")
        .arg("--host").arg("127.0.0.1");
+
+    let template = if model_name.to_lowercase().contains("qwen") {
+        "chatml"
+    } else if model_name.to_lowercase().contains("gemma") {
+        "gemma"
+    } else if model_name.to_lowercase().contains("phi-4") {
+        "phi4"
+    } else {
+        "chatml"
+    };
+    cmd.arg("--chat-template").arg(template);
 
     #[cfg(target_os = "windows")]
     {
@@ -195,6 +207,18 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
+
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let log_file_path = app_data_dir.join("llama_sidecar.log");
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&log_file_path)
+        .map_err(|e| format!("Failed to create log file {:?}: {}", log_file_path, e))?;
+
+    cmd.stdout(log_file.try_clone().map_err(|e| e.to_string())?);
+    cmd.stderr(log_file);
 
     let child = cmd.spawn().map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
     *process_guard = Some(child);

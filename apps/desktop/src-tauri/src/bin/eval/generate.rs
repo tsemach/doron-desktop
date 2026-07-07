@@ -33,7 +33,13 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
 
     println!("Generating corpus in {}...", out_dir.display());
 
-    let documents = get_corpus_templates();
+    let documents: Vec<(String, String, String)> = get_corpus_templates()
+        .into_iter()
+        .map(|(filename, doc_type, desc)| {
+            let docx_filename = filename.replace(".txt", ".docx");
+            (docx_filename, doc_type, desc)
+        })
+        .collect();
 
     if args.ai {
         let api_key = args.api_key.unwrap_or_default();
@@ -56,6 +62,24 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
                 println!("Local model server is already online and ready.");
             } else {
                 println!("Local model server is offline. Spawning sidecar automatically... ");
+
+                // Kill any zombie/hanging local server process first
+                #[cfg(not(target_os = "windows"))]
+                {
+                    let _ = std::process::Command::new("pkill")
+                        .arg("-f")
+                        .arg("llama-server")
+                        .status();
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(&["/F", "/IM", "llama-server.exe"])
+                        .status();
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+
                 let sidecar_path = crate::sidecar::get_cli_sidecar_path()?;
                 let model_file = tauri_app_lib::llm::get_model_filename(&model)?;
                 let model_path = tauri_app_lib::store::cli_app_data_dir().join("models").join(model_file);
@@ -75,8 +99,21 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
                     .arg(port.to_string())
                     .arg("--threads")
                     .arg("4")
+                    .arg("-c")
+                    .arg("8192")
                     .arg("--host")
                     .arg("127.0.0.1");
+
+                let template = if model.to_lowercase().contains("qwen") {
+                    "chatml"
+                } else if model.to_lowercase().contains("gemma") {
+                    "gemma"
+                } else if model.to_lowercase().contains("phi-4") {
+                    "phi4"
+                } else {
+                    "chatml"
+                };
+                cmd.arg("--chat-template").arg(template);
 
                 #[cfg(target_os = "windows")]
                 {
@@ -84,6 +121,18 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
                     const CREATE_NO_WINDOW: u32 = 0x08000000;
                     cmd.creation_flags(CREATE_NO_WINDOW);
                 }
+
+                let app_data_dir = tauri_app_lib::store::cli_app_data_dir();
+                let log_file_path = app_data_dir.join("llama_sidecar.log");
+                let log_file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(&log_file_path)
+                    .map_err(|e| format!("Failed to create log file {:?}: {}", log_file_path, e))?;
+
+                cmd.stdout(log_file.try_clone().map_err(|e| e.to_string())?);
+                cmd.stderr(log_file);
 
                 let child = cmd.spawn()
                     .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
@@ -116,21 +165,27 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
             let file_path = out_dir.join(filename);
             println!("Generating (AI) {}...", filename);
 
+            let template_str = match get_few_shot_template(doc_type) {
+                Some(tpl) => format!(
+                    "\n\nFollow the structure, terminology, and legal style of this Hebrew template example where applicable:\n---\n{}\n---",
+                    tpl
+                ),
+                None => String::new(),
+            };
+
             let prompt = format!(
-                "Draft a realistic, detailed Hebrew legal document or correspondence of type '{}'. Description: {}. Write only the document text in Hebrew, without any markdown formatting or meta commentaries.",
-                doc_type, desc
+                "Draft a realistic, detailed Hebrew legal document or correspondence of type '{}'. Description: {}. Write only the document text in Hebrew, without any markdown formatting or meta commentaries.{}",
+                doc_type, desc, template_str
             );
 
             let text = provider.call_simple(&prompt, Some("You are a helpful assistant that writes realistic dummy legal documents in Hebrew.")).await?;
-            fs::write(&file_path, text)
-                .map_err(|e| format!("Failed to write {}: {}", filename, e))?;
+            write_docx_file(&file_path, &text)?;
         }
     } else {
         for (filename, _, desc) in &documents {
             let file_path = out_dir.join(filename);
             let text = get_static_document_text(filename, desc);
-            fs::write(&file_path, text)
-                .map_err(|e| format!("Failed to write {}: {}", filename, e))?;
+            write_docx_file(&file_path, &text)?;
         }
     }
 
@@ -179,14 +234,14 @@ fn generate_queries(filename: &str, doc_type: &str, desc: &str) -> Vec<String> {
     let q1 = if !parts.is_empty() {
         parts[0].to_string()
     } else {
-        format!("חיפוש {} {}", hebrew_type, filename.replace(".txt", "").replace('_', " "))
+        format!("חיפוש {} {}", hebrew_type, filename.replace(".docx", "").replace(".txt", "").replace('_', " "))
     };
 
     let q2 = if parts.len() > 1 {
         let clean_part = parts[1].replace(':', " ");
         format!("{} {}", hebrew_type, clean_part)
     } else {
-        format!("{} קובץ {}", hebrew_type, filename.replace(".txt", "").replace('_', " "))
+        format!("{} קובץ {}", hebrew_type, filename.replace(".docx", "").replace(".txt", "").replace('_', " "))
     };
 
     let q3 = if parts.len() > 2 {
@@ -392,7 +447,7 @@ fn get_corpus_templates() -> Vec<(String, String, String)> {
 }
 
 fn get_static_document_text(filename: &str, desc: &str) -> String {
-    let clean_title = filename.replace(".txt", "").replace('_', " ");
+    let clean_title = filename.replace(".docx", "").replace(".txt", "").replace('_', " ");
 
     if filename.contains("chozeh")
         || filename.contains("heskem")
@@ -563,4 +618,73 @@ ___________________                  ___________________
             desc = desc
         )
     }
+}
+
+fn get_few_shot_template(doc_type: &str) -> Option<&'static str> {
+    match doc_type {
+        "contract" => Some(r#"משרד המשפטים/הרשות לרישום והסדר מקרקעין
+שטר לפעולות שכירות במקרקעי ישראל
+הואיל והמשכיר הינו הבעלים של המקרקעין המפורטים להלן, מבוקש לבצע: רישום זכות חכירה.
+1. הצדדים:
+   - המשכיר: [שם המשכיר / רשות מקרקעי ישראל]
+   - השוכר/ים: [שם השוכר], ת.ז/ח.פ: [מספר זיהוי]
+2. תיאור המקרקעין:
+   - גוש: [מספר], חלקה: [מספר], תת-חלקה: [מספר], ישוב: [שם הישוב]
+3. תנאי השכירות:
+   - תקופת השכירות: [מספר] שנים, החל מיום [תאריך] ועד יום [תאריך].
+   - דמי השכירות והוראות פיננסיות יהיו בהתאם לנספח תנאי השכירות המצורף לשטר זה.
+4. חתימות ואישורים:
+   - חתימת המשכיר: [חתימה] | חתימת השוכר: [חתימה]
+   - אישור עו"ד: הריני לאשר כי הצדדים התייצבו בפניי וחתמו מרצונם החופשי."#),
+        "will" => Some(r#"תצהיר משפטי מאומת:
+אני הח"מ, עו"ד [שם עו"ד], מ.ר. [מספר רישיון], לאחר שהוזהרתי כי עלי לומר את האמת וכי אהיה צפוי לעונשים בחוק אם לא אעשה כן, מצהיר בזה בכתב כדלקמן:
+1. בדקתי את ההתחייבויות בתיקי הערות האזהרה הרשומות על המקרקעין הידועים כגוש [מספר], חלקה [מספר].
+2. הריני לאשר כי הפעולה המבוקשת אינה פוגעת בזכויות הזכאים ואינה סותרת את תוכנן.
+3. הנני מצהיר כי שמי הוא [שם המצהיר], החתימה למטה היא חתימתי ותוכן תצהירי זה אמת.
+- תאריך: [תאריך] | חתימת המצהיר: [חתימה]
+- אימות חתימה: אני עו"ד [שם], מאשר כי ביום [תאריך] הופיע בפניי המצהיר ולאחר שהזהרתיו כחוק חתם על תצהיר זה בפניי."#),
+        "report" => Some(r#"בקשת רישום מקרקעין:
+משרד המשפטים / הרשות לרישום והסדר זכויות מקרקעין
+נושא: בקשה לרישום במקרקעין (לפי תקנות המקרקעין)
+1. תיאור המקרקעין:
+   - ישוב: [שם הישוב] | גוש: [מספר] | חלקה: [מספר] | תת-חלקה: [מספר]
+2. הפעולה המבוקשת:
+   - רישום צו ירושה / צו קיום צוואה / הסכם חלוקת עיזבון [סמן X או פרט פרטים]
+3. פרטי המבקשים:
+   - שם מלא / תאגיד: [שם] | מספר זיהוי: [ת.ז/ח.פ] | כתובת: [כתובת]
+4. אימות חתימה:
+   - אני מעיד כי היום התייצב בפניי המבקש ולאחר שזיהיתיו והסברתי לו את מהות הבקשה, חתם לפניי מרצונו."#),
+        "letter" => Some(r#"מכתב דרישה והודעה משפטית:
+מאת: עו"ד [שם עו"ד], מ.ר. [מספר רישיון]
+אל: [שם הנמען] | כתובת: [כתובת]
+תאריך: [תאריך]
+הנדון: דרישה לתשלום והסדרת חוב בהמשך להחלטה שיפוטית
+
+פנייה זו נשלחת אליך בהמשך לקביעה מיום [תאריך], לפיה נפסק תשלום בסך [סכום] ש"ח לטובת מר/גב' [שם הזכאי] ת"ז [מספר זיהוי].
+הנך נדרש להעביר את הסכום הנ"ל בתוך 7 ימי עסקים בהעברה בנקאית לחשבון בנק [שם הבנק], סניף [מספר], חשבון [מספר].
+בברכה ובכבוד רב,
+עו"ד [שם עו"ד], [חתימה]"#),
+        _ => None,
+    }
+}
+
+fn write_docx_file(dest_docx: &Path, text: &str) -> Result<(), String> {
+    let temp_txt = dest_docx.with_extension("txt");
+    fs::write(&temp_txt, text).map_err(|e| format!("Failed to write temporary text: {e}"))?;
+
+    let python_exe = "python/.venv/bin/python";
+    let status = std::process::Command::new(python_exe)
+        .arg("python/create_docx.py")
+        .arg(&temp_txt)
+        .arg(dest_docx)
+        .status()
+        .map_err(|e| format!("Failed to run python creator script: {e}"))?;
+
+    let _ = fs::remove_file(&temp_txt);
+
+    if !status.success() {
+        return Err(format!("python docx compiler exited with error status: {:?}", status.code()));
+    }
+
+    Ok(())
 }
