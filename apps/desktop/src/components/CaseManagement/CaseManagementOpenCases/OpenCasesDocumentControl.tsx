@@ -10,7 +10,7 @@ interface OpenCasesDocumentPanelControlProps {
   onRemoveDocument: (doc: CaseFile) => void;
 }
 
-export default function OpenCasesDocumentPanelControl({
+export default function OpenCasesDocumentControl({
   doc,
   onEditAnnotations,
   onOpenFile,
