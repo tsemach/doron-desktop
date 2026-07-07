@@ -141,7 +141,7 @@ pub async fn call_provider(provider: &llm_provider::LlmProvider, text: &str) -> 
     };
     
     let is_local = match provider {
-        llm_provider::LlmProvider::OpenAi(_) => true,
+        llm_provider::LlmProvider::Local(_) => true,
         _ => false,
     };
     let prompt_template = if is_local {

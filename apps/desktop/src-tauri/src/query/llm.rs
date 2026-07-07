@@ -67,7 +67,7 @@ Candidates:
 
 pub(crate) async fn analyze_query(query: &str, provider: &crate::llm::llm_provider::LlmProvider) -> Result<QueryAnalysis, String> {
     let is_local = match provider {
-        crate::llm::llm_provider::LlmProvider::OpenAi(_) => true,
+        crate::llm::llm_provider::LlmProvider::Local(_) => true,
         _ => false,
     };
     let prompt_template = if is_local {
