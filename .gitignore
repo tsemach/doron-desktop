@@ -40,3 +40,4 @@ dist-ssr
 evaluation_corpus/
 
 scratch/
+**/__pycache__/

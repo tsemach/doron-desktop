@@ -19,7 +19,6 @@ export default function OpenCasesDocumentFields({
   onCancel,
 }: OpenCasesDocumentFieldsProps) {
   const [fields, setFields] = useState<string[]>([]);
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -99,7 +98,6 @@ export default function OpenCasesDocumentFields({
         docFields.forEach((field) => {
           initialValues[field] = currentCaseFields[field] || "";
         });
-        setFieldValues(initialValues);
         setEditedValues(initialValues);
 
         // 4. Load full HTML of marked template

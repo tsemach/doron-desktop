@@ -75,7 +75,7 @@ export default function SettingAiProvider({
 
   // Model lists mappings
   const localModels: Record<string, string[]> = {
-    google: ["Gemma 4 E4B (Q4)"],
+    google: ["Gemma 4 E4B (Q4)", "Gemma 4 12B"],
     microsoft: [
       "Phi-4-mini-instruct (3.8B Q4)",
       "Phi-3.5-mini-instruct (3.8B Q4)"
@@ -334,6 +334,8 @@ export default function SettingAiProvider({
         return "Stable Baseline / Balanced Mode (RAM footprint: ~2.2 GB). Best for 16GB RAM machines. Outstanding performance-to-size ratio with a native 128K context window.";
       case "Gemma 4 E4B (Q4)":
         return "Alternative Capable Mode (RAM footprint: ~2.5 GB). Strong multimodal and agentic capability, slightly higher memory overhead.";
+      case "Gemma 4 12B":
+        return "High Performance Mode (RAM footprint: ~7.5 GB). Recommended for 16GB+ RAM machines. Outstanding reasoning and multimodal capabilities.";
       default:
         return "";
     }

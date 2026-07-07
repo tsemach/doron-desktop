@@ -55,8 +55,8 @@ pub fn get_model_filename(model_name: &str) -> Result<&'static str, String> {
         "gemma 4 e4b (q4)" | "gemma-4-e4b-q4" | "gemma-2-2b-it-local" | "gemma-2-2b-it-q4" => {
             Ok("gemma-2-2b-it-Q4_K_M.gguf")
         }
-        "gemma 4 12b (q4)" | "gemma-4-12b-it-q4" | "gemma-4-12b-it-local" | "gemma-4-12b" => {
-            Ok("gemma-4-12b-it-Q4_K_M.gguf")
+        "gemma 4 12b (q4)" | "gemma-4-12b-it-q4" | "gemma-4-12b-it-local" | "gemma-4-12b" | "gemma 4 12b" => {
+            Ok("gemma-4-12B-it-Q4_K_M.gguf")
         }
         _ => Err(format!("Unknown local model: {}", model_name)),
     }
@@ -79,8 +79,8 @@ fn get_model_url(model_name: &str) -> Result<&'static str, String> {
         "gemma 4 e4b (q4)" | "gemma-4-e4b-q4" | "gemma-2-2b-it-local" | "gemma-2-2b-it-q4" => {
             Ok("https://huggingface.co/second-state/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf")
         }
-        "gemma 4 12b (q4)" | "gemma-4-12b-it-q4" | "gemma-4-12b-it-local" | "gemma-4-12b" => {
-            Ok("https://huggingface.co/lmstudio-community/gemma-4-12B-it-GGUF/resolve/main/gemma-4-12b-it-Q4_K_M.gguf")
+        "gemma 4 12b (q4)" | "gemma-4-12b-it-q4" | "gemma-4-12b-it-local" | "gemma-4-12b" | "gemma 4 12b" => {
+            Ok("https://huggingface.co/lmstudio-community/gemma-4-12B-it-GGUF/resolve/main/gemma-4-12B-it-Q4_K_M.gguf")
         }
         _ => Err(format!("Unknown local model URL for: {}", model_name)),
     }

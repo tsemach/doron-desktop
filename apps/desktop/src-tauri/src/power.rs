@@ -46,8 +46,92 @@ mod win_power {
 // Fallback for non-Windows platforms (macOS, Linux)
 #[cfg(not(target_os = "windows"))]
 mod win_power {
-    pub fn prevent_system_sleep(_keep_display_on: bool) {}
-    pub fn allow_system_sleep() {}
+    use std::sync::{Mutex, OnceLock};
+    use std::process::Child;
+
+    static NON_WIN_GUARD: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+
+    fn get_non_win_guard() -> &'static Mutex<Option<Child>> {
+        NON_WIN_GUARD.get_or_init(|| Mutex::new(None))
+    }
+
+    pub fn prevent_system_sleep(keep_display_on: bool) {
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(mut guard) = get_non_win_guard().lock() {
+                if guard.is_none() {
+                    let arg = if keep_display_on { "-d" } else { "-i" };
+                    match std::process::Command::new("caffeinate")
+                        .arg(arg)
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .spawn()
+                    {
+                        Ok(child) => {
+                            println!("[Power] Spawned caffeinate helper on macOS (keep_display_on: {}).", keep_display_on);
+                            *guard = Some(child);
+                        }
+                        Err(e) => {
+                            println!("[Power] Failed to spawn caffeinate on macOS: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // Detect if we are in WSL
+            let is_wsl = std::env::var("WSL_DISTRO_NAME").is_ok() || 
+                std::fs::read_to_string("/proc/sys/kernel/osrelease")
+                    .map(|s| s.to_lowercase().contains("microsoft"))
+                    .unwrap_or(false);
+
+            if is_wsl {
+                if let Ok(mut guard) = get_non_win_guard().lock() {
+                    if guard.is_none() {
+                        let flags = if keep_display_on { "2147483651" } else { "2147483649" };
+                        let script = format!(
+                            "$code = '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint esFlags);'; \
+                             Add-Type -MemberDefinition $code -Name Win32SetThreadExecutionState -Namespace Win32; \
+                             while ($true) {{ \
+                                 [Win32.Win32SetThreadExecutionState]::SetThreadExecutionState({}); \
+                                 Start-Sleep -Seconds 30; \
+                             }}",
+                            flags
+                        );
+                        
+                        match std::process::Command::new("powershell.exe")
+                            .args(&["-NoProfile", "-Command", &script])
+                            .stdout(std::process::Stdio::null())
+                            .stderr(std::process::Stdio::null())
+                            .spawn()
+                        {
+                            Ok(child) => {
+                                println!("[Power] Spawned powershell.exe sleep prevention helper in WSL.");
+                                *guard = Some(child);
+                            }
+                            Err(e) => {
+                                println!("[Power] Failed to spawn powershell.exe sleep prevention in WSL: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn allow_system_sleep() {
+        if let Ok(mut guard) = get_non_win_guard().lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+                #[cfg(target_os = "macos")]
+                println!("[Power] Terminated caffeinate helper on macOS.");
+                #[cfg(target_os = "linux")]
+                println!("[Power] Terminated powershell.exe sleep prevention helper in WSL.");
+            }
+        }
+    }
 }
 
 pub fn prevent_sleep_core(keep_display_on: bool) {

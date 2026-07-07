@@ -96,10 +96,13 @@ Generate test documents for search indexing.
 6. Generate rich synthetic legal documents via Local Microsoft Phi-4:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
 
-7. Generate rich synthetic legal documents via Local Google Gemma:
+7. Generate rich synthetic legal documents via Local Google Gemma E4B:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --ai --provider local --model "Gemma 4 E4B (Q4)" --corpus-dir ./gemma_docs
 
-8. Generate rich synthetic legal documents via Local Qwen 3B:
+8. Generate rich synthetic legal documents via Local Google Gemma 12B:
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --ai --provider local --model "Gemma 4 12B" --corpus-dir ./gemma12b_docs
+
+9. Generate rich synthetic legal documents via Local Qwen 3B:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --ai --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --corpus-dir ./qwen_docs
 
 Note: Running generation with local models requires your local llama-server to be active on port 10086 (e.g. by running the desktop app in local mode or starting the sidecar).
@@ -162,16 +165,19 @@ The evaluation dataset JSON is automatically autodetected from the corpus direct
 15. Run evaluation using Local Microsoft Phi-3.5:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Phi-3.5-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-16. Run evaluation using Local Google Gemma:
+16. Run evaluation using Local Google Gemma E4B:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Gemma 4 E4B (Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-17. Run evaluation using Local Qwen 3B:
+17. Run evaluation using Local Google Gemma 12B:
+   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Gemma 4 12B" --algorithm hybrid --corpus-dir ./evaluation_corpus
+
+18. Run evaluation using Local Qwen 3B:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-18. Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
+19. Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider openai --model my-custom-model --api-key MY_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
 
-19. Run evaluation on a custom corpus output directory:
+20. Run evaluation on a custom corpus output directory:
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider mock --algorithm hybrid --corpus-dir /path/to/my_custom_corpus
 ================================================================================
 "#
