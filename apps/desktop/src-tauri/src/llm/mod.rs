@@ -154,7 +154,7 @@ pub async fn call_provider(provider: &llm_provider::LlmProvider, text: &str) -> 
     let raw = provider.call_structured(&prompt, None).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<DocumentMetadata>(&json_str)
-        .map_err(|e| format!("Failed to parse metadata JSON: {e}. Raw: {}", &json_str[..json_str.len().min(200)]))
+        .map_err(|e| format!("Failed to parse metadata JSON: {e}. Raw: {}", json_str.chars().take(200).collect::<String>()))
 }
 
 /// Analyze a document and return structured metadata (JSON parsed) via Claude.
@@ -201,5 +201,52 @@ fn clean_json(raw: &str) -> String {
     match (s.find('{'), s.rfind('}')) {
         (Some(start), Some(end)) if end > start => s[start..=end].to_string(),
         _ => s.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_json;
+
+    #[test]
+    fn test_clean_json_already_clean() {
+        let input = "{\"key\": \"value\"}";
+        assert_eq!(clean_json(input), "{\"key\": \"value\"}");
+    }
+
+    #[test]
+    fn test_clean_json_markdown_fences() {
+        let input = "```json\n{\"key\": \"value\"}\n```";
+        assert_eq!(clean_json(input), "{\"key\": \"value\"}");
+
+        let input_no_lang = "```\n{\"key\": \"value\"}\n```";
+        assert_eq!(clean_json(input_no_lang), "{\"key\": \"value\"}");
+    }
+
+    #[test]
+    fn test_clean_json_leading_trailing_text() {
+        let input = "Here is the response:\n{\"key\": \"value\"}\nHope this helps!";
+        assert_eq!(clean_json(input), "{\"key\": \"value\"}");
+    }
+
+    #[test]
+    fn test_clean_json_combined_fences_and_text() {
+        let input = "Sure, here is the JSON:\n```json\n{\"key\": \"value\"}\n```\nLet me know if you need anything else.";
+        assert_eq!(clean_json(input), "{\"key\": \"value\"}");
+    }
+
+    #[test]
+    fn test_clean_json_nested_braces() {
+        let input = "```json\n{\"key\": {\"nested\": [1, 2, 3]}}\n```";
+        assert_eq!(clean_json(input), "{\"key\": {\"nested\": [1, 2, 3]}}");
+    }
+
+    #[test]
+    fn test_clean_json_invalid_braces() {
+        let input = "no braces here";
+        assert_eq!(clean_json(input), "no braces here");
+
+        let input_open_only = "{\"only_open\": 123";
+        assert_eq!(clean_json(input_open_only), "{\"only_open\": 123");
     }
 }

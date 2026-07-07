@@ -34,7 +34,7 @@ async fn test_mock_provider_metadata_extraction() {
         .await
         .expect("Mock provider metadata extraction should succeed");
 
-    assert_eq!(metadata.doc_type, Some("contract".to_string()));
+    assert_eq!(metadata.doc_type, Some(serde_json::Value::String("contract".to_string())));
     assert!(metadata.title.unwrap().contains("שכירות"));
     assert_eq!(metadata.confidence, Some(0.95));
 }

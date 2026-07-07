@@ -79,7 +79,7 @@ pub(crate) async fn analyze_query(query: &str, provider: &crate::llm::llm_provid
     let raw = provider.call_structured(&prompt, None).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<QueryAnalysis>(&json_str)
-        .map_err(|e| format!("Failed to parse query analysis: {e}. Raw: {}", &json_str[..json_str.len().min(300)]))
+        .map_err(|e| format!("Failed to parse query analysis: {e}. Raw: {}", json_str.chars().take(300).collect::<String>()))
 }
 
 // Rerank candidates using Claude

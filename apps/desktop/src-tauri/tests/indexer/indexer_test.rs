@@ -26,7 +26,7 @@ async fn test_index_document() {
     let metadata = if api_key.is_empty() {
         println!("\n[llm] ANTHROPIC_API_KEY not set — skipping Claude call");
         tauri_app_lib::llm::DocumentMetadata {
-            doc_type:   Some("document".to_string()),
+            doc_type:   Some(serde_json::Value::String("document".to_string())),
             title:      Some("Tiviat Nezikin".to_string()),
             summary:    Some("Stub summary — LLM not called".to_string()),
             authors:    None,
@@ -62,12 +62,18 @@ async fn test_index_document() {
         .map(|m| m.len() as i64 / 1024)
         .unwrap_or(0);
 
+    let doc_type_str = metadata.doc_type.and_then(|v| match v {
+        serde_json::Value::String(s) => Some(s),
+        serde_json::Value::Object(map) => serde_json::to_string(&map).ok(),
+        other => Some(other.to_string()),
+    });
+
     let record = store::DocumentRecord {
         file_path:    abs_path,
         file_name:    "tiviat-nezikin.docx".to_string(),
         file_ext:     "docx".to_string(),
         file_size_kb,
-        doc_type:     metadata.doc_type,
+        doc_type:     doc_type_str,
         title:        metadata.title,
         summary:      metadata.summary,
         authors:      serde_json::to_string(&metadata.authors.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),

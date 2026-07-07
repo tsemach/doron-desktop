@@ -6,17 +6,21 @@ pub mod llm_provider_openai;
 pub mod llm_provider_entropic;
 #[path = "llm_provider_mock.rs"]
 pub mod llm_provider_mock;
+#[path = "llm_provider_local.rs"]
+pub mod llm_provider_local;
 
 pub use llm_provider_gemini::GeminiProvider;
 pub use llm_provider_openai::OpenAiProvider;
 pub use llm_provider_entropic::ClaudeProvider;
 pub use llm_provider_mock::MockProvider;
+pub use llm_provider_local::LocalProvider;
 
 pub enum LlmProvider {
     Claude(ClaudeProvider),
     Gemini(GeminiProvider),
     OpenAi(OpenAiProvider),
     Mock(MockProvider),
+    Local(LocalProvider),
 }
 
 impl LlmProvider {
@@ -26,6 +30,7 @@ impl LlmProvider {
             Self::Gemini(p) => p.call_simple(prompt, system).await,
             Self::OpenAi(p) => p.call_simple(prompt, system).await,
             Self::Mock(p) => p.call_simple(prompt, system).await,
+            Self::Local(p) => p.call_simple(prompt, system).await,
         }
     }
 
@@ -35,6 +40,7 @@ impl LlmProvider {
             Self::Gemini(p) => p.call_structured(prompt, system).await,
             Self::OpenAi(p) => p.call_structured(prompt, system).await,
             Self::Mock(p) => p.call_structured(prompt, system).await,
+            Self::Local(p) => p.call_structured(prompt, system).await,
         }
     }
 }
@@ -68,7 +74,7 @@ pub fn get_active_provider(config: ProviderConfig) -> LlmProvider {
             model: if model.is_empty() { "gpt-4o-mini".to_string() } else { model },
             base_url: config.base_url,
         }),
-        "local" | "ollama" => LlmProvider::OpenAi(OpenAiProvider {
+        "local" | "ollama" => LlmProvider::Local(LocalProvider {
             api_key: config.api_key,
             model: if model.is_empty() { "phi-4".to_string() } else { model },
             base_url: Some(config.base_url.unwrap_or_else(|| "http://localhost:10086/v1".to_string())),
