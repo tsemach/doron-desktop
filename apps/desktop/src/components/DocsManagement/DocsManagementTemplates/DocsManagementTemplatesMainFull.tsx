@@ -24,7 +24,7 @@ function FieldItem({ field, docCount, sourceDocs }: { field: string; docCount: n
     timeoutRef.current = setTimeout(() => {
       setIsCopied(false);
       timeoutRef.current = null;
-    }, 1500);
+    }, 2000);
   };
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function DocsManagementTemplatesMainFull({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-1">
       {filteredUniqueFields.map((field) => {
         const docCount = uniqueFieldsMap[field].count;
         const sourceDocs = uniqueFieldsMap[field].docNames.map((name) => `• ${name}`).join("\n");

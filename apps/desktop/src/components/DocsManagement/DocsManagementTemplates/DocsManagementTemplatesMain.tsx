@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useDeferredValue } from "react";
 import { TemplateRow } from "./DocsManagementTemplates.types";
 import DocsManagementTemplatesMainEmpty from "./DocsManagementTemplatesMainEmpty";
 import DocsManagementTemplatesMainHeader from "./DocsManagementTemplatesMainHeader";
@@ -21,9 +21,8 @@ export default function DocsManagementTemplatesMain({
   isSyncingAll,
 }: DocsManagementTemplatesEmptyStateProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [activeTab, setActiveTab] = useState<"unique" | "by_doc">("unique");
-
-
 
   // Safe parsing helper
   const parseFields = (fieldsJson: string): string[] => {
@@ -36,54 +35,67 @@ export default function DocsManagementTemplatesMain({
   };
 
   // Construct structured templates with fields list
-  const docFieldsList = templates.map((t) => {
-    const fields = parseFields(t.fields_found);
-    return {
-      id: t.id,
-      file_name: t.file_name,
-      title: t.title,
-      fields: fields.sort(),
-    };
-  });
+  const docFieldsList = useMemo(() => {
+    return templates.map((t) => {
+      const fields = parseFields(t.fields_found);
+      return {
+        id: t.id,
+        file_name: t.file_name,
+        title: t.title,
+        fields: fields.sort(),
+      };
+    });
+  }, [templates]);
 
   // Calculate unique fields dictionary
-  const uniqueFieldsMap: Record<string, { count: number; docNames: string[] }> = {};
-  docFieldsList.forEach(({ file_name, title, fields }) => {
-    const displayName = title || file_name;
-    fields.forEach((f) => {
-      if (!uniqueFieldsMap[f]) {
-        uniqueFieldsMap[f] = { count: 0, docNames: [] };
-      }
-      uniqueFieldsMap[f].count += 1;
-      uniqueFieldsMap[f].docNames.push(displayName);
+  const uniqueFieldsMap = useMemo(() => {
+    const map: Record<string, { count: number; docNames: string[] }> = {};
+    docFieldsList.forEach(({ file_name, title, fields }) => {
+      const displayName = title || file_name;
+      fields.forEach((f) => {
+        if (!map[f]) {
+          map[f] = { count: 0, docNames: [] };
+        }
+        map[f].count += 1;
+        map[f].docNames.push(displayName);
+      });
     });
-  });
+    return map;
+  }, [docFieldsList]);
 
-  const uniqueFieldsList = Object.keys(uniqueFieldsMap).sort();
+  const uniqueFieldsList = useMemo(() => {
+    return Object.keys(uniqueFieldsMap).sort();
+  }, [uniqueFieldsMap]);
 
-  // Filters
-  const filteredUniqueFields = uniqueFieldsList.filter((f) =>
-    f.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filters (utilizing deferredSearchQuery to keep the UI input responsive)
+  const filteredUniqueFields = useMemo(() => {
+    const query = deferredSearchQuery.toLowerCase().trim();
+    return uniqueFieldsList.filter((f) =>
+      f.toLowerCase().includes(query)
+    );
+  }, [uniqueFieldsList, deferredSearchQuery]);
 
-  const filteredDocFields = docFieldsList
-    .map((doc) => {
-      const matchingFields = doc.fields.filter((f) =>
-        f.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      const docMatches =
-        doc.file_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (doc.title && doc.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredDocFields = useMemo(() => {
+    const query = deferredSearchQuery.toLowerCase().trim();
+    return docFieldsList
+      .map((doc) => {
+        const matchingFields = doc.fields.filter((f) =>
+          f.toLowerCase().includes(query)
+        );
+        const docMatches =
+          doc.file_name.toLowerCase().includes(query) ||
+          (doc.title && doc.title.toLowerCase().includes(query));
 
-      if (docMatches || matchingFields.length > 0) {
-        return {
-          ...doc,
-          fields: docMatches ? doc.fields : matchingFields,
-        };
-      }
-      return null;
-    })
-    .filter((d): d is NonNullable<typeof d> => d !== null);
+        if (docMatches || matchingFields.length > 0) {
+          return {
+            ...doc,
+            fields: docMatches ? doc.fields : matchingFields,
+          };
+        }
+        return null;
+      })
+      .filter((d): d is NonNullable<typeof d> => d !== null);
+  }, [docFieldsList, deferredSearchQuery]);
 
   // If there are no templates, show the original centered empty state
   if (templates.length === 0) {
