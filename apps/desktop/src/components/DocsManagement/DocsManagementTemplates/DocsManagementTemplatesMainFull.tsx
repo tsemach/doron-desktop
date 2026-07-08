@@ -38,10 +38,10 @@ function FieldItem({ field, docCount, sourceDocs }: { field: string; docCount: n
   return (
     <div
       onClick={handleCopy}
-      className={`text-xs font-mono px-2.5 py-1.5 rounded-lg border cursor-pointer select-none relative group transition-all duration-150 flex items-center gap-2 ${
+      className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border font-mono text-xs shadow-xs cursor-pointer select-none transition-all duration-150 relative group ${
         isCopied
           ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400 font-bold shadow-sm"
-          : "bg-muted/40 hover:bg-muted/95 border-border hover:border-primary/40 text-foreground hover:scale-102 hover:shadow-sm"
+          : "bg-muted/40 hover:bg-muted/90 border-border hover:border-primary/40 text-foreground/80 hover:shadow-sm"
       }`}
     >
       {/* Custom CSS Tooltip */}
@@ -66,10 +66,46 @@ function FieldItem({ field, docCount, sourceDocs }: { field: string; docCount: n
         </span>
       )}
 
-      <span>[[ {field} ]]</span>
+      <div className="flex items-center gap-2 min-w-0">
+        {isCopied ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-green-600 dark:text-green-400 shrink-0"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-primary/70 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+          >
+            <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+            <path d="M7 7h.01" />
+          </svg>
+        )}
+        <span className="truncate font-semibold text-foreground/80" title={field}>
+          {field}
+        </span>
+      </div>
 
       {/* Variable state icons */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 shrink-0">
         {docCount > 1 && (
           <span
             className={`text-[9px] rounded-full px-1.5 py-0.2 border shrink-0 ${
@@ -82,22 +118,7 @@ function FieldItem({ field, docCount, sourceDocs }: { field: string; docCount: n
           </span>
         )}
 
-        {isCopied ? (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-green-600 dark:text-green-400"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        ) : (
+        {!isCopied && (
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="10"
@@ -108,7 +129,7 @@ function FieldItem({ field, docCount, sourceDocs }: { field: string; docCount: n
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="text-muted-foreground opacity-30 group-hover:opacity-100 transition-opacity"
+            className="text-muted-foreground opacity-30 group-hover:opacity-100 transition-opacity shrink-0"
           >
             <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
             <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
@@ -132,7 +153,7 @@ export default function DocsManagementTemplatesMainFull({
   }
 
   return (
-    <div className="flex flex-wrap gap-2 pt-1">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
       {filteredUniqueFields.map((field) => {
         const docCount = uniqueFieldsMap[field].count;
         const sourceDocs = uniqueFieldsMap[field].docNames.map((name) => `• ${name}`).join("\n");
