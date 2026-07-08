@@ -61,9 +61,9 @@ All evaluation results are stored in `evaluation_history.db` within the applicat
 * **Linux/WSL**: `~/.local/share/com.tsemach.doron-desktop/evaluation_history.db`
 
 Commands:
-* `eval list`: Lists summary scores of all historical runs.
-* `eval show <ID>`: Displays query-by-query ranks and latencies for that run.
-* `eval compare <ID_1> <ID_2>`: Performs a side-by-side delta comparison of run scores and latencies (highlighting regressions in red/green).
+* `eval document list`: Lists summary scores of all historical runs.
+* `eval document show <ID>`: Displays query-by-query ranks and latencies for that run.
+* `eval document compare <ID_1> <ID_2>`: Performs a side-by-side delta comparison of run scores and latencies (highlighting regressions in red/green).
 
 ---
 
