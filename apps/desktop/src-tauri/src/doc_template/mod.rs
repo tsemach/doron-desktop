@@ -315,6 +315,7 @@ pub async fn process_template_internal(
     api_key: Option<String>,
     model: Option<String>,
     title: Option<String>,
+    open_editor: bool,
 ) -> Result<TemplateResult, String> {
     let path = Path::new(&file_path);
     let ext = path
@@ -381,9 +382,11 @@ pub async fn process_template_internal(
     let conn = store::open_db(&app)?;
     let id = store::insert_template(&conn, &record).map_err(|e| e.to_string())?;
 
-    emit_progress(&app, "processing", "opening template editor...");
-    if let Err(e) = open_path(marked_path_str.clone()) {
-        eprintln!("Failed to open template file: {e}");
+    if open_editor {
+        emit_progress(&app, "processing", "opening template editor...");
+        if let Err(e) = open_path(marked_path_str.clone()) {
+            eprintln!("Failed to open template file: {e}");
+        }
     }
 
     emit_progress(&app, "ok", "done");
