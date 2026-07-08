@@ -43,8 +43,22 @@ function FieldItem({ field, docCount, sourceDocs }: { field: string; docCount: n
           ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400 font-bold shadow-sm"
           : "bg-muted/40 hover:bg-muted/95 border-border hover:border-primary/40 text-foreground hover:scale-102 hover:shadow-sm"
       }`}
-      title={`Placeholder format: [[${field}]]\nUsed in ${docCount} template(s):\n${sourceDocs}`}
     >
+      {/* Custom CSS Tooltip */}
+      <div
+        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2 bg-neutral-900 dark:bg-neutral-950 text-white text-[10px] rounded-lg shadow-xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-100 z-50 origin-bottom border border-neutral-800 font-sans leading-relaxed text-center ${
+          isCopied ? "hidden" : ""
+        }`}
+      >
+        <div className="font-semibold text-neutral-200 mb-0.5">Placeholder: [[{field}]]</div>
+        <div className="text-neutral-400 text-[9px]">Used in {docCount} template(s):</div>
+        <div className="text-neutral-300 font-mono mt-1 whitespace-pre-line text-left leading-normal text-[9px]">
+          {sourceDocs}
+        </div>
+        {/* Tooltip Arrow */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-950" />
+      </div>
+
       {/* Copy success tooltip banner */}
       {isCopied && (
         <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow-md z-10 animate-bounce">

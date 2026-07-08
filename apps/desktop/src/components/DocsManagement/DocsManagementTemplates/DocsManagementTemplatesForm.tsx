@@ -52,7 +52,6 @@ function FormFieldItem({ field }: { field: string }) {
           ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400 font-bold shadow-sm"
           : "bg-muted/40 hover:bg-muted/90 border-border hover:border-primary/40 text-foreground/80 hover:shadow-sm"
       }`}
-      title={`Click to copy: [[${field}]]`}
     >
       {isCopied && (
         <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow-md z-10 animate-bounce">

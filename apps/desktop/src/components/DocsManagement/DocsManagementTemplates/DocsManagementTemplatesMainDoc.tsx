@@ -53,7 +53,6 @@ function DocFieldItemComponent({ field }: { field: string }) {
           ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400 font-bold"
           : "bg-muted/20 hover:bg-muted/70 border-border hover:border-primary/30 text-foreground"
       }`}
-      title={`Click to copy: [[${field}]]`}
     >
       {isFieldCopied && (
         <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10 animate-bounce">
