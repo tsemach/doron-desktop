@@ -4,7 +4,12 @@ use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
+pub mod local_add;
+pub mod download;
 pub mod context;
+
+pub use local_add::process_template;
+pub use download::download_and_process_template;
 
 use crate::{extractor, store};
 
@@ -303,14 +308,14 @@ fn strip_docx_form_fields(xml: &str) -> String {
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
-#[tauri::command]
 #[allow(unused_variables)]
-pub async fn process_template(
+pub async fn process_template_internal(
     app: AppHandle,
     file_path: String,
     api_key: Option<String>,
     model: Option<String>,
     title: Option<String>,
+    open_editor: bool,
 ) -> Result<TemplateResult, String> {
     let path = Path::new(&file_path);
     let ext = path
@@ -377,9 +382,11 @@ pub async fn process_template(
     let conn = store::open_db(&app)?;
     let id = store::insert_template(&conn, &record).map_err(|e| e.to_string())?;
 
-    emit_progress(&app, "processing", "opening template editor...");
-    if let Err(e) = open_path(marked_path_str.clone()) {
-        eprintln!("Failed to open template file: {e}");
+    if open_editor {
+        emit_progress(&app, "processing", "opening template editor...");
+        if let Err(e) = open_path(marked_path_str.clone()) {
+            eprintln!("Failed to open template file: {e}");
+        }
     }
 
     emit_progress(&app, "ok", "done");

@@ -61,3 +61,14 @@ export const verificationTokens = pgTable(
     },
   ]
 );
+
+export const documentTemplates = pgTable("document_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fileName: text("file_name").notNull(),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  language: text("language").notNull(), // 'en' or 'he'
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+

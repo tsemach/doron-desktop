@@ -61,8 +61,8 @@ pub fn run() {
             indexer::index_folder,
             indexer::index_file,
             query::search_documents,
-            // doc_template
-            doc_template::process_template,
+            doc_template::local_add::process_template,
+            doc_template::download::download_and_process_template,
             doc_template::list_templates,
             doc_template::sync_template_fields,
             doc_template::sync_all_templates_fields,

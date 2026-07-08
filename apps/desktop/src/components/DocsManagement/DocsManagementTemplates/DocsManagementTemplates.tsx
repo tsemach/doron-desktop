@@ -17,11 +17,14 @@ import DocsManagementTemplatesForm from "./DocsManagementTemplatesForm";
 import DocsManagementTemplatesMain from "./DocsManagementTemplatesMain";
 import TemplateTitlePromptModal from "../TemplateTitlePromptModal";
 import TemplateDeleteWarningModal from "../TemplateDeleteWarningModal";
+import { Download } from "lucide-react";
+import DocsManagementTemplatesDownloadModal from "./DocsManagementTemplatesDownloadModal";
 
 export default function DocsManagementTemplates() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [processing, setProcessing] = useState<ProcessingState>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
@@ -112,6 +115,42 @@ export default function DocsManagementTemplates() {
       unlistenRef.current?.();
       unlistenRef.current = null;
       setProcessing({ status: "ok", message: "Template uploaded and opened in editor!" });
+      await loadTemplates();
+      setTimeout(() => setProcessing(null), 4000);
+    } catch (e) {
+      unlistenRef.current?.();
+      unlistenRef.current = null;
+      setProcessing({ status: "failed", message: String(e) });
+    }
+  }
+
+  async function handleDownloadTemplates(selectedList: { url: string; fileName: string; title: string }[]) {
+    if (selectedList.length === 0) return;
+    setProcessing({ status: "processing", message: "Starting templates download..." });
+
+    unlistenRef.current = await listen<TemplateProgressEvent>("template-progress", (event) => {
+      const { status, message } = event.payload;
+      setProcessing({ status: status as "processing" | "ok" | "failed", message });
+    });
+
+    try {
+      for (let i = 0; i < selectedList.length; i++) {
+        const item = selectedList[i];
+        setProcessing({
+          status: "processing",
+          message: `Downloading template ${i + 1}/${selectedList.length}: ${item.fileName}...`,
+        });
+
+        await invoke("download_and_process_template", {
+          url: item.url,
+          fileName: item.fileName,
+          title: item.title || null,
+        });
+      }
+
+      unlistenRef.current?.();
+      unlistenRef.current = null;
+      setProcessing({ status: "ok", message: "Templates downloaded and imported successfully!" });
       await loadTemplates();
       setTimeout(() => setProcessing(null), 4000);
     } catch (e) {
@@ -258,9 +297,20 @@ export default function DocsManagementTemplates() {
         <div className="p-4 border-b border-border/80 bg-background/50 flex flex-col gap-3 shrink-0">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground">Template Vault</h3>
-            <Button size="sm" onClick={handleAddTemplate} disabled={processing?.status === "processing"}>
-              + Add
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDownloadModal(true)}
+                disabled={processing?.status === "processing"}
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                Download
+              </Button>
+              <Button size="sm" onClick={handleAddTemplate} disabled={processing?.status === "processing"}>
+                + Add
+              </Button>
+            </div>
           </div>
           {/* Search bar */}
           <DocsManagementTemplatesSearchBar
@@ -342,6 +392,17 @@ export default function DocsManagementTemplates() {
           fileName={selectedTemplate.file_name}
           onConfirm={handleConfirmDelete}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {showDownloadModal && (
+        <DocsManagementTemplatesDownloadModal
+          localTemplates={templates}
+          onConfirmDownload={(selectedList) => {
+            setShowDownloadModal(false);
+            handleDownloadTemplates(selectedList);
+          }}
+          onCancel={() => setShowDownloadModal(false)}
         />
       )}
     </div>

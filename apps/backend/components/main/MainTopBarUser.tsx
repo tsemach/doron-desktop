@@ -1,5 +1,6 @@
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 type MainTopBarUserProps = {
   userName: string;
@@ -40,6 +41,14 @@ export default function MainTopBarUser({ userName, handleLogout }: MainTopBarUse
 
         {dropdownOpen && (
           <div className="absolute right-[-18px] mt-2 w-28 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50">
+          <Link
+            href="/templates"
+            onClick={() => setDropdownOpen(false)}
+            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Templates
+          </Link>
           <button
             onClick={() => {
               setDropdownOpen(false);
