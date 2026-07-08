@@ -4,7 +4,12 @@ use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
+pub mod local_add;
+pub mod download;
 pub mod context;
+
+pub use local_add::process_template;
+pub use download::download_and_process_template;
 
 use crate::{extractor, store};
 
@@ -303,9 +308,8 @@ fn strip_docx_form_fields(xml: &str) -> String {
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
-#[tauri::command]
 #[allow(unused_variables)]
-pub async fn process_template(
+pub async fn process_template_internal(
     app: AppHandle,
     file_path: String,
     api_key: Option<String>,
