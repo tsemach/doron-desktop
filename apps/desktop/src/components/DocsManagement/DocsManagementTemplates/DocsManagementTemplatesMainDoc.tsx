@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface DocFieldItem {
   id: number;
@@ -18,12 +19,10 @@ function DocFieldItemComponent({ field }: { field: string }) {
   const handleCopy = () => {
     setIsFieldCopied(true);
 
-    setTimeout(() => {
-      const textToCopy = `[[${field}]]`;
-      navigator.clipboard.writeText(textToCopy).catch((err) => {
-        console.error("Failed to copy field: ", err);
-      });
-    }, 0);
+    const textToCopy = `[[${field}]]`;
+    invoke("write_clipboard", { text: textToCopy }).catch((err) => {
+      console.error("Failed to copy field: ", err);
+    });
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -106,12 +105,10 @@ function DocTemplateCard({ doc }: { doc: DocFieldItem }) {
   const handleCopyAllFields = () => {
     setIsDocCopied(true);
 
-    setTimeout(() => {
-      const textToCopy = doc.fields.map((f) => `[[${f}]]`).join("\n");
-      navigator.clipboard.writeText(textToCopy).catch((err) => {
-        console.error("Failed to copy all fields: ", err);
-      });
-    }, 0);
+    const textToCopy = doc.fields.map((f) => `[[${f}]]`).join("\n");
+    invoke("write_clipboard", { text: textToCopy }).catch((err) => {
+      console.error("Failed to copy all fields: ", err);
+    });
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);

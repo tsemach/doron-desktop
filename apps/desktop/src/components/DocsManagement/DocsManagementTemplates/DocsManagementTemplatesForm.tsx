@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { TemplateRow } from "./DocsManagementTemplates.types";
 import { Button } from "../../ui/button";
 
@@ -21,12 +22,10 @@ function FormFieldItem({ field }: { field: string }) {
   const handleCopy = () => {
     setIsCopied(true);
 
-    setTimeout(() => {
-      const textToCopy = `[[${field}]]`;
-      navigator.clipboard.writeText(textToCopy).catch((err) => {
-        console.error("Failed to copy field: ", err);
-      });
-    }, 0);
+    const textToCopy = `[[${field}]]`;
+    invoke("write_clipboard", { text: textToCopy }).catch((err) => {
+      console.error("Failed to copy field: ", err);
+    });
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);

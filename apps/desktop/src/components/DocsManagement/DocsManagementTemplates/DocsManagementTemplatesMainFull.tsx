@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface DocsManagementTemplatesMainFullProps {
   filteredUniqueFields: string[];
@@ -12,12 +13,10 @@ function FieldItem({ field, docCount, sourceDocs }: { field: string; docCount: n
   const handleCopy = () => {
     setIsCopied(true);
 
-    setTimeout(() => {
-      const textToCopy = `[[${field}]]`;
-      navigator.clipboard.writeText(textToCopy).catch((err) => {
-        console.error("Failed to copy field name: ", err);
-      });
-    }, 0);
+    const textToCopy = `[[${field}]]`;
+    invoke("write_clipboard", { text: textToCopy }).catch((err) => {
+      console.error("Failed to copy to native clipboard: ", err);
+    });
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
