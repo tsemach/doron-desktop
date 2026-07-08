@@ -57,15 +57,15 @@ A standalone Rust binary (`apps/desktop/src-tauri/src/bin/eval/`) benchmarks doc
 
 ```bash
 # Generate a synthetic test corpus + ground-truth queries
-cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml generate --corpus-dir ./my_test_docs
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --corpus-dir ./my_test_docs
 
 # Index the corpus and score an algorithm against evaluation_dataset.json
-cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml run --provider mock --algorithm hybrid --corpus-dir ./my_test_docs
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm hybrid --corpus-dir ./my_test_docs
 
 # Inspect history
-cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml list
-cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml show <run_id>
-cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml compare <run_a> <run_b>
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document list
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document show <run_id>
+cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document compare <run_a> <run_b>
 ```
 
 Two separate SQLite DBs are involved: `evaluation_history.db` (run metadata/metrics — use for `list`/`show`/`compare`) and `evaluation_index.db` (scratch search index for a run). Don't point `show`/`list` at the index DB.
