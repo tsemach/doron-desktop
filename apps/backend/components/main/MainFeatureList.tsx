@@ -1,8 +1,9 @@
 type MainFreatureListProps = {
+  activeFeatureId: string;
   onFeatureSelect: (featureTitle: string, featureId: string) => void;
 }
 
-export default function MainFeatureList({onFeatureSelect}: MainFreatureListProps) {
+export default function MainFeatureList({ activeFeatureId, onFeatureSelect }: MainFreatureListProps) {
   const features = [
     {
       id: "central-working-space",
@@ -43,25 +44,40 @@ export default function MainFeatureList({onFeatureSelect}: MainFreatureListProps
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm space-y-4">
-      <h3 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
+      <h3 className="text-xs font-bold text-slate-400 border-b border-slate-100 pb-2 uppercase tracking-wider">
         Key Features
       </h3>
-      <div className="flex flex-col gap-3.5">
-        {features.map((feature, i) => (
-          <div 
-            key={i} 
-            className="flex gap-2.5 items-start p-2 rounded-lg hover:bg-slate-200 hover:shadow-xs transition-all cursor-pointer"
-            onClick={() => handleFeatureSelect(i)}
-          >
-            <div className="w-5 h-5 rounded bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 text-xs mt-0.5 font-bold">
-              ✓
+      <div className="flex flex-col gap-2">
+        {features.map((feature, i) => {
+          const isActive = feature.id === activeFeatureId;
+          return (
+            <div 
+              key={i} 
+              className={`flex gap-3 items-start p-3 rounded-lg transition-all duration-200 cursor-pointer border ${
+                isActive 
+                  ? "bg-blue-50/50 border-blue-200/60 shadow-xs translate-x-1" 
+                  : "bg-transparent border-transparent hover:bg-slate-50 hover:translate-x-0.5"
+              }`}
+              onClick={() => handleFeatureSelect(i)}
+            >
+              <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 text-[10px] mt-0.5 font-bold transition-colors ${
+                isActive
+                  ? "bg-blue-600 border border-blue-600 text-white"
+                  : "bg-slate-50 border border-slate-200 text-slate-400"
+              }`}>
+                ✓
+              </div>
+              <div className="space-y-0.5">
+                <h4 className={`text-sm font-bold transition-colors ${
+                  isActive ? "text-blue-900" : "text-slate-800"
+                }`}>{feature.title}</h4>
+                <p className={`text-xs leading-relaxed transition-colors ${
+                  isActive ? "text-blue-750" : "text-slate-500"
+                }`}>{feature.desc}</p>
+              </div>
             </div>
-            <div className="space-y-0.5">
-              <h4 className="text-base font-bold text-slate-800">{feature.title}</h4>
-              <p className="text-base text-slate-500 leading-normal">{feature.desc}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   )
