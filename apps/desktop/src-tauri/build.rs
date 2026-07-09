@@ -39,8 +39,15 @@ fn ensure_sidecar_binary() -> Result<(), String> {
         let _ = std::fs::File::create(placeholder_so);
     }
 
-    if dest_path.exists() {
+    if sidecar_is_complete(&dest_path, dest_dir, &target) {
         return Ok(());
+    }
+
+    if dest_path.exists() {
+        println!(
+            "cargo:warning=Sidecar binary exists but shared libraries are missing; re-downloading..."
+        );
+        let _ = std::fs::remove_file(&dest_path);
     }
 
     // Map targets to precompiled llama.cpp release URLs (tag b9827)
@@ -143,4 +150,34 @@ fn ensure_sidecar_binary() -> Result<(), String> {
         dest_path
     );
     Ok(())
+}
+
+/// The llama-server executable is a thin launcher; it cannot run without platform libs
+/// copied alongside it during extraction. A prior partial install may leave only the exe.
+fn sidecar_is_complete(dest_path: &PathBuf, dest_dir: &std::path::Path, target: &str) -> bool {
+    if !dest_path.exists() {
+        return false;
+    }
+
+    if target.contains("windows") {
+        return dest_dir
+            .read_dir()
+            .ok()
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| entry.ok())
+            .any(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .is_some_and(|ext| ext == "dll")
+                    && entry.file_name() != "placeholder.dll"
+            });
+    }
+
+    if target.contains("apple-darwin") {
+        return dest_dir.join("libllama-server-impl.dylib").exists();
+    }
+
+    dest_dir.join("libllama.so").exists() || dest_dir.join("libllama.so.0").exists()
 }
