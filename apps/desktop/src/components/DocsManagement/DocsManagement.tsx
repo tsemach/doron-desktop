@@ -40,26 +40,47 @@ export default function DocsManagement() {
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
   }, [setAiConfig]);
 
+  const resetState = () => {
+    setShowOutput(false);
+    setSummary(null);
+    setError(null);
+    setItems([]);
+    setSelectedPath("");
+  };
+
   useEffect(() => {
     return () => {
       unlistenRef.current?.();
     };
   }, []);
 
-  async function startIndexing(path: string, folder: boolean) {
+  async function startIndexing(path: string, folder: boolean, isContinue: boolean = false, startIndex: number = 0) {
+    console.log("startIndexing called", { path, folder, isContinue, startIndex, itemsLength: items.length });
     navigate("/docs-management/scan");
     setSelectedPath(path);
     setIsFolder(folder);
     setShowOutput(true);
-    setItems([]);
+    if (!isContinue) {
+      setItems([]);
+    }
     setSummary(null);
     setError(null);
     setIsProcessing(true);
 
     unlistenRef.current = await listen<IndexProgressEvent>("indexing-progress", (event) => {
       const { file_name, status, message, current, total } = event.payload;
+      console.log("indexing-progress event payload:", event.payload);
       setItems((prev) => {
         const idx = prev.findIndex((p) => p.file_name === file_name);
+        if (idx !== -1 && prev[idx].status === "ok" && status === "skipped") {
+          const next = [...prev];
+          next[idx] = {
+            ...prev[idx],
+            current,
+            total,
+          };
+          return next;
+        }
         const item: ProgressItem = {
           file_name,
           status: status as ProgressStatus,
@@ -79,7 +100,7 @@ export default function DocsManagement() {
         console.error("Failed to prevent sleep:", err);
       });
       const result = folder
-        ? await invoke<IndexSummary>("index_folder", { folderPath: path, apiKey })
+        ? await invoke<IndexSummary>("index_folder", { folderPath: path, apiKey, startIndex })
         : await invoke<IndexSummary>("index_file", { filePath: path, apiKey });
       setSummary(result);
     } catch (e) {
@@ -108,6 +129,7 @@ export default function DocsManagement() {
             ? { current: currentItem.current, total: currentItem.total }
             : undefined
         }
+        resetState={resetState}
       />
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -129,6 +151,7 @@ export default function DocsManagement() {
                 summary={summary}
                 error={error}
                 startIndexing={startIndexing}
+                resetState={resetState}
               />
             }
           />

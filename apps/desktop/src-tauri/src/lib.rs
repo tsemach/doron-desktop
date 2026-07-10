@@ -60,6 +60,7 @@ pub fn run() {
             store::get_db_path,
             indexer::index_folder,
             indexer::index_file,
+            indexer::stop_indexing,
             query::search_documents,
             doc_template::local_add::process_template,
             doc_template::download::download_and_process_template,

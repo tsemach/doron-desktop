@@ -1,6 +1,14 @@
 use serde::Serialize;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
+
+static SHOULD_STOP_INDEXING: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+pub fn stop_indexing() {
+    SHOULD_STOP_INDEXING.store(true, Ordering::SeqCst);
+}
 
 use crate::{extractor, llm, store};
 use crate::llm::llm_provider::LlmProvider;
@@ -261,9 +269,11 @@ pub async fn index_folder(
     api_key: String,
     model: Option<String>,
     reindex: Option<bool>,
+    start_index: Option<usize>,
 ) -> Result<IndexSummary, String> {
     let model = model.unwrap_or_else(|| "claude-sonnet-4-6".to_string());
     let reindex = reindex.unwrap_or(false);
+    println!("index_folder invoked: start_index = {:?}", start_index);
 
     let supported = ["docx", "pdf", "xlsx", "xls", "txt"];
     let files: Vec<std::path::PathBuf> = walkdir::WalkDir::new(&folder_path)
@@ -316,8 +326,33 @@ pub async fn index_folder(
     };
     
     let db_path = store::db_path(&app);
+    
+    let mut already_indexed = std::collections::HashSet::new();
+    if !reindex {
+        if let Ok(conn) = store::open_db_by_path(&db_path) {
+            for path in &files {
+                let path_str = path.to_string_lossy().to_string();
+                if let Ok(true) = store::is_already_indexed(&conn, &path_str) {
+                    already_indexed.insert(path_str);
+                }
+            }
+        }
+    }
 
-    for (i, path) in files.iter().enumerate() {
+    let skip_count = start_index.unwrap_or(0);
+    SHOULD_STOP_INDEXING.store(false, Ordering::SeqCst);
+
+    for (i, path) in files.iter().enumerate().skip(skip_count) {
+        if SHOULD_STOP_INDEXING.load(Ordering::SeqCst) {
+            let _ = app.emit("indexing-progress", IndexProgress {
+                current: i,
+                total,
+                file_name: "".to_string(),
+                status: "failed".to_string(),
+                message: "Indexing stopped by user".to_string(),
+            });
+            break;
+        }
         let current = i + 1;
         let file_name = path
             .file_name()
@@ -326,25 +361,22 @@ pub async fn index_folder(
             .to_string();
         let path_str = path.to_string_lossy().to_string();
 
+        // Check skipped status
+        if already_indexed.contains(&path_str) {
+            skipped += 1;
+            let _ = app.emit("indexing-progress", IndexProgress {
+                current, total, file_name,
+                status: "skipped".to_string(),
+                message: "already indexed".to_string(),
+            });
+            continue;
+        }
+
         let _ = app.emit("indexing-progress", IndexProgress {
             current, total, file_name: file_name.clone(),
             status: "processing".to_string(),
             message: "indexing...".to_string(),
         });
-
-        // Check skipped status
-        if !reindex {
-            let conn = store::open_db_by_path(&db_path)?;
-            if let Ok(true) = store::is_already_indexed(&conn, &path_str) {
-                skipped += 1;
-                let _ = app.emit("indexing-progress", IndexProgress {
-                    current, total, file_name,
-                    status: "skipped".to_string(),
-                    message: "already indexed".to_string(),
-                });
-                continue;
-            }
-        }
 
         match index_file_core(&db_path, &provider, path, &options, reindex).await {
             Ok(msg) => {

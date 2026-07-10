@@ -7,6 +7,7 @@ type DocsManagementHeaderProps = {
   dbPath: string;
   isProcessing: boolean;
   scanCount?: { current: number; total: number };
+  resetState?: () => void;
 };
 
 export default function DocsManagementHeader({
@@ -14,6 +15,7 @@ export default function DocsManagementHeader({
   dbPath,
   isProcessing,
   scanCount,
+  resetState,
 }: DocsManagementHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,7 +95,12 @@ export default function DocsManagementHeader({
             {t("smart_search")}
           </button>
           <button
-            onClick={() => navigate("/docs-management/scan")}
+            onClick={() => {
+              navigate("/docs-management/scan");
+              if (resetState && !isProcessing) {
+                resetState();
+              }
+            }}
             className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5 relative ${activeTab === "scan"
                 ? "bg-background text-foreground shadow-sm font-bold scale-102"
                 : "text-muted-foreground hover:text-foreground"
