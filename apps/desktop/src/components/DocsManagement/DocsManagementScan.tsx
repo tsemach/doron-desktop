@@ -68,9 +68,7 @@ export default function DocsManagementScan({
 
   const actualItemsCount = items.filter((i) => i.file_name !== "").length;
 
-  const currentCount = isProcessing && currentItem
-    ? currentItem.current
-    : actualItemsCount;
+  const currentCount = actualItemsCount;
 
   const totalCount = isProcessing && currentItem
     ? currentItem.total
@@ -406,7 +404,7 @@ export default function DocsManagementScan({
               <p className="text-muted-foreground italic">Connecting to Tauri background pipeline...</p>
             )}
             {items
-              .filter((i) => i.status !== "processing")
+              .filter((i) => i.status !== "processing" && i.file_name && i.file_name.trim() !== "" && i.message !== "Indexing stopped by user")
               .map((item) => (
                 <div key={item.file_name} className="flex items-start gap-3 border-b border-border/10 pb-1 last:border-0 last:pb-0 whitespace-nowrap min-w-max">
                   <span className="mt-0.5 w-4 shrink-0 text-center">
@@ -420,7 +418,7 @@ export default function DocsManagementScan({
               ))}
             {error && (
               <div className="text-red-500 font-bold border-t border-red-200/20 pt-2 mt-2">
-                CRITICAL ERROR: {error}
+                {error}
               </div>
             )}
           </div>

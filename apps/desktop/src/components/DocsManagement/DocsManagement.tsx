@@ -136,6 +136,9 @@ export default function DocsManagement() {
     unlistenRef.current = await listen<IndexProgressEvent>("indexing-progress", (event) => {
       const { file_name, status, message, current, total } = event.payload;
       console.log("indexing-progress event payload:", event.payload);
+      if (!file_name || file_name.trim() === "" || message === "Indexing stopped by user") {
+        return;
+      }
       setItems((prev) => {
         const idx = prev.findIndex((p) => p.file_name === file_name);
         if (idx !== -1 && prev[idx].status === "ok" && status === "skipped") {
@@ -177,6 +180,7 @@ export default function DocsManagement() {
       setError(String(e));
     } finally {
       setIsProcessing(false);
+      setItems((prev) => prev.filter((item) => item.status !== "processing"));
       unlistenRef.current?.();
       unlistenRef.current = null;
       await invoke("allow_sleep").catch((err) => {
