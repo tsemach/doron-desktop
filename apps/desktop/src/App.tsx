@@ -8,12 +8,16 @@ import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { invoke } from "@tauri-apps/api/core";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
+import { useAtomValue } from "jotai";
+import { isProcessingAtom } from "./store/indexStore";
+import BackgroundIndexer from "./components/DocsManagement/BackgroundIndexer";
 
 function Home() {
   const navigate = useNavigate();
   const [username, setUsername] = useState<string>(() => localStorage.getItem("user_name") || "");
   const [nameInput, setNameInput] = useState("");
   const { t } = useLanguage();
+  const isProcessing = useAtomValue(isProcessingAtom);
 
   useEffect(() => {
     const setupWindow = async () => {
@@ -96,9 +100,15 @@ function Home() {
             <button
               type="button"
               onClick={handleDocsManagement}
-              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
+              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10 relative"
             >
               {t("docs_management")}
+              {isProcessing && (
+                <span className="absolute top-4 right-4 flex h-3.5 w-3.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-500"></span>
+                </span>
+              )}
             </button>
           </div>
 
@@ -207,6 +217,7 @@ function App() {
   return (
     <LanguageProvider>
       <UpdateBanner />
+      <BackgroundIndexer />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/case-management/*" element={<CaseManagement />} />

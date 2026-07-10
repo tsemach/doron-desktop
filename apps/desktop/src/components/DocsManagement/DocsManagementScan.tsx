@@ -78,6 +78,11 @@ export default function DocsManagementScan({
   const [activeSession, setActiveSession] = useState<IndexingSession | null>(null);
 
   useEffect(() => {
+    // When entering the Scan & Index page, default to showing the cards/main selection view
+    setShowOutput(false);
+  }, [setShowOutput]);
+
+  useEffect(() => {
     async function checkActiveSession() {
       try {
         const sessions = await invoke<IndexingSession[]>("get_active_indexing_sessions");
@@ -230,7 +235,7 @@ export default function DocsManagementScan({
   }
 
   // --- IDLE STATE VIEW ---
-  if (!isProcessing && !show && !summary) {
+  if (!show && !summary) {
     const isDisabled = !!activeSession || isProcessing;
     const isFolderActive = activeSession ? activeSession.is_folder : false;
 
