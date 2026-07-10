@@ -243,6 +243,7 @@ export default function DocsManagement() {
                 resetState={resetState}
                 setSelectedPath={setSelectedPath}
                 setIsFolder={setIsFolder}
+                setShowOutput={setShowOutput}
               />
             }
           />

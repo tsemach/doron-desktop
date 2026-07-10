@@ -30,6 +30,16 @@ function StatusIcon({ status }: { status: ProgressStatus }) {
   return <span className="text-muted-foreground">─</span>;
 }
 
+export interface IndexingSession {
+  path: string;
+  is_folder: boolean;
+  reindex: boolean;
+  start_index: number;
+  total_files: number;
+  status: string;
+  updated_at: string;
+}
+
 type Props = {
   show: boolean;
   isFolder: boolean;
@@ -43,6 +53,7 @@ type Props = {
   resetState?: () => void;
   setSelectedPath: (path: string) => void;
   setIsFolder: (isFolder: boolean) => void;
+  setShowOutput: (show: boolean) => void;
 };
 
 export default function DocsManagementScan({
@@ -58,11 +69,38 @@ export default function DocsManagementScan({
   resetState,
   setSelectedPath,
   setIsFolder,
+  setShowOutput,
 }: Props) {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const outputRef = useRef<HTMLDivElement>(null);
   const [reindex, setReindex] = useState(false);
+  const [activeSession, setActiveSession] = useState<IndexingSession | null>(null);
+
+  useEffect(() => {
+    async function checkActiveSession() {
+      try {
+        const sessions = await invoke<IndexingSession[]>("get_active_indexing_sessions");
+        const active = sessions.filter((s) => s.total_files === 0 || s.start_index < s.total_files);
+        if (active.length > 0) {
+          active.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+          setActiveSession(active[0]);
+        } else {
+          setActiveSession(null);
+        }
+      } catch (err) {
+        console.error("Failed to check active indexing sessions in scan view:", err);
+      }
+    }
+    checkActiveSession();
+  }, [isProcessing]);
+
+  function handleOpenActiveSession() {
+    if (!activeSession) return;
+    setSelectedPath(activeSession.path);
+    setIsFolder(activeSession.is_folder);
+    setShowOutput(true);
+  }
 
 
 
@@ -193,6 +231,9 @@ export default function DocsManagementScan({
 
   // --- IDLE STATE VIEW ---
   if (!isProcessing && !show && !summary) {
+    const isDisabled = !!activeSession || isProcessing;
+    const isFolderActive = activeSession ? activeSession.is_folder : false;
+
     return (
       <div className="max-w-4xl mx-auto space-y-8 py-4 animate-fade-in-down">
         <div className="text-center space-y-2">
@@ -205,14 +246,16 @@ export default function DocsManagementScan({
           </p>
         </div>
 
-
-
         {/* Dual Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Card 1: Index Directory */}
+          {/* Card 1: Index Entire Folder */}
           <div
-            onClick={handleSelectFolder}
-            className="group relative rounded-xl border border-border bg-card p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between items-start hover:-translate-y-0.5"
+            onClick={(isDisabled && isFolderActive) ? undefined : handleSelectFolder}
+            className={`group relative rounded-xl border border-border bg-card p-6 shadow-sm transition-all duration-300 flex flex-col justify-between items-start ${
+              (isDisabled && isFolderActive)
+                ? "opacity-60 cursor-not-allowed pointer-events-none bg-muted/20"
+                : "hover:shadow-md cursor-pointer hover:-translate-y-0.5"
+            }`}
           >
             <div className="space-y-4">
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
@@ -245,10 +288,14 @@ export default function DocsManagementScan({
             </div>
           </div>
 
-          {/* Card 2: Index File */}
+          {/* Card 2: Index Single Document */}
           <div
-            onClick={handleSelectFile}
-            className="group relative rounded-xl border border-border bg-card p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between items-start hover:-translate-y-0.5"
+            onClick={(isDisabled && !isFolderActive) ? undefined : handleSelectFile}
+            className={`group relative rounded-xl border border-border bg-card p-6 shadow-sm transition-all duration-300 flex flex-col justify-between items-start ${
+              (isDisabled && !isFolderActive)
+                ? "opacity-60 cursor-not-allowed pointer-events-none bg-muted/20"
+                : "hover:shadow-md cursor-pointer hover:-translate-y-0.5"
+            }`}
           >
             <div className="space-y-4">
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
@@ -281,6 +328,77 @@ export default function DocsManagementScan({
               <span>→</span>
             </div>
           </div>
+
+          {/* Row 2: Status Banners */}
+          {activeSession && isFolderActive && (
+            <div className="flex items-center justify-between text-xs animate-fade-in col-start-1 mt-2 px-1">
+              <div className="flex items-center gap-2 text-blue-600 font-medium">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0 animate-pulse"
+                >
+                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                  <path d="M12 17v-4" />
+                  <path d="M12 9h.01" />
+                </svg>
+                <span className="font-semibold">
+                  Indexing is already in progress...
+                </span>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleOpenActiveSession}
+                className="h-7 bg-blue-600 hover:bg-blue-750 text-white font-semibold text-[10px] px-3 shrink-0"
+              >
+                Open
+              </Button>
+            </div>
+          )}
+
+          {activeSession && !isFolderActive && (
+            <>
+              {/* Push the message to Column 2 on desktop */}
+              <div className="hidden md:block" />
+              <div className="flex items-center justify-between text-xs animate-fade-in mt-2 px-1">
+                <div className="flex items-center gap-2 text-blue-600 font-medium">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0 animate-pulse"
+                  >
+                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                    <path d="M12 17v-4" />
+                    <path d="M12 9h.01" />
+                  </svg>
+                  <span className="font-semibold">
+                    Indexing is already in progress...
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleOpenActiveSession}
+                  className="h-7 bg-blue-600 hover:bg-blue-750 text-white font-semibold text-[10px] px-3 shrink-0"
+                >
+                  Open
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
