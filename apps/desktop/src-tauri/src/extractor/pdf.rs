@@ -26,7 +26,17 @@ fn fix_rtl(text: &str) -> String {
 pub fn extract_pdf(path: &Path) -> Result<(String, i32), String> {
     let raw = pdf_extract::extract_text(path).map_err(|e| e.to_string())?;
     let text = fix_rtl(&raw);
-    let doc = lopdf::Document::load(path).map_err(|e| e.to_string())?;
-    let page_count = doc.get_pages().len() as i32;
+    
+    let page_count = match lopdf::Document::load(path) {
+        Ok(doc) => doc.get_pages().len() as i32,
+        Err(err) => {
+            eprintln!(
+                "Warning: lopdf failed to load document metadata for {:?}: {}. Falling back to page count 1.",
+                path, err
+            );
+            1
+        }
+    };
+    
     Ok((text, page_count))
 }
