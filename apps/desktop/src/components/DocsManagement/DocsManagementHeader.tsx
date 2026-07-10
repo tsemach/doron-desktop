@@ -4,7 +4,6 @@ import { useLanguage } from "../../context/LanguageContext";
 import AiStatusBadge from "../ui/AiStatusBadge";
 
 type DocsManagementHeaderProps = {
-  isAiConnected: boolean;
   dbPath: string;
   isProcessing: boolean;
   scanCount?: { current: number; total: number };
@@ -12,7 +11,6 @@ type DocsManagementHeaderProps = {
 };
 
 export default function DocsManagementHeader({
-  isAiConnected,
   dbPath,
   isProcessing,
   scanCount,

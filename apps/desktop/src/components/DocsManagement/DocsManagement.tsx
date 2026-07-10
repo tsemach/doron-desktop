@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate, Routes, Route } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -10,6 +10,16 @@ import DocsManagementTemplates from "./DocsManagementTemplates/DocsManagementTem
 import DocsManagementSearch from "./DocsManagementSearch";
 import { useAtom, useAtomValue } from "jotai";
 import { aiConfigAtom, aiConfigStatusAtom } from "../../store/aiStore";
+import {
+  showOutputAtom,
+  isProcessingAtom,
+  selectedPathAtom,
+  isFolderAtom,
+  itemsAtom,
+  summaryAtom,
+  errorAtom,
+  dbPathAtom,
+} from "../../store/indexStore";
 
 type IndexProgressEvent = {
   file_name: string;
@@ -19,20 +29,22 @@ type IndexProgressEvent = {
   total: number;
 };
 
+// Global variables to persist across mount/unmount lifecycles
+let globalUnlisten: UnlistenFn | null = null;
+let globalIsCancelled = false;
+
 export default function DocsManagement() {
   const navigate = useNavigate();
-  const [showOutput, setShowOutput] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedPath, setSelectedPath] = useState("");
-  const [isFolder, setIsFolder] = useState(false);
-  const [items, setItems] = useState<ProgressItem[]>([]);
-  const [summary, setSummary] = useState<IndexSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const unlistenRef = useRef<UnlistenFn | null>(null);
-  const isCancelledRef = useRef(false);
+  const [showOutput, setShowOutput] = useAtom(showOutputAtom);
+  const [isProcessing, setIsProcessing] = useAtom(isProcessingAtom);
+  const [selectedPath, setSelectedPath] = useAtom(selectedPathAtom);
+  const [isFolder, setIsFolder] = useAtom(isFolderAtom);
+  const [items, setItems] = useAtom(itemsAtom);
+  const [summary, setSummary] = useAtom(summaryAtom);
+  const [error, setError] = useAtom(errorAtom);
+  const [dbPath, setDbPath] = useAtom(dbPathAtom);
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
-  const [dbPath, setDbPath] = useState("");
   const [aiConfig, setAiConfig] = useAtom(aiConfigAtom);
   const aiHealthStatus = useAtomValue(aiConfigStatusAtom);
 
@@ -41,16 +53,16 @@ export default function DocsManagement() {
   useEffect(() => {
     invoke<string>("get_db_path").then(setDbPath).catch(() => { });
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
-  }, [setAiConfig]);
+  }, [setDbPath, setAiConfig]);
 
   useEffect(() => {
     if (isAiConnected && error && error.includes("AI connection is offline")) {
       setError(null);
     }
-  }, [isAiConnected, error]);
+  }, [isAiConnected, error, setError]);
 
   const resetState = () => {
-    isCancelledRef.current = true;
+    globalIsCancelled = true;
     setShowOutput(false);
     setSummary(null);
     setError(null);
@@ -58,15 +70,9 @@ export default function DocsManagement() {
     setSelectedPath("");
     setIsFolder(false);
     setIsProcessing(false);
-    unlistenRef.current?.();
-    unlistenRef.current = null;
+    globalUnlisten?.();
+    globalUnlisten = null;
   };
-
-  useEffect(() => {
-    return () => {
-      unlistenRef.current?.();
-    };
-  }, []);
 
   interface IndexingSession {
     path: string;
@@ -81,6 +87,9 @@ export default function DocsManagement() {
   useEffect(() => {
     async function checkResumeSession() {
       try {
+        // Do not auto-resume if already processing in the background!
+        if (isProcessing) return;
+
         const sessions = await invoke<IndexingSession[]>("get_active_indexing_sessions");
         const active = sessions.filter((s) => s.total_files === 0 || s.start_index < s.total_files);
         if (active.length > 0) {
@@ -104,12 +113,17 @@ export default function DocsManagement() {
     reindex: boolean = false,
     autoResume: boolean = false
   ) {
-    isCancelledRef.current = false;
+    if (isProcessing) {
+      console.log("[DocsManagement] Indexing is already running in background. Ignoring duplicate call.");
+      return;
+    }
+
+    globalIsCancelled = false;
     console.log("startIndexing called", { path, folder, isContinue, startIndex, reindex, autoResume, itemsLength: items.length });
     
     // Check if AI connection is verified for all flows (including startup auto-resume)
-    const isAiConnected = aiHealthStatus === "verified";
-    if (!isAiConnected) {
+    const isAiConnectedCheck = aiHealthStatus === "verified";
+    if (!isAiConnectedCheck) {
       setError("AI connection is offline. Please click the status badge in the top right (e.g. 'API Offline') to check/start the connection before indexing.");
       if (!autoResume) {
         navigate("/docs-management/scan");
@@ -133,7 +147,7 @@ export default function DocsManagement() {
     setError(null);
     setIsProcessing(true);
 
-    unlistenRef.current = await listen<IndexProgressEvent>("indexing-progress", (event) => {
+    globalUnlisten = await listen<IndexProgressEvent>("indexing-progress", (event) => {
       const { file_name, status, message, current, total } = event.payload;
       console.log("indexing-progress event payload:", event.payload);
       if (!file_name || file_name.trim() === "" || message === "Indexing stopped by user") {
@@ -171,7 +185,7 @@ export default function DocsManagement() {
       const result = folder
         ? await invoke<IndexSummary>("index_folder", { folderPath: path, apiKey, startIndex, reindex })
         : await invoke<IndexSummary>("index_file", { filePath: path, apiKey, reindex });
-      if (isCancelledRef.current) {
+      if (globalIsCancelled) {
         console.log("[DocsManagement] Await completed, but session was cancelled. Ignoring result.");
         return;
       }
@@ -181,8 +195,8 @@ export default function DocsManagement() {
     } finally {
       setIsProcessing(false);
       setItems((prev) => prev.filter((item) => item.status !== "processing"));
-      unlistenRef.current?.();
-      unlistenRef.current = null;
+      globalUnlisten?.();
+      globalUnlisten = null;
       await invoke("allow_sleep").catch((err) => {
         console.error("Failed to allow sleep:", err);
       });
@@ -194,12 +208,14 @@ export default function DocsManagement() {
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       <DocsManagementHeader
-        isAiConnected={isAiConnected}
         dbPath={dbPath}
         isProcessing={isProcessing}
         scanCount={
-          isFolder && isProcessing && currentItem
-            ? { current: currentItem.current, total: currentItem.total }
+          isFolder && isProcessing
+            ? {
+                current: items.filter((i) => i.file_name !== "").length,
+                total: currentItem?.total || items[0]?.total || 0,
+              }
             : undefined
         }
         resetState={resetState}
