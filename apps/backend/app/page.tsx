@@ -9,6 +9,10 @@ import MainTopBar from "@/components/main/MainTopBar";
 import MainFeatureList from "@/components/main/MainFeatureList";
 import MainHelpCentralWorkingSpace from "@/components/main/MainHelpCentralWorkingSpace";
 import MainHelpCaseManagementAndTraking from "@/components/main/MainHelpCaseManagementAndTraking";
+import MainHelpDocumentIndexing from "@/components/main/MainHelpDocumentIndexing";
+import MainHelpFullTextSearch from "@/components/main/MainHelpFullTextSearch";
+import MainHelpDocumentTagsAndNotes from "@/components/main/MainHelpDocumentTagsAndNotes";
+import MainHelpEmailCorrespondencesSync from "@/components/main/MainHelpEmailCorrespondencesSync";
 
 export default function Home() {
   const router = useRouter();
@@ -55,16 +59,16 @@ export default function Home() {
         <div className="lg:w-2/3 max-w-4xl flex flex-col justify-start space-y-6 ml-12">
           {MainHelpFeatureSelected === "central-working-space" && <MainHelpCentralWorkingSpace />}
           {MainHelpFeatureSelected === "case-management-tracking" && <MainHelpCaseManagementAndTraking />}
-          {/* {MainHelpFeatureSelected === "ai-document-indexing" && <MainHelpDocumentIndexing />}
+          {MainHelpFeatureSelected === "ai-document-indexing" && <MainHelpDocumentIndexing />}
           {MainHelpFeatureSelected === "smart-full-text-search" && <MainHelpFullTextSearch />}
           {MainHelpFeatureSelected === "document-tags-notes" && <MainHelpDocumentTagsAndNotes />}
-          {MainHelpFeatureSelected === "email-correspondences-sync" && <MainHelpEmailCorrespondencesSync />} */}
+          {MainHelpFeatureSelected === "email-correspondences-sync" && <MainHelpEmailCorrespondencesSync />}
         </div>
 
         {/* Right Column: Features Highlight & Screenshot Carousel (1/3 width) */}
         <div className="lg:w-1/3 flex flex-col justify-start lg:pt-12 gap-6" id="features-section">
           {/* Features Highlight Card */}
-          <MainFeatureList onFeatureSelect={onFeatureSelect} />
+          <MainFeatureList activeFeatureId={MainHelpFeatureSelected} onFeatureSelect={onFeatureSelect} />
         </div>
       </main>
 

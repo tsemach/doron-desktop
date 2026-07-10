@@ -7,7 +7,6 @@ import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsMod
 import OpenCasesCaseAnnotationsModal from "./OpenCasesCaseAnnotationsModal";
 import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
 import OpenCasesUpdateDocumentModal from "./OpenCasesUpdateDocumentModal";
-import OpenCasesFieldsModal from "./OpenCasesFieldsModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
 import CaseEmailsChat from "./OpenCasesEmailsChat";
@@ -32,7 +31,6 @@ export default function CaseManagementOpenCasesDetails() {
   const [editingCaseAnnotations, setEditingCaseAnnotations] = useState<Case | null>(null);
   const [showAddDocModal, setShowAddDocModal] = useState(false);
   const [updatingAttachment, setUpdatingAttachment] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
-  const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
 
@@ -483,7 +481,6 @@ export default function CaseManagementOpenCasesDetails() {
             onRemoveDocument={handleRemoveDocument}
             onEditAnnotations={setEditingDoc}
             onEditCaseAnnotations={() => setEditingCaseAnnotations(selectedCase)}
-            onShowFields={() => setShowFieldsModal(true)}
             onAddDocument={() => setShowAddDocModal(true)}
             onSelectDocument={(doc) => {
               setSelectedDocument(doc);
@@ -699,13 +696,7 @@ export default function CaseManagementOpenCasesDetails() {
         />
       )}
 
-      {showFieldsModal && selectedCase && (
-        <OpenCasesFieldsModal
-          caseId={Number(selectedCase.id)}
-          caseName={selectedCase.name}
-          onClose={() => setShowFieldsModal(false)}
-        />
-      )}
+
 
       {/* Modern Confirmation Modal for Document Deletion */}
       {docToDelete && (

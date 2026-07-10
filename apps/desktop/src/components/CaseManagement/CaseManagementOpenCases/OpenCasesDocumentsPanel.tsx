@@ -17,7 +17,6 @@ interface OpenCasesDocumentsPanelProps {
   onRemoveDocument: (doc: CaseFile) => void;
   onEditAnnotations: (doc: CaseFile) => void;
   onEditCaseAnnotations?: () => void;
-  onShowFields: () => void;
   onAddDocument: () => void;
   onSelectDocument?: (doc: CaseFile) => void;
   selectedDocument?: CaseFile | null;
@@ -40,7 +39,6 @@ export default function OpenCasesDocumentsPanel({
   onRemoveDocument,
   onEditAnnotations,
   onEditCaseAnnotations,
-  onShowFields,
   onAddDocument,
   onSelectDocument,
   selectedDocument,
@@ -107,7 +105,6 @@ export default function OpenCasesDocumentsPanel({
                 selectedCase={selectedCase}
                 activeRightTab={activeRightTab}
                 onTabChange={onTabChange}
-                onShowFields={onShowFields}
                 onAddDocument={onAddDocument}
                 onEditCaseAnnotations={onEditCaseAnnotations}
                 isDetailView={isDetailView}
