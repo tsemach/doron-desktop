@@ -247,7 +247,7 @@ export default function DocsManagementScan({
         </div>
 
         {/* Dual Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
           {/* Card 1: Index Entire Folder */}
           <div
             onClick={(isDisabled && isFolderActive) ? undefined : handleSelectFolder}
@@ -331,7 +331,7 @@ export default function DocsManagementScan({
 
           {/* Row 2: Status Banners */}
           {activeSession && isFolderActive && (
-            <div className="flex items-center justify-between text-xs animate-fade-in col-start-1 mt-2 px-1">
+            <div className="flex items-center justify-between text-xs animate-fade-in col-start-1 px-1">
               <div className="flex items-center gap-2 text-blue-600 font-medium">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -367,7 +367,7 @@ export default function DocsManagementScan({
             <>
               {/* Push the message to Column 2 on desktop */}
               <div className="hidden md:block" />
-              <div className="flex items-center justify-between text-xs animate-fade-in mt-2 px-1">
+              <div className="flex items-center justify-between text-xs animate-fade-in px-1">
                 <div className="flex items-center gap-2 text-blue-600 font-medium">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
