@@ -61,6 +61,8 @@ pub fn run() {
             indexer::index_folder,
             indexer::index_file,
             indexer::stop_indexing,
+            indexer::get_active_indexing_sessions,
+            indexer::delete_indexing_session,
             query::search_documents,
             doc_template::local_add::process_template,
             doc_template::download::download_and_process_template,

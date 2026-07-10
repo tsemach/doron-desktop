@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "../ui/button";
@@ -39,8 +39,10 @@ type Props = {
   currentItem: ProgressItem | undefined;
   summary: IndexSummary | null;
   error: string | null;
-  startIndexing: (path: string, isFolder: boolean, isContinue?: boolean, startIndex?: number) => void;
+  startIndexing: (path: string, isFolder: boolean, isContinue?: boolean, startIndex?: number, reindex?: boolean) => void;
   resetState?: () => void;
+  setSelectedPath: (path: string) => void;
+  setIsFolder: (isFolder: boolean) => void;
 };
 
 export default function DocsManagementScan({
@@ -54,18 +56,25 @@ export default function DocsManagementScan({
   error,
   startIndexing,
   resetState,
+  setSelectedPath,
+  setIsFolder,
 }: Props) {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const outputRef = useRef<HTMLDivElement>(null);
+  const [reindex, setReindex] = useState(false);
+
+
+
+  const actualItemsCount = items.filter((i) => i.file_name !== "").length;
 
   const currentCount = isProcessing && currentItem
     ? currentItem.current
-    : items.length;
+    : actualItemsCount;
 
   const totalCount = isProcessing && currentItem
     ? currentItem.total
-    : (items[0]?.total || items.length);
+    : (items[0]?.total || actualItemsCount);
 
   const progressPercent = totalCount > 0
     ? Math.round((currentCount / totalCount) * 100)
@@ -76,6 +85,24 @@ export default function DocsManagementScan({
       await invoke("stop_indexing");
     } catch (err) {
       console.error("Error stopping indexing:", err);
+    }
+  }
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  async function executeCancelIndexing() {
+    try {
+      if (isProcessing) {
+        await invoke("stop_indexing");
+      }
+      if (selectedPath) {
+        await invoke("delete_indexing_session", { path: selectedPath });
+      }
+      if (resetState) {
+        resetState();
+      }
+    } catch (err) {
+      console.error("Error cancelling indexing:", err);
     }
   }
 
@@ -92,7 +119,7 @@ export default function DocsManagementScan({
         filters: [{ name: "Documents", extensions: ["docx", "pdf", "xlsx", "xls", "txt"] }],
       });
       if (selected && typeof selected === "string") {
-        startIndexing(selected, false);
+        startIndexing(selected, false, false, 0, reindex);
       }
     } catch (err) {
       console.error("Error choosing file:", err);
@@ -103,11 +130,67 @@ export default function DocsManagementScan({
     try {
       const selected = await open({ directory: true });
       if (selected && typeof selected === "string") {
-        startIndexing(selected, true);
+        setSelectedPath(selected);
+        setIsFolder(true);
       }
     } catch (err) {
       console.error("Error choosing folder:", err);
     }
+  }
+
+  // --- FOLDER SELECTED STATE VIEW (Before starting scan) ---
+  if (!isProcessing && !show && !summary && selectedPath && isFolder) {
+    return (
+      <div className="max-w-xl mx-auto py-8 animate-fade-in-down space-y-6">
+        <div className="rounded-xl border border-border bg-card shadow-md overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
+              Folder Selected
+            </span>
+            <h3 className="text-sm font-bold truncate text-foreground font-mono mt-1">
+              {selectedPath}
+            </h3>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Reindex Option checkbox */}
+            <div className="flex items-center">
+              <label className="inline-flex items-center gap-2.5 px-4 py-3 rounded-lg border border-border bg-card shadow-xs cursor-pointer select-none hover:bg-muted/30 transition-colors w-full">
+                <input
+                  type="checkbox"
+                  checked={reindex}
+                  onChange={(e) => setReindex(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 accent-primary cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-foreground/95">
+                  Force re-index / override already processed documents
+                </span>
+              </label>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetState}
+                className="h-9 px-4 text-xs font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="h-9 px-5 text-xs font-semibold bg-blue-600 hover:bg-blue-750 text-white"
+                onClick={() => startIndexing(selectedPath, true, false, 0, reindex)}
+              >
+                Start Indexing
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // --- IDLE STATE VIEW ---
@@ -123,6 +206,8 @@ export default function DocsManagementScan({
             and generate vector embeddings for intelligent semantic search.
           </p>
         </div>
+
+
 
         {/* Dual Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -208,8 +293,9 @@ export default function DocsManagementScan({
     <div className="max-w-4xl mx-auto space-y-6 py-4 animate-fade-in">
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         {/* Header bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-border/60 bg-muted/30 gap-3">
-          <div className="space-y-1 min-w-0">
+        <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-b border-border/60 bg-muted/30 gap-3">
+          {/* Column 1: Path */}
+          <div className="space-y-1 min-w-0 justify-self-start">
             <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
               {isFolder ? "Directory Sync" : "Single File Scan"}
             </span>
@@ -217,12 +303,20 @@ export default function DocsManagementScan({
               {selectedPath}
             </h3>
           </div>
-          {(isProcessing || items.length > 0) && (
-            <div className="flex items-center gap-2">
+
+          {/* Column 2: Files Count (Centered) */}
+          <div className="flex justify-center justify-self-center">
+            {(isProcessing || items.length > 0) && (
               <span className="shrink-0 text-xs font-mono font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">
                 Files: {currentCount} / {totalCount}
               </span>
-              {isProcessing ? (
+            )}
+          </div>
+
+          {/* Column 3: Actions (Right-aligned) */}
+          <div className="flex items-center gap-2 justify-self-end">
+            {isProcessing ? (
+              <>
                 <Button
                   variant="destructive"
                   size="sm"
@@ -231,17 +325,43 @@ export default function DocsManagementScan({
                 >
                   Stop
                 </Button>
-              ) : items.some((i) => i.message === "Indexing stopped by user") ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-semibold border-muted-foreground/30 text-muted-foreground hover:bg-muted"
+                  onClick={() => setShowCancelConfirm(true)}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : !summary ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs font-semibold border-blue-200 text-blue-700 hover:bg-blue-50/50"
+                  onClick={() => startIndexing(selectedPath, isFolder, false, 0)}
+                >
+                  Restart
+                </Button>
                 <Button
                   size="sm"
                   className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-750 text-white"
-                  onClick={() => startIndexing(selectedPath, isFolder, true, Math.max(0, items.length - 1))}
+                  onClick={() => startIndexing(selectedPath, isFolder, true, items.filter((i) => i.file_name !== "").length)}
                 >
                   Continue
                 </Button>
-              ) : null}
-            </div>
-          )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-semibold border-muted-foreground/30 text-muted-foreground hover:bg-muted"
+                  onClick={() => setShowCancelConfirm(true)}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : null}
+          </div>
         </div>
 
         {/* Progress bar container */}
@@ -280,7 +400,7 @@ export default function DocsManagementScan({
           </label>
           <div
             ref={outputRef}
-            className="h-64 overflow-y-auto px-4 py-3 rounded-lg border bg-muted/80 font-mono text-xs leading-relaxed space-y-2 text-foreground/90 scrollbar-thin"
+            className="h-64 overflow-y-auto overflow-x-auto px-4 py-3 rounded-lg border bg-muted/80 font-mono text-xs leading-relaxed space-y-2 text-foreground/90 scrollbar-thin"
           >
             {items.length === 0 && isProcessing && (
               <p className="text-muted-foreground italic">Connecting to Tauri background pipeline...</p>
@@ -288,14 +408,14 @@ export default function DocsManagementScan({
             {items
               .filter((i) => i.status !== "processing")
               .map((item) => (
-                <div key={item.file_name} className="flex items-start gap-3 border-b border-border/10 pb-1 last:border-0 last:pb-0">
+                <div key={item.file_name} className="flex items-start gap-3 border-b border-border/10 pb-1 last:border-0 last:pb-0 whitespace-nowrap min-w-max">
                   <span className="mt-0.5 w-4 shrink-0 text-center">
                     <StatusIcon status={item.status} />
                   </span>
-                  <span className="w-48 shrink-0 truncate text-foreground font-semibold">
+                  <span className="shrink-0 text-foreground font-semibold">
                     {item.file_name}
                   </span>
-                  <span className="text-muted-foreground truncate">{item.message}</span>
+                  <span className="text-muted-foreground">{item.message}</span>
                 </div>
               ))}
             {error && (
@@ -307,15 +427,9 @@ export default function DocsManagementScan({
         </div>
 
         {/* Summary Footer */}
-        {summary && (
+        {(summary || (!isProcessing && items.length > 0)) && (
           <div className="border-t border-border/80 bg-muted/20 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-6 text-xs">
-              {items.some((i) => i.message === "Indexing stopped by user") && (
-                <div className="flex items-center gap-1.5 bg-red-50/50 border border-red-200 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold text-red-600">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Stopped
-                </div>
-              )}
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
                 <span className="font-semibold">{items.filter((i) => i.status === "ok").length} Indexed</span>
@@ -331,6 +445,12 @@ export default function DocsManagementScan({
             </div>
 
             <div className="flex items-center gap-2">
+              {items.some((i) => i.message === "Indexing stopped by user") && (
+                <div className="flex items-center gap-1.5 bg-red-50/50 border border-red-200 px-2.5 py-1 rounded-full text-[10px] uppercase font-bold text-red-600 mr-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  Stopped
+                </div>
+              )}
               <Button size="sm" variant="outline" onClick={() => navigate("/docs-management/search")}>
                 {t("go_to_smart_search")}
               </Button>
@@ -350,6 +470,55 @@ export default function DocsManagementScan({
           </div>
         )}
       </div>
+
+      {/* Custom Confirmation Modal */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-[2px] flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-card border border-border rounded-xl shadow-lg max-w-sm w-full mx-4 overflow-hidden animate-scale-in">
+            {/* Header */}
+            <div className="px-5 py-3.5 border-b border-border/60 bg-muted/30 flex items-center gap-3">
+              <span className="w-7 h-7 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 text-sm">
+                ⚠️
+              </span>
+              <div>
+                <h3 className="text-xs font-bold text-foreground">
+                  Cancel Indexing
+                </h3>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-5">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Are you sure you want to cancel the indexing process? This will clear all progress for this folder.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-5 py-3.5 bg-muted/20 border-t border-border/60 flex items-center justify-end gap-2.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-semibold"
+                onClick={() => setShowCancelConfirm(false)}
+              >
+                No
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
+                onClick={async () => {
+                  setShowCancelConfirm(false);
+                  await executeCancelIndexing();
+                }}
+              >
+                Yes, Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,20 @@ pub fn stop_indexing() {
     SHOULD_STOP_INDEXING.store(true, Ordering::SeqCst);
 }
 
+#[tauri::command]
+pub fn get_active_indexing_sessions(app: AppHandle) -> Result<Vec<store::IndexingSession>, String> {
+    let db_path = store::db_path(&app);
+    let conn = store::open_db_by_path(&db_path).map_err(|e| e.to_string())?;
+    store::get_active_indexing_sessions(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_indexing_session(app: AppHandle, path: String) -> Result<(), String> {
+    let db_path = store::db_path(&app);
+    let conn = store::open_db_by_path(&db_path).map_err(|e| e.to_string())?;
+    store::delete_indexing_session(&conn, &path).map_err(|e| e.to_string())
+}
+
 use crate::{extractor, llm, store};
 use crate::llm::llm_provider::LlmProvider;
 
@@ -43,6 +57,23 @@ pub async fn index_file_core(
     options: &IndexOptions,
     reindex: bool,
 ) -> Result<String, String> {
+    let result = index_file_core_impl(db_path, provider, file_path, options, reindex).await;
+    if result.is_err() {
+        let path_str = file_path.to_string_lossy().to_string();
+        if let Ok(conn) = store::open_db_by_path(db_path) {
+            let _ = store::delete_document_by_path(&conn, &path_str);
+        }
+    }
+    result
+}
+
+async fn index_file_core_impl(
+    db_path: &Path,
+    provider: &LlmProvider,
+    file_path: &Path,
+    options: &IndexOptions,
+    reindex: bool,
+) -> Result<String, String> {
     let path_str = file_path.to_string_lossy().to_string();
     
     // Check if file is already indexed
@@ -51,6 +82,10 @@ pub async fn index_file_core(
         if store::is_already_indexed(&conn, &path_str).map_err(|e| e.to_string())? {
             return Ok("already indexed".to_string());
         }
+    }
+
+    if SHOULD_STOP_INDEXING.load(Ordering::SeqCst) {
+        return Err("Indexing stopped by user".to_string());
     }
 
     let ext = file_path
@@ -78,7 +113,14 @@ pub async fn index_file_core(
 
     // Track 1: LLM Metadata extraction
     if options.run_llm_metadata {
-        let metadata = llm::call_provider(provider, &extracted.text).await?;
+        let metadata = tokio::select! {
+            res = llm::call_provider(provider, &extracted.text) => res?,
+            _ = async {
+                while !SHOULD_STOP_INDEXING.load(Ordering::SeqCst) {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
+            } => return Err("Indexing stopped by user".to_string()),
+        };
         let file_size_kb = std::fs::metadata(file_path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
         let raw_metadata = serde_json::to_string(&metadata).unwrap_or_default();
         
@@ -141,6 +183,10 @@ pub async fn index_file_core(
     }
 
     let doc_id = doc_id_opt.ok_or_else(|| "Failed to retrieve document ID".to_string())?;
+
+    if SHOULD_STOP_INDEXING.load(Ordering::SeqCst) {
+        return Err("Indexing stopped by user".to_string());
+    }
 
     // Track 2: Vector Embeddings generation
     if options.run_vector_embeddings {
@@ -224,25 +270,7 @@ pub async fn index_file(
     }
 
     // Set up provider configuration
-    let provider = if let Some(config) = crate::llm::get_ai_settings_internal(&app) {
-        crate::llm::llm_provider::get_active_provider(
-            crate::llm::llm_provider::ProviderConfig {
-                provider_type: config.provider,
-                api_key: if config.api_key_enc.is_empty() { api_key } else { config.api_key_enc },
-                model: config.ai_model,
-                base_url: None,
-            }
-        )
-    } else {
-        crate::llm::llm_provider::get_active_provider(
-            crate::llm::llm_provider::ProviderConfig {
-                provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
-                api_key,
-                model,
-                base_url: None,
-            }
-        )
-    };
+    let provider = crate::llm::load_active_provider(&app, api_key, Some(model));
 
     let options = IndexOptions {
         run_llm_metadata: true,
@@ -300,25 +328,7 @@ pub async fn index_folder(
     let mut failed = 0usize;
 
     // Set up provider configuration
-    let provider = if let Some(config) = crate::llm::get_ai_settings_internal(&app) {
-        crate::llm::llm_provider::get_active_provider(
-            crate::llm::llm_provider::ProviderConfig {
-                provider_type: config.provider,
-                api_key: if config.api_key_enc.is_empty() { api_key } else { config.api_key_enc },
-                model: config.ai_model,
-                base_url: None,
-            }
-        )
-    } else {
-        crate::llm::llm_provider::get_active_provider(
-            crate::llm::llm_provider::ProviderConfig {
-                provider_type: if model.contains("gemini") { "gemini".to_string() } else if model.contains("gpt") { "openai".to_string() } else { "claude".to_string() },
-                api_key,
-                model,
-                base_url: None,
-            }
-        )
-    };
+    let provider = crate::llm::load_active_provider(&app, api_key, Some(model));
 
     let options = IndexOptions {
         run_llm_metadata: true,
@@ -326,10 +336,11 @@ pub async fn index_folder(
     };
     
     let db_path = store::db_path(&app);
+    let db_conn = store::open_db_by_path(&db_path).ok();
     
     let mut already_indexed = std::collections::HashSet::new();
     if !reindex {
-        if let Ok(conn) = store::open_db_by_path(&db_path) {
+        if let Some(ref conn) = db_conn {
             for path in &files {
                 let path_str = path.to_string_lossy().to_string();
                 if let Ok(true) = store::is_already_indexed(&conn, &path_str) {
@@ -340,10 +351,36 @@ pub async fn index_folder(
     }
 
     let skip_count = start_index.unwrap_or(0);
+
+    if let Some(ref conn) = db_conn {
+        let session = store::IndexingSession {
+            path: folder_path.clone(),
+            is_folder: true,
+            reindex,
+            start_index: skip_count,
+            total_files: total,
+            status: "running".to_string(),
+            updated_at: chrono::Local::now().to_rfc3339(),
+        };
+        let _ = store::save_indexing_session(conn, &session);
+    }
+
     SHOULD_STOP_INDEXING.store(false, Ordering::SeqCst);
 
     for (i, path) in files.iter().enumerate().skip(skip_count) {
         if SHOULD_STOP_INDEXING.load(Ordering::SeqCst) {
+            if let Some(ref conn) = db_conn {
+                let session = store::IndexingSession {
+                    path: folder_path.clone(),
+                    is_folder: true,
+                    reindex,
+                    start_index: i,
+                    total_files: total,
+                    status: "stopped".to_string(),
+                    updated_at: chrono::Local::now().to_rfc3339(),
+                };
+                let _ = store::save_indexing_session(conn, &session);
+            }
             let _ = app.emit("indexing-progress", IndexProgress {
                 current: i,
                 total,
@@ -353,6 +390,20 @@ pub async fn index_folder(
             });
             break;
         }
+
+        if let Some(ref conn) = db_conn {
+            let session = store::IndexingSession {
+                path: folder_path.clone(),
+                is_folder: true,
+                reindex,
+                start_index: i,
+                total_files: total,
+                status: "running".to_string(),
+                updated_at: chrono::Local::now().to_rfc3339(),
+            };
+            let _ = store::save_indexing_session(conn, &session);
+        }
+
         let current = i + 1;
         let file_name = path
             .file_name()
@@ -388,6 +439,28 @@ pub async fn index_folder(
                 });
             }
             Err(e) => {
+                if e == "Indexing stopped by user" {
+                    if let Some(ref conn) = db_conn {
+                        let session = store::IndexingSession {
+                            path: folder_path.clone(),
+                            is_folder: true,
+                            reindex,
+                            start_index: i,
+                            total_files: total,
+                            status: "stopped".to_string(),
+                            updated_at: chrono::Local::now().to_rfc3339(),
+                        };
+                        let _ = store::save_indexing_session(conn, &session);
+                    }
+                    let _ = app.emit("indexing-progress", IndexProgress {
+                        current,
+                        total,
+                        file_name: "".to_string(),
+                        status: "failed".to_string(),
+                        message: "Indexing stopped by user".to_string(),
+                    });
+                    break;
+                }
                 failed += 1;
                 let _ = app.emit("indexing-progress", IndexProgress {
                     current, total, file_name,
@@ -396,6 +469,15 @@ pub async fn index_folder(
                 });
             }
         }
+    }
+
+    let stopped = SHOULD_STOP_INDEXING.load(Ordering::SeqCst);
+    if stopped {
+        return Err("Indexing stopped by user".to_string());
+    }
+
+    if let Some(ref conn) = db_conn {
+        let _ = store::delete_indexing_session(conn, &folder_path);
     }
 
     Ok(IndexSummary { indexed, skipped, failed })
