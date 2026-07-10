@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import BackButton from "../ui/back-button";
 import { useLanguage } from "../../context/LanguageContext";
 import AiStatusBadge from "../ui/AiStatusBadge";
+import DocsManagementScanFileCount from "./DocsManagementScanFileCount";
 
 type DocsManagementHeaderProps = {
   dbPath: string;
@@ -160,11 +161,16 @@ export default function DocsManagementHeader({
           {isProcessing && (
             <div className="flex items-center gap-2 bg-blue-50/50 border border-blue-200 rounded-full px-3 py-1 text-xs font-medium text-blue-700 animate-pulse">
               <span className="inline-block animate-spin">⟳</span>
-              <span>
-                {scanCount
-                  ? `Indexing: ${scanCount.current}/${scanCount.total}`
-                  : "Scanning..."}
-              </span>
+              {scanCount ? (
+                <DocsManagementScanFileCount
+                  current={scanCount.current}
+                  total={scanCount.total}
+                  prefix="Indexing: "
+                  className="font-mono font-semibold"
+                />
+              ) : (
+                <span>Scanning...</span>
+              )}
             </div>
           )}
 
