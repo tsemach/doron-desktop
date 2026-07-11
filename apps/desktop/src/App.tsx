@@ -3,17 +3,21 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import CaseManagement from "@/components/CaseManagement/CaseManagement";
 import DocsManagement from "./components/DocsManagement/DocsManagement";
 import Settings from "./components/Settings/Settings";
-import { getCurrentWindow  } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { invoke } from "@tauri-apps/api/core";
 import UpdateBanner from "./components/Updater/UpdateBanner";
-import { triggerGlobalHealthCheck } from "./store/aiStore";
+import { triggerGlobalHealthCheck, aiConfigStatusAtom } from "./store/aiStore";
+import { useAtomValue, getDefaultStore } from "jotai";
+import { isProcessingAtom } from "./store/indexStore";
+import DocsManagementScanBackgroundIndexer from "./components/DocsManagement/DocsManagementScanBackgroundIndexer";
 
 function Home() {
   const navigate = useNavigate();
   const [username, setUsername] = useState<string>(() => localStorage.getItem("user_name") || "");
   const [nameInput, setNameInput] = useState("");
   const { t } = useLanguage();
+  const isProcessing = useAtomValue(isProcessingAtom);
 
   useEffect(() => {
     const setupWindow = async () => {
@@ -96,9 +100,15 @@ function Home() {
             <button
               type="button"
               onClick={handleDocsManagement}
-              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
+              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10 relative"
             >
               {t("docs_management")}
+              {isProcessing && (
+                <span className="absolute bottom-4 right-4 flex h-3.5 w-3.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-500"></span>
+                </span>
+              )}
             </button>
           </div>
 
@@ -120,7 +130,28 @@ function Home() {
 
 function App() {
   useEffect(() => {
-    triggerGlobalHealthCheck();
+    async function runCheck() {
+      let retries = 8; // Try 8 times (24 seconds max) to account for slow model loading
+      while (retries > 0) {
+        try {
+          await triggerGlobalHealthCheck();
+          const store = getDefaultStore();
+          const status = store.get(aiConfigStatusAtom);
+          if (status === "verified") {
+            console.log("[App] AI connection verified successfully!");
+            break;
+          }
+        } catch (err) {
+          console.error("[App] Health check attempt failed:", err);
+          localStorage.setItem("debug_health_check_error", String(err));
+        }
+        retries--;
+        if (retries > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+      }
+    }
+    runCheck();
   }, []);
 
   useEffect(() => {
@@ -152,8 +183,8 @@ function App() {
           const selectedText = target.value.substring(start, end);
           invoke("write_clipboard", { text: selectedText }).then(() => {
             const newValue = target.value.substring(0, start) + target.value.substring(end);
-            const prototype = target instanceof HTMLTextAreaElement 
-              ? HTMLTextAreaElement.prototype 
+            const prototype = target instanceof HTMLTextAreaElement
+              ? HTMLTextAreaElement.prototype
               : HTMLInputElement.prototype;
             const nativeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
             if (nativeValueSetter) {
@@ -175,8 +206,8 @@ function App() {
           const end = target.selectionEnd;
           if (start !== null && end !== null) {
             const newValue = target.value.substring(0, start) + clipText + target.value.substring(end);
-            const prototype = target instanceof HTMLTextAreaElement 
-              ? HTMLTextAreaElement.prototype 
+            const prototype = target instanceof HTMLTextAreaElement
+              ? HTMLTextAreaElement.prototype
               : HTMLInputElement.prototype;
             const nativeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
             if (nativeValueSetter) {
@@ -207,6 +238,7 @@ function App() {
   return (
     <LanguageProvider>
       <UpdateBanner />
+      <DocsManagementScanBackgroundIndexer />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/case-management/*" element={<CaseManagement />} />

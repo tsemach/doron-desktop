@@ -6,7 +6,6 @@ import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsMod
 import OpenCasesCaseAnnotationsModal from "./OpenCasesCaseAnnotationsModal";
 import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
 import OpenCasesUpdateDocumentModal from "./OpenCasesUpdateDocumentModal";
-import OpenCasesFieldsModal from "./OpenCasesFieldsModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesCaseDeleteModal from "./OpenCasesCaseDeleteModal";
 import OpenCasesList from "./OpenCasesList";
@@ -31,7 +30,6 @@ export default function CaseManagementOpenCases() {
   const [editingCaseAnnotations, setEditingCaseAnnotations] = useState<Case | null>(null);
   const [showAddDocModal, setShowAddDocModal] = useState(false);
   const [updatingAttachment, setUpdatingAttachment] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
-  const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null);
 
@@ -308,7 +306,6 @@ export default function CaseManagementOpenCases() {
           onRemoveDocument={handleRemoveDocument}
           onEditAnnotations={setEditingDoc}
           onEditCaseAnnotations={() => setEditingCaseAnnotations(selectedCase)}
-          onShowFields={() => setShowFieldsModal(true)}
           onAddDocument={() => setShowAddDocModal(true)}
           onCopyAttachmentToCase={setUpdatingAttachment}
           isDetailView={false}
@@ -404,13 +401,7 @@ export default function CaseManagementOpenCases() {
         />
       )}
 
-      {showFieldsModal && selectedCase && (
-        <OpenCasesFieldsModal
-          caseId={Number(selectedCase.id)}
-          caseName={selectedCase.name}
-          onClose={() => setShowFieldsModal(false)}
-        />
-      )}
+
 
       {/* Modern Confirmation Modal for Case Deletion */}
       {caseToDelete && (

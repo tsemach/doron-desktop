@@ -37,15 +37,39 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let conn = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
-    ).map_err(|e| e.to_string())?;
     
-    // Enable WAL journal mode and busy timeout for safe concurrent writes
-    let _ = conn.execute("PRAGMA journal_mode = WAL;", []);
-    let _ = conn.execute("PRAGMA busy_timeout = 5000;", []);
-    conn.execute("PRAGMA foreign_keys = ON;", []).map_err(|e| e.to_string())?;
+    let mut conn = None;
+    let mut last_err = String::new();
+    
+    for _ in 0..5 {
+        match Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
+        ) {
+            Ok(c) => {
+                // Set journal mode to DELETE to avoid WAL shared-memory mapping failures on DrvFs /mnt/c/ mounts in WSL 2
+                // Note: PRAGMA journal_mode returns a row, so we use query_row instead of execute.
+                if let Err(e) = c.query_row("PRAGMA journal_mode = DELETE;", [], |_| Ok(())) {
+                    eprintln!("Warning: PRAGMA journal_mode = DELETE failed: {}", e);
+                }
+                let _ = c.execute("PRAGMA busy_timeout = 5000;", []);
+                if let Err(e) = c.execute("PRAGMA foreign_keys = ON;", []) {
+                    last_err = format!("Failed to set foreign keys: {}", e);
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    continue;
+                }
+                conn = Some(c);
+                break;
+            }
+            Err(e) => {
+                last_err = e.to_string();
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+        }
+    }
+    
+    let conn = conn.ok_or_else(|| format!("Failed to open database after retries: {}", last_err))?;
+    
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS cases (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -351,7 +375,78 @@ const DOCUMENTS_SCHEMA: &str = "
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON document_chunks(document_id);
+
+    CREATE TABLE IF NOT EXISTS active_indexing_sessions (
+        path          TEXT PRIMARY KEY,
+        is_folder     INTEGER NOT NULL,
+        reindex       INTEGER NOT NULL,
+        start_index   INTEGER NOT NULL,
+        total_files   INTEGER NOT NULL,
+        status        TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+    );
 ";
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct IndexingSession {
+    pub path: String,
+    pub is_folder: bool,
+    pub reindex: bool,
+    pub start_index: usize,
+    pub total_files: usize,
+    pub status: String,
+    pub updated_at: String,
+}
+
+pub fn save_indexing_session(
+    conn: &Connection,
+    session: &IndexingSession,
+) -> Result<(), rusqlite::Error> {
+    conn.execute(
+        "INSERT OR REPLACE INTO active_indexing_sessions (path, is_folder, reindex, start_index, total_files, status, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            session.path,
+            if session.is_folder { 1 } else { 0 },
+            if session.reindex { 1 } else { 0 },
+            session.start_index as i64,
+            session.total_files as i64,
+            session.status,
+            session.updated_at
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn get_active_indexing_sessions(conn: &Connection) -> Result<Vec<IndexingSession>, rusqlite::Error> {
+    let mut stmt = conn.prepare("SELECT path, is_folder, reindex, start_index, total_files, status, updated_at FROM active_indexing_sessions")?;
+    let rows = stmt.query_map([], |row| {
+        let is_folder: i32 = row.get(1)?;
+        let reindex: i32 = row.get(2)?;
+        let start_index: i64 = row.get(3)?;
+        let total_files: i64 = row.get(4)?;
+        Ok(IndexingSession {
+            path: row.get(0)?,
+            is_folder: is_folder != 0,
+            reindex: reindex != 0,
+            start_index: start_index as usize,
+            total_files: total_files as usize,
+            status: row.get(5)?,
+            updated_at: row.get(6)?,
+        })
+    })?;
+
+    let mut sessions = Vec::new();
+    for r in rows {
+        sessions.push(r?);
+    }
+    Ok(sessions)
+}
+
+pub fn delete_indexing_session(conn: &Connection, path: &str) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM active_indexing_sessions WHERE path = ?1", params![path])?;
+    Ok(())
+}
 
 pub struct DocumentRecord {
     pub file_path: String,
@@ -661,6 +756,11 @@ pub fn insert_document_chunk(
 
 pub fn delete_document_chunks(conn: &Connection, doc_id: i64) -> Result<(), rusqlite::Error> {
     conn.execute("DELETE FROM document_chunks WHERE document_id = ?1", params![doc_id])?;
+    Ok(())
+}
+
+pub fn delete_document_by_path(conn: &Connection, file_path: &str) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM documents WHERE file_path = ?1", params![file_path])?;
     Ok(())
 }
 

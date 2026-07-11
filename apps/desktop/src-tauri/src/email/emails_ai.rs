@@ -108,10 +108,10 @@ async fn call_llm_classification(
     top_cases: &[&CaseCandidate],
 ) -> Result<(Option<i64>, f64, String), String> {
     let provider = get_active_provider(ProviderConfig {
-        provider_type: config.provider.clone(),
-        api_key: config.api_key_enc.clone(),
+        provider_type: if config.ai_mode == "local" { "local".to_string() } else { config.provider.clone() },
+        api_key: if config.ai_mode == "local" { "".to_string() } else { config.api_key_enc.clone() },
         model: config.ai_model.clone(),
-        base_url: None,
+        base_url: if config.ai_mode == "local" { Some("http://localhost:10086/v1".to_string()) } else { None },
     });
 
     let mut candidate_list = String::new();

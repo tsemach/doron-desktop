@@ -38,12 +38,13 @@ export async function triggerGlobalHealthCheck() {
     }
 
     // 3. Run real health check
+    const fallbackApiKey = localStorage.getItem("claude_api_key") || "";
     const response = await invoke<string>("check_ai_health", {
       config: {
         ai_mode: res.ai_mode,
         provider: res.provider,
         ai_model: res.ai_model,
-        api_key_enc: res.api_key_enc,
+        api_key_enc: res.api_key_enc || fallbackApiKey,
       }
     });
 
@@ -55,5 +56,6 @@ export async function triggerGlobalHealthCheck() {
   } catch (err) {
     console.error("[triggerGlobalHealthCheck] Error checking AI health:", err);
     store.set(aiConfigStatusAtom, "failed");
+    throw err;
   }
 }

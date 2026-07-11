@@ -1,19 +1,21 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import BackButton from "../ui/back-button";
 import { useLanguage } from "../../context/LanguageContext";
+import AiStatusBadge from "../ui/AiStatusBadge";
+import DocsManagementScanFileCount from "./DocsManagementScanFileCount";
 
 type DocsManagementHeaderProps = {
-  isAiConnected: boolean;
   dbPath: string;
   isProcessing: boolean;
   scanCount?: { current: number; total: number };
+  resetState?: () => void;
 };
 
 export default function DocsManagementHeader({
-  isAiConnected,
   dbPath,
   isProcessing,
   scanCount,
+  resetState,
 }: DocsManagementHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -34,9 +36,9 @@ export default function DocsManagementHeader({
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md shrink-0 px-6 py-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-4">
         {/* Left Side: Back & Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 justify-self-start">
           <BackButton navigateTo="/" />
           <div className="h-6 w-[1px] bg-border" />
           <div className="flex items-center gap-2">
@@ -68,7 +70,7 @@ export default function DocsManagementHeader({
         </div>
 
         {/* Center: Navigation Tabs */}
-        <nav className="flex items-center bg-muted/60 p-1 rounded-lg border border-border/40 max-w-fit mx-auto md:mx-0">
+        <nav className="flex items-center bg-muted/60 p-1 rounded-lg border border-border/40 max-w-fit justify-self-center">
           <button
             onClick={() => navigate("/docs-management")}
             className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5 ${activeTab === "search"
@@ -93,7 +95,12 @@ export default function DocsManagementHeader({
             {t("smart_search")}
           </button>
           <button
-            onClick={() => navigate("/docs-management/scan")}
+            onClick={() => {
+              navigate("/docs-management/scan");
+              if (resetState && !isProcessing) {
+                resetState();
+              }
+            }}
             className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5 relative ${activeTab === "scan"
                 ? "bg-background text-foreground shadow-sm font-bold scale-102"
                 : "text-muted-foreground hover:text-foreground"
@@ -117,7 +124,10 @@ export default function DocsManagementHeader({
             </svg>
             {t("scan_and_index")}
             {isProcessing && (
-              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+              <span className="absolute top-0.5 right-0.5 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500 animate-pulse"></span>
+              </span>
             )}
           </button>
           <button
@@ -146,16 +156,21 @@ export default function DocsManagementHeader({
         </nav>
 
         {/* Right Side: Status Indicators */}
-        <div className="flex items-center justify-end gap-3 flex-wrap">
+        <div className="flex items-center justify-end gap-3 flex-wrap justify-self-end">
           {/* Active Progress Badge */}
           {isProcessing && (
             <div className="flex items-center gap-2 bg-blue-50/50 border border-blue-200 rounded-full px-3 py-1 text-xs font-medium text-blue-700 animate-pulse">
               <span className="inline-block animate-spin">⟳</span>
-              <span>
-                {scanCount
-                  ? `Indexing: ${scanCount.current}/${scanCount.total}`
-                  : "Scanning..."}
-              </span>
+              {scanCount ? (
+                <DocsManagementScanFileCount
+                  current={scanCount.current}
+                  total={scanCount.total}
+                  prefix="Indexing: "
+                  className="font-mono font-semibold"
+                />
+              ) : (
+                <span>Scanning...</span>
+              )}
             </div>
           )}
 
@@ -184,18 +199,8 @@ export default function DocsManagementHeader({
             </div>
           )}
 
-          {/* Claude API Key Status */}
-          {isAiConnected ? (
-            <div className="flex items-center gap-1.5 bg-green-50/60 border border-green-200 rounded-full px-3 py-1 text-xs font-medium text-green-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              <span>AI Connected</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 bg-red-50/60 border border-red-200 rounded-full px-3 py-1 text-xs font-medium text-red-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-              <span>API Offline</span>
-            </div>
-          )}
+          {/* Reusable AI Connection Status Badge */}
+          <AiStatusBadge />
         </div>
       </div>
     </header>

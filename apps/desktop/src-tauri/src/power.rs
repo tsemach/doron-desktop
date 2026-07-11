@@ -15,6 +15,11 @@ mod win_power {
         fn SetThreadExecutionState(esFlags: EXECUTION_STATE) -> EXECUTION_STATE;
     }
 
+    #[link(name = "user32")]
+    extern "system" {
+        fn mouse_event(dwFlags: u32, dx: i32, dy: i32, dwData: u32, dwExtraInfo: usize);
+    }
+
     pub fn prevent_system_sleep(keep_display_on: bool) {
         let count = PREVENT_SLEEP_COUNT.fetch_add(1, Ordering::SeqCst);
         if count == 0 {
@@ -26,6 +31,20 @@ mod win_power {
                 SetThreadExecutionState(flags);
             }
             println!("[Power] Sleep prevention enabled (keep_display_on: {}).", keep_display_on);
+
+            // Spawn a background thread to simulate subtle user activity (mouse movement)
+            // every 30 seconds to bypass Modern Standby sleep transitions (especially on battery).
+            std::thread::spawn(move || {
+                while PREVENT_SLEEP_COUNT.load(Ordering::SeqCst) > 0 {
+                    unsafe {
+                        // MOUSEEVENTF_MOVE = 0x0001
+                        // Move mouse 1 pixel and back to reset idle timers without impacting user
+                        mouse_event(0x0001, 1, 1, 0, 0);
+                        mouse_event(0x0001, -1, -1, 0, 0);
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(30));
+                }
+            });
         }
     }
 
@@ -92,17 +111,27 @@ mod win_power {
                     if guard.is_none() {
                         let flags = if keep_display_on { "2147483651" } else { "2147483649" };
                         let script = format!(
-                            "$code = '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint esFlags);'; \
+                            "Add-Type -AssemblyName System.Windows.Forms; \
+                             $code = '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint esFlags);'; \
                              Add-Type -MemberDefinition $code -Name Win32SetThreadExecutionState -Namespace Win32; \
+                             $myshell = New-Object -com 'Wscript.Shell'; \
                              while ($true) {{ \
                                  [Win32.Win32SetThreadExecutionState]::SetThreadExecutionState({}); \
+                                 try {{ \
+                                     $pos = [System.Windows.Forms.Cursor]::Position; \
+                                     [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(($pos.X + 1), $pos.Y); \
+                                     [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($pos.X, $pos.Y); \
+                                 }} catch {{}} \
+                                 try {{ \
+                                     $myshell.sendkeys('{{F15}}'); \
+                                 }} catch {{}} \
                                  Start-Sleep -Seconds 30; \
                              }}",
                             flags
                         );
                         
                         match std::process::Command::new("powershell.exe")
-                            .args(&["-NoProfile", "-Command", &script])
+                            .args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &script])
                             .stdout(std::process::Stdio::null())
                             .stderr(std::process::Stdio::null())
                             .spawn()

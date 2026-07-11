@@ -9,7 +9,6 @@ interface OpenDocumentsPanelTopMenuProps {
   selectedCase: Case | null;
   activeRightTab: "preview" | "emails";
   onTabChange?: (tab: "preview" | "emails") => void;
-  onShowFields: () => void;
   onAddDocument: () => void;
   onEditCaseAnnotations?: () => void;
   isDetailView?: boolean;
@@ -35,7 +34,6 @@ export default function OpenDocumentsPanelTopMenu({
   selectedCase,
   activeRightTab,
   onTabChange,
-  onShowFields,
   onAddDocument,
   onEditCaseAnnotations,
   isDetailView = false,
@@ -248,33 +246,6 @@ export default function OpenDocumentsPanelTopMenu({
                     {t("emails")}
                   </button>
                 )}
-
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    onShowFields();
-                  }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer bg-transparent border-none"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-muted-foreground"
-                  >
-                    <rect width="18" height="18" x="3" y="3" rx="2" />
-                    <path d="M7 8h10" />
-                    <path d="M7 12h10" />
-                    <path d="M7 16h10" />
-                  </svg>
-                  {t("case_fields")}
-                </button>
               </div>
             </>
           )}

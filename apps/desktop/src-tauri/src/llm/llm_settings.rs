@@ -64,17 +64,58 @@ pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
     }).ok()
 }
 
+pub fn load_active_provider(
+    app: &AppHandle,
+    api_key_fallback: String,
+    model_fallback: Option<String>,
+) -> super::llm_provider::LlmProvider {
+    let config = match get_ai_settings_internal(app) {
+        Some(config) if config.ai_mode == "local" => {
+            super::llm_provider::ProviderConfig {
+                provider_type: "local".to_string(),
+                api_key: String::new(),
+                model: config.ai_model,
+                base_url: Some("http://localhost:10086/v1".to_string()),
+            }
+        }
+        Some(config) => {
+            let api_key = if config.api_key_enc.is_empty() {
+                api_key_fallback
+            } else {
+                config.api_key_enc
+            };
+            super::llm_provider::ProviderConfig {
+                provider_type: config.provider,
+                api_key,
+                model: config.ai_model,
+                base_url: None,
+            }
+        }
+        None => {
+            let model = model_fallback.unwrap_or_else(|| "claude-3-5-sonnet-20241022".to_string());
+            let provider_type = if model.contains("gemini") {
+                "gemini".to_string()
+            } else if model.contains("gpt") {
+                "openai".to_string()
+            } else {
+                "claude".to_string()
+            };
+            super::llm_provider::ProviderConfig {
+                provider_type,
+                api_key: api_key_fallback,
+                model,
+                base_url: None,
+            }
+        }
+    };
+
+    super::llm_provider::get_active_provider(config)
+}
+
+
 /// Tauri command to run the connection test/health check
 #[tauri::command]
 pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String, String> {
-    if config.ai_mode == "online" {
-        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-        return Ok(format!(
-            "Online Pro model connection successful: verified account status, model '{}' is ready.",
-            config.ai_model
-        ));
-    }
-
     // For local mode, ensure the background sidecar is started and responsive
     if config.ai_mode == "local" {
         let port = start_llama_server(&app, &config.ai_model)?;
@@ -94,35 +135,29 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
         if !responsive {
             return Err("Local model server failed to start or did not become responsive within timeout.".to_string());
         }
+        return Ok("Connection successful! Local model server is running and healthy.".to_string());
     }
 
-    // For local or BYOM, perform a real network/service call!
-    let provider = if config.ai_mode == "local" {
-        crate::llm::llm_provider::get_active_provider(
-            crate::llm::llm_provider::ProviderConfig {
-                provider_type: "local".to_string(),
-                api_key: "".to_string(),
-                model: config.ai_model.clone(),
-                base_url: Some("http://localhost:10086/v1".to_string()),
-            }
-        )
-    } else {
-        crate::llm::llm_provider::get_active_provider(
-            crate::llm::llm_provider::ProviderConfig {
-                provider_type: config.provider.clone(),
-                api_key: config.api_key_enc.clone(),
-                model: config.ai_model.clone(),
-                base_url: None,
-            }
-        )
-    };
+    // For BYOM/online, perform a real network/service call!
+    let provider = crate::llm::llm_provider::get_active_provider(
+        crate::llm::llm_provider::ProviderConfig {
+            provider_type: config.provider.clone(),
+            api_key: config.api_key_enc.clone(),
+            model: config.ai_model.clone(),
+            base_url: None,
+        }
+    );
 
-    match provider.call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None).await {
-        Ok(res) => {
+    let check_future = provider.call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None);
+    match tokio::time::timeout(std::time::Duration::from_secs(10), check_future).await {
+        Ok(Ok(res)) => {
             Ok(format!("Connection successful! Response: '{}'", res.trim()))
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             Err(format!("Connection failed: {e}"))
+        }
+        Err(_) => {
+            Err("Connection timed out after 10 seconds. The model might still be loading or warming up in memory.".to_string())
         }
     }
 }
@@ -176,17 +211,25 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
             .status();
     } else {
         let _ = std::process::Command::new("pkill")
-            .args(&["-f", &sidecar_filename])
+            .args(&["-9", "-f", &sidecar_filename])
             .status();
-        // Give the OS kernel a brief moment (200ms) to clean up port/socket bindings
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        // Give the OS kernel a brief moment (1000ms) to clean up port/socket bindings
+        std::thread::sleep(std::time::Duration::from_millis(1000));
     }
+
+    // Dynamically detect total logical CPU threads and allocate 50% to the Llama server
+    let system_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    let allocated_threads = (system_threads / 2).max(1);
+    println!("Dynamic CPU allocation: using {} out of {} available threads", allocated_threads, system_threads);
 
     let port = 10086;
     let mut cmd = std::process::Command::new(&sidecar_path);
     cmd.arg("--model").arg(&model_path)
        .arg("--port").arg(port.to_string())
-       .arg("--threads").arg("4")
+       .arg("--threads").arg(allocated_threads.to_string())
+       .arg("--threads-batch").arg(allocated_threads.to_string())
        .arg("-c").arg("8192")
        .arg("--host").arg("127.0.0.1");
 
