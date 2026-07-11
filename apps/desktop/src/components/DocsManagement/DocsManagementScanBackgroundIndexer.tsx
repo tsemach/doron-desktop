@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAtomValue } from "jotai";
 import { aiConfigStatusAtom } from "../../store/aiStore";
 
-export default function BackgroundIndexer() {
+export default function DocsManagementScanBackgroundIndexer() {
   const { isProcessing, startIndexing } = useIndexing();
   const aiHealthStatus = useAtomValue(aiConfigStatusAtom);
   const [hasChecked, setHasChecked] = useState(false);
@@ -22,7 +22,7 @@ export default function BackgroundIndexer() {
         if (active.length > 0) {
           active.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
           const session = active[0];
-          console.log("[BackgroundIndexer] Auto-resuming indexing session on app start:", session);
+          console.log("[DocsManagementScanBackgroundIndexer] Auto-resuming indexing session on app start:", session);
           setHasChecked(true);
           startIndexing(session.path, session.is_folder, true, session.start_index, session.reindex, true);
         } else {

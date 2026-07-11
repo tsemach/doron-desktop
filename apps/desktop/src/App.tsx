@@ -3,14 +3,14 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import CaseManagement from "@/components/CaseManagement/CaseManagement";
 import DocsManagement from "./components/DocsManagement/DocsManagement";
 import Settings from "./components/Settings/Settings";
-import { getCurrentWindow  } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { invoke } from "@tauri-apps/api/core";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "./store/indexStore";
-import BackgroundIndexer from "./components/DocsManagement/BackgroundIndexer";
+import DocsManagementScanBackgroundIndexer from "./components/DocsManagement/DocsManagementScanBackgroundIndexer";
 
 function Home() {
   const navigate = useNavigate();
@@ -162,8 +162,8 @@ function App() {
           const selectedText = target.value.substring(start, end);
           invoke("write_clipboard", { text: selectedText }).then(() => {
             const newValue = target.value.substring(0, start) + target.value.substring(end);
-            const prototype = target instanceof HTMLTextAreaElement 
-              ? HTMLTextAreaElement.prototype 
+            const prototype = target instanceof HTMLTextAreaElement
+              ? HTMLTextAreaElement.prototype
               : HTMLInputElement.prototype;
             const nativeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
             if (nativeValueSetter) {
@@ -185,8 +185,8 @@ function App() {
           const end = target.selectionEnd;
           if (start !== null && end !== null) {
             const newValue = target.value.substring(0, start) + clipText + target.value.substring(end);
-            const prototype = target instanceof HTMLTextAreaElement 
-              ? HTMLTextAreaElement.prototype 
+            const prototype = target instanceof HTMLTextAreaElement
+              ? HTMLTextAreaElement.prototype
               : HTMLInputElement.prototype;
             const nativeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
             if (nativeValueSetter) {
@@ -217,7 +217,7 @@ function App() {
   return (
     <LanguageProvider>
       <UpdateBanner />
-      <BackgroundIndexer />
+      <DocsManagementScanBackgroundIndexer />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/case-management/*" element={<CaseManagement />} />
