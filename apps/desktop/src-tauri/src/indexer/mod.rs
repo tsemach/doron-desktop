@@ -22,7 +22,20 @@ pub fn get_active_indexing_sessions(app: AppHandle) -> Result<Vec<store::Indexin
 pub fn delete_indexing_session(app: AppHandle, path: String) -> Result<(), String> {
     let db_path = store::db_path(&app);
     let conn = store::open_db_by_path(&db_path).map_err(|e| e.to_string())?;
-    store::delete_indexing_session(&conn, &path).map_err(|e| e.to_string())
+    
+    let normalized = path.replace("\\", "/");
+    let clean_path = if normalized.len() >= 2 && normalized.as_bytes()[1] == b':' {
+        let drive = &normalized[..2].to_lowercase();
+        if drive == "u:" {
+            normalized[2..].to_string()
+        } else {
+            normalized
+        }
+    } else {
+        normalized
+    };
+
+    store::delete_indexing_session(&conn, &clean_path).map_err(|e| e.to_string())
 }
 
 use crate::{extractor, llm, store};

@@ -7,34 +7,68 @@ pub struct LocalProvider {
 }
 
 #[derive(Serialize)]
+struct LocalMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Serialize)]
+struct LocalResponseFormat {
+    #[serde(rename = "type")]
+    format_type: String, // "json_object"
+}
+
+#[derive(Serialize)]
 struct LocalRequestBody {
     model: String,
-    prompt: String,
-    max_tokens: u32,
+    messages: Vec<LocalMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    response_format: Option<LocalResponseFormat>,
+    max_tokens: Option<u32>,
+}
+
+#[derive(Deserialize)]
+struct LocalChoiceMessage {
+    content: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct LocalChoice {
-    text: String,
+    message: Option<LocalChoiceMessage>,
 }
 
 #[derive(Deserialize)]
 struct LocalResponseBody {
-    choices: Vec<LocalChoice>,
+    choices: Option<Vec<LocalChoice>>,
 }
 
 impl LocalProvider {
-    async fn execute_request(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        let full_prompt = if let Some(sys) = system {
-            format!("System: {}\n\nUser: {}\n\nAssistant:", sys, prompt)
+    async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool) -> Result<String, String> {
+        let mut messages = Vec::new();
+        if let Some(sys) = system {
+            messages.push(LocalMessage {
+                role: "system".to_string(),
+                content: sys.to_string(),
+            });
+        }
+        messages.push(LocalMessage {
+            role: "user".to_string(),
+            content: prompt.to_string(),
+        });
+
+        let response_format = if json_mode {
+            Some(LocalResponseFormat {
+                format_type: "json_object".to_string(),
+            })
         } else {
-            format!("User: {}\n\nAssistant:", prompt)
+            None
         };
 
         let body = LocalRequestBody {
             model: self.model.clone(),
-            prompt: full_prompt,
-            max_tokens: 2048,
+            messages,
+            response_format,
+            max_tokens: Some(2048),
         };
 
         let client = reqwest::Client::builder()
@@ -43,7 +77,7 @@ impl LocalProvider {
             .unwrap_or_else(|_| reqwest::Client::new());
         
         let base_url = self.base_url.as_deref().unwrap_or("http://localhost:10086/v1");
-        let url = format!("{}/completions", base_url);
+        let url = format!("{}/chat/completions", base_url);
         
         let mut request = client
             .post(&url)
@@ -72,23 +106,19 @@ impl LocalProvider {
 
         let text = resp
             .choices
-            .into_iter()
-            .next()
-            .map(|c| c.text)
+            .and_then(|c| c.into_iter().next())
+            .and_then(|c| c.message)
+            .and_then(|m| m.content)
             .unwrap_or_default();
 
         Ok(text)
     }
 
     pub async fn call_simple(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        self.execute_request(prompt, system).await
+        self.execute_request(prompt, system, false).await
     }
 
     pub async fn call_structured(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        let system_prompt = match system {
-            Some(sys) => format!("{}\n\nIMPORTANT: Your response must be valid JSON.", sys),
-            None => "IMPORTANT: Your response must be valid JSON.".to_string()
-        };
-        self.execute_request(prompt, Some(&system_prompt)).await
+        self.execute_request(prompt, system, true).await
     }
 }

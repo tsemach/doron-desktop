@@ -107,45 +107,9 @@ mod win_power {
                     .unwrap_or(false);
 
             if is_wsl {
-                if let Ok(mut guard) = get_non_win_guard().lock() {
-                    if guard.is_none() {
-                        let flags = if keep_display_on { "2147483651" } else { "2147483649" };
-                        let script = format!(
-                            "Add-Type -AssemblyName System.Windows.Forms; \
-                             $code = '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint esFlags);'; \
-                             Add-Type -MemberDefinition $code -Name Win32SetThreadExecutionState -Namespace Win32; \
-                             $myshell = New-Object -com 'Wscript.Shell'; \
-                             while ($true) {{ \
-                                 [Win32.Win32SetThreadExecutionState]::SetThreadExecutionState({}); \
-                                 try {{ \
-                                     $pos = [System.Windows.Forms.Cursor]::Position; \
-                                     [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(($pos.X + 1), $pos.Y); \
-                                     [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($pos.X, $pos.Y); \
-                                 }} catch {{}} \
-                                 try {{ \
-                                     $myshell.sendkeys('{{F15}}'); \
-                                 }} catch {{}} \
-                                 Start-Sleep -Seconds 30; \
-                             }}",
-                            flags
-                        );
-                        
-                        match std::process::Command::new("powershell.exe")
-                            .args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &script])
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .spawn()
-                        {
-                            Ok(child) => {
-                                println!("[Power] Spawned powershell.exe sleep prevention helper in WSL.");
-                                *guard = Some(child);
-                            }
-                            Err(e) => {
-                                println!("[Power] Failed to spawn powershell.exe sleep prevention in WSL: {}", e);
-                            }
-                        }
-                    }
-                }
+                // Spawning powershell.exe sleep prevention is disabled in WSL
+                // to avoid F15 key simulation crashing Turborepo TUI and generating warning logs.
+                println!("[Power] Sleep prevention disabled in WSL development environment.");
             }
         }
     }
