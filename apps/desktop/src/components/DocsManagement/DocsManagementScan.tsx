@@ -121,14 +121,32 @@ export default function DocsManagementScan({
 
   async function executeCancelIndexing() {
     try {
+      // 1. Immediately clear the local state to unlock the UI instantly
+      setActiveSession(null);
+      
+      // 2. Stop active indexing thread
       if (isProcessing) {
         await invoke("stop_indexing");
       }
+      
+      // 3. Delete the session from the database
       if (selectedPath) {
         await invoke("delete_indexing_session", { path: selectedPath });
       }
+      
+      // 4. Reset all Jotai indexing atoms
       if (resetState) {
         resetState();
+      }
+
+      // 5. Perform a final query to ensure the UI is fully in sync with the database
+      const sessions = await invoke<IndexingSession[]>("get_active_indexing_sessions");
+      const active = sessions.filter((s) => s.total_files === 0 || s.start_index < s.total_files);
+      if (active.length > 0) {
+        active.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        setActiveSession(active[0]);
+      } else {
+        setActiveSession(null);
       }
     } catch (err) {
       console.error("Error cancelling indexing:", err);
