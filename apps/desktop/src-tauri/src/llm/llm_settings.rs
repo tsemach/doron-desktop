@@ -211,10 +211,10 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
             .status();
     } else {
         let _ = std::process::Command::new("pkill")
-            .args(&["-f", &sidecar_filename])
+            .args(&["-9", "-f", &sidecar_filename])
             .status();
-        // Give the OS kernel a brief moment (200ms) to clean up port/socket bindings
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        // Give the OS kernel a brief moment (1000ms) to clean up port/socket bindings
+        std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 
     // Dynamically detect total logical CPU threads and allocate 50% to the Llama server

@@ -7,8 +7,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { invoke } from "@tauri-apps/api/core";
 import UpdateBanner from "./components/Updater/UpdateBanner";
-import { triggerGlobalHealthCheck } from "./store/aiStore";
-import { useAtomValue } from "jotai";
+import { triggerGlobalHealthCheck, aiConfigStatusAtom } from "./store/aiStore";
+import { useAtomValue, getDefaultStore } from "jotai";
 import { isProcessingAtom } from "./store/indexStore";
 import DocsManagementScanBackgroundIndexer from "./components/DocsManagement/DocsManagementScanBackgroundIndexer";
 
@@ -130,7 +130,28 @@ function Home() {
 
 function App() {
   useEffect(() => {
-    triggerGlobalHealthCheck();
+    async function runCheck() {
+      let retries = 8; // Try 8 times (24 seconds max) to account for slow model loading
+      while (retries > 0) {
+        try {
+          await triggerGlobalHealthCheck();
+          const store = getDefaultStore();
+          const status = store.get(aiConfigStatusAtom);
+          if (status === "verified") {
+            console.log("[App] AI connection verified successfully!");
+            break;
+          }
+        } catch (err) {
+          console.error("[App] Health check attempt failed:", err);
+          localStorage.setItem("debug_health_check_error", String(err));
+        }
+        retries--;
+        if (retries > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+      }
+    }
+    runCheck();
   }, []);
 
   useEffect(() => {

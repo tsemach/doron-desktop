@@ -37,15 +37,39 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let conn = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
-    ).map_err(|e| e.to_string())?;
     
-    // Enable WAL journal mode and busy timeout for safe concurrent writes
-    let _ = conn.execute("PRAGMA journal_mode = WAL;", []);
-    let _ = conn.execute("PRAGMA busy_timeout = 5000;", []);
-    conn.execute("PRAGMA foreign_keys = ON;", []).map_err(|e| e.to_string())?;
+    let mut conn = None;
+    let mut last_err = String::new();
+    
+    for _ in 0..5 {
+        match Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
+        ) {
+            Ok(c) => {
+                // Set journal mode to DELETE to avoid WAL shared-memory mapping failures on DrvFs /mnt/c/ mounts in WSL 2
+                // Note: PRAGMA journal_mode returns a row, so we use query_row instead of execute.
+                if let Err(e) = c.query_row("PRAGMA journal_mode = DELETE;", [], |_| Ok(())) {
+                    eprintln!("Warning: PRAGMA journal_mode = DELETE failed: {}", e);
+                }
+                let _ = c.execute("PRAGMA busy_timeout = 5000;", []);
+                if let Err(e) = c.execute("PRAGMA foreign_keys = ON;", []) {
+                    last_err = format!("Failed to set foreign keys: {}", e);
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    continue;
+                }
+                conn = Some(c);
+                break;
+            }
+            Err(e) => {
+                last_err = e.to_string();
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+        }
+    }
+    
+    let conn = conn.ok_or_else(|| format!("Failed to open database after retries: {}", last_err))?;
+    
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS cases (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,

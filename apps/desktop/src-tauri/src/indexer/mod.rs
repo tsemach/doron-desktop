@@ -14,7 +14,8 @@ pub fn stop_indexing() {
 pub fn get_active_indexing_sessions(app: AppHandle) -> Result<Vec<store::IndexingSession>, String> {
     let db_path = store::db_path(&app);
     let conn = store::open_db_by_path(&db_path).map_err(|e| e.to_string())?;
-    store::get_active_indexing_sessions(&conn).map_err(|e| e.to_string())
+    let sessions = store::get_active_indexing_sessions(&conn).map_err(|e| e.to_string())?;
+    Ok(sessions)
 }
 
 #[tauri::command]
