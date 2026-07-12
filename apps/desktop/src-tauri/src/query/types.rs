@@ -42,3 +42,9 @@ pub struct RerankCandidate {
     pub title: Option<String>,
     pub summary: Option<String>,
 }
+
+#[derive(Clone, Debug)]
+pub struct SearchOptions {
+    pub use_llm_query_analysis: bool,
+    pub use_llm_rerank: bool,
+}

@@ -53,11 +53,16 @@ Indexes the generated corpus, autodetects `evaluation_dataset.json` in the corpu
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm vector --corpus-dir ./my_test_docs
   ```
-* **Run Hybrid Search with E5 Embeddings & Local Phi-4 Reranking:**
-  *(Note: The local model health-check polling timeout is configured up to 120 seconds to allow weights to load into memory.)*
+* **Run Hybrid Search (FTS + Vector Rank Fusion):**
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./my_test_docs
   ```
+* **Run Hybrid Search with Local Phi-4 Reranking:**
+  *(Note: The local model health-check polling timeout is configured up to 120 seconds to allow weights to load into memory.)*
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+
 
 ---
 

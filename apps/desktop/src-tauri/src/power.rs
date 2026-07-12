@@ -74,9 +74,10 @@ mod win_power {
         NON_WIN_GUARD.get_or_init(|| Mutex::new(None))
     }
 
-    pub fn prevent_system_sleep(keep_display_on: bool) {
+    pub fn prevent_system_sleep(_keep_display_on: bool) {
         #[cfg(target_os = "macos")]
         {
+            let keep_display_on = _keep_display_on;
             if let Ok(mut guard) = get_non_win_guard().lock() {
                 if guard.is_none() {
                     let arg = if keep_display_on { "-d" } else { "-i" };

@@ -3,7 +3,7 @@ mod helpers;
 mod queries;
 mod llm;
 
-pub use types::DocumentRow;
+pub use types::{DocumentRow, SearchOptions};
 use tauri::AppHandle;
 use crate::store;
 use crate::llm::llm_provider::LlmProvider;
@@ -17,16 +17,20 @@ pub async fn search_documents_core(
     provider: &LlmProvider,
     query: &str,
     limit: usize,
-    use_rerank: bool,
+    options: &SearchOptions,
 ) -> Result<Vec<DocumentRow>, String> {
-    let analysis = llm::analyze_query(query, provider).await?;
+    let analysis = if options.use_llm_query_analysis {
+        llm::analyze_query(query, provider).await?
+    } else {
+        llm::analyze_query_heuristically(query)
+    };
 
     let local_results = {
         let conn = store::open_db_by_path(db_path)?;
         queries::execute_smart_query(&conn, &analysis, query, limit * 2)
     };
 
-    if use_rerank {
+    if options.use_llm_rerank {
         llm::rerank_candidates(query, local_results, provider).await
     } else {
         Ok(local_results)
@@ -45,9 +49,17 @@ pub async fn search_documents(
 
     // Set up provider configuration
     let provider = crate::llm::load_active_provider(&app, api_key, model);
+    let is_local = match &provider {
+        LlmProvider::Local(_) => true,
+        _ => false,
+    };
+    let options = SearchOptions {
+        use_llm_query_analysis: !is_local,
+        use_llm_rerank: !is_local,
+    };
 
     let db_path = store::db_path(&app);
-    search_documents_core(&db_path, &provider, &query, limit, true).await
+    search_documents_core(&db_path, &provider, &query, limit, &options).await
 }
 
 #[cfg(test)]
@@ -56,7 +68,30 @@ mod tests {
 
     #[test]
     fn test_similarity_run() {
-        let conn = Connection::open("/home/tsemach/.local/share/com.tsemach.doron-desktop/documents.db").unwrap();
+        let db_paths = [
+            "/home/tsemach/.local/share/com.tsemach.doron-desktop/documents.db",
+            "C:\\Users\\tsemach\\AppData\\Local\\com.tsemach.doron-desktop\\documents.db",
+            "C:\\Users\\tsemach\\AppData\\Roaming\\com.tsemach.doron-desktop\\documents.db",
+        ];
+        
+        let mut conn = None;
+        for path in &db_paths {
+            if std::path::Path::new(path).exists() {
+                if let Ok(c) = Connection::open(path) {
+                    conn = Some(c);
+                    break;
+                }
+            }
+        }
+        
+        let conn = match conn {
+            Some(c) => c,
+            None => {
+                println!("Skipping test_similarity_run because test database was not found.");
+                return;
+            }
+        };
+        
         let query_text = "מצא חוזה שכירות מ-2024";
         let query_vec = crate::embeddings::get_query_embedding(query_text).unwrap();
 
@@ -78,3 +113,4 @@ mod tests {
         }
     }
 }
+

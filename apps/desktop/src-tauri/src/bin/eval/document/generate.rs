@@ -102,7 +102,8 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
                     .arg("-c")
                     .arg("8192")
                     .arg("--host")
-                    .arg("127.0.0.1");
+                    .arg("127.0.0.1")
+                    .arg("--no-cache-prompt");
 
                 let template = if model.to_lowercase().contains("qwen") {
                     "chatml"

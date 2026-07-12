@@ -231,7 +231,8 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
        .arg("--threads").arg(allocated_threads.to_string())
        .arg("--threads-batch").arg(allocated_threads.to_string())
        .arg("-c").arg("8192")
-       .arg("--host").arg("127.0.0.1");
+       .arg("--host").arg("127.0.0.1")
+       .arg("--no-cache-prompt");
 
     let template = if model_name.to_lowercase().contains("qwen") {
         "chatml"

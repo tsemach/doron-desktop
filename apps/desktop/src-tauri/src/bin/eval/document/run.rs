@@ -7,7 +7,7 @@ use std::time::Instant;
 use tauri_app_lib::{
     indexer::{index_file_core, IndexOptions},
     llm::llm_provider::{get_active_provider, ProviderConfig},
-    query::search_documents_core,
+    query::{search_documents_core, SearchOptions},
     store,
 };
 
@@ -44,13 +44,30 @@ struct LabeledQuery {
     expected_files: Vec<String>,
 }
 
-pub async fn execute(args: RunArgs) -> Result<(), String> {
-    let _guard = tauri_app_lib::power::SleepPreventionGuard::new(true);
-    let corpus_path = Path::new(&args.corpus_dir);
+struct QueryEvalResult {
+    query_text: String,
+    expected_files: Vec<String>,
+    returned_files: Vec<String>,
+    first_match_rank: Option<i64>,
+    reciprocal_rank: f64,
+    search_latency_ms: f64,
+    hit_at_1: i32,
+    hit_at_3: i32,
+}
+
+struct EvaluationSummary {
+    avg_search_ms: f64,
+    hit_at_1: f64,
+    hit_at_3: f64,
+    mrr: f64,
+}
+
+fn load_evaluation_dataset(corpus_dir: &str) -> Result<Vec<LabeledQuery>, String> {
+    let corpus_path = Path::new(corpus_dir);
     if !corpus_path.exists() || !corpus_path.is_dir() {
         return Err(format!(
             "Corpus directory '{}' does not exist. Please run 'eval generate' first.",
-            args.corpus_dir
+            corpus_dir
         ));
     }
 
@@ -79,8 +96,11 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         return Err("Labeled query dataset is empty.".to_string());
     }
 
-    // Resolve db path and delete existing test database to ensure a fresh benchmark index
-    let db_path = store::cli_db_path(&args.db_name);
+    Ok(queries)
+}
+
+fn init_index_database(db_name: &str) -> Result<PathBuf, String> {
+    let db_path = store::cli_db_path(db_name);
     if db_path.exists() {
         let _ = fs::remove_file(&db_path);
     }
@@ -91,8 +111,10 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     );
     // Create/initialize connection and migrations
     let _conn = store::open_db_by_path(&db_path)?;
+    Ok(db_path)
+}
 
-    // Scan corpus files
+fn scan_corpus_files(corpus_path: &Path) -> Result<Vec<PathBuf>, String> {
     let files: Vec<PathBuf> = walkdir::WalkDir::new(corpus_path)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -108,19 +130,17 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     if files.is_empty() {
         return Err(format!(
             "No files found in corpus directory '{}'",
-            args.corpus_dir
+            corpus_path.display()
         ));
     }
 
-    // Setup AI provider
-    let api_key = args.api_key.unwrap_or_default();
-    let model = args
-        .model
-        .unwrap_or_else(|| "claude-sonnet-4-6".to_string());
+    Ok(files)
+}
 
+async fn setup_local_sidecar(provider: &str, model: &str) -> Result<crate::sidecar::SidecarGuard, String> {
     let mut sidecar_guard = crate::sidecar::SidecarGuard { child: None };
 
-    if args.provider.to_lowercase() == "local" {
+    if provider.to_lowercase() == "local" {
         println!("Initializing local model sidecar for evaluation...");
 
         // Kill any existing running local server to release the port
@@ -141,7 +161,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         }
 
         let sidecar_path = crate::sidecar::get_cli_sidecar_path()?;
-        let model_file = tauri_app_lib::llm::get_model_filename(&model)?;
+        let model_file = tauri_app_lib::llm::get_model_filename(model)?;
         let model_path = store::cli_app_data_dir().join("models").join(model_file);
 
         if !model_path.exists() {
@@ -162,7 +182,8 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             .arg("-c")
             .arg("8192")
             .arg("--host")
-            .arg("127.0.0.1");
+            .arg("127.0.0.1")
+            .arg("--no-cache-prompt");
 
         let template = if model.to_lowercase().contains("qwen") {
             "chatml"
@@ -224,23 +245,22 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         println!("Local model sidecar is active and ready.");
     }
 
-    let provider = get_active_provider(ProviderConfig {
-        provider_type: args.provider.clone(),
-        api_key,
-        model: model.clone(),
-        base_url: if args.provider.to_lowercase() == "local" {
-            Some("http://localhost:10086/v1".to_string())
-        } else {
-            None
-        },
-    });
+    Ok(sidecar_guard)
+}
 
+async fn index_documents(
+    db_path: &Path,
+    provider: &tauri_app_lib::llm::llm_provider::LlmProvider,
+    files: &[PathBuf],
+    algorithm: &str,
+    is_local: bool,
+) -> Result<(usize, usize, f64), String> {
     // Configure indexing tracks based on target algorithm
-    let run_llm_metadata = match args.algorithm.as_str() {
+    let run_llm_metadata = match algorithm {
         "vector" => false,
-        _ => true,
+        _ => !is_local,
     };
-    let run_vector_embeddings = match args.algorithm.as_str() {
+    let run_vector_embeddings = match algorithm {
         "fts" => false,
         _ => true,
     };
@@ -261,7 +281,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let mut indexed_count = 0;
     let mut failed_count = 0;
 
-    for file in &files {
+    for file in files {
         let current_index = indexed_count + failed_count + 1;
         let file_name = file.file_name().and_then(|n| n.to_str()).unwrap_or("");
         print!(
@@ -274,7 +294,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         let _ = std::io::stdout().flush();
 
         let start = Instant::now();
-        match index_file_core(&db_path, &provider, file, &index_options, true).await {
+        match index_file_core(db_path, provider, file, &index_options, true).await {
             Ok(_) => {
                 total_indexing_time += start.elapsed();
                 indexed_count += 1;
@@ -297,14 +317,31 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         indexed_count, failed_count, avg_indexing_ms
     );
 
-    // 2. Execute retrieval queries & evaluate metrics
+    Ok((indexed_count, failed_count, avg_indexing_ms))
+}
+
+async fn evaluate_queries(
+    db_path: &Path,
+    provider: &tauri_app_lib::llm::llm_provider::LlmProvider,
+    queries: &[LabeledQuery],
+    algorithm: &str,
+) -> Result<(Vec<QueryEvalResult>, EvaluationSummary), String> {
     println!(
         "Running {} evaluation queries using algorithm: '{}'...",
         queries.len(),
-        args.algorithm
+        algorithm
     );
 
-    let use_rerank = args.algorithm == "hybrid-rerank";
+    let use_llm_query_analysis = match algorithm {
+        "fts" | "vector" => false,
+        _ => true,
+    };
+    let use_llm_rerank = algorithm == "hybrid-rerank";
+    let search_options = SearchOptions {
+        use_llm_query_analysis,
+        use_llm_rerank,
+    };
+
     let mut total_search_time = std::time::Duration::default();
     let mut hit_at_1_sum = 0;
     let mut hit_at_3_sum = 0;
@@ -321,23 +358,12 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     );
     println!("{}", "-".repeat(114));
 
-    struct QueryEvalResult {
-        query_text: String,
-        expected_files: Vec<String>,
-        returned_files: Vec<String>,
-        first_match_rank: Option<i64>,
-        reciprocal_rank: f64,
-        search_latency_ms: f64,
-        hit_at_1: i32,
-        hit_at_3: i32,
-    }
-
     let mut query_results = Vec::new();
 
-    for q in &queries {
+    for q in queries {
         let start = Instant::now();
         let search_results =
-            match search_documents_core(&db_path, &provider, &q.query, 5, use_rerank).await {
+            match search_documents_core(db_path, provider, &q.query, 5, &search_options).await {
                 Ok(results) => results,
                 Err(e) => {
                     eprintln!("Error executing query '{}': {}", q.query, e);
@@ -444,32 +470,61 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
     let final_hit_at_3 = hit_at_3_sum as f64 / queries.len() as f64;
     let final_mrr = mrr_sum / queries.len() as f64;
 
+    Ok((
+        query_results,
+        EvaluationSummary {
+            avg_search_ms,
+            hit_at_1: final_hit_at_1,
+            hit_at_3: final_hit_at_3,
+            mrr: final_mrr,
+        },
+    ))
+}
+
+fn print_report(
+    algorithm: &str,
+    provider: &str,
+    model: &str,
+    files_count: usize,
+    queries_count: usize,
+    avg_indexing_ms: f64,
+    summary: &EvaluationSummary,
+) {
     println!("\n=======================================================");
     println!("               EVALUATION REPORT SUMMARY               ");
     println!("=======================================================");
-    println!("Algorithm:             {}", args.algorithm);
-    println!("Provider / Model:      {} / {}", args.provider, model);
-    println!("Corpus Size:           {} documents", files.len());
-    println!("Queries Evaluated:     {}", queries.len());
+    println!("Algorithm:             {}", algorithm);
+    println!("Provider / Model:      {} / {}", provider, model);
+    println!("Corpus Size:           {} documents", files_count);
+    println!("Queries Evaluated:     {}", queries_count);
     println!("-------------------------------------------------------");
     println!(
         "Avg Indexing Latency:  {:.2} ms / document",
         avg_indexing_ms
     );
-    println!("Avg Search Latency:    {:.2} ms / query", avg_search_ms);
+    println!("Avg Search Latency:    {:.2} ms / query", summary.avg_search_ms);
     println!("-------------------------------------------------------");
     println!(
         "Precision@1 (Hit@1):   {:.2}%",
-        final_hit_at_1 * 10000.0 / 100.0
+        summary.hit_at_1 * 10000.0 / 100.0
     );
     println!(
         "Recall@3 (Hit@3):      {:.2}%",
-        final_hit_at_3 * 10000.0 / 100.0
+        summary.hit_at_3 * 10000.0 / 100.0
     );
-    println!("Mean Reciprocal Rank:  {:.4}", final_mrr);
+    println!("Mean Reciprocal Rank:  {:.4}", summary.mrr);
     println!("=======================================================");
+}
 
-    // Log to history database
+fn log_run_to_history(
+    args: &RunArgs,
+    model: &str,
+    files_count: usize,
+    queries_count: usize,
+    avg_indexing_ms: f64,
+    summary: &EvaluationSummary,
+    query_results: Vec<QueryEvalResult>,
+) {
     let history_db_path = store::cli_db_path("evaluation_history.db");
     match rusqlite::Connection::open(&history_db_path) {
         Ok(history_conn) => {
@@ -484,13 +539,13 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
                         args.provider,
                         model,
                         args.algorithm,
-                        files.len() as i64,
-                        queries.len() as i64,
+                        files_count as i64,
+                        queries_count as i64,
                         avg_indexing_ms,
-                        avg_search_ms,
-                        final_hit_at_1,
-                        final_hit_at_3,
-                        final_mrr,
+                        summary.avg_search_ms,
+                        summary.hit_at_1,
+                        summary.hit_at_3,
+                        summary.mrr,
                     ],
                 );
 
@@ -529,6 +584,72 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
             eprintln!("Warning: Failed to open history DB: {}", e);
         }
     }
+}
+
+pub async fn execute(args: RunArgs) -> Result<(), String> {
+    let _guard = tauri_app_lib::power::SleepPreventionGuard::new(true);
+    let corpus_path = Path::new(&args.corpus_dir);
+
+    let queries = load_evaluation_dataset(&args.corpus_dir)?;
+    let db_path = init_index_database(&args.db_name)?;
+    let files = scan_corpus_files(corpus_path)?;
+
+    let model = args
+        .model
+        .clone()
+        .unwrap_or_else(|| "claude-sonnet-4-6".to_string());
+
+    let _sidecar_guard = setup_local_sidecar(&args.provider, &model).await?;
+
+    let api_key = args.api_key.clone().unwrap_or_default();
+    let provider = get_active_provider(ProviderConfig {
+        provider_type: args.provider.clone(),
+        api_key,
+        model: model.clone(),
+        base_url: if args.provider.to_lowercase() == "local" {
+            Some("http://localhost:10086/v1".to_string())
+        } else {
+            None
+        },
+    });
+
+    let is_local = args.provider.to_lowercase() == "local";
+    let (_indexed_count, _failed_count, avg_indexing_ms) = index_documents(
+        &db_path,
+        &provider,
+        &files,
+        &args.algorithm,
+        is_local,
+    )
+    .await?;
+
+    let (query_results, summary) = evaluate_queries(
+        &db_path,
+        &provider,
+        &queries,
+        &args.algorithm,
+    )
+    .await?;
+
+    print_report(
+        &args.algorithm,
+        &args.provider,
+        &model,
+        files.len(),
+        queries.len(),
+        avg_indexing_ms,
+        &summary,
+    );
+
+    log_run_to_history(
+        &args,
+        &model,
+        files.len(),
+        queries.len(),
+        avg_indexing_ms,
+        &summary,
+        query_results,
+    );
 
     Ok(())
 }

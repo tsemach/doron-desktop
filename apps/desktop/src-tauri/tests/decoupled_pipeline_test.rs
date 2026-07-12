@@ -3,7 +3,7 @@ use std::path::Path;
 use rusqlite::Connection;
 use tauri_app_lib::{
     indexer::{index_file_core, IndexOptions},
-    query::{search_documents_core, DocumentRow},
+    query::{search_documents_core, DocumentRow, SearchOptions},
     llm::llm_provider::{get_active_provider, LlmProvider, ProviderConfig},
     store,
 };
@@ -61,7 +61,10 @@ async fn test_decoupled_index_and_search_pipeline() {
         &provider,
         "מצא חוזה שכירות של אלי נחמיאס",
         5,
-        true,
+        &SearchOptions {
+            use_llm_query_analysis: true,
+            use_llm_rerank: true,
+        },
     )
     .await
     .expect("Search documents core should succeed");
