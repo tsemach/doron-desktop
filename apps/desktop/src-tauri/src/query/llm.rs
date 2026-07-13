@@ -72,7 +72,7 @@ Candidates:
 
 // ── LLM query analysis ────────────────────────────────────────────────────────
 
-pub async fn analyze_query(query: &str, provider: &crate::llm::llm_provider::LlmProvider) -> Result<QueryAnalysis, String> {
+pub async fn query_llm_analyze_query(query: &str, provider: &crate::llm::llm_provider::LlmProvider) -> Result<QueryAnalysis, String> {
     let is_local = match provider {
         crate::llm::llm_provider::LlmProvider::Local(_) => true,
         _ => false,
@@ -95,7 +95,7 @@ struct RerankResponse {
 }
 
 // Rerank candidates using Claude
-pub async fn rerank_candidates(
+pub async fn query_llm_rerank_candidates(
     query: &str,
     candidates: Vec<DocumentRow>,
     provider: &crate::llm::llm_provider::LlmProvider,

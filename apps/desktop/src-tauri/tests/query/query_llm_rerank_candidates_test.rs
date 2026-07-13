@@ -1,6 +1,6 @@
 use tauri_app_lib::{
     llm::llm_provider::{get_active_provider, ProviderConfig},
-    query::{llm::rerank_candidates, DocumentRow},
+    query::{llm::query_llm_rerank_candidates, DocumentRow},
 };
 use super::common::{start_llama_server_test, call_with_retry};
 
@@ -60,7 +60,7 @@ async fn test_local_candidate_reranking_phi() {
     ];
 
     let sorted = call_with_retry(|| async {
-        rerank_candidates("חוזה משמורת ילדים משותפת", candidates.clone(), &provider).await
+        query_llm_rerank_candidates("חוזה משמורת ילדים משותפת", candidates.clone(), &provider).await
     })
     .await
     .expect("Candidate reranking should succeed");
@@ -130,7 +130,7 @@ async fn test_local_candidate_reranking_qwen() {
     ];
 
     let sorted = call_with_retry(|| async {
-        rerank_candidates("חוזה משמורת ילדים משותפת", candidates.clone(), &provider).await
+        query_llm_rerank_candidates("חוזה משמורת ילדים משותפת", candidates.clone(), &provider).await
     })
     .await
     .expect("Candidate reranking should succeed");
@@ -154,7 +154,7 @@ async fn test_local_candidate_reranking_empty() {
     });
 
     let candidates: Vec<DocumentRow> = vec![];
-    let result = rerank_candidates("any query", candidates, &provider).await;
+    let result = query_llm_rerank_candidates("any query", candidates, &provider).await;
     assert!(result.is_ok());
     let sorted = result.unwrap();
     assert!(sorted.is_empty(), "Should return empty list for empty candidates");
@@ -187,7 +187,7 @@ async fn test_local_candidate_reranking_single() {
     };
 
     let candidates = vec![candidate.clone()];
-    let result = rerank_candidates("any query", candidates, &provider).await;
+    let result = query_llm_rerank_candidates("any query", candidates, &provider).await;
     assert!(result.is_ok());
     let sorted = result.unwrap();
     assert_eq!(sorted.len(), 1, "Should return the same single candidate");
@@ -251,7 +251,7 @@ async fn test_local_candidate_reranking_no_relevant() {
     ];
 
     let sorted = call_with_retry(|| async {
-        rerank_candidates("divorce agreement between spouses", candidates.clone(), &provider).await
+        query_llm_rerank_candidates("divorce agreement between spouses", candidates.clone(), &provider).await
     })
     .await
     .expect("Candidate reranking should succeed");

@@ -7,7 +7,7 @@ use std::time::Instant;
 use tauri_app_lib::{
     indexer::{index_file_core, IndexOptions},
     llm::llm_provider::{get_active_provider, ProviderConfig},
-    query::{search_documents_core, SearchOptions},
+    query::{query_search_documents_core, SearchOptions},
     store,
 };
 
@@ -363,7 +363,7 @@ async fn evaluate_queries(
     for q in queries {
         let start = Instant::now();
         let search_results =
-            match search_documents_core(db_path, provider, &q.query, 5, &search_options).await {
+            match query_search_documents_core(db_path, provider, &q.query, 5, &search_options).await {
                 Ok(results) => results,
                 Err(e) => {
                     eprintln!("Error executing query '{}': {}", q.query, e);

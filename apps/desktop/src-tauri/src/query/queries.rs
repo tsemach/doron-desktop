@@ -150,14 +150,42 @@ fn query_by_fts_with_filter(
     results
 }
 
+/// Query the FTS database and collect scores into a HashMap
+pub fn query_by_fts(
+    conn: &Connection,
+    keywords: Option<&Vec<String>>,
+    filter_ids: Option<&HashSet<i64>>,
+    limit: usize,
+) -> HashMap<i64, f32> {
+    let mut fts_scores = HashMap::new();
+    if let Some(keywords) = keywords {
+        if !keywords.is_empty() {
+            let and_expr = keywords.iter().map(|k| fts_term(k)).collect::<Vec<_>>().join(" ");
+            let matches = query_by_fts_with_filter(conn, &and_expr, filter_ids, limit * 2);
+
+            let matches = if matches.is_empty() {
+                let or_expr = keywords.iter().map(|k| fts_term(k)).collect::<Vec<_>>().join(" OR ");
+                query_by_fts_with_filter(conn, &or_expr, filter_ids, limit * 2)
+            } else {
+                matches
+            };
+
+            for (id, score) in matches {
+                fts_scores.insert(id, score);
+            }
+        }
+    }
+    fts_scores
+}
+
 /// Generate query embedding and calculate cosine similarity over all stored chunks
-fn query_by_vector(
+pub fn query_by_vector(
     conn: &Connection,
     query_text: &str,
     filter_ids: Option<&HashSet<i64>>,
     limit: usize,
 ) -> Vec<(i64, f32)> {
-    let query_vec = match crate::embeddings::get_query_embedding(query_text) {
+    let query_vec = match crate::embeddings::embedding_by_query(query_text) {
         Ok(v) => v,
         Err(_) => return vec![],
     };
@@ -203,7 +231,7 @@ fn query_by_vector(
 }
 
 /// Core smart query dispatcher executing both text/FTS search and vector search
-pub(crate) fn execute_smart_query(
+pub(crate) fn query_smart_execute(
     conn: &Connection,
     analysis: &QueryAnalysis,
     query_text: &str,
@@ -227,24 +255,7 @@ pub(crate) fn execute_smart_query(
     }
 
     // 2. Fetch FTS matches
-    let mut fts_scores = HashMap::new();
-    if let Some(keywords) = &analysis.keywords {
-        if !keywords.is_empty() {
-            let and_expr = keywords.iter().map(|k| fts_term(k)).collect::<Vec<_>>().join(" ");
-            let matches = query_by_fts_with_filter(conn, &and_expr, filter_ids.as_ref(), limit * 2);
-
-            let matches = if matches.is_empty() {
-                let or_expr = keywords.iter().map(|k| fts_term(k)).collect::<Vec<_>>().join(" OR ");
-                query_by_fts_with_filter(conn, &or_expr, filter_ids.as_ref(), limit * 2)
-            } else {
-                matches
-            };
-
-            for (id, score) in matches {
-                fts_scores.insert(id, score);
-            }
-        }
-    }
+    let fts_scores = query_by_fts(conn, analysis.keywords.as_ref(), filter_ids.as_ref(), limit);
 
     // 3. Fetch Vector Similarity matches
     let mut vec_scores = HashMap::new();

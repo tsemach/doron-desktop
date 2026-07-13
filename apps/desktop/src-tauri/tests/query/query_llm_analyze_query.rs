@@ -1,6 +1,6 @@
 use tauri_app_lib::{
     llm::llm_provider::{get_active_provider, ProviderConfig},
-    query::llm::analyze_query,
+    query::llm::query_llm_analyze_query,
 };
 use super::common::{start_llama_server_test, call_with_retry};
 
@@ -26,7 +26,7 @@ async fn test_local_query_analysis() {
     println!("Testing local query analysis...");
     let query = "מצא חוזה שכירות של אלי נחמיאס משנת 2023";
     let analysis = call_with_retry(|| async {
-        analyze_query(query, &provider).await
+        query_llm_analyze_query(query, &provider).await
     })
     .await
     .expect("Query analysis should succeed");
@@ -90,7 +90,7 @@ async fn test_local_query_analysis_bilingual_employment() {
     println!("Testing local query analysis bilingual...");
     let query = "find חוזה העסקה של john doe from 2022";
     let analysis = call_with_retry(|| async {
-        analyze_query(query, &provider).await
+        query_llm_analyze_query(query, &provider).await
     })
     .await
     .expect("Bilingual query analysis should succeed");
@@ -151,7 +151,7 @@ async fn test_local_query_analysis_generic() {
     println!("Testing local query analysis generic...");
     let query = "ביטוח בריאות";
     let analysis = call_with_retry(|| async {
-        analyze_query(query, &provider).await
+        query_llm_analyze_query(query, &provider).await
     })
     .await
     .expect("Generic query analysis should succeed");
@@ -194,7 +194,7 @@ async fn test_local_query_analysis_medical_phi() {
     println!("Testing local query analysis medical...");
     let query = "דוח ואבחנה לאחר סיבוך רפואי";
     let analysis = call_with_retry(|| async {
-        analyze_query(query, &provider).await
+        query_llm_analyze_query(query, &provider).await
     })
     .await
     .expect("Medical query analysis should succeed");
@@ -235,7 +235,7 @@ async fn test_local_query_analysis_medical_qwen() {
     println!("Testing local query analysis medical...");
     let query = "דוח ואבחנה לאחר סיבוך רפואי";
     let analysis = call_with_retry(|| async {
-        analyze_query(query, &provider).await
+        query_llm_analyze_query(query, &provider).await
     })
     .await
     .expect("Medical query analysis should succeed");

@@ -4,6 +4,8 @@ mod queries;
 pub mod llm;
 
 pub use types::{DocumentRow, SearchOptions, QueryAnalysis, DateRange};
+pub use queries::query_by_vector;
+pub use queries::query_by_fts;
 use tauri::AppHandle;
 use crate::store;
 use crate::llm::llm_provider::LlmProvider;
@@ -12,7 +14,7 @@ use std::path::Path;
 
 /// Core decoupled search dispatcher.
 /// Executes query analysis, local FTS + Vector hybrid search, and LLM reranking.
-pub async fn search_documents_core(
+pub async fn query_search_documents_core(
     db_path: &Path,
     provider: &LlmProvider,
     query: &str,
@@ -20,25 +22,25 @@ pub async fn search_documents_core(
     options: &SearchOptions,
 ) -> Result<Vec<DocumentRow>, String> {
     let analysis = if options.use_llm_query_analysis {
-        llm::analyze_query(query, provider).await?
+        llm::query_llm_analyze_query(query, provider).await?
     } else {
         llm::analyze_query_heuristically(query)
     };
 
     let local_results = {
         let conn = store::open_db_by_path(db_path)?;
-        queries::execute_smart_query(&conn, &analysis, query, limit * 2)
+        queries::query_smart_execute(&conn, &analysis, query, limit * 2)
     };
 
     if options.use_llm_rerank {
-        llm::rerank_candidates(query, local_results, provider).await
+        llm::query_llm_rerank_candidates(query, local_results, provider).await
     } else {
         Ok(local_results)
     }
 }
 
 #[tauri::command]
-pub async fn search_documents(
+pub async fn query_search_documents(
     app: AppHandle,
     query: String,
     api_key: String,
@@ -59,7 +61,7 @@ pub async fn search_documents(
     };
 
     let db_path = store::db_path(&app);
-    search_documents_core(&db_path, &provider, &query, limit, &options).await
+    query_search_documents_core(&db_path, &provider, &query, limit, &options).await
 }
 
 #[cfg(test)]
@@ -93,7 +95,7 @@ mod tests {
         };
         
         let query_text = "מצא חוזה שכירות מ-2024";
-        let query_vec = crate::embeddings::get_query_embedding(query_text).unwrap();
+        let query_vec = crate::embeddings::embedding_by_query(query_text).unwrap();
 
         let mut stmt = conn.prepare("SELECT d.id, d.file_name, c.chunk_index, c.embedding FROM documents d JOIN document_chunks c ON d.id = c.document_id").unwrap();
         let rows = stmt.query_map([], |row| {
