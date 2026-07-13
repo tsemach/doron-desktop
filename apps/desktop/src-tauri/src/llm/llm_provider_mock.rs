@@ -30,6 +30,18 @@ impl MockProvider {
             } else if prompt.contains("מכר") || prompt.contains("רחל") {
                 keywords = vec!["חוזה".to_string(), "מכר".to_string(), "לוי".to_string()];
                 doc_types = vec!["contract".to_string()];
+            } else if prompt.contains("אזהרה") {
+                keywords = vec!["אזהרה".to_string(), "הערת".to_string(), "אילת".to_string()];
+                doc_types = vec!["contract".to_string()];
+            } else if prompt.contains("משכנתה") {
+                keywords = vec!["משכנתה".to_string(), "פדיון".to_string()];
+                doc_types = vec!["contract".to_string()];
+            } else if prompt.contains("זיקת") || prompt.contains("הנאה") {
+                keywords = vec!["זיקת".to_string(), "הנאה".to_string()];
+                doc_types = vec!["contract".to_string()];
+            } else if prompt.contains("חכירה") {
+                keywords = vec!["חכירה".to_string()];
+                doc_types = vec!["contract".to_string()];
             }
 
             let response_json = serde_json::json!({
@@ -74,6 +86,8 @@ impl MockProvider {
                 "report"
             } else if prompt.contains("מכר") || prompt.contains("רחל") {
                 "contract"
+            } else if prompt.contains("אזהרה") || prompt.contains("חכירה") || prompt.contains("משכנתה") || prompt.contains("זיקת") {
+                "contract"
             } else {
                 "other"
             };
@@ -88,6 +102,14 @@ impl MockProvider {
                 "כתב תביעה בגין רשלנות רפואית"
             } else if prompt.contains("מכר") || prompt.contains("רחל") {
                 "חוזה מכר דירה"
+            } else if prompt.contains("אזהרה") {
+                "בקשה לרישום הערת אזהרה"
+            } else if prompt.contains("חכירה") {
+                "שטר רישום זכות חכירה"
+            } else if prompt.contains("משכנתה") {
+                "שטר פדיון משכנתה"
+            } else if prompt.contains("זיקת") || prompt.contains("הנאה") {
+                "שטר זיקת הנאה"
             } else {
                 "מסמך משפטי"
             };
@@ -102,6 +124,14 @@ impl MockProvider {
                 vec!["רשלנות".to_string(), "רפואית".to_string(), "תביעה".to_string()]
             } else if prompt.contains("מכר") || prompt.contains("רחל") {
                 vec!["חוזה".to_string(), "מכר".to_string(), "לוי".to_string()]
+            } else if prompt.contains("אזהרה") {
+                vec!["אזהרה".to_string(), "הערת".to_string(), "אילת".to_string(), "טאבו".to_string()]
+            } else if prompt.contains("חכירה") {
+                vec!["חכירה".to_string(), "רמ\"י".to_string(), "מהוון".to_string(), "הורשה".to_string()]
+            } else if prompt.contains("משכנתה") {
+                vec!["משכנתה".to_string(), "פדיון".to_string()]
+            } else if prompt.contains("זיקת") || prompt.contains("הנאה") {
+                vec!["זיקת".to_string(), "הנאה".to_string(), "כפופים".to_string()]
             } else {
                 vec!["חוזה".to_string(), "דירה".to_string(), "מסמך".to_string()]
             };
