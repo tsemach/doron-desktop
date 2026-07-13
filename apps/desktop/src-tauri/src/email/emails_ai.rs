@@ -129,7 +129,7 @@ async fn call_llm_classification(
         sender, subject, snippet, candidate_list
     );
 
-    match provider.call_structured(&prompt, Some(system_prompt)).await {
+    match provider.call_structured(&prompt, Some(system_prompt), None).await {
         Ok(json_res) => {
             let cleaned = json_res.trim();
             let start = cleaned.find('{').unwrap_or(0);

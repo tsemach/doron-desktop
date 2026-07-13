@@ -56,7 +56,7 @@ Identify which candidates are actually relevant to the user query.
 Sort them by relevance (most relevant first).
 Exclude any candidates that do not match the specific intent (e.g. if query is for rental "שכירות", exclude sale "מכר", loan "הלוואה", or employment "העסקה").
 
-Return ONLY a JSON object with a "relevant_ids" key containing an array of integers representing the relevant document IDs (most relevant first).
+Return ONLY a JSON object with a "relevant_ids" key containing an array of integers representing the relevant document IDs (most relevant first). If no candidates are relevant to the user query, return an empty array: {"relevant_ids": []}.
 
 Example format:
 {
@@ -72,7 +72,7 @@ Candidates:
 
 // ── LLM query analysis ────────────────────────────────────────────────────────
 
-pub(crate) async fn analyze_query(query: &str, provider: &crate::llm::llm_provider::LlmProvider) -> Result<QueryAnalysis, String> {
+pub async fn analyze_query(query: &str, provider: &crate::llm::llm_provider::LlmProvider) -> Result<QueryAnalysis, String> {
     let is_local = match provider {
         crate::llm::llm_provider::LlmProvider::Local(_) => true,
         _ => false,
@@ -83,7 +83,7 @@ pub(crate) async fn analyze_query(query: &str, provider: &crate::llm::llm_provid
         QUERY_ANALYSIS_PROMPT
     };
     let prompt = prompt_template.replace("{query}", query);
-    let raw = provider.call_structured(&prompt, None).await?;
+    let raw = provider.call_structured(&prompt, None, Some(0.0)).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<QueryAnalysis>(&json_str)
         .map_err(|e| format!("Failed to parse query analysis: {e}. Raw: {}", json_str.chars().take(300).collect::<String>()))
@@ -95,7 +95,7 @@ struct RerankResponse {
 }
 
 // Rerank candidates using Claude
-pub(crate) async fn rerank_candidates(
+pub async fn rerank_candidates(
     query: &str,
     candidates: Vec<DocumentRow>,
     provider: &crate::llm::llm_provider::LlmProvider,
@@ -124,7 +124,7 @@ pub(crate) async fn rerank_candidates(
         .replace("{query}", query)
         .replace("{candidates_json}", &candidates_json);
 
-    let response_raw = provider.call_structured(&prompt, None).await?;
+    let response_raw = provider.call_structured(&prompt, None, Some(0.0)).await?;
     let cleaned = clean_json(&response_raw);
 
     let res: RerankResponse = serde_json::from_str(&cleaned)

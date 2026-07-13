@@ -25,6 +25,8 @@ struct LocalRequestBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     response_format: Option<LocalResponseFormat>,
     max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -43,7 +45,7 @@ struct LocalResponseBody {
 }
 
 impl LocalProvider {
-    async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool) -> Result<String, String> {
+    async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool, temperature: Option<f32>) -> Result<String, String> {
         let mut messages = Vec::new();
         if let Some(sys) = system {
             messages.push(LocalMessage {
@@ -69,6 +71,7 @@ impl LocalProvider {
             messages,
             response_format,
             max_tokens: Some(2048),
+            temperature,
         };
 
         let client = reqwest::Client::builder()
@@ -114,11 +117,11 @@ impl LocalProvider {
         Ok(text)
     }
 
-    pub async fn call_simple(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        self.execute_request(prompt, system, false).await
+    pub async fn call_simple(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
+        self.execute_request(prompt, system, false, temperature).await
     }
 
-    pub async fn call_structured(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        self.execute_request(prompt, system, true).await
+    pub async fn call_structured(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
+        self.execute_request(prompt, system, true, temperature).await
     }
 }

@@ -1,9 +1,9 @@
 mod types;
 mod helpers;
 mod queries;
-mod llm;
+pub mod llm;
 
-pub use types::{DocumentRow, SearchOptions};
+pub use types::{DocumentRow, SearchOptions, QueryAnalysis, DateRange};
 use tauri::AppHandle;
 use crate::store;
 use crate::llm::llm_provider::LlmProvider;

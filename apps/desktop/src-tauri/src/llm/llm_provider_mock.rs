@@ -1,7 +1,7 @@
 pub struct MockProvider;
 
 impl MockProvider {
-    pub async fn call_simple(&self, prompt: &str, _system: Option<&str>) -> Result<String, String> {
+    pub async fn call_simple(&self, prompt: &str, _system: Option<&str>, _temperature: Option<f32>) -> Result<String, String> {
         // If it's a connection health check or system check
         if prompt.contains("Brief system check") || prompt.contains("system check") {
             return Ok("OK".to_string());
@@ -11,7 +11,7 @@ impl MockProvider {
         Ok("Mock simple response".to_string())
     }
 
-    pub async fn call_structured(&self, prompt: &str, _system: Option<&str>) -> Result<String, String> {
+    pub async fn call_structured(&self, prompt: &str, _system: Option<&str>, _temperature: Option<f32>) -> Result<String, String> {
         // 1. If it's query analysis
         if prompt.contains("Analyze the following query") || prompt.contains("intent") {
             // Check query terms to customize keywords

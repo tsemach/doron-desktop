@@ -26,6 +26,8 @@ struct OpenAiRequestBody {
     response_format: Option<OpenAiResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -44,7 +46,7 @@ struct OpenAiResponseBody {
 }
 
 impl OpenAiProvider {
-    async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool) -> Result<String, String> {
+    async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool, temperature: Option<f32>) -> Result<String, String> {
         let mut messages = Vec::new();
         if let Some(sys) = system {
             messages.push(OpenAiMessage {
@@ -70,6 +72,7 @@ impl OpenAiProvider {
             messages,
             response_format,
             max_tokens: None,
+            temperature,
         };
 
         let client = reqwest::Client::new();
@@ -111,15 +114,15 @@ impl OpenAiProvider {
         Ok(text)
     }
 
-    pub async fn call_simple(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        self.execute_request(prompt, system, false).await
+    pub async fn call_simple(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
+        self.execute_request(prompt, system, false, temperature).await
     }
 
-    pub async fn call_structured(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
+    pub async fn call_structured(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
         let system_prompt = match system {
             Some(sys) => format!("{}\n\nIMPORTANT: Your response must be valid JSON.", sys),
             None => "IMPORTANT: Your response must be valid JSON.".to_string()
         };
-        self.execute_request(prompt, Some(&system_prompt), true).await
+        self.execute_request(prompt, Some(&system_prompt), true, temperature).await
     }
 }

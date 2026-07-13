@@ -5,6 +5,7 @@ mod win_power {
     // Track active sleep-prevention requests so multiple concurrent operations don't conflict
     static PREVENT_SLEEP_COUNT: AtomicUsize = AtomicUsize::new(0);
 
+    #[allow(non_camel_case_types)]
     type EXECUTION_STATE = u32;
     const ES_CONTINUOUS: EXECUTION_STATE = 0x80000000;
     const ES_SYSTEM_REQUIRED: EXECUTION_STATE = 0x00000001;
