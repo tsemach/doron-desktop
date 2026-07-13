@@ -5,15 +5,84 @@ use tauri_app_lib::{
 use super::common::{start_llama_server_test, call_with_retry};
 
 #[tokio::test]
-async fn test_local_candidate_reranking() {
+async fn test_local_candidate_reranking_phi() {
     let model_name = "phi-4-mini-instruct (3.8b q4)";
     let port = 10092;
 
     let _guard = match start_llama_server_test(model_name, port).await {
         Ok(g) => g,
         Err(e) => {
-            println!("Skipping local candidate reranking test: model not found: {}", e);
-            return;
+            panic!("local candidate reranking phi test: model not found: {}", e);
+        }
+    };
+
+    let provider = get_active_provider(ProviderConfig {
+        provider_type: "local".to_string(),
+        api_key: "".to_string(),
+        model: model_name.to_string(),
+        base_url: Some(format!("http://127.0.0.1:{}", port)),
+    });
+
+    println!("Testing local candidate reranking...");
+    let candidates = vec![
+        DocumentRow {
+            id: 1,
+            file_path: "heskem_gerushin_abraham.docx".to_string(),
+            file_name: "heskem_gerushin_abraham.docx".to_string(),
+            title: Some("הסכם גירושין".to_string()),
+            summary: Some("הסכם גירושין ופירוד משותף הכולל משמורת ילדים משותפת".to_string()),
+            doc_type: Some("contract".to_string()),
+            doc_date: Some("2024-05-12".to_string()),
+            language: Some("he".to_string()),
+            keywords: vec!["גירושין".to_string(), "הסכם".to_string(), "ילדים".to_string()],
+            topics: vec![],
+            entities: vec![],
+            authors: vec![],
+            page_count: None,
+            confidence: None,
+        },
+        DocumentRow {
+            id: 2,
+            file_path: "invoice_office_supplies.docx".to_string(),
+            file_name: "invoice_office_supplies.docx".to_string(),
+            title: Some("חשבונית רכש".to_string()),
+            summary: Some("חשבונית עבור ציוד משרדי וריהוט".to_string()),
+            doc_type: Some("invoice".to_string()),
+            doc_date: Some("2023-11-20".to_string()),
+            language: Some("he".to_string()),
+            keywords: vec![],
+            topics: vec![],
+            entities: vec![],
+            authors: vec![],
+            page_count: None,
+            confidence: None,
+        },
+    ];
+
+    let sorted = call_with_retry(|| async {
+        rerank_candidates("חוזה משמורת ילדים משותפת", candidates.clone(), &provider).await
+    })
+    .await
+    .expect("Candidate reranking should succeed");
+
+    println!("Reranked results count: {}", sorted.len());
+    for doc in &sorted {
+        println!(" - ID: {}, Title: {:?}", doc.id, doc.title);
+    }
+
+    assert!(!sorted.is_empty(), "Should return reranked candidates");
+    assert_eq!(sorted[0].id, 1, "The divorce agreement (ID 1) should be ranked first as it specifically covers child custody");
+}
+
+#[tokio::test]
+async fn test_local_candidate_reranking_qwen() {
+    let model_name = "qwen-2.5-3b-instruct (q4)";
+    let port = 10095;
+
+    let _guard = match start_llama_server_test(model_name, port).await {
+        Ok(g) => g,
+        Err(e) => {
+            panic!("local candidate reranking qwen test: model not found: {}", e);
         }
     };
 
