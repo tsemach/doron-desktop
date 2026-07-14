@@ -45,6 +45,7 @@ Generates synthetic documents (mock or AI-generated) in a target directory to bu
 ## 2. Running Benchmark Evaluations (`document run`)
 Indexes the generated corpus, autodetects `evaluation_dataset.json` in the corpus directory, runs queries, measures latencies, and computes Precision@1, Recall@3, and Mean Reciprocal Rank (MRR).
 
+### 2.1 Basic Retrieval Algorithms
 * **Run Full-Text Search (FTS) Evaluation:**
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm fts --corpus-dir ./my_test_docs
@@ -53,15 +54,53 @@ Indexes the generated corpus, autodetects `evaluation_dataset.json` in the corpu
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm vector --corpus-dir ./my_test_docs
   ```
-* **Run Hybrid Search (FTS + Vector Rank Fusion):**
+* **Run Hybrid Search (FTS + Vector Fusion):**
   ```bash
-  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./my_test_docs
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm hybrid --corpus-dir ./my_test_docs
   ```
-* **Run Hybrid Search with Local Phi-4 Reranking:**
-  *(Note: The local model health-check polling timeout is configured up to 120 seconds to allow weights to load into memory.)*
+
+### 2.2 Hybrid Retrieval with LLM Reranking (`hybrid-rerank`)
+* **Mock Provider (Offline Reranking benchmark):**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+* **Local Phi-4 Model (Hybrid + Reranking):**
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
   ```
+* **Online Gemini Model (Hybrid + Reranking):**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider gemini --model gemini-1.5-pro --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+
+### 2.3 Local LLM Configurations (Requires local llama-server on port 10086)
+* **Local Microsoft Phi-4:**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+* **Local Alibaba Qwen-2.5 (3B):**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+* **Local Google Gemma 2 (2B E4B):**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Gemma 4 E4B (Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+
+### 2.4 Online LLM Configurations (Requires API key)
+* **Google Gemini 2.0 Flash:**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider gemini --model gemini-2.0-flash --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+* **Anthropic Claude 3.5 Sonnet:**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider claude --model claude-3-5-sonnet-online --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+* **OpenAI GPT-4o Mini:**
+  ```bash
+  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider openai --model gpt-4o-mini --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./my_test_docs
+  ```
+
 
 
 ---
