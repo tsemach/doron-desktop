@@ -4,6 +4,7 @@ import DocsManagementTemplatesMainEmpty from "./DocsManagementTemplatesMainEmpty
 import DocsManagementTemplatesMainHeader from "./DocsManagementTemplatesMainHeader";
 import DocsManagementTemplatesMainFull from "./DocsManagementTemplatesMainFull";
 import DocsManagementTemplatesMainDoc from "./DocsManagementTemplatesMainDoc";
+import { useRowFields } from "@/hooks/useRowFields";
 
 interface DocsManagementTemplatesEmptyStateProps {
   onAddTemplate: () => void;
@@ -22,6 +23,7 @@ export default function DocsManagementTemplatesMain({
 }: DocsManagementTemplatesEmptyStateProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"unique" | "by_doc">("unique");
 
   // Safe parsing helper
@@ -67,35 +69,56 @@ export default function DocsManagementTemplatesMain({
     return Object.keys(uniqueFieldsMap).sort();
   }, [uniqueFieldsMap]);
 
+  const { uniqueRows, getFilteredFields } = useRowFields(uniqueFieldsList);
+
   // Filters (utilizing deferredSearchQuery to keep the UI input responsive)
   const filteredUniqueFields = useMemo(() => {
-    const query = deferredSearchQuery.toLowerCase().trim();
-    return uniqueFieldsList.filter((f) =>
-      f.toLowerCase().includes(query)
-    );
-  }, [uniqueFieldsList, deferredSearchQuery]);
+    return getFilteredFields(selectedRow, deferredSearchQuery);
+  }, [getFilteredFields, selectedRow, deferredSearchQuery]);
 
   const filteredDocFields = useMemo(() => {
     const query = deferredSearchQuery.toLowerCase().trim();
     return docFieldsList
       .map((doc) => {
-        const matchingFields = doc.fields.filter((f) =>
-          f.toLowerCase().includes(query)
-        );
+        const matchingFields = doc.fields.filter((f) => {
+          const matchesQuery = query === "" || f.toLowerCase().includes(query);
+          if (!matchesQuery) return false;
+          
+          if (selectedRow !== null) {
+            const match = f.match(/:([1-9])$/);
+            if (!match || parseInt(match[1], 10) !== selectedRow) {
+              return false;
+            }
+          }
+          return true;
+        });
+
         const docMatches =
-          doc.file_name.toLowerCase().includes(query) ||
-          (doc.title && doc.title.toLowerCase().includes(query));
+          query !== "" && (
+            doc.file_name.toLowerCase().includes(query) ||
+            (doc.title && doc.title.toLowerCase().includes(query))
+          );
 
         if (docMatches || matchingFields.length > 0) {
-          return {
-            ...doc,
-            fields: docMatches ? doc.fields : matchingFields,
-          };
+          let fieldsToUse = doc.fields;
+          if (selectedRow !== null) {
+            fieldsToUse = doc.fields.filter((f) => {
+              const match = f.match(/:([1-9])$/);
+              return match && parseInt(match[1], 10) === selectedRow;
+            });
+          }
+          
+          if (fieldsToUse.length > 0) {
+            return {
+              ...doc,
+              fields: docMatches && selectedRow === null ? doc.fields : fieldsToUse.filter((f) => query === "" || f.toLowerCase().includes(query)),
+            };
+          }
         }
         return null;
       })
       .filter((d): d is NonNullable<typeof d> => d !== null);
-  }, [docFieldsList, deferredSearchQuery]);
+  }, [docFieldsList, deferredSearchQuery, selectedRow]);
 
   // If there are no templates, show the original centered empty state
   if (templates.length === 0) {
@@ -118,6 +141,9 @@ export default function DocsManagementTemplatesMain({
         docCount={filteredDocFields.length}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        uniqueRows={uniqueRows}
+        selectedRow={selectedRow}
+        setSelectedRow={setSelectedRow}
         onSyncAllFields={onSyncAllFields}
         isSyncingAll={isSyncingAll}
       />
