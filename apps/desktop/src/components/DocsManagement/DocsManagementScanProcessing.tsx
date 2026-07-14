@@ -86,7 +86,7 @@ export default function DocsManagementScanProcessing({
         )}
 
         {/* Active item status detail */}
-        {isProcessing && currentItem && (
+        {isProcessing && (
           <DocsManagementScanProcessingCurrent currentItem={currentItem} />
         )}
 

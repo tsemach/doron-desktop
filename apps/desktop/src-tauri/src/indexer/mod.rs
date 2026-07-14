@@ -213,7 +213,7 @@ async fn index_file_core_impl(
     }
 
     // Track 2: Vector Embeddings generation
-    if options.run_vector_embeddings {
+    if options.run_vector_embeddings && !crate::query::USE_FTS_ONLY {
         let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
         if !chunks.is_empty() {
             let embeddings = crate::embeddings::get_passage_embeddings(&chunks)
@@ -230,7 +230,7 @@ async fn index_file_core_impl(
         }
     }
 
-    let status_str = match (options.run_llm_metadata, options.run_vector_embeddings) {
+    let status_str = match (options.run_llm_metadata, options.run_vector_embeddings && !crate::query::USE_FTS_ONLY) {
         (true, true) => "Indexed with LLM metadata and vector chunks",
         (true, false) => "Indexed with LLM metadata only",
         (false, true) => "Indexed with vector chunks only (fallback metadata)",
