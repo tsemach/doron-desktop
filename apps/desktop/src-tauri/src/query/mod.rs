@@ -13,6 +13,8 @@ use crate::llm::llm_provider::LlmProvider;
 
 use std::path::Path;
 
+pub const USE_FTS_ONLY: bool = true;
+
 /// Core decoupled search dispatcher.
 /// Executes query analysis, local FTS + Vector hybrid search, and LLM reranking.
 pub async fn query_search_documents_core(
@@ -22,7 +24,7 @@ pub async fn query_search_documents_core(
     limit: usize,
     options: &SearchOptions,
 ) -> Result<Vec<DocumentRow>, String> {
-    let analysis = if options.use_llm_query_analysis {
+    let analysis = if options.use_llm_query_analysis && !USE_FTS_ONLY {
         llm::query_llm_analyze_query(query, provider).await?
     } else {
         llm::analyze_query_heuristically(query)
@@ -33,7 +35,7 @@ pub async fn query_search_documents_core(
         queries::query_smart_execute(&conn, &analysis, query, limit * 2)
     };
 
-    if options.use_llm_rerank {
+    if options.use_llm_rerank && !USE_FTS_ONLY {
         llm::query_llm_rerank_candidates(query, local_results, provider).await
     } else {
         Ok(local_results)

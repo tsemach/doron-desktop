@@ -257,11 +257,13 @@ pub fn query_smart_execute(
     // 2. Fetch FTS matches
     let fts_scores = query_by_fts(conn, analysis.keywords.as_ref(), filter_ids.as_ref(), limit);
 
-    // 3. Fetch Vector Similarity matches
+    // 3. Fetch Vector Similarity matches (bypassed if FTS-only is active)
     let mut vec_scores = HashMap::new();
-    let vec_matches = query_by_vector(conn, query_text, filter_ids.as_ref(), limit * 3);
-    for (id, score) in vec_matches {
-        vec_scores.insert(id, score);
+    if !super::USE_FTS_ONLY {
+        let vec_matches = query_by_vector(conn, query_text, filter_ids.as_ref(), limit * 3);
+        for (id, score) in vec_matches {
+            vec_scores.insert(id, score);
+        }
     }
 
     // 4. Merge results using a strict semantic relevance check
@@ -291,15 +293,19 @@ pub fn query_smart_execute(
             let type_score = compute_type_overlap(&query_type_dist, &doc_type_dist);
 
             // Stricter Relevance Verification:
-            let is_relevant = if has_embs {
+            let is_relevant = if has_embs && !super::USE_FTS_ONLY {
                 vec_score >= 0.75 || (fts_score > 0.0 && vec_score >= 0.68)
             } else {
                 fts_score > 0.0
             };
 
             if is_relevant {
-                // Combine: vector similarity + normalized FTS score + type overlap score (weighted at 0.20)
-                let combined = vec_score + (fts_score / 200.0) + (type_score as f32 * 0.20);
+                // Combine scores:
+                let combined = if super::USE_FTS_ONLY {
+                    fts_score + (type_score as f32 * 0.20)
+                } else {
+                    vec_score + (fts_score / 200.0) + (type_score as f32 * 0.20)
+                };
                 combined_scores.insert(id, combined);
             }
         }
