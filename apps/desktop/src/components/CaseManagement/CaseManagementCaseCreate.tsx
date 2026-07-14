@@ -634,7 +634,7 @@ export default function CaseManagementCaseCreate() {
                     </div>
 
                     {/* Context Body: Grid of associated document cards */}
-                    <div className="flex-1 overflow-y-auto pr-1">
+                    <div className="flex-1 flex flex-col min-h-0 gap-3">
                       {(() => {
                         const docs = fieldToDocsMap[focusedField] || [];
                         if (docs.length === 0) {
@@ -646,83 +646,24 @@ export default function CaseManagementCaseCreate() {
                         }
 
                         return (
-                          <div className="space-y-3">
-                            {/* Horizontal grid of document cards */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                              {docs.map((doc) => {
-                                const isExpanded = expandedDocId === doc.id;
-                                return (
-                                  <div
-                                    key={doc.id}
-                                    className={`rounded-lg p-3 transition-colors duration-150 flex flex-col justify-between cursor-pointer select-none ${
-                                      isExpanded
-                                        ? "bg-primary/10"
-                                        : "bg-muted/30 hover:bg-muted/50"
-                                    }`}
-                                    onClick={() => handleToggleDocContext(doc.id)}
-                                  >
-                                    <div className="flex items-start justify-between gap-2 min-w-0">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <svg
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          className="text-primary shrink-0"
-                                        >
-                                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                                          <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-                                        </svg>
-                                        <div className="min-w-0">
-                                          <p className="text-xs font-bold text-foreground truncate" title={doc.title || doc.file_name}>
-                                            {doc.title || doc.file_name}
-                                          </p>
-                                          <p className="text-[9px] text-muted-foreground font-mono truncate">
-                                            {doc.file_name}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => handleOpenTemplateFile(e, doc.marked_path)}
-                                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all shrink-0"
-                                          title="Open template file"
-                                        >
-                                          <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="13"
-                                            height="13"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                          >
-                                            <path d="M15 3h6v6" />
-                                            <path d="M10 14 21 3" />
-                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                          </svg>
-                                        </button>
-
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleToggleDocContext(doc.id);
-                                          }}
-                                          className={`p-1 rounded hover:bg-muted transition-all shrink-0 ${
-                                            isExpanded ? "text-primary rotate-180" : "text-muted-foreground"
-                                          }`}
-                                          title={isExpanded ? "Collapse preview" : "Expand preview"}
-                                        >
+                          <>
+                            {/* Horizontal grid of document cards (scrolls independently if too many) */}
+                            <div className="shrink-0 overflow-y-auto max-h-[120px] pr-1">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                {docs.map((doc) => {
+                                  const isExpanded = expandedDocId === doc.id;
+                                  return (
+                                    <div
+                                      key={doc.id}
+                                      className={`rounded-lg p-3 transition-colors duration-150 flex flex-col justify-between cursor-pointer select-none ${
+                                        isExpanded
+                                          ? "bg-primary/10"
+                                          : "bg-muted/30 hover:bg-muted/50"
+                                      }`}
+                                      onClick={() => handleToggleDocContext(doc.id)}
+                                    >
+                                      <div className="flex items-start justify-between gap-2 min-w-0">
+                                        <div className="flex items-center gap-2 min-w-0">
                                           <svg
                                             xmlns="http://www.w3.org/2000/svg"
                                             width="14"
@@ -730,25 +671,86 @@ export default function CaseManagementCaseCreate() {
                                             viewBox="0 0 24 24"
                                             fill="none"
                                             stroke="currentColor"
-                                            strokeWidth="2.5"
+                                            strokeWidth="2"
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
-                                            className="transition-transform duration-200"
+                                            className="text-primary shrink-0"
                                           >
-                                            <path d="m6 9 6 6 6-6" />
+                                            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                            <path d="M14 2v4a2 2 0 0 0 2 2h4" />
                                           </svg>
-                                        </button>
+                                          <div className="min-w-0">
+                                            <p className="text-xs font-bold text-foreground truncate" title={doc.title || doc.file_name}>
+                                              {doc.title || doc.file_name}
+                                            </p>
+                                            <p className="text-[9px] text-muted-foreground font-mono truncate">
+                                              {doc.file_name}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => handleOpenTemplateFile(e, doc.marked_path)}
+                                            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all shrink-0"
+                                            title="Open template file"
+                                          >
+                                            <svg
+                                              xmlns="http://www.w3.org/2000/svg"
+                                              width="13"
+                                              height="13"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2.5"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                            >
+                                              <path d="M15 3h6v6" />
+                                              <path d="M10 14 21 3" />
+                                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                            </svg>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleToggleDocContext(doc.id);
+                                            }}
+                                            className={`p-1 rounded hover:bg-muted transition-all shrink-0 ${
+                                              isExpanded ? "text-primary rotate-180" : "text-muted-foreground"
+                                            }`}
+                                            title={isExpanded ? "Collapse preview" : "Expand preview"}
+                                          >
+                                            <svg
+                                              xmlns="http://www.w3.org/2000/svg"
+                                              width="14"
+                                              height="14"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2.5"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              className="transition-transform duration-200"
+                                            >
+                                              <path d="m6 9 6 6 6-6" />
+                                            </svg>
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
                             </div>
 
                             {/* Full-width context snippet container below the grid if any card is expanded */}
                             {expandedDocId && (
-                              <div className="border border-border/80 rounded-lg p-3 bg-muted/20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="flex justify-between items-center pb-1 border-b border-border/40">
+                              <div className="flex-1 min-h-0 flex flex-col border border-border/80 rounded-lg p-3 bg-muted/20 space-y-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="flex justify-between items-center pb-1 border-b border-border/40 shrink-0">
                                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                                     Document Live Preview
                                   </span>
@@ -756,49 +758,52 @@ export default function CaseManagementCaseCreate() {
                                     {docTemplates.find(d => d.id === expandedDocId)?.file_name}
                                   </span>
                                 </div>
-                                {loadingContext ? (
-                                  <div className="py-6 flex items-center justify-center text-xs text-muted-foreground">
-                                    <svg
-                                      className="animate-spin -ml-1 mr-3 h-4 w-4 text-primary"
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <circle
-                                        className="opacity-25"
-                                        cx="12"
-                                        cy="12"
-                                        r="10"
-                                        stroke="currentColor"
-                                        strokeWidth="4"
-                                      />
-                                      <path
-                                        className="opacity-75"
-                                        fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                      />
-                                    </svg>
-                                    Loading template preview...
-                                  </div>
-                                ) : previewError ? (
-                                  <div className="py-4 text-center text-xs text-destructive bg-destructive/10 rounded border border-destructive/20">
-                                    {previewError}
-                                  </div>
-                                ) : docHtmlCache[expandedDocId] ? (
-                                  <DocumentPlaceholderPreview
-                                    html={docHtmlCache[expandedDocId]}
-                                    fields={templateFields}
-                                    fieldValues={fieldValues}
-                                    focusedField={focusedField}
-                                  />
-                                ) : (
-                                  <div className="py-4 text-center text-xs text-muted-foreground">
-                                    No preview available
-                                  </div>
-                                )}
+                                <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
+                                  {loadingContext ? (
+                                    <div className="py-6 flex items-center justify-center text-xs text-muted-foreground">
+                                      <svg
+                                        className="animate-spin -ml-1 mr-3 h-4 w-4 text-primary"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <circle
+                                          className="opacity-25"
+                                          cx="12"
+                                          cy="12"
+                                          r="10"
+                                          stroke="currentColor"
+                                          strokeWidth="4"
+                                        />
+                                        <path
+                                          className="opacity-75"
+                                          fill="currentColor"
+                                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        />
+                                      </svg>
+                                      Loading template preview...
+                                    </div>
+                                  ) : previewError ? (
+                                    <div className="py-4 text-center text-xs text-destructive bg-destructive/10 rounded border border-destructive/20">
+                                      {previewError}
+                                    </div>
+                                  ) : docHtmlCache[expandedDocId] ? (
+                                    <DocumentPlaceholderPreview
+                                      html={docHtmlCache[expandedDocId]}
+                                      fields={templateFields}
+                                      fieldValues={fieldValues}
+                                      focusedField={focusedField}
+                                      className="flex-1 min-h-0 w-full overflow-y-auto bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 relative select-text"
+                                    />
+                                  ) : (
+                                    <div className="py-4 text-center text-xs text-muted-foreground">
+                                      No preview available
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
-                          </div>
+                          </>
                         );
                       })()}
                     </div>

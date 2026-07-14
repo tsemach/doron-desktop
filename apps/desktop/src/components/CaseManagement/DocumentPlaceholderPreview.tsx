@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 
 interface DocumentPlaceholderPreviewProps {
   html: string;
@@ -19,6 +19,8 @@ const DocumentPlaceholderPreview = React.memo(
     style,
   }: DocumentPlaceholderPreviewProps) {
   
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const isRtlText = (text: string | null | undefined): boolean => {
     if (!text) return false;
     const rtlRegex = /[\u0590-\u05FF\u0600-\u06FF]/;
@@ -53,14 +55,22 @@ const DocumentPlaceholderPreview = React.memo(
     return processedHtml;
   };
 
-  // Scroll focused field into view in the document preview page
+  // Scroll focused field into view in the document preview page (scrolling container only)
   useEffect(() => {
     if (!focusedField || !html) return;
 
     const timer = setTimeout(() => {
       const anchor = document.getElementById("focused-field-preview-anchor");
-      if (anchor) {
-        anchor.scrollIntoView({ behavior: "smooth", block: "center" });
+      const container = containerRef.current;
+      if (anchor && container) {
+        const containerRect = container.getBoundingClientRect();
+        const anchorRect = anchor.getBoundingClientRect();
+        const scrollTopOffset = anchorRect.top - containerRect.top + container.scrollTop - (containerRect.height / 2);
+        
+        container.scrollTo({
+          top: scrollTopOffset,
+          behavior: "smooth"
+        });
       }
     }, 150);
 
@@ -69,6 +79,7 @@ const DocumentPlaceholderPreview = React.memo(
 
   return (
     <div 
+      ref={containerRef}
       className={className || "bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto max-h-[300px] min-h-[220px] relative select-text"}
       style={style}
     >
