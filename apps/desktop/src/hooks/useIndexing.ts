@@ -102,7 +102,7 @@ export function useIndexing() {
         return;
       }
       setItems((prev) => {
-        const idx = prev.findIndex((p) => p.file_name === file_name);
+        const idx = prev.findIndex((p) => p.current === current || (p.file_name === file_name && !p.current));
         if (idx !== -1 && prev[idx].status === "ok" && status === "skipped") {
           const next = [...prev];
           next[idx] = {

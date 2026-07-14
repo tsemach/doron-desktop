@@ -77,6 +77,7 @@ export default function DocsManagementScanProcessing({
             isFolder={isFolder}
             startIndexing={startIndexing}
             items={items}
+            resetState={resetState}
           />
         </div>
 

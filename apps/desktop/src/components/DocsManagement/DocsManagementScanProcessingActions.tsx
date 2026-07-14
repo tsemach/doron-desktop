@@ -10,6 +10,7 @@ interface DocsManagementScanProcessingActionsProps {
   isFolder: boolean;
   startIndexing: (path: string, isFolder: boolean, isContinue?: boolean, startIndex?: number, reindex?: boolean) => void;
   items: ProgressItem[];
+  resetState?: () => void;
 }
 
 export default function DocsManagementScanProcessingActions({
@@ -21,6 +22,7 @@ export default function DocsManagementScanProcessingActions({
   isFolder,
   startIndexing,
   items,
+  resetState,
 }: DocsManagementScanProcessingActionsProps) {
   return (
     <div className="flex items-center gap-2 justify-self-end">
@@ -69,7 +71,15 @@ export default function DocsManagementScanProcessingActions({
             Cancel
           </Button>
         </>
-      ) : null}
+      ) : (
+        <Button
+          size="sm"
+          className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+          onClick={() => resetState?.()}
+        >
+          Close
+        </Button>
+      )}
     </div>
   );
 }

@@ -44,7 +44,7 @@ export default function DocsManagement() {
         dbPath={dbPath}
         isProcessing={isProcessing}
         scanCount={
-          isFolder && isProcessing
+          isFolder && showOutput
             ? {
                 current: items.filter((i) => i.file_name !== "").length,
                 total: currentItem?.total || items[0]?.total || 0,
