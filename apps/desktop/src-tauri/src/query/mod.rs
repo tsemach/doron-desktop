@@ -6,6 +6,7 @@ pub mod llm;
 pub use types::{DocumentRow, SearchOptions, QueryAnalysis, DateRange};
 pub use queries::query_by_vector;
 pub use queries::query_by_fts;
+pub use queries::query_smart_execute;
 use tauri::AppHandle;
 use crate::store;
 use crate::llm::llm_provider::LlmProvider;

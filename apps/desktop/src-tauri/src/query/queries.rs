@@ -231,7 +231,7 @@ pub fn query_by_vector(
 }
 
 /// Core smart query dispatcher executing both text/FTS search and vector search
-pub(crate) fn query_smart_execute(
+pub fn query_smart_execute(
     conn: &Connection,
     analysis: &QueryAnalysis,
     query_text: &str,
