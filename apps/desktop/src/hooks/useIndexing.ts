@@ -1,9 +1,8 @@
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { API_KEY_STORAGE_KEY } from "../components/Settings/Settings";
-import { aiConfigAtom } from "../store/aiStore";
 import {
   showOutputAtom,
   isProcessingAtom,
