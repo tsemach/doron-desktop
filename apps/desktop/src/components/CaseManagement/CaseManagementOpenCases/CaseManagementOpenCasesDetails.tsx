@@ -165,9 +165,6 @@ export default function CaseManagementOpenCasesDetails() {
 
   // Handle selected document preview loading
   useEffect(() => {
-    // Reset sub-tab to preview when selecting a different document
-    setDocSubTab("preview");
-
     if (!selectedDocument) {
       setPreviewHtml(null);
       setPreviewText(null);
