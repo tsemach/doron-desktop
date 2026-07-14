@@ -31,7 +31,7 @@
   "close_case_title": "סגור תיק",
   "delete_case_title": "מחק תיק",
   "status_open": "פתוח",
-  "status_in_progress": "בתהליך",
+  "status_waiting": "בהמתנה",
   "status_closed": "סגור",
   "status_followup": "מעקב",
   "case_documents": "מסמכי התיק",

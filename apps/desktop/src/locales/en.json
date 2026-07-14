@@ -31,7 +31,7 @@
   "close_case_title": "Close Case",
   "delete_case_title": "Delete Case",
   "status_open": "Open",
-  "status_in_progress": "In Progress",
+  "status_waiting": "Waiting",
   "status_closed": "Closed",
   "status_followup": "Follow Up",
   "case_documents": "Case Documents",
