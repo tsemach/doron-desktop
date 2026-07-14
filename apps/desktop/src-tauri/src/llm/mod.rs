@@ -151,7 +151,7 @@ pub async fn call_provider(provider: &llm_provider::LlmProvider, text: &str) -> 
     };
 
     let prompt = prompt_template.replace("{text}", &truncated);
-    let raw = provider.call_structured(&prompt, None).await?;
+    let raw = provider.call_structured(&prompt, None, Some(0.0)).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<DocumentMetadata>(&json_str)
         .map_err(|e| format!("Failed to parse metadata JSON: {e}. Raw: {}", json_str.chars().take(200).collect::<String>()))

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { API_KEY_STORAGE_KEY } from "../components/Settings/Settings";
-import { aiConfigStatusAtom } from "../store/aiStore";
+import { aiConfigAtom } from "../store/aiStore";
 import {
   showOutputAtom,
   isProcessingAtom,
@@ -46,7 +46,8 @@ export function useIndexing() {
   const [items, setItems] = useAtom(itemsAtom);
   const [summary, setSummary] = useAtom(summaryAtom);
   const [error, setError] = useAtom(errorAtom);
-  const aiHealthStatus = useAtomValue(aiConfigStatusAtom);
+  const aiConfig = useAtomValue(aiConfigAtom);
+  const aiMode = aiConfig?.aiMode ?? "";
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
 
@@ -79,19 +80,6 @@ export function useIndexing() {
     globalIsCancelled = false;
     console.log("startIndexing called", { path, folder, isContinue, startIndex, reindex, autoResume });
 
-    // Check if AI connection is verified for all flows (including startup auto-resume)
-    const isAiConnectedCheck = aiHealthStatus === "verified";
-    if (!isAiConnectedCheck) {
-      setError("AI connection is offline. Please click the status badge in the top right (e.g. 'API Offline') to check/start the connection before indexing.");
-      if (!autoResume) {
-        navigate("/docs-management/scan");
-      }
-      setShowOutput(true);
-      setSelectedPath(path);
-      setIsFolder(folder);
-      return;
-    }
-
     if (!autoResume) {
       navigate("/docs-management/scan");
       setShowOutput(true);
@@ -114,7 +102,7 @@ export function useIndexing() {
         return;
       }
       setItems((prev) => {
-        const idx = prev.findIndex((p) => p.file_name === file_name);
+        const idx = prev.findIndex((p) => p.current === current || (p.file_name === file_name && !p.current));
         if (idx !== -1 && prev[idx].status === "ok" && status === "skipped") {
           const next = [...prev];
           next[idx] = {

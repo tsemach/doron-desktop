@@ -148,7 +148,7 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
         }
     );
 
-    let check_future = provider.call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None);
+    let check_future = provider.call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None, None);
     match tokio::time::timeout(std::time::Duration::from_secs(10), check_future).await {
         Ok(Ok(res)) => {
             Ok(format!("Connection successful! Response: '{}'", res.trim()))
@@ -231,7 +231,8 @@ pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, Stri
        .arg("--threads").arg(allocated_threads.to_string())
        .arg("--threads-batch").arg(allocated_threads.to_string())
        .arg("-c").arg("8192")
-       .arg("--host").arg("127.0.0.1");
+       .arg("--host").arg("127.0.0.1")
+       .arg("--no-cache-prompt");
 
     let template = if model_name.to_lowercase().contains("qwen") {
         "chatml"

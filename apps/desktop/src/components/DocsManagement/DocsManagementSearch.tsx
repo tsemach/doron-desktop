@@ -154,7 +154,7 @@ export default function DocsManagementSearch() {
     setIsSearching(true);
     setError(null);
     try {
-      const rows = await invoke<DocumentRow[]>("search_documents", {
+      const rows = await invoke<DocumentRow[]>("query_search_documents", {
         query: queryString,
         apiKey,
         limit: 20,

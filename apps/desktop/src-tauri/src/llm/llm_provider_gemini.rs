@@ -26,6 +26,8 @@ struct GeminiSystemInstruction {
 struct GeminiGenerationConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     response_mime_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
 }
 
 #[derive(Serialize)]
@@ -59,14 +61,15 @@ struct GeminiResponseBody {
 }
 
 impl GeminiProvider {
-    async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool) -> Result<String, String> {
+    async fn execute_request(&self, prompt: &str, system: Option<&str>, json_mode: bool, temperature: Option<f32>) -> Result<String, String> {
         let system_instruction = system.map(|sys| GeminiSystemInstruction {
             parts: vec![GeminiPart { text: sys.to_string() }],
         });
 
-        let generation_config = if json_mode {
+        let generation_config = if json_mode || temperature.is_some() {
             Some(GeminiGenerationConfig {
-                response_mime_type: Some("application/json".to_string()),
+                response_mime_type: if json_mode { Some("application/json".to_string()) } else { None },
+                temperature,
             })
         } else {
             None
@@ -117,11 +120,11 @@ impl GeminiProvider {
         Ok(text)
     }
 
-    pub async fn call_simple(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        self.execute_request(prompt, system, false).await
+    pub async fn call_simple(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
+        self.execute_request(prompt, system, false, temperature).await
     }
 
-    pub async fn call_structured(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
-        self.execute_request(prompt, system, true).await
+    pub async fn call_structured(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
+        self.execute_request(prompt, system, true, temperature).await
     }
 }

@@ -129,7 +129,7 @@ async fn call_llm_classification(
         sender, subject, snippet, candidate_list
     );
 
-    match provider.call_structured(&prompt, Some(system_prompt)).await {
+    match provider.call_structured(&prompt, Some(system_prompt), None).await {
         Ok(json_res) => {
             let cleaned = json_res.trim();
             let start = cleaned.find('{').unwrap_or(0);
@@ -184,7 +184,7 @@ pub(crate) async fn run_cascade_classification(
         "email subject: {}\nemail sender: {}\nemail body: {}",
         subject, sender, snippet
     );
-    let query_vector = match embeddings::get_query_embedding(&combined_input) {
+    let query_vector = match embeddings::embedding_by_query(&combined_input) {
         Ok(vec) => vec,
         Err(_) => return (None, 0.0, "Failed to generate query embedding".to_string()),
     };

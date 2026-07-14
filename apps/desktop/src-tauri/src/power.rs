@@ -5,6 +5,7 @@ mod win_power {
     // Track active sleep-prevention requests so multiple concurrent operations don't conflict
     static PREVENT_SLEEP_COUNT: AtomicUsize = AtomicUsize::new(0);
 
+    #[allow(non_camel_case_types)]
     type EXECUTION_STATE = u32;
     const ES_CONTINUOUS: EXECUTION_STATE = 0x80000000;
     const ES_SYSTEM_REQUIRED: EXECUTION_STATE = 0x00000001;
@@ -74,9 +75,10 @@ mod win_power {
         NON_WIN_GUARD.get_or_init(|| Mutex::new(None))
     }
 
-    pub fn prevent_system_sleep(keep_display_on: bool) {
+    pub fn prevent_system_sleep(_keep_display_on: bool) {
         #[cfg(target_os = "macos")]
         {
+            let keep_display_on = _keep_display_on;
             if let Ok(mut guard) = get_non_win_guard().lock() {
                 if guard.is_none() {
                     let arg = if keep_display_on { "-d" } else { "-i" };

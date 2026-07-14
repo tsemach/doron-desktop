@@ -5,7 +5,6 @@ import DocsManagement from "./components/DocsManagement/DocsManagement";
 import Settings from "./components/Settings/Settings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
-import { invoke } from "@tauri-apps/api/core";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck, aiConfigStatusAtom } from "./store/aiStore";
 import { useAtomValue, getDefaultStore } from "jotai";
@@ -130,109 +129,9 @@ function Home() {
 
 function App() {
   useEffect(() => {
-    async function runCheck() {
-      let retries = 8; // Try 8 times (24 seconds max) to account for slow model loading
-      while (retries > 0) {
-        try {
-          await triggerGlobalHealthCheck();
-          const store = getDefaultStore();
-          const status = store.get(aiConfigStatusAtom);
-          if (status === "verified") {
-            console.log("[App] AI connection verified successfully!");
-            break;
-          }
-        } catch (err) {
-          console.error("[App] Health check attempt failed:", err);
-          localStorage.setItem("debug_health_check_error", String(err));
-        }
-        retries--;
-        if (retries > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-        }
-      }
-    }
-    runCheck();
-  }, []);
-
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const target = e.target;
-      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
-        return;
-      }
-
-      // Check if standard modifier is pressed (Ctrl on Windows/Linux, Cmd on macOS)
-      const isMod = e.ctrlKey || e.metaKey;
-      if (!isMod) return;
-
-      const key = e.key.toLowerCase();
-      if (key === "c") {
-        const start = target.selectionStart;
-        const end = target.selectionEnd;
-        if (start !== null && end !== null && start !== end) {
-          const selectedText = target.value.substring(start, end);
-          invoke("write_clipboard", { text: selectedText }).catch((err) => {
-            console.error("Failed to copy text:", err);
-          });
-        }
-        e.preventDefault();
-      } else if (key === "x") {
-        const start = target.selectionStart;
-        const end = target.selectionEnd;
-        if (start !== null && end !== null && start !== end) {
-          const selectedText = target.value.substring(start, end);
-          invoke("write_clipboard", { text: selectedText }).then(() => {
-            const newValue = target.value.substring(0, start) + target.value.substring(end);
-            const prototype = target instanceof HTMLTextAreaElement
-              ? HTMLTextAreaElement.prototype
-              : HTMLInputElement.prototype;
-            const nativeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-            if (nativeValueSetter) {
-              nativeValueSetter.call(target, newValue);
-            } else {
-              target.value = newValue;
-            }
-            target.setSelectionRange(start, start);
-            target.dispatchEvent(new Event("input", { bubbles: true }));
-          }).catch((err) => {
-            console.error("Failed to cut text:", err);
-          });
-        }
-        e.preventDefault();
-      } else if (key === "v") {
-        invoke<string>("read_clipboard").then((clipText) => {
-          if (!clipText) return;
-          const start = target.selectionStart;
-          const end = target.selectionEnd;
-          if (start !== null && end !== null) {
-            const newValue = target.value.substring(0, start) + clipText + target.value.substring(end);
-            const prototype = target instanceof HTMLTextAreaElement
-              ? HTMLTextAreaElement.prototype
-              : HTMLInputElement.prototype;
-            const nativeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-            if (nativeValueSetter) {
-              nativeValueSetter.call(target, newValue);
-            } else {
-              target.value = newValue;
-            }
-            const newCursorPos = start + clipText.length;
-            target.setSelectionRange(newCursorPos, newCursorPos);
-            target.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-        }).catch((err) => {
-          console.error("Failed to paste text:", err);
-        });
-        e.preventDefault();
-      } else if (key === "a") {
-        target.select();
-        e.preventDefault();
-      }
-    };
-
-    window.addEventListener("keydown", handleGlobalKeyDown, true);
-    return () => {
-      window.removeEventListener("keydown", handleGlobalKeyDown, true);
-    };
+    triggerGlobalHealthCheck().catch((err) => {
+      console.error("[App] Initial health check failed:", err);
+    });
   }, []);
 
   return (

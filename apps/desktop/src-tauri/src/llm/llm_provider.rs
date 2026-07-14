@@ -24,23 +24,23 @@ pub enum LlmProvider {
 }
 
 impl LlmProvider {
-    pub async fn call_simple(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
+    pub async fn call_simple(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
         match self {
-            Self::Claude(p) => p.call_simple(prompt, system).await,
-            Self::Gemini(p) => p.call_simple(prompt, system).await,
-            Self::OpenAi(p) => p.call_simple(prompt, system).await,
-            Self::Mock(p) => p.call_simple(prompt, system).await,
-            Self::Local(p) => p.call_simple(prompt, system).await,
+            Self::Claude(p) => p.call_simple(prompt, system, temperature).await,
+            Self::Gemini(p) => p.call_simple(prompt, system, temperature).await,
+            Self::OpenAi(p) => p.call_simple(prompt, system, temperature).await,
+            Self::Mock(p) => p.call_simple(prompt, system, temperature).await,
+            Self::Local(p) => p.call_simple(prompt, system, temperature).await,
         }
     }
 
-    pub async fn call_structured(&self, prompt: &str, system: Option<&str>) -> Result<String, String> {
+    pub async fn call_structured(&self, prompt: &str, system: Option<&str>, temperature: Option<f32>) -> Result<String, String> {
         match self {
-            Self::Claude(p) => p.call_structured(prompt, system).await,
-            Self::Gemini(p) => p.call_structured(prompt, system).await,
-            Self::OpenAi(p) => p.call_structured(prompt, system).await,
-            Self::Mock(p) => p.call_structured(prompt, system).await,
-            Self::Local(p) => p.call_structured(prompt, system).await,
+            Self::Claude(p) => p.call_structured(prompt, system, temperature).await,
+            Self::Gemini(p) => p.call_structured(prompt, system, temperature).await,
+            Self::OpenAi(p) => p.call_structured(prompt, system, temperature).await,
+            Self::Mock(p) => p.call_structured(prompt, system, temperature).await,
+            Self::Local(p) => p.call_structured(prompt, system, temperature).await,
         }
     }
 }

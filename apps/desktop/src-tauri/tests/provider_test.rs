@@ -13,7 +13,7 @@ async fn test_mock_provider_health_check() {
     });
 
     let res = provider
-        .call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None)
+        .call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None, None)
         .await
         .expect("Health check should succeed");
 
@@ -51,7 +51,7 @@ async fn test_openai_provider_custom_url_routing() {
     });
 
     let err_msg = provider
-        .call_simple("hello", None)
+        .call_simple("hello", None, None)
         .await
         .expect_err("Should fail with a connection error to local port 9999");
 

@@ -171,23 +171,33 @@ async fn index_file_core_impl(
     } else if doc_id_opt.is_none() {
         // Fallback skeletal insertion so we have a document_id to map vector chunks to
         let file_size_kb = std::fs::metadata(file_path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
+        let metadata = extractor::metadata::extract_heuristic_metadata(&extracted.text, &file_name, &ext);
+        let raw_metadata = serde_json::to_string(&metadata).unwrap_or_default();
+        
+        let doc_type_str = match &metadata.doc_type {
+            Some(serde_json::Value::Object(map)) => serde_json::to_string(map).ok(),
+            Some(serde_json::Value::String(s)) => Some(s.clone()),
+            Some(other) => Some(other.to_string()),
+            None => None,
+        };
+
         let record = store::DocumentRecord {
             file_path: path_str.clone(),
             file_name: file_name.clone(),
             file_ext: ext.clone(),
             file_size_kb,
-            doc_type: Some("other".to_string()),
-            title: Some(file_name.clone()),
-            summary: Some("Skeletal document (indexed without LLM metadata)".to_string()),
-            authors: "[]".to_string(),
-            doc_date: None,
-            topics: "[]".to_string(),
-            entities: "[]".to_string(),
-            keywords: "[]".to_string(),
-            language: Some("he".to_string()),
+            doc_type: doc_type_str,
+            title: metadata.title,
+            summary: metadata.summary,
+            authors:   serde_json::to_string(&metadata.authors.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+            doc_date:  metadata.date,
+            topics:    serde_json::to_string(&metadata.topics.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+            entities:  serde_json::to_string(&metadata.entities.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+            keywords:  serde_json::to_string(&metadata.keywords.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string()),
+            language:  metadata.language,
             page_count: extracted.page_count,
-            confidence: None,
-            raw_metadata: "{}".to_string(),
+            confidence: metadata.confidence,
+            raw_metadata,
             raw_text: extracted.text.clone(),
         };
         
@@ -203,7 +213,7 @@ async fn index_file_core_impl(
     }
 
     // Track 2: Vector Embeddings generation
-    if options.run_vector_embeddings {
+    if options.run_vector_embeddings && !crate::query::USE_FTS_ONLY {
         let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
         if !chunks.is_empty() {
             let embeddings = crate::embeddings::get_passage_embeddings(&chunks)
@@ -220,7 +230,7 @@ async fn index_file_core_impl(
         }
     }
 
-    let status_str = match (options.run_llm_metadata, options.run_vector_embeddings) {
+    let status_str = match (options.run_llm_metadata, options.run_vector_embeddings && !crate::query::USE_FTS_ONLY) {
         (true, true) => "Indexed with LLM metadata and vector chunks",
         (true, false) => "Indexed with LLM metadata only",
         (false, true) => "Indexed with vector chunks only (fallback metadata)",
@@ -286,8 +296,12 @@ pub async fn index_file(
     // Set up provider configuration
     let provider = crate::llm::load_active_provider(&app, api_key, Some(model));
 
+    let is_local = match &provider {
+        LlmProvider::Local(_) => true,
+        _ => false,
+    };
     let options = IndexOptions {
-        run_llm_metadata: true,
+        run_llm_metadata: !is_local,
         run_vector_embeddings: true,
     };
 
@@ -344,8 +358,12 @@ pub async fn index_folder(
     // Set up provider configuration
     let provider = crate::llm::load_active_provider(&app, api_key, Some(model));
 
+    let is_local = match &provider {
+        LlmProvider::Local(_) => true,
+        _ => false,
+    };
     let options = IndexOptions {
-        run_llm_metadata: true,
+        run_llm_metadata: !is_local,
         run_vector_embeddings: true,
     };
     

@@ -102,7 +102,8 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
                     .arg("-c")
                     .arg("8192")
                     .arg("--host")
-                    .arg("127.0.0.1");
+                    .arg("127.0.0.1")
+                    .arg("--no-cache-prompt");
 
                 let template = if model.to_lowercase().contains("qwen") {
                     "chatml"
@@ -178,7 +179,7 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
                 doc_type, desc, template_str
             );
 
-            let text = provider.call_simple(&prompt, Some("You are a helpful assistant that writes realistic dummy legal documents in Hebrew.")).await?;
+            let text = provider.call_simple(&prompt, Some("You are a helpful assistant that writes realistic dummy legal documents in Hebrew."), None).await?;
             write_docx_file(&file_path, &text)?;
         }
     } else {

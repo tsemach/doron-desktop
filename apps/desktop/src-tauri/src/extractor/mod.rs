@@ -2,6 +2,7 @@ pub mod docx;
 pub mod pdf;
 pub mod xlsx;
 pub mod txt;
+pub mod metadata;
 
 use std::path::Path;
 

@@ -3,7 +3,7 @@ use std::path::Path;
 use rusqlite::Connection;
 use tauri_app_lib::{
     indexer::{index_file_core, IndexOptions},
-    query::{search_documents_core, DocumentRow},
+    query::{query_search_documents_core, DocumentRow, SearchOptions},
     llm::llm_provider::{get_active_provider, LlmProvider, ProviderConfig},
     store,
 };
@@ -56,12 +56,15 @@ async fn test_decoupled_index_and_search_pipeline() {
     assert!(chunk_count > 0, "Vector chunks should have been generated");
 
     // 2. Test search document using the query core
-    let search_results: Vec<DocumentRow> = search_documents_core(
+    let search_results: Vec<DocumentRow> = query_search_documents_core(
         db_path,
         &provider,
         "מצא חוזה שכירות של אלי נחמיאס",
         5,
-        true,
+        &SearchOptions {
+            use_llm_query_analysis: true,
+            use_llm_rerank: true,
+        },
     )
     .await
     .expect("Search documents core should succeed");

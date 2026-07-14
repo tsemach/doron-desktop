@@ -56,7 +56,7 @@ pub fn get_passage_embeddings(texts: &[String]) -> Result<Vec<Vec<f32>>, String>
 
 /// Helper to generate the embedding for a single search query.
 /// Prepends "query: " required by the E5 model family.
-pub fn get_query_embedding(text: &str) -> Result<Vec<f32>, String> {
+pub fn embedding_by_query(text: &str) -> Result<Vec<f32>, String> {
     let model = get_embedding_model()?;
     let prefixed = format!("query: {text}");
     let embeddings = model.embed(vec![prefixed], None).map_err(|e| format!("Failed to generate query embedding: {e}"))?;

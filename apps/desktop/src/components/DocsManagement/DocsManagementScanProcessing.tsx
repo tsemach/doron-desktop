@@ -77,6 +77,7 @@ export default function DocsManagementScanProcessing({
             isFolder={isFolder}
             startIndexing={startIndexing}
             items={items}
+            resetState={resetState}
           />
         </div>
 
@@ -86,7 +87,7 @@ export default function DocsManagementScanProcessing({
         )}
 
         {/* Active item status detail */}
-        {isProcessing && currentItem && (
+        {isProcessing && (
           <DocsManagementScanProcessingCurrent currentItem={currentItem} />
         )}
 
