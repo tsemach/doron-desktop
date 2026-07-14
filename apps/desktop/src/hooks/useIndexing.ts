@@ -46,7 +46,6 @@ export function useIndexing() {
   const [items, setItems] = useAtom(itemsAtom);
   const [summary, setSummary] = useAtom(summaryAtom);
   const [error, setError] = useAtom(errorAtom);
-  const aiConfig = useAtomValue(aiConfigAtom);
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
 
