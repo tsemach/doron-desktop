@@ -24,7 +24,7 @@ export function useRowFields(fields: string[]): RowFieldsResult {
     };
 
     safeFields.forEach((field) => {
-      const match = field.match(/:([1-9])$/);
+      const match = field.match(/:([1-9])\]*$/);
       if (match) {
         const rowNum = parseInt(match[1], 10);
         rowsSet.add(rowNum);

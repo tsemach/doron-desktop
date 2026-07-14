@@ -109,7 +109,7 @@ export default function DocsManagementTemplatesMainHeader({
 
         {/* Search and Row Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-2 w-full">
-          <div className="relative flex-1">
+          <div className="relative w-full sm:flex-1">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="12"

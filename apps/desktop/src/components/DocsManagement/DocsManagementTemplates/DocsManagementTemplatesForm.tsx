@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { TemplateRow } from "./DocsManagementTemplates.types";
 import { Button } from "../../ui/button";
+import { useRowFields } from "@/hooks/useRowFields";
 
 interface DocsManagementTemplatesFormProps {
   selectedTemplate: TemplateRow;
@@ -124,11 +125,19 @@ export default function DocsManagementTemplatesForm({
   onDelete,
 }: DocsManagementTemplatesFormProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
+
+  // Reset row selection when selected document changes
+  useEffect(() => {
+    setSelectedRow(null);
+  }, [selectedTemplate.id]);
 
   const fields = Object.keys(fieldValues);
-  const filteredFields = fields.filter((f) =>
-    f.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const { uniqueRows, getFilteredFields } = useRowFields(fields);
+
+  const filteredFields = useMemo(() => {
+    return getFilteredFields(selectedRow, searchQuery);
+  }, [getFilteredFields, selectedRow, searchQuery]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -207,36 +216,60 @@ export default function DocsManagementTemplatesForm({
 
         {/* Search bar */}
         {fields.length > 0 && (
-          <div className="relative w-full max-w-sm">
-            <input
-              type="text"
-              placeholder="Search variables..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-8 py-1.5 text-xs rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
-            />
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground font-semibold text-xs cursor-pointer"
+          <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xl animate-in fade-in duration-250">
+            <div className="relative w-full sm:flex-1">
+              <input
+                type="text"
+                placeholder="Search variables..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 text-xs rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+              />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
               >
-                ✕
-              </button>
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground font-semibold text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {uniqueRows.length > 0 && (
+              <div className="relative w-full sm:w-[120px] shrink-0 animate-in fade-in duration-200">
+                <select
+                  value={selectedRow ?? "all"}
+                  onChange={(e) => setSelectedRow(e.target.value === "all" ? null : parseInt(e.target.value, 10))}
+                  className="w-full h-[30px] rounded-md border border-input bg-background pl-3 pr-8 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer shadow-[0_0_0_1px_var(--border)]"
+                >
+                  <option value="all">All Rows</option>
+                  {uniqueRows.map((row) => (
+                    <option key={row} value={row}>
+                      Row {row}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-2.5 flex items-center pointer-events-none text-muted-foreground">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+              </div>
             )}
           </div>
         )}

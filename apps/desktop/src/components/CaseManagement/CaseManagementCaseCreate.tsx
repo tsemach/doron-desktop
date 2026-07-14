@@ -513,7 +513,7 @@ export default function CaseManagementCaseCreate() {
 
                   {/* Search and Document Filter Bar */}
                   <div className="flex flex-col sm:flex-row gap-2 mt-2 mb-2 shrink-0">
-                    <div className="relative flex-1">
+                    <div className="relative w-full sm:flex-1">
                       <input
                         type="text"
                         placeholder="Search fields..."
