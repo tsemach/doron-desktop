@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CaseTemplate, DocTemplate } from "./CaseManagementTypes";
 import mammoth from "mammoth";
 import DocumentPlaceholderPreview from "./DocumentPlaceholderPreview";
+import { useRowFields } from "@/hooks/useRowFields";
 
 
 export default function CaseManagementCaseCreate() {
@@ -17,6 +18,7 @@ export default function CaseManagementCaseCreate() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("empty");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [docTemplates, setDocTemplates] = useState<DocTemplate[]>([]);
   const [filterDocId, setFilterDocId] = useState<number | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -115,7 +117,16 @@ export default function CaseManagementCaseCreate() {
 
   // Parse fields for the currently selected template
   const activeTemplate = templates.find((t) => String(t.id) === selectedTemplateId);
-  const templateFields: string[] = activeTemplate ? JSON.parse(activeTemplate.fields) : [];
+  const templateFields: string[] = useMemo(() => {
+    if (!activeTemplate) return [];
+    try {
+      const parsed = JSON.parse(activeTemplate.fields);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Failed to parse template fields:", e);
+      return [];
+    }
+  }, [activeTemplate]);
 
   // Reset/sync fields when template changes
   useEffect(() => {
@@ -126,6 +137,7 @@ export default function CaseManagementCaseCreate() {
     setFieldValues(initialValues);
     setSearchQuery(""); // Reset search query when template changes
     setFilterDocId(null); // Reset document filter when template changes
+    setSelectedRow(null); // Reset row filter when template changes
     setFocusedField(null); // Reset focused field
     setExpandedDocId(null); // Reset expanded document details
     setDocHtmlCache({}); // Clear preview HTML cache
@@ -150,16 +162,17 @@ export default function CaseManagementCaseCreate() {
     } catch {}
   });
 
-  const filteredTemplateFields = templateFields.filter((field) => {
-    const matchesSearch = field.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!matchesSearch) return false;
+  const { uniqueRows, getFilteredFields } = useRowFields(templateFields);
 
-    if (filterDocId !== null) {
-      const docs = fieldToDocsMap[field] || [];
-      return docs.some((d) => d.id === filterDocId);
-    }
-    return true;
-  });
+  const filteredTemplateFields = useMemo(() => {
+    return getFilteredFields(selectedRow, searchQuery, (field) => {
+      if (filterDocId !== null) {
+        const docs = fieldToDocsMap[field] || [];
+        return docs.some((d) => d.id === filterDocId);
+      }
+      return true;
+    });
+  }, [getFilteredFields, selectedRow, searchQuery, filterDocId, fieldToDocsMap]);
 
   const loadFullDocHtml = async (docId: number) => {
     setLoadingContext(true);
@@ -533,6 +546,28 @@ export default function CaseManagementCaseCreate() {
                         </button>
                       )}
                     </div>
+
+                    {uniqueRows.length > 0 && (
+                      <div className="relative w-full sm:w-[120px] shrink-0">
+                        <select
+                          value={selectedRow ?? "all"}
+                          onChange={(e) => setSelectedRow(e.target.value === "all" ? null : parseInt(e.target.value, 10))}
+                          className="rounded-md border-0 bg-background pl-3 pr-8 rtl:pr-3 rtl:pl-8 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring h-[34px] w-full shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
+                        >
+                          <option value="all">All Rows</option>
+                          {uniqueRows.map((row) => (
+                            <option key={row} value={row}>
+                              Row {row}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-2.5 rtl:left-2.5 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
 
                     {associatedDocs.length > 0 && (
                       <div className="relative w-full sm:w-[220px]">

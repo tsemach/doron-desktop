@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "../../ui/button";
 import { CaseFile, DocTemplate } from "../CaseManagementTypes";
 import DocumentPlaceholderPreview from "../DocumentPlaceholderPreview";
 import mammoth from "mammoth";
+import { useRowFields } from "@/hooks/useRowFields";
 
 interface OpenCasesDocumentFieldsProps {
   selectedDocument: CaseFile;
@@ -21,6 +22,7 @@ export default function OpenCasesDocumentFields({
   const [fields, setFields] = useState<string[]>([]);
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [docHtml, setDocHtml] = useState<string | null>(null);
   const [showOnlyEmpty, setShowOnlyEmpty] = useState(false);
@@ -59,6 +61,11 @@ export default function OpenCasesDocumentFields({
     };
   }, [isDragging]);
 
+  // Reset row selection when selected document changes
+  useEffect(() => {
+    setSelectedRow(null);
+  }, [selectedDocument.name]);
+
   useEffect(() => {
     let active = true;
     async function loadData() {
@@ -80,7 +87,8 @@ export default function OpenCasesDocumentFields({
         // 2. Parse document fields
         let docFields: string[] = [];
         try {
-          docFields = JSON.parse(match.fields_found) as string[];
+          const parsed = JSON.parse(match.fields_found);
+          docFields = Array.isArray(parsed) ? parsed : [];
         } catch (e) {
           docFields = [];
         }
@@ -158,16 +166,16 @@ export default function OpenCasesDocumentFields({
     }
   }
 
-  const filteredFields = fields.filter((field) => {
-    const matchesSearch = field.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!matchesSearch) return false;
+  const { uniqueRows, getFilteredFields } = useRowFields(fields);
 
-    if (showOnlyEmpty) {
-      return initiallyEmptyFields.includes(field);
-    }
-
-    return true;
-  });
+  const filteredFields = useMemo(() => {
+    return getFilteredFields(selectedRow, searchQuery, (field) => {
+      if (showOnlyEmpty) {
+        return initiallyEmptyFields.includes(field);
+      }
+      return true;
+    });
+  }, [getFilteredFields, selectedRow, searchQuery, showOnlyEmpty, initiallyEmptyFields]);
 
   if (loading) {
     return (
@@ -262,6 +270,29 @@ export default function OpenCasesDocumentFields({
                 "Show Empty Only"
               )}
             </Button>
+
+            {/* Row Select Dropdown (to the left of the search bar) */}
+            {uniqueRows.length > 0 && (
+              <div className="relative w-full sm:w-[120px] shrink-0 animate-in fade-in duration-200">
+                <select
+                  value={selectedRow ?? "all"}
+                  onChange={(e) => setSelectedRow(e.target.value === "all" ? null : parseInt(e.target.value, 10))}
+                  className="rounded-md border-0 bg-background pl-3 pr-8 rtl:pr-3 rtl:pl-8 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring h-[30px] w-full shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
+                >
+                  <option value="all">All Rows</option>
+                  {uniqueRows.map((row) => (
+                    <option key={row} value={row}>
+                      Row {row}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-2.5 rtl:left-2.5 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+              </div>
+            )}
 
             {/* Search bar */}
             <div className="relative w-full sm:w-[200px]">
