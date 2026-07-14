@@ -52,7 +52,7 @@
   "edit_notes_tags": "Edit notes & tags",
   "open_external": "Open file in system default viewer",
   "remove_document": "Remove document from case",
-  "document_preview": "Document Preview",
+  "document_details": "Document Details",
   "no_document_selected": "No Document Selected",
   "select_document_desc": "Select a document from the list on the left to preview its content here.",
   "converting_preview": "Converting and loading preview...",
