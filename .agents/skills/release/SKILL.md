@@ -1,6 +1,6 @@
 ---
 name: release
-description: Prompts the developer for a version number and automates the version bump, committing, tagging, and pushing of the release to GitHub.
+description: Prompts the developer for a version number and automates the version bump, committing, pushing the release branch, and creating a Pull Request to master.
 ---
 
 # Release Automation Skill
@@ -17,13 +17,25 @@ This skill guides you in executing the full release process for the desktop app.
    ```bash
    pnpm release:bump <version>
    ```
-   *Note: This command automatically updates the version in `tauri.conf.json` and `package.json`, adds them to git, commits with `chore: bump version to v<version>`, and creates the tag `v<version>` locally.*
+   *Note: If run on master, this command automatically checks out a new branch named `release/v<version>`, updates the version in `tauri.conf.json` and `package.json`, and commits the changes.*
 
-3. **Push to Remote:**
-   Run the git command to push the commit and tag to GitHub to trigger the release runner:
+3. **Get Current Branch Name:**
+   Determine the active branch name by running:
    ```bash
-   git push && git push --tags
+   git rev-parse --abbrev-ref HEAD
    ```
 
-4. **Completion Summary:**
-   Provide a brief confirmation message showing that the release tag has been pushed and the GitHub Actions build is running.
+4. **Push Release Branch:**
+   Push the release branch to remote:
+   ```bash
+   git push -u origin <branch_name>
+   ```
+
+5. **Create Pull Request:**
+   Open a Pull Request to `master` using the GitHub CLI:
+   ```bash
+   gh pr create --title "Release v<version>" --body "Automated release version bump to v<version>"
+   ```
+
+6. **Completion Summary:**
+   Provide a brief confirmation message showing that the Pull Request has been created, and instruct the user to merge it to master to trigger the automated CI/CD release build.

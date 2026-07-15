@@ -22,6 +22,19 @@ if (!semverRegex.test(cleanVersion)) {
 
 const rootDir = path.resolve(__dirname, '..');
 
+// 0. Branch protection: if on master/main, checkout release/v<version>
+try {
+  const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', cwd: rootDir }).trim();
+  console.log(`Current branch: ${currentBranch}`);
+  if (currentBranch === 'master' || currentBranch === 'main') {
+    const newBranch = `release/v${cleanVersion}`;
+    console.log(`Automatically checking out new release branch "${newBranch}"...`);
+    execSync(`git checkout -b ${newBranch}`, { stdio: 'inherit', cwd: rootDir });
+  }
+} catch (err) {
+  console.warn(`Warning: Failed to check/switch branch:`, err.message);
+}
+
 // 1. Update apps/desktop/src-tauri/tauri.conf.json
 const tauriConfPath = path.join(rootDir, 'apps/desktop/src-tauri/tauri.conf.json');
 if (fs.existsSync(tauriConfPath)) {
@@ -52,17 +65,14 @@ if (fs.existsSync(desktopPackagePath)) {
   }
 }
 
-// 3. Commit and tag changes
+// 3. Commit changes (no local tag creation, since it is automated on GitHub Actions merge)
 try {
   console.log(`Staging and committing files for release...`);
   execSync(`git add apps/desktop/src-tauri/tauri.conf.json apps/desktop/package.json`, { stdio: 'inherit', cwd: rootDir });
   execSync(`git commit -m "chore: bump version to ${taggedVersion}"`, { stdio: 'inherit', cwd: rootDir });
   
-  console.log(`Creating tag ${taggedVersion}...`);
-  execSync(`git tag ${taggedVersion}`, { stdio: 'inherit', cwd: rootDir });
-  
-  console.log(`\n🎉 Successfully bumped version to ${cleanVersion} and tagged ${taggedVersion}!`);
-  console.log(`Next step: Run 'git push && git push --tags' to start deployment.`);
+  console.log(`\n🎉 Successfully bumped version to ${cleanVersion}!`);
+  console.log(`Next step: Push the branch and open a PR to master.`);
 } catch (err) {
   console.error(`Git command failed:`, err.message);
   process.exit(1);
