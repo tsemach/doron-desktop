@@ -5,7 +5,8 @@ use native_tls::TlsConnector;
 
 use crate::store;
 use super::types::{EmailConfig, AttachmentMetadata, AttachmentData};
-use super::emails_ai::run_cascade_classification;
+use super::emails_case_api::resolve_case_api;
+use super::emails_orchestrate::{apply_pipeline_outcome, run_email_pipeline, PreparedEmail};
 
 type ImapSession = imap::Session<native_tls::TlsStream<std::net::TcpStream>>;
 
@@ -56,7 +57,7 @@ async fn filter_new_emails(
 
 async fn ingest_single_email(
     app: &AppHandle,
-    config: &EmailConfig,
+    _config: &EmailConfig,
     session: &mut ImapSession,
     seq: u32,
     message_id: &str,
@@ -150,48 +151,19 @@ async fn ingest_single_email(
     let attachments_json =
         serde_json::to_string(&staged_attachments).unwrap_or_else(|_| "[]".to_string());
 
-    // ── Cascade Classification ──
-    let (suggested_case_id, confidence, reason) =
-        run_cascade_classification(app, config, &sender, &subject, &snippet).await;
+    // ── Classification pipeline (deterministic → case API → LLM → case API → alert) ──
+    let prepared = PreparedEmail {
+        message_id: message_id.to_string(),
+        sender: sender.clone(),
+        subject: subject.clone(),
+        snippet: snippet.clone(),
+        body_text: text_body.clone(),
+        received_at: date_str.clone(),
+        attachments_json: attachments_json.clone(),
+    };
 
-    let conn = store::open_db(app)?;
-
-    if suggested_case_id.is_some() {
-        // Insert into pending alerts
-        conn.execute(
-            "INSERT INTO pending_email_alerts (message_id, sender, subject, body_snippet, body_text, received_at, suggested_case_id, confidence, reason, attachments_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-            params![
-                message_id,
-                sender,
-                subject,
-                snippet,
-                text_body,
-                date_str,
-                suggested_case_id,
-                confidence,
-                reason,
-                attachments_json
-            ],
-        ).map_err(|e| format!("Database insert error: {}", e))?;
-
-        // Emit Tauri window notification event
-        let _ = app.emit("new-email-alert", ());
-    } else {
-        // Clean up staged folder since email is unrelated/spam
-        if app_staging_dir.exists() {
-            let _ = std::fs::remove_dir_all(&app_staging_dir);
-        }
-        conn.execute(
-            "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
-            params![message_id],
-        ).map_err(|e| format!("Database ignore insert error: {}", e))?;
-        let message_id_trimmed = message_id.trim_matches(|c| c == '<' || c == '>');
-        conn.execute(
-            "INSERT OR IGNORE INTO ignored_emails (message_id) VALUES (?1)",
-            params![message_id_trimmed],
-        ).map_err(|e| format!("Database ignore insert error: {}", e))?;
-    }
+    let pipeline_result = run_email_pipeline(app, &prepared, resolve_case_api(app)).await?;
+    apply_pipeline_outcome(app, &prepared, &pipeline_result)?;
 
     Ok(())
 }

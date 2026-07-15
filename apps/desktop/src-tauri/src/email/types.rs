@@ -57,13 +57,6 @@ pub struct AttachmentData {
     pub size_kb: i64,
 }
 
-#[derive(Deserialize)]
-pub struct MatchResult {
-    pub suggested_case_id: Option<i64>,
-    pub confidence: f64,
-    pub reason: String,
-}
-
 // ── Subject Blocklist Keywords ───────────────────────────────────────────────
 
 pub const BLOCKED_SUBJECT_KEYWORDS: &[&str] = &[

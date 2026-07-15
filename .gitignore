@@ -38,6 +38,7 @@ dist-ssr
 
 # Evaluation
 evaluation_corpus/
+email_eval_corpus/
 
 scratch/
 **/__pycache__/

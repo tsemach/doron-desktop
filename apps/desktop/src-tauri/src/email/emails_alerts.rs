@@ -69,10 +69,8 @@ pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, St
     for row in rows {
         let alert = row.map_err(|e| e.to_string())?;
         let is_spam = is_transactional_or_spam(&alert.sender, &alert.subject);
-        let is_low_confidence_embedding_only = alert.confidence < 0.84 
-            && alert.reason == "Embedding-only classification (API key not configured)";
 
-        if is_spam || is_low_confidence_embedding_only {
+        if is_spam {
             let folder = staging_base.join(&alert.message_id);
             if folder.exists() {
                 let _ = std::fs::remove_dir_all(folder);

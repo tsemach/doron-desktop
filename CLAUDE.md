@@ -93,7 +93,7 @@ Two separate SQLite DBs are involved: `evaluation_history.db` (run metadata/metr
 - **`llm/`** — Provider abstraction: `llm_provider.rs` (trait) with `llm_provider_{entropic,gemini,openai,mock}.rs` implementations, `llm_local_mode.rs` (manages the bundled `llama-server` sidecar for local GGUF models), `llm_settings.rs`
 - **`doc_template/`** and **`case_template/`** — Document/case template CRUD, placeholder filling, field-context extraction
 - **`case/`** — Case CRUD and annotations
-- **`email/`** — IMAP ingestion (`emails_ingestion.rs`), AI-assisted email classification (`emails_ai.rs`), alerts, settings, and shared `types.rs`
+- **`email/`** — IMAP ingestion (`emails_ingestion.rs`), classification pipeline (`emails_orchestrate.rs`, `emails_classify*.rs`), case-match API stub (`emails_case_api.rs`), alerts, settings, and shared `types.rs`
 - **`documents/`** — Document versioning (`versioning.rs`)
 - **`clipboard.rs`**, **`power.rs`** — small OS-integration commands
 - **`bin/eval/`** — the standalone `eval` CLI described above; not part of the main app binary
