@@ -2,14 +2,44 @@ name: "Publish Release"
 
 on:
   push:
-    tags:
-      - "v*" # Triggers when pushing tags starting with 'v' (e.g., v0.1.0)
+    branches:
+      - master
 
 permissions:
   contents: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      tag_name: ${{ steps.check.outputs.tag_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all tags
+
+      - name: Check version and tags
+        id: check
+        run: |
+          VERSION=$(jq -r '.version' apps/desktop/src-tauri/tauri.conf.json)
+          TAG_NAME="v$VERSION"
+          echo "Detected version: $VERSION"
+          echo "Expected tag: $TAG_NAME"
+          
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists. Skipping release build."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag $TAG_NAME does not exist. Triggering release build!"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
   publish-tauri:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -48,9 +78,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: "./apps/desktop"
-          tagName: ${{ github.ref_name }}
-          releaseName: "Release ${{ github.ref_name }}"
+          tagName: ${{ needs.check-version.outputs.tag_name }}
+          releaseName: "Release ${{ needs.check-version.outputs.tag_name }}"
           releaseDraft: false
           prerelease: false
-
-

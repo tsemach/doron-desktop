@@ -9,6 +9,61 @@ import Link from "next/link";
 
 export default function DownloadDashboard() {
   const router = useRouter();
+  const [downloadUrl, setDownloadUrl] = React.useState<string>(
+    "https://github.com/tsemach/doron-desktop/releases/latest"
+  );
+  const [os, setOs] = React.useState<string>("Windows");
+
+  React.useEffect(() => {
+    // Detect OS on client mount
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    let detectedOs = "Windows";
+    if (userAgent.includes("mac")) {
+      detectedOs = "macOS";
+    } else if (userAgent.includes("linux")) {
+      detectedOs = "Linux";
+    }
+    setOs(detectedOs);
+
+    // Fetch latest release info from GitHub
+    fetch("https://api.github.com/repos/tsemach/doron-desktop/releases/latest")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch latest release metadata");
+        return res.json();
+      })
+      .then((data) => {
+        if (data && Array.isArray(data.assets)) {
+          // Match the file extension pattern by OS
+          let pattern = ".exe";
+          if (detectedOs === "macOS") {
+            pattern = ".dmg";
+          } else if (detectedOs === "Linux") {
+            pattern = ".deb";
+          }
+
+          // Locate primary asset
+          let asset = data.assets.find((a: any) => a.name.endsWith(pattern));
+
+          // Fallbacks for mac/linux if primary extension is missing
+          if (!asset && detectedOs === "macOS") {
+            asset = data.assets.find(
+              (a: any) => a.name.endsWith(".app.tar.gz") || a.name.endsWith(".zip")
+            );
+          } else if (!asset && detectedOs === "Linux") {
+            asset = data.assets.find((a: any) => a.name.endsWith(".AppImage"));
+          }
+
+          if (asset && asset.browser_download_url) {
+            setDownloadUrl(asset.browser_download_url);
+          } else if (data.html_url) {
+            setDownloadUrl(data.html_url);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to resolve dynamic download link:", err);
+      });
+  }, []);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
@@ -74,10 +129,10 @@ export default function DownloadDashboard() {
 
         {/* Action Button */}
         <div className="flex justify-center pt-2">
-          <a href="https://github.com/tsemach/doron-desktop/releases/download/pre-0.0.1/doron-desktop_0.1.0_x64-setup.exe" className="w-full sm:w-auto">
+          <a href={downloadUrl} className="w-full sm:w-auto">
             <Button className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-lg transition-all cursor-pointer shadow-md shadow-blue-900/20">
               <Download className="w-5 h-5 animate-pulse" />
-              <span>Download Standalone App</span>
+              <span>Download Standalone App ({os})</span>
             </Button>
           </a>
         </div>

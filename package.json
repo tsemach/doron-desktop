@@ -9,7 +9,8 @@
     "desktop:dev": "pnpm --filter desktop dev",
     "desktop:build": "pnpm --filter desktop build",
     "desktop:release": "pnpm --filter desktop tauri build",
-    "backend:dev": "pnpm --filter backend dev"
+    "backend:dev": "pnpm --filter backend dev",
+    "release:bump": "node scripts/bump-version.js"
   },
   "devDependencies": {
     "turbo": "^2.0.12"
