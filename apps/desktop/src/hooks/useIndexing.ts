@@ -1,9 +1,8 @@
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { API_KEY_STORAGE_KEY } from "../components/Settings/Settings";
-import { aiConfigAtom } from "../store/aiStore";
 import {
   showOutputAtom,
   isProcessingAtom,
@@ -46,8 +45,6 @@ export function useIndexing() {
   const [items, setItems] = useAtom(itemsAtom);
   const [summary, setSummary] = useAtom(summaryAtom);
   const [error, setError] = useAtom(errorAtom);
-  const aiConfig = useAtomValue(aiConfigAtom);
-  const aiMode = aiConfig?.aiMode ?? "";
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
 

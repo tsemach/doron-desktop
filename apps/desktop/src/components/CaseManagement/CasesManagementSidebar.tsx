@@ -21,52 +21,51 @@ export default function CaseManagementSidebar() {
   const displayName = localStorage.getItem("user_name");
 
   return (
-    <aside className="w-35 shrink-0 flex flex-col py-4 px-3 border-r rtl:border-r-0 rtl:border-l border-border">       
+    <aside className="w-40 shrink-0 flex flex-col py-4 px-3 border-r rtl:border-r-0 rtl:border-l border-border">       
       <BackButton navigateTo={"/"} /> 
 
       <div className="border-t border-border -mx-3 mt-2" />
 
-      {/* Centered Navigation Menu */}
-      <div className="flex-1 flex flex-col justify-center">
-        <div className="flex flex-col gap-1">
+      {/* Navigation Menu (Top-aligned) */}
+      <div className="flex-1 flex flex-col mt-4">
+        <div className="flex flex-col gap-3">
           <Button
             variant="ghost"
-            className={`w-full justify-start font-normal ${
+            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
               isOpenCasesActive ? "bg-muted text-foreground font-semibold" : ""
             }`}
             onClick={() => navigate("/case-management")}
           >
-            {t("open_cases")}
+            {t("open_cases").split(" ").map((word, i) => (
+              <span key={i} className="block">{word}</span>
+            ))}
           </Button>
           <Button
             variant="ghost"
-            className="w-full justify-start text-muted-foreground/40 cursor-not-allowed"
-            disabled
-          >
-            {t("search")}
-          </Button>
-          <Button
-            variant="ghost"
-            className={`w-full justify-start font-normal ${
+            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
               isNewCaseActive ? "bg-muted text-foreground font-semibold" : ""
             }`}
             onClick={() => navigate("/case-management/new-case")}
           >
-            {t("new_case")}
+            {t("new_case").split(" ").map((word, i) => (
+              <span key={i} className="block">{word}</span>
+            ))}
           </Button>
         </div>
 
         <div className="border-t border-border -mx-3 my-4" />
 
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-3">
           <Button
             variant="ghost"
-            className={`w-full justify-start font-normal ${
+            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
               isTemplatesActive ? "bg-muted text-foreground font-semibold" : ""
             }`}
             onClick={() => navigate("/case-management/templates")}
           >
-            {t("template")}
+            {t("template").split(" ").map((word, i) => (
+              <span key={i} className="block">{word}</span>
+            ))}
           </Button>        
         </div>
       </div>

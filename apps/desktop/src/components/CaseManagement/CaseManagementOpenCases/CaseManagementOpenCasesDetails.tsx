@@ -165,9 +165,6 @@ export default function CaseManagementOpenCasesDetails() {
 
   // Handle selected document preview loading
   useEffect(() => {
-    // Reset sub-tab to preview when selecting a different document
-    setDocSubTab("preview");
-
     if (!selectedDocument) {
       setPreviewHtml(null);
       setPreviewText(null);
@@ -517,7 +514,7 @@ export default function CaseManagementOpenCasesDetails() {
               <span>
                 {activeRightTab === "emails"
                   ? (t("emails_exchange") || "Case Email Correspondence")
-                  : (t("document_preview") || "Document Preview")}
+                  : (t("document_details") || "Document Details")}
               </span>
               {activeRightTab === "preview" && selectedDocument && (
                 <span className="text-xs text-muted-foreground font-mono font-normal truncate max-w-[200px] align-middle" title={selectedDocument.name}>

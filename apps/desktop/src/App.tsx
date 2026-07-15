@@ -6,8 +6,8 @@ import Settings from "./components/Settings/Settings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import UpdateBanner from "./components/Updater/UpdateBanner";
-import { triggerGlobalHealthCheck, aiConfigStatusAtom } from "./store/aiStore";
-import { useAtomValue, getDefaultStore } from "jotai";
+import { triggerGlobalHealthCheck } from "./store/aiStore";
+import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "./store/indexStore";
 import DocsManagementScanBackgroundIndexer from "./components/DocsManagement/DocsManagementScanBackgroundIndexer";
 

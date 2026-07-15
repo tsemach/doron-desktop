@@ -18,7 +18,7 @@ import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
 export default function CaseManagementOpenCases() {
   const navigate = useNavigate();
   const [cases, setCases] = useState<Case[]>([]);
-  const [filter, setFilter] = useState<CaseStatus | "all">("all");
+  const [filter, setFilter] = useState<CaseStatus | "all">("open");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
 

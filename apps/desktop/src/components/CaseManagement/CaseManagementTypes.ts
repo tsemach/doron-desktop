@@ -1,4 +1,4 @@
-export type CaseStatus = "open" | "in-progress" | "closed" | "followup";
+export type CaseStatus = "open" | "waiting" | "followup" | "closed";
 
 export interface Case {
   id: string;

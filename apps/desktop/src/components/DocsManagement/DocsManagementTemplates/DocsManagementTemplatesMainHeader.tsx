@@ -7,6 +7,9 @@ interface DocsManagementTemplatesMainHeaderProps {
   docCount: number;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  uniqueRows: number[];
+  selectedRow: number | null;
+  setSelectedRow: (row: number | null) => void;
   onSyncAllFields?: () => void;
   isSyncingAll?: boolean;
 }
@@ -18,6 +21,9 @@ export default function DocsManagementTemplatesMainHeader({
   docCount,
   searchQuery,
   setSearchQuery,
+  uniqueRows,
+  selectedRow,
+  setSelectedRow,
   onSyncAllFields,
   isSyncingAll,
 }: DocsManagementTemplatesMainHeaderProps) {
@@ -101,37 +107,61 @@ export default function DocsManagementTemplatesMainHeader({
           </button>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search variables or document names..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-md border border-input bg-card pl-8 pr-8 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground font-semibold text-xs cursor-pointer"
+        {/* Search and Row Filter Bar */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
+          <div className="relative w-full sm:flex-1">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
             >
-              ✕
-            </button>
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search variables or document names..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-md border border-input bg-card pl-8 pr-8 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground font-semibold text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {uniqueRows.length > 0 && (
+            <div className="relative w-full sm:w-[120px] shrink-0 animate-in fade-in duration-200">
+              <select
+                value={selectedRow ?? "all"}
+                onChange={(e) => setSelectedRow(e.target.value === "all" ? null : parseInt(e.target.value, 10))}
+                className="w-full h-[30px] rounded-md border border-input bg-card pl-3 pr-8 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+              >
+                <option value="all">All Rows</option>
+                {uniqueRows.map((row) => (
+                  <option key={row} value={row}>
+                    Row {row}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-2.5 flex items-center pointer-events-none text-muted-foreground">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -34,6 +34,9 @@ jobs:
         with:
           workspaces: "./apps/desktop/src-tauri -> target"
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
