@@ -42,10 +42,19 @@ export default function SettingSoftwareUpdate({
             </span>
           )}
           {updateStatus === "up-to-date" && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
-              <Check className="size-3.5" />
-              App is up-to-date
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                <Check className="size-3.5" />
+                App is up-to-date
+              </span>
+              <button
+                onClick={onCheckForUpdates}
+                className="px-2.5 py-1.5 border border-border bg-background hover:bg-accent rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+              >
+                <RefreshCw className="size-3 text-muted-foreground" />
+                Check again
+              </button>
+            </div>
           )}
           {updateStatus === "available" && (
             <div className="flex flex-col sm:items-end gap-1.5">
