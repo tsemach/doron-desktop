@@ -22,6 +22,7 @@ export default function CaseManagementCaseCreate() {
   const [docTemplates, setDocTemplates] = useState<DocTemplate[]>([]);
   const [filterDocId, setFilterDocId] = useState<number | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [showAllPreviews, setShowAllPreviews] = useState(false);
   const [expandedDocId, setExpandedDocId] = useState<number | null>(null);
   const [docHtmlCache, setDocHtmlCache] = useState<Record<number, string>>({});
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -139,6 +140,7 @@ export default function CaseManagementCaseCreate() {
     setFilterDocId(null); // Reset document filter when template changes
     setSelectedRow(null); // Reset row filter when template changes
     setFocusedField(null); // Reset focused field
+    setShowAllPreviews(false); // Reset "show all previews" mode
     setExpandedDocId(null); // Reset expanded document details
     setDocHtmlCache({}); // Clear preview HTML cache
     setPreviewError(null); // Clear preview error
@@ -184,6 +186,7 @@ export default function CaseManagementCaseCreate() {
       setFilterDocId(null);
     }
     setFocusedField(field);
+    setShowAllPreviews(false);
 
     // Wait for React to actually commit + paint the re-render (filter reset
     // and/or focused-field highlight) before the target input can be scrolled
@@ -243,7 +246,7 @@ export default function CaseManagementCaseCreate() {
   };
 
   useEffect(() => {
-    if (!focusedField || expandedDocId === null) return;
+    if (showAllPreviews || !focusedField || expandedDocId === null) return;
 
     const docs = fieldToDocsMap[focusedField] || [];
     const hasDoc = docs.some((d) => d.id === expandedDocId);
@@ -526,15 +529,31 @@ export default function CaseManagementCaseCreate() {
                 {/* Top portion: fields list */}
                 <div 
                   className="flex flex-col min-h-0" 
-                  style={focusedField && isLgScreen ? { height: `${100 - bottomPercent}%` } : { flex: "1 1 0%" }}
+                  style={(focusedField || showAllPreviews) && isLgScreen ? { height: `${100 - bottomPercent}%` } : { flex: "1 1 0%" }}
                 >
-                  <div className="shrink-0">
-                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-                      Template Fields ({activeTemplate?.name})
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Enter real values for the template variables. Unfilled fields will remain as placeholders.
-                    </p>
+                  <div className="shrink-0 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+                        Template Fields ({activeTemplate?.name})
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Enter real values for the template variables. Unfilled fields will remain as placeholders.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={associatedDocs.length === 0}
+                      onClick={() => {
+                        setFocusedField(null);
+                        setExpandedDocId(null);
+                        setShowAllPreviews(true);
+                      }}
+                      className="shrink-0"
+                    >
+                      Show all preview
+                    </Button>
                   </div>
 
                   {/* Search and Document Filter Bar */}
@@ -649,7 +668,10 @@ export default function CaseManagementCaseCreate() {
                                 placeholder={`Value...`}
                                 value={fieldValues[field] || ""}
                                 onChange={(e) => setFieldValues({ ...fieldValues, [field]: e.target.value })}
-                                onFocus={() => setFocusedField(field)}
+                                onFocus={() => {
+                                  setFocusedField(field);
+                                  setShowAllPreviews(false);
+                                }}
                                 className={`w-full rounded-md border px-4 py-2.5 text-sm focus:outline-none transition-all font-mono ${
                                   isSelected
                                     ? isFilled
@@ -668,7 +690,7 @@ export default function CaseManagementCaseCreate() {
                 </div>
 
                 {/* Resizable Separation Line */}
-                {focusedField && isLgScreen && (
+                {(focusedField || showAllPreviews) && isLgScreen && (
                   <div
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -683,7 +705,7 @@ export default function CaseManagementCaseCreate() {
                 )}
 
                 {/* Bottom portion: Document Context drawer */}
-                {focusedField && (
+                {(focusedField || showAllPreviews) && (
                   <div
                     className="flex flex-col min-h-0 border border-border/80 bg-background/50 rounded-lg pt-4 px-0 pb-0 -mb-px space-y-2 shrink-0"
                     style={isLgScreen ? { maxHeight: `${bottomPercent}%` } : { maxHeight: "350px" }}
@@ -691,16 +713,23 @@ export default function CaseManagementCaseCreate() {
                     <div className="flex justify-between items-center shrink-0 pb-1 border-b border-border/60">
                       <div className="pl-2">
                         <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                          Context for Field: <span className="font-mono text-primary">{focusedField}</span>
+                          {showAllPreviews ? (
+                            "All Document Previews"
+                          ) : (
+                            <>Context for Field: <span className="font-mono text-primary">{focusedField}</span></>
+                          )}
                         </h4>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Select a document card below to view its context snippet.
+                          {showAllPreviews
+                            ? "Every document in this case template. Select a card below to view its context snippet."
+                            : "Select a document card below to view its context snippet."}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
                           setFocusedField(null);
+                          setShowAllPreviews(false);
                           setExpandedDocId(null);
                         }}
                         className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors text-xs font-semibold"
@@ -713,11 +742,15 @@ export default function CaseManagementCaseCreate() {
                     {/* Context Body: Grid of associated document cards */}
                     <div className="flex-1 flex flex-col min-h-0 gap-2 -mb-px">
                       {(() => {
-                        const docs = fieldToDocsMap[focusedField] || [];
+                        const docs = showAllPreviews
+                          ? associatedDocs
+                          : (focusedField ? fieldToDocsMap[focusedField] || [] : []);
                         if (docs.length === 0) {
                           return (
                             <div className="flex items-center justify-center h-full text-center text-xs text-muted-foreground italic py-4">
-                              This field is manually added and does not belong to any document templates.
+                              {showAllPreviews
+                                ? "This case template has no associated documents."
+                                : "This field is manually added and does not belong to any document templates."}
                             </div>
                           );
                         }
