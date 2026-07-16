@@ -492,7 +492,7 @@ export default function CaseManagementCaseCreate() {
             {hasFields && (
               <div
                 id="right-fields-container"
-                className={`rounded-lg border border-border bg-card p-4 animate-in fade-in slide-in-from-right-4 duration-300 min-w-0 flex flex-col gap-3 ${
+                className={`rounded-lg border border-border bg-card p-4 animate-in fade-in slide-in-from-right-4 duration-300 min-w-0 flex flex-col gap-2 pb-0 ${
                   isLgScreen ? "h-full" : ""
                 }`}
                 style={isLgScreen ? { flex: "1 1 0%" } : undefined}
@@ -643,11 +643,11 @@ export default function CaseManagementCaseCreate() {
                 {/* Bottom portion: Document Context drawer */}
                 {focusedField && (
                   <div
-                    className="flex flex-col min-h-0 border border-border/80 bg-background/50 rounded-lg p-4 space-y-3 shrink-0"
-                    style={isLgScreen ? { height: `${bottomPercent}%` } : { maxHeight: "280px" }}
+                    className="flex flex-col min-h-0 border border-border/80 bg-background/50 rounded-lg pt-4 px-0 pb-0 space-y-2 shrink-0"
+                    style={isLgScreen ? { maxHeight: `${bottomPercent}%` } : { maxHeight: "280px" }}
                   >
                     <div className="flex justify-between items-center shrink-0 pb-1 border-b border-border/60">
-                      <div>
+                      <div className="pl-2">
                         <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
                           Context for Field: <span className="font-mono text-primary">{focusedField}</span>
                         </h4>
@@ -669,7 +669,7 @@ export default function CaseManagementCaseCreate() {
                     </div>
 
                     {/* Context Body: Grid of associated document cards */}
-                    <div className="flex-1 flex flex-col min-h-0 gap-3">
+                    <div className="flex-1 flex flex-col min-h-0 gap-2">
                       {(() => {
                         const docs = fieldToDocsMap[focusedField] || [];
                         if (docs.length === 0) {
@@ -784,7 +784,7 @@ export default function CaseManagementCaseCreate() {
 
                             {/* Full-width context snippet container below the grid if any card is expanded */}
                             {expandedDocId && (
-                              <div className="flex-1 min-h-0 flex flex-col border border-border/80 rounded-lg p-3 bg-muted/20 space-y-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                              <div className="flex-1 min-h-0 flex flex-col border border-border/80 rounded-lg pt-3 px-3 pb-0 bg-muted/20 space-y-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="flex justify-between items-center pb-1 border-b border-border/40 shrink-0">
                                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                                     Document Live Preview
@@ -828,7 +828,7 @@ export default function CaseManagementCaseCreate() {
                                       fields={templateFields}
                                       fieldValues={fieldValues}
                                       focusedField={focusedField}
-                                      className="flex-1 min-h-0 w-full overflow-y-auto bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 relative select-text"
+                                      className="flex-1 min-h-0 w-full overflow-y-auto bg-background/80 dark:bg-background/20 pt-3 px-3 pb-0 rounded-lg border border-border/40 relative select-text"
                                     />
                                   ) : (
                                     <div className="py-4 text-center text-xs text-muted-foreground">
