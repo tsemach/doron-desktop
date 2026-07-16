@@ -13,6 +13,8 @@ pub mod email;
 pub mod documents;
 pub mod clipboard;
 pub mod power;
+pub mod tags;
+pub mod user_settings;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -92,7 +94,6 @@ pub fn run() {
             case::get_case_annotations,
             case::set_case_annotations,
             case::delete_case_annotations,
-            case::list_all_annotation_tags,
             case::add_file_to_case,
             case::get_case_fields,
             case::save_case_fields,
@@ -105,6 +106,15 @@ pub fn run() {
             documents::versioning::list_document_versions,
             documents::versioning::restore_document_version,
             documents::versioning::delete_document_version,
+            // tags
+            tags::add_tag,
+            tags::update_tag,
+            tags::remove_tag,
+            tags::list_tags,
+            tags::list_all_tag_names,
+            // user settings
+            user_settings::get_user_settings,
+            user_settings::save_user_settings,
             // email commands
             email::get_email_settings,
             email::save_email_settings,

@@ -7,8 +7,6 @@ use crate::store;
 pub struct CaseAnnotations {
     pub case_id: i64,
     pub notes: Option<String>,
-    pub tags: Vec<String>,
-    pub followup_date: Option<String>,
     pub updated_at: String,
 }
 
@@ -16,25 +14,17 @@ pub struct CaseAnnotations {
 pub fn get_case_annotations(app: AppHandle, case_id: i64) -> Result<Option<CaseAnnotations>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn.prepare(
-        "SELECT notes, tags, followup_date, updated_at FROM case_annotations WHERE case_id = ?1"
+        "SELECT notes, updated_at FROM case_annotations WHERE case_id = ?1"
     ).map_err(|e| e.to_string())?;
-    
+
     let mut rows = stmt.query(params![case_id]).map_err(|e| e.to_string())?;
     if let Some(row) = rows.next().map_err(|e| e.to_string())? {
         let notes: Option<String> = row.get(0).map_err(|e| e.to_string())?;
-        let tags_str: Option<String> = row.get(1).map_err(|e| e.to_string())?;
-        let followup_date: Option<String> = row.get(2).map_err(|e| e.to_string())?;
-        let updated_at: String = row.get(3).map_err(|e| e.to_string())?;
-        
-        let tags = tags_str
-            .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
-            .unwrap_or_default();
-            
+        let updated_at: String = row.get(1).map_err(|e| e.to_string())?;
+
         Ok(Some(CaseAnnotations {
             case_id,
             notes,
-            tags,
-            followup_date,
             updated_at,
         }))
     } else {
@@ -47,24 +37,19 @@ pub fn set_case_annotations(
     app: AppHandle,
     case_id: i64,
     notes: Option<String>,
-    tags: Vec<String>,
-    followup_date: Option<String>,
 ) -> Result<CaseAnnotations, String> {
     let conn = store::open_db(&app)?;
-    let tags_str = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
     let updated_at = chrono::Utc::now().to_rfc3339();
-    
+
     conn.execute(
-        "INSERT OR REPLACE INTO case_annotations (case_id, notes, tags, followup_date, updated_at) 
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![case_id, notes, tags_str, followup_date, updated_at],
+        "INSERT OR REPLACE INTO case_annotations (case_id, notes, updated_at)
+         VALUES (?1, ?2, ?3)",
+        params![case_id, notes, updated_at],
     ).map_err(|e| format!("[set_case_annotations] {e}"))?;
-    
+
     Ok(CaseAnnotations {
         case_id,
         notes,
-        tags,
-        followup_date,
         updated_at,
     })
 }

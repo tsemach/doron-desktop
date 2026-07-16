@@ -230,7 +230,6 @@ export default function CaseManagementOpenCasesDetails() {
         folder: c.folder,
         notes: c.notes,
         tags: c.tags || [],
-        followupDate: c.followup_date,
       }));
       const found = mapped.find((c) => c.id === id);
       if (found) {
@@ -610,17 +609,23 @@ export default function CaseManagementOpenCasesDetails() {
           caseSubject={editingCaseAnnotations.subject || "No Subject"}
           initialNotes={editingCaseAnnotations.notes}
           initialTags={editingCaseAnnotations.tags}
-          initialFollowupDate={editingCaseAnnotations.followupDate}
           onCancel={() => setEditingCaseAnnotations(null)}
-          onSave={(notes, tags, followupDate) => {
+          onTagsChange={(tags) => {
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes, tags, followupDate } : prev
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, tags } : prev
+            );
+          }}
+          onSave={(notes) => {
+            setSelectedCase((prev) =>
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes } : prev
             );
             setEditingCaseAnnotations(null);
           }}
           onDelete={() => {
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes: undefined, tags: [], followupDate: undefined } : prev
+              prev && prev.id === editingCaseAnnotations.id
+                ? { ...prev, notes: undefined, tags: prev.tags.filter((tg) => tg.type === "system") }
+                : prev
             );
             setEditingCaseAnnotations(null);
           }}
@@ -634,26 +639,36 @@ export default function CaseManagementOpenCasesDetails() {
           initialNotes={editingDoc.notes}
           initialTags={editingDoc.tags}
           onCancel={() => setEditingDoc(null)}
-          onSave={(notes, tags) => {
+          onTagsChange={(tags) => {
             setDocuments((prev) =>
-              prev.map((d) =>
-                d.path === editingDoc.path ? { ...d, notes, tags } : d
-              )
+              prev.map((d) => (d.path === editingDoc.path ? { ...d, tags } : d))
+            );
+            if (selectedDocument?.path === editingDoc.path) {
+              setSelectedDocument((prev) => (prev ? { ...prev, tags } : null));
+            }
+          }}
+          onSave={(notes) => {
+            setDocuments((prev) =>
+              prev.map((d) => (d.path === editingDoc.path ? { ...d, notes } : d))
             );
             // Sync current selected preview doc annotations if edited
             if (selectedDocument?.path === editingDoc.path) {
-              setSelectedDocument((prev) => prev ? { ...prev, notes, tags } : null);
+              setSelectedDocument((prev) => (prev ? { ...prev, notes } : null));
             }
             setEditingDoc(null);
           }}
           onDelete={() => {
             setDocuments((prev) =>
               prev.map((d) =>
-                d.path === editingDoc.path ? { ...d, notes: undefined, tags: [] } : d
+                d.path === editingDoc.path
+                  ? { ...d, notes: undefined, tags: d.tags.filter((tg) => tg.type === "system") }
+                  : d
               )
             );
             if (selectedDocument?.path === editingDoc.path) {
-              setSelectedDocument((prev) => prev ? { ...prev, notes: undefined, tags: [] } : null);
+              setSelectedDocument((prev) =>
+                prev ? { ...prev, notes: undefined, tags: prev.tags.filter((tg) => tg.type === "system") } : null
+              );
             }
             setEditingDoc(null);
           }}

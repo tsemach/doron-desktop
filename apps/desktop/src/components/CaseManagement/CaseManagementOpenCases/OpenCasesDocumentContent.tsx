@@ -29,10 +29,14 @@ export default function OpenCasesDocumentContent({ doc }: OpenCasesDocumentConte
           <div className="flex flex-wrap gap-1 mt-1.5">
             {doc.tags.map((tag) => (
               <span
-                key={tag}
-                className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold border border-primary/20 tracking-wide uppercase select-none"
+                key={tag.name}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border tracking-wide uppercase select-none ${
+                  tag.type === "system"
+                    ? "bg-muted text-muted-foreground border-border/60"
+                    : "bg-primary/10 text-primary border-primary/20"
+                }`}
               >
-                #{tag}
+                #{tag.value ? `${tag.name}: ${tag.value}` : tag.name}
               </span>
             ))}
           </div>

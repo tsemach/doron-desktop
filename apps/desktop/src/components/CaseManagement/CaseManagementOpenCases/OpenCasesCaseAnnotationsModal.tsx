@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "../../ui/button";
+import TagChip from "../../ui/TagChip";
 import { useLanguage } from "../../../context/LanguageContext";
+import type { Tag } from "../CaseManagementTypes";
 
 interface OpenCasesCaseAnnotationsModalProps {
   caseId: string;
   caseSubject: string;
   initialNotes?: string;
-  initialTags?: string[];
-  initialFollowupDate?: string;
-  onSave: (notes: string, tags: string[], followupDate?: string) => void;
+  initialTags: Tag[];
+  onSave: (notes: string) => void;
+  onTagsChange: (tags: Tag[]) => void;
   onCancel: () => void;
   onDelete: () => void;
 }
@@ -18,22 +20,16 @@ export default function OpenCasesCaseAnnotationsModal({
   caseId,
   caseSubject,
   initialNotes = "",
-  initialTags = [],
-  initialFollowupDate = "",
+  initialTags,
   onSave,
+  onTagsChange,
   onCancel,
   onDelete,
 }: OpenCasesCaseAnnotationsModalProps) {
   const [notes, setNotes] = useState(initialNotes || "");
-  const [tags, setTags] = useState<string[]>(initialTags || []);
-  const [followupDate, setFollowupDate] = useState(initialFollowupDate || "");
-
-  useEffect(() => {
-    if (followupDate && followupDate.trim() && !tags.includes("followup")) {
-      setTags([...tags, "followup"]);
-    }
-  }, [followupDate]);
-  const [newTag, setNewTag] = useState("");
+  const [tags, setTags] = useState<Tag[]>(initialTags);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagValue, setNewTagValue] = useState("");
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const { t } = useLanguage();
@@ -44,38 +40,68 @@ export default function OpenCasesCaseAnnotationsModal({
 
   async function loadSuggestedTags() {
     try {
-      const allTags = await invoke<string[]>("list_all_annotation_tags");
+      const allTags = await invoke<string[]>("list_all_tag_names", { tagType: "user" });
       setSuggestedTags(allTags);
     } catch (e) {
       console.error("Failed to load suggested tags:", e);
     }
   }
 
-  function handleAddTag() {
-    const trimmed = newTag.trim().toLowerCase();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      setNewTag("");
+  function applyTags(next: Tag[]) {
+    setTags(next);
+    onTagsChange(next);
+  }
+
+  async function handleAddTag(name: string, value?: string) {
+    const trimmedName = name.trim().toLowerCase();
+    if (!trimmedName || tags.some((tg) => tg.name === trimmedName)) return;
+    try {
+      const tag = await invoke<Tag>("add_tag", {
+        scopeType: "case",
+        scopeValue: caseId,
+        name: trimmedName,
+        value: value?.trim() || null,
+        tagType: "user",
+      });
+      applyTags([...tags, tag]);
+      setNewTagName("");
+      setNewTagValue("");
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to add tag: ${err}`);
     }
   }
 
-  function handleRemoveTag(tagToRemove: string) {
-    setTags(tags.filter((t) => t !== tagToRemove));
-    if (tagToRemove === "followup") {
-      setFollowupDate("");
+  async function handleRemoveTag(tag: Tag) {
+    try {
+      await invoke("remove_tag", { scopeType: "case", scopeValue: caseId, name: tag.name });
+      applyTags(tags.filter((tg) => tg.name !== tag.name));
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to remove tag: ${err}`);
     }
   }
 
-  function handleAddSuggestedTag(tag: string) {
-    if (!tags.includes(tag)) {
-      setTags([...tags, tag]);
+  async function handleUpdateFollowupDate(newDate: string) {
+    try {
+      const tag = await invoke<Tag>("update_tag", {
+        scopeType: "case",
+        scopeValue: caseId,
+        name: "followup",
+        value: newDate || null,
+        tagType: "user",
+      });
+      applyTags(tags.map((tg) => (tg.name === "followup" ? tag : tg)));
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to update follow-up date: ${err}`);
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
-      handleAddTag();
+      handleAddTag(newTagName, newTagValue);
     }
   };
 
@@ -86,10 +112,8 @@ export default function OpenCasesCaseAnnotationsModal({
       await invoke("set_case_annotations", {
         caseId: Number(caseId),
         notes: notes ? notes.trim() : null,
-        tags,
-        followupDate: followupDate ? followupDate.trim() : null,
       });
-      onSave(notes ? notes.trim() : "", tags, followupDate ? followupDate.trim() : undefined);
+      onSave(notes ? notes.trim() : "");
     } catch (err) {
       console.error(err);
       alert(`Failed to save case annotations: ${err}`);
@@ -103,6 +127,11 @@ export default function OpenCasesCaseAnnotationsModal({
     setIsSaving(true);
     try {
       await invoke("delete_case_annotations", { caseId: Number(caseId) });
+      const userTagsToRemove = tags.filter((tg) => tg.type === "user");
+      for (const tag of userTagsToRemove) {
+        await invoke("remove_tag", { scopeType: "case", scopeValue: caseId, name: tag.name });
+      }
+      applyTags(tags.filter((tg) => tg.type === "system"));
       onDelete();
     } catch (err) {
       console.error(err);
@@ -112,8 +141,15 @@ export default function OpenCasesCaseAnnotationsModal({
     }
   };
 
+  const userTags = tags.filter((tg) => tg.type === "user");
+  const systemTags = tags.filter((tg) => tg.type === "system");
+  const followupTag = userTags.find((tg) => tg.name === "followup");
+  const isTypingFollowup = newTagName.trim().toLowerCase() === "followup";
+
   // Filter suggested tags to exclude currently added ones, and ensure "followup" is always offered if not already added.
-  const filteredSuggestions = [...new Set(["followup", ...suggestedTags])].filter((t) => !tags.includes(t));
+  const filteredSuggestions = [...new Set(["followup", ...suggestedTags])].filter(
+    (name) => !userTags.some((tg) => tg.name === name)
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -150,43 +186,45 @@ export default function OpenCasesCaseAnnotationsModal({
                 <span className="text-[10px] text-muted-foreground">Press Enter or comma to add</span>
               </label>
 
-              {/* Render current tags */}
+              {/* Render current tags (system tags shown read-only, user tags removable) */}
               <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border border-input rounded-lg bg-background/50 focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold select-none border border-primary/20"
-                  >
-                    #{tag}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                      className="hover:bg-primary/20 text-primary/75 hover:text-primary rounded-full p-0.5 leading-none transition-colors"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="10"
-                        height="10"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                      >
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </span>
+                {systemTags.map((tag) => (
+                  <TagChip key={tag.name} tag={tag} />
+                ))}
+                {userTags.map((tag) => (
+                  <TagChip key={tag.name} tag={tag} onRemove={handleRemoveTag} />
                 ))}
                 <input
                   type="text"
                   placeholder={tags.length === 0 ? "Add tags (e.g. urgent, signed)..." : ""}
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="flex-1 bg-transparent text-xs text-foreground focus:outline-none border-none p-0.5 min-w-[120px]"
                 />
               </div>
+
+              {/* Optional value for the tag currently being typed */}
+              {newTagName.trim() && (
+                <div className="flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
+                  <input
+                    type={isTypingFollowup ? "date" : "text"}
+                    placeholder={isTypingFollowup ? undefined : "Optional value..."}
+                    value={newTagValue}
+                    onChange={(e) => setNewTagValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => handleAddTag(newTagName, newTagValue)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
 
               {/* Suggested Tags */}
               {filteredSuggestions.length > 0 && (
@@ -195,14 +233,14 @@ export default function OpenCasesCaseAnnotationsModal({
                     Suggested Tags:
                   </span>
                   <div className="flex flex-wrap gap-1">
-                    {filteredSuggestions.slice(0, 10).map((tag) => (
+                    {filteredSuggestions.slice(0, 10).map((name) => (
                       <button
-                        key={tag}
+                        key={name}
                         type="button"
-                        onClick={() => handleAddSuggestedTag(tag)}
+                        onClick={() => handleAddTag(name)}
                         className="px-2 py-0.5 rounded-full border border-border bg-background hover:bg-muted text-[10px] text-muted-foreground hover:text-foreground transition-all duration-150"
                       >
-                        +{tag}
+                        +{name}
                       </button>
                     ))}
                   </div>
@@ -210,8 +248,8 @@ export default function OpenCasesCaseAnnotationsModal({
               )}
             </div>
 
-            {/* Follow-up Date (renders conditionally if "followup" tag is present) */}
-            {tags.includes("followup") && (
+            {/* Follow-up Date (editable once the "followup" tag exists) */}
+            {followupTag && (
               <div className="space-y-2 shrink-0 animate-in slide-in-from-top-2 duration-200 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
                 <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <span>📅 Follow-up Date</span>
@@ -219,9 +257,9 @@ export default function OpenCasesCaseAnnotationsModal({
                 </label>
                 <input
                   type="date"
-                  value={followupDate}
+                  value={followupTag.value || ""}
                   onChange={(e) => {
-                    setFollowupDate(e.target.value);
+                    handleUpdateFollowupDate(e.target.value);
                     if (e.target.value && e.target.value.length === 10) {
                       e.target.blur();
                     }
@@ -246,7 +284,7 @@ export default function OpenCasesCaseAnnotationsModal({
           {/* Footer Actions */}
           <div className="flex items-center justify-between border-t border-border pt-4 mt-auto shrink-0 select-none">
             <div>
-              {(initialNotes || initialTags.length > 0) && (
+              {(initialNotes || userTags.length > 0) && (
                 <Button
                   type="button"
                   variant="destructive"

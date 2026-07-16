@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Case, CaseStatus } from "../CaseManagementTypes";
 import { useLanguage } from "../../../context/LanguageContext";
+import { getFollowupStatus } from "@/lib/followupStatus";
 
 const STATUS_STYLES: Record<CaseStatus, string> = {
   open: "bg-zinc-100 text-zinc-700 dark:bg-zinc-900/30 dark:text-zinc-300",
@@ -29,23 +30,8 @@ export default function OpenCasesListItem({
 }: OpenCasesListItemProps) {
   const { t } = useLanguage();
 
-  const getFollowupStatus = (dateStr?: string) => {
-    if (!dateStr) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = new Date(dateStr);
-    target.setHours(0, 0, 0, 0);
-    
-    if (target.getTime() < today.getTime()) {
-      return { type: "overdue", label: `Overdue: ${dateStr}` };
-    } else if (target.getTime() === today.getTime()) {
-      return { type: "due-today", label: `Due Today: ${dateStr}` };
-    } else {
-      return { type: "pending", label: `Follow-up: ${dateStr}` };
-    }
-  };
-
-  const followupStatus = getFollowupStatus(c.followupDate);
+  const followupTag = c.tags.find((tg) => tg.name === "followup");
+  const followupStatus = getFollowupStatus(followupTag?.value);
 
   return (
     <tr

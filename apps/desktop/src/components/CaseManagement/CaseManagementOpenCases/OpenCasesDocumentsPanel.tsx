@@ -59,7 +59,7 @@ export default function OpenCasesDocumentsPanel({
     const nameMatch = doc.name.toLowerCase().includes(q);
     const titleMatch = doc.title?.toLowerCase().includes(q) ?? false;
     const notesMatch = doc.notes?.toLowerCase().includes(q) ?? false;
-    const tagsMatch = doc.tags?.some((t) => t.toLowerCase().includes(q)) ?? false;
+    const tagsMatch = doc.tags?.some((t) => t.name.toLowerCase().includes(q)) ?? false;
     return nameMatch || titleMatch || notesMatch || tagsMatch;
   });
 

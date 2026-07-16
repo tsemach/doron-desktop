@@ -1,5 +1,21 @@
 export type CaseStatus = "open" | "waiting" | "followup" | "closed";
 
+export type TagScopeType = "case" | "document" | "app";
+export type TagKind = "user" | "system";
+
+// Mirrors the Rust `Tag` struct's wire shape as-is (snake_case) — like `CaseFile`
+// below, tag arrays are used directly from invoke() results without a remapping step.
+export interface Tag {
+  id: number;
+  scope_type: TagScopeType;
+  scope_value?: string;
+  name: string;
+  value?: string;
+  type: TagKind;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Case {
   id: string;
   subject?: string;
@@ -9,8 +25,7 @@ export interface Case {
   updatedAt?: string;
   folder?: string;
   notes?: string;
-  tags?: string[];
-  followupDate?: string;
+  tags: Tag[];
 }
 
 export interface CaseFile {
@@ -20,7 +35,7 @@ export interface CaseFile {
   size_kb: number;
   title?: string;
   notes?: string;
-  tags: string[];
+  tags: Tag[];
 }
 
 export interface DocTemplate {

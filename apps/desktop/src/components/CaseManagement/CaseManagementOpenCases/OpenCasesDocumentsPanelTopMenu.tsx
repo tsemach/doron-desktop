@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "../../../context/LanguageContext";
+import { getFollowupStatus } from "@/lib/followupStatus";
 
 import { Case } from "../CaseManagementTypes";
 
@@ -13,22 +14,6 @@ interface OpenDocumentsPanelTopMenuProps {
   onEditCaseAnnotations?: () => void;
   isDetailView?: boolean;
 }
-
-const getFollowupStatus = (dateStr?: string) => {
-  if (!dateStr) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0);
-  
-  if (target.getTime() < today.getTime()) {
-    return { type: "overdue", label: `Overdue: ${dateStr}` };
-  } else if (target.getTime() === today.getTime()) {
-    return { type: "due-today", label: `Due Today: ${dateStr}` };
-  } else {
-    return { type: "pending", label: `Follow-up: ${dateStr}` };
-  }
-};
 
 export default function OpenDocumentsPanelTopMenu({
   selectedCase,
@@ -90,25 +75,26 @@ export default function OpenDocumentsPanelTopMenu({
         )}
         {/* Render tags with conditional followup badge */}
         {(() => {
-          let renderTags = selectedCase?.tags || [];
-          if (isDetailView && selectedCase?.followupDate && !renderTags.includes("followup")) {
-            renderTags = [...renderTags, "followup"];
-          }
-          const filteredTags = renderTags.filter((tag) => isDetailView || tag.toLowerCase() !== "followup");
-          if (filteredTags.length === 0) return null;
+          const allTags = selectedCase?.tags || [];
+          const visibleTags = allTags.filter((tag) => isDetailView || tag.name.toLowerCase() !== "followup");
+          if (visibleTags.length === 0) return null;
 
           return (
             <div className="flex flex-wrap gap-1.5 mt-2 items-center">
-              {filteredTags.map((tag) => {
-                const isFollowupTag = tag.toLowerCase() === "followup";
-                const status = isFollowupTag && isDetailView ? getFollowupStatus(selectedCase?.followupDate) : null;
+              {visibleTags.map((tag) => {
+                const isFollowupTag = tag.name.toLowerCase() === "followup";
+                const status = isFollowupTag && isDetailView ? getFollowupStatus(tag.value) : null;
 
                 return (
-                  <div key={tag} className="flex items-center gap-1.5 select-none">
+                  <div key={tag.name} className="flex items-center gap-1.5 select-none">
                     <span
-                      className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold border border-primary/20 tracking-wide uppercase select-none font-sans"
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border tracking-wide uppercase select-none font-sans ${
+                        tag.type === "system"
+                          ? "bg-muted text-muted-foreground border-border/60"
+                          : "bg-primary/10 text-primary border-primary/20"
+                      }`}
                     >
-                      #{tag}
+                      #{!isFollowupTag && tag.value ? `${tag.name}: ${tag.value}` : tag.name}
                     </span>
                     {status && (
                       <span
