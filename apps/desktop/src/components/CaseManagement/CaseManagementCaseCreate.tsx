@@ -26,14 +26,14 @@ export default function CaseManagementCaseCreate() {
   const [docHtmlCache, setDocHtmlCache] = useState<Record<number, string>>({});
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingContext, setLoadingContext] = useState(false);
-  const [bottomPercent, setBottomPercent] = useState(33);
+  const [bottomPercent, setBottomPercent] = useState(55);
   const [isDraggingHeight, setIsDraggingHeight] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Split-pane resizing states
-  const [leftPercent, setLeftPercent] = useState(45);
+  const [leftPercent, setLeftPercent] = useState(36);
   const [isDragging, setIsDragging] = useState(false);
   const [isLgScreen, setIsLgScreen] = useState(window.innerWidth >= 1024);
 
@@ -81,8 +81,8 @@ export default function CaseManagementCaseCreate() {
       const rect = container.getBoundingClientRect();
       const relativeY = e.clientY - rect.top;
       const percentage = ((rect.height - relativeY) / rect.height) * 100;
-      // Clamp between 15% and 60% of total height
-      const clamped = Math.max(15, Math.min(60, percentage));
+      // Clamp between 15% and 65% of total height
+      const clamped = Math.max(15, Math.min(65, percentage));
       setBottomPercent(clamped);
     };
 
@@ -686,7 +686,7 @@ export default function CaseManagementCaseCreate() {
                 {focusedField && (
                   <div
                     className="flex flex-col min-h-0 border border-border/80 bg-background/50 rounded-lg pt-4 px-0 pb-0 -mb-px space-y-2 shrink-0"
-                    style={isLgScreen ? { maxHeight: `${bottomPercent}%` } : { maxHeight: "280px" }}
+                    style={isLgScreen ? { maxHeight: `${bottomPercent}%` } : { maxHeight: "350px" }}
                   >
                     <div className="flex justify-between items-center shrink-0 pb-1 border-b border-border/60">
                       <div className="pl-2">
@@ -725,7 +725,7 @@ export default function CaseManagementCaseCreate() {
                         return (
                           <>
                             {/* Horizontal grid of document cards (scrolls independently if too many) */}
-                            <div className="shrink-0 overflow-y-auto max-h-[120px] pr-1">
+                            <div className="shrink-0 overflow-y-auto max-h-[150px] pr-1">
                               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 {docs.map((doc) => {
                                   const isExpanded = expandedDocId === doc.id;
