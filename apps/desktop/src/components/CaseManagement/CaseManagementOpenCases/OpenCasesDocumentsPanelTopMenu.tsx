@@ -88,10 +88,10 @@ export default function OpenDocumentsPanelTopMenu({
                 return (
                   <div key={tag.name} className="flex items-center gap-1.5 select-none">
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border tracking-wide uppercase select-none font-sans ${
+                      className={`px-1 py-px rounded-full text-[9px] font-normal lowercase leading-tight select-none font-sans ${
                         tag.type === "system"
-                          ? "bg-muted text-muted-foreground border-border/60"
-                          : "bg-primary/10 text-primary border-primary/20"
+                          ? "bg-muted/50 text-muted-foreground/75"
+                          : "bg-primary/5 text-primary/75"
                       }`}
                     >
                       #{!isFollowupTag && tag.value ? `${tag.name}: ${tag.value}` : tag.name}

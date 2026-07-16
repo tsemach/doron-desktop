@@ -11,18 +11,18 @@ export default function TagChip({ tag, onRemove }: TagChipProps) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold select-none border ${
+      className={`inline-flex items-center gap-0.5 px-1 py-px rounded-full text-[9px] font-normal lowercase leading-tight select-none ${
         isSystem
-          ? "bg-muted text-muted-foreground border-border/60"
-          : "bg-primary/10 text-primary border-primary/20"
+          ? "bg-muted/50 text-muted-foreground/75"
+          : "bg-primary/5 text-primary/75"
       }`}
       title={isSystem ? "System tag (managed automatically)" : undefined}
     >
       {isSystem && (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="9"
-          height="9"
+          width="7"
+          height="7"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -42,8 +42,8 @@ export default function TagChip({ tag, onRemove }: TagChipProps) {
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="10"
-            height="10"
+            width="8"
+            height="8"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
