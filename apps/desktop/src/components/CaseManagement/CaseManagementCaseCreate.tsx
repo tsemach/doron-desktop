@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -173,6 +173,32 @@ export default function CaseManagementCaseCreate() {
       return true;
     });
   }, [getFilteredFields, selectedRow, searchQuery, filterDocId, fieldToDocsMap]);
+
+  // Clicking a placeholder in the bottom preview jumps the top fields panel to
+  // that field's input and focuses it, so the user can type a value right away.
+  const handleFieldClickFromPreview = useCallback((field: string) => {
+    const isHidden = !filteredTemplateFields.includes(field);
+    if (isHidden) {
+      setSearchQuery("");
+      setSelectedRow(null);
+      setFilterDocId(null);
+    }
+    setFocusedField(field);
+
+    // Wait for React to actually commit + paint the re-render (filter reset
+    // and/or focused-field highlight) before the target input can be scrolled
+    // to/focused — an arbitrary setTimeout delay was unreliable here; a double
+    // rAF reliably waits for the next painted frame regardless of what changed.
+    const focusInput = () => {
+      const input = document.getElementById(`field-${field}`) as HTMLInputElement | null;
+      if (!input) return;
+      input.scrollIntoView({ behavior: "smooth", block: "center" });
+      // preventScroll avoids the browser's own focus-triggered auto-scroll
+      // fighting with the smooth scrollIntoView call above.
+      input.focus({ preventScroll: true });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(focusInput));
+  }, [filteredTemplateFields]);
 
   const loadFullDocHtml = async (docId: number) => {
     setLoadingContext(true);
@@ -599,27 +625,43 @@ export default function CaseManagementCaseCreate() {
                   ) : (
                     <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-2 pb-2">
-                        {filteredTemplateFields.map((field) => (
-                          <div key={field} className="space-y-0.5">
-                            <label
-                              htmlFor={`field-${field}`}
-                              className="text-xs font-mono font-medium text-muted-foreground truncate block"
-                              title={field}
-                            >
-                              {field}
-                            </label>
-                            <input
-                              id={`field-${field}`}
-                              type="text"
-                              placeholder={`Value...`}
-                              value={fieldValues[field] || ""}
-                              onChange={(e) => setFieldValues({ ...fieldValues, [field]: e.target.value })}
-                              onFocus={() => setFocusedField(field)}
-                              className="w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all font-mono"
-                              disabled={loading}
-                            />
-                          </div>
-                        ))}
+                        {filteredTemplateFields.map((field) => {
+                          const isSelected = field === focusedField;
+                          const isFilled = !!fieldValues[field]?.trim();
+                          return (
+                            <div key={field} className="space-y-0.5">
+                              <label
+                                htmlFor={`field-${field}`}
+                                className={`text-xs font-mono font-bold truncate block transition-all w-fit max-w-full ${
+                                  isSelected
+                                    ? isFilled
+                                      ? "text-white bg-emerald-500 px-2 py-0.5 rounded-md shadow-sm shadow-emerald-500/40"
+                                      : "text-white bg-amber-500 px-2 py-0.5 rounded-md shadow-sm shadow-amber-500/40 animate-pulse"
+                                    : "text-muted-foreground font-medium"
+                                }`}
+                                title={field}
+                              >
+                                {field}
+                              </label>
+                              <input
+                                id={`field-${field}`}
+                                type="text"
+                                placeholder={`Value...`}
+                                value={fieldValues[field] || ""}
+                                onChange={(e) => setFieldValues({ ...fieldValues, [field]: e.target.value })}
+                                onFocus={() => setFocusedField(field)}
+                                className={`w-full rounded-md border px-4 py-2.5 text-sm focus:outline-none transition-all font-mono ${
+                                  isSelected
+                                    ? isFilled
+                                      ? "border-emerald-500/60 ring-2 ring-emerald-400"
+                                      : "border-amber-500/60 ring-2 ring-amber-400"
+                                    : "border-input bg-background focus:ring-2 focus:ring-ring"
+                                }`}
+                                disabled={loading}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -643,7 +685,7 @@ export default function CaseManagementCaseCreate() {
                 {/* Bottom portion: Document Context drawer */}
                 {focusedField && (
                   <div
-                    className="flex flex-col min-h-0 border border-border/80 bg-background/50 rounded-lg pt-4 px-0 pb-0 space-y-2 shrink-0"
+                    className="flex flex-col min-h-0 border border-border/80 bg-background/50 rounded-lg pt-4 px-0 pb-0 -mb-px space-y-2 shrink-0"
                     style={isLgScreen ? { maxHeight: `${bottomPercent}%` } : { maxHeight: "280px" }}
                   >
                     <div className="flex justify-between items-center shrink-0 pb-1 border-b border-border/60">
@@ -669,7 +711,7 @@ export default function CaseManagementCaseCreate() {
                     </div>
 
                     {/* Context Body: Grid of associated document cards */}
-                    <div className="flex-1 flex flex-col min-h-0 gap-2">
+                    <div className="flex-1 flex flex-col min-h-0 gap-2 -mb-px">
                       {(() => {
                         const docs = fieldToDocsMap[focusedField] || [];
                         if (docs.length === 0) {
@@ -828,6 +870,7 @@ export default function CaseManagementCaseCreate() {
                                       fields={templateFields}
                                       fieldValues={fieldValues}
                                       focusedField={focusedField}
+                                      onFieldClick={handleFieldClickFromPreview}
                                       className="flex-1 min-h-0 w-full overflow-y-auto bg-background/80 dark:bg-background/20 pt-3 px-3 pb-0 rounded-lg border border-border/40 relative select-text"
                                     />
                                   ) : (
