@@ -1,5 +1,6 @@
 import OpenCasesFileIcon from "./OpenCasesFileIcon";
 import { CaseFile } from "../CaseManagementTypes";
+import TagChip from "@/components/ui/TagChip";
 
 export interface OpenCasesDocumentContentProps {
   doc: CaseFile;
@@ -28,16 +29,7 @@ export default function OpenCasesDocumentContent({ doc }: OpenCasesDocumentConte
         {doc.tags && doc.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
             {doc.tags.map((tag) => (
-              <span
-                key={tag.name}
-                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border tracking-wide uppercase select-none ${
-                  tag.type === "system"
-                    ? "bg-muted text-muted-foreground border-border/60"
-                    : "bg-primary/10 text-primary border-primary/20"
-                }`}
-              >
-                #{tag.value ? `${tag.name}: ${tag.value}` : tag.name}
-              </span>
+              <TagChip key={tag.name} tag={tag} />
             ))}
           </div>
         )}
