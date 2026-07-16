@@ -1,6 +1,7 @@
 use tauri::AppHandle;
 use rusqlite::params;
 use crate::store;
+use crate::tags::{upsert_tag_internal, TagScope, TagType};
 use super::types::EmailConfig;
 
 #[tauri::command]
@@ -44,6 +45,10 @@ pub fn save_email_settings(app: AppHandle, config: EmailConfig) -> Result<(), St
             config.api_key_enc
         ],
     ).map_err(|e| e.to_string())?;
+
+    upsert_tag_internal(&app, TagScope::App, "useremail", Some(&config.username), TagType::System)
+        .map_err(|e| format!("[save_email_settings] failed to write useremail system tag: {e}"))?;
+
     Ok(())
 }
 

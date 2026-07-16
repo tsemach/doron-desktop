@@ -140,29 +140,46 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
             notes       TEXT,
-            tags        TEXT, -- JSON array of strings
             updated_at  TEXT  NOT NULL
         );
     ").map_err(|e| format!("[annotations schema] {e}"))?;
+
+    // Drop the legacy 'tags' column now that tags live in the 'tags' table (pre-production, no data migration needed)
+    let document_annotations_tags_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('document_annotations') WHERE name='tags'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if document_annotations_tags_exists {
+        let _ = conn.execute("ALTER TABLE document_annotations DROP COLUMN tags;", []);
+    }
 
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS case_annotations (
             case_id     INTEGER PRIMARY KEY,
             notes       TEXT,
-            tags        TEXT, -- JSON array of strings
             updated_at  TEXT  NOT NULL,
             FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
         );
     ").map_err(|e| format!("[case annotations schema] {e}"))?;
 
-    // Ensure 'followup_date' column exists in 'case_annotations'
-    let followup_date_exists: bool = conn.query_row(
+    // Drop the legacy 'tags'/'followup_date' columns now that tags (including 'followup') live
+    // in the 'tags' table (pre-production, no data migration needed)
+    let case_annotations_tags_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('case_annotations') WHERE name='tags'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if case_annotations_tags_exists {
+        let _ = conn.execute("ALTER TABLE case_annotations DROP COLUMN tags;", []);
+    }
+    let case_annotations_followup_date_exists: bool = conn.query_row(
         "SELECT COUNT(1) FROM pragma_table_info('case_annotations') WHERE name='followup_date'",
         [],
         |row| row.get(0)
     ).unwrap_or(0) > 0;
-    if !followup_date_exists {
-        let _ = conn.execute("ALTER TABLE case_annotations ADD COLUMN followup_date TEXT;", []);
+    if case_annotations_followup_date_exists {
+        let _ = conn.execute("ALTER TABLE case_annotations DROP COLUMN followup_date;", []);
     }
 
     conn.execute_batch("
@@ -174,6 +191,36 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
             FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
         );
     ").map_err(|e| format!("[case_fields schema] {e}"))?;
+
+    conn.execute_batch("
+        CREATE TABLE IF NOT EXISTS tags (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope_type  TEXT NOT NULL CHECK (scope_type IN ('case','document','app')),
+            scope_value TEXT,
+            name        TEXT NOT NULL,
+            value       TEXT,
+            type        TEXT NOT NULL CHECK (type IN ('user','system')),
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL,
+            UNIQUE(scope_type, scope_value, name)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_tags_lookup ON tags(name, value);
+        CREATE INDEX IF NOT EXISTS idx_tags_scope ON tags(scope_type, scope_value);
+
+        -- 'cases' rows are only ever soft-deleted (see delete_case), so no cascade trigger
+        -- is needed there. 'documents' rows ARE hard-deleted, so cascade their tags here.
+        -- scope_value is always stored slash-normalized (see TagScope::Document), so
+        -- old.file_path must be normalized the same way or the match can silently miss.
+        CREATE TRIGGER IF NOT EXISTS tags_document_cascade AFTER DELETE ON documents BEGIN
+            DELETE FROM tags WHERE scope_type = 'document' AND scope_value = REPLACE(old.file_path, '\', '/');
+        END;
+
+        CREATE TABLE IF NOT EXISTS user_settings (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            username  TEXT NOT NULL
+        );
+    ").map_err(|e| format!("[tags schema] {e}"))?;
 
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS email_configurations (

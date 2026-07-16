@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::store;
+use crate::tags::{list_all_tags_for_scope_type, list_tags_for_document_fuzzy, upsert_tag_internal, Tag, TagScope, TagType};
 
 pub mod annotations;
 pub use annotations::*;
@@ -19,8 +20,7 @@ pub struct Case {
     pub updated_at: Option<String>,
     pub folder: Option<String>,
     pub notes: Option<String>,
-    pub tags: Vec<String>,
-    pub followup_date: Option<String>,
+    pub tags: Vec<Tag>,
 }
 
 #[tauri::command]
@@ -28,19 +28,15 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
         .prepare("
-            SELECT c.id, c.subject, c.status, c.name, c.created_at, c.updated_at, c.folder, ca.notes, ca.tags, ca.followup_date 
+            SELECT c.id, c.subject, c.status, c.name, c.created_at, c.updated_at, c.folder, ca.notes
             FROM cases c
             LEFT JOIN case_annotations ca ON c.id = ca.case_id
-            WHERE c.deleted = 0 OR c.deleted IS NULL 
+            WHERE c.deleted = 0 OR c.deleted IS NULL
             ORDER BY c.id DESC
         ")
         .map_err(|e| e.to_string())?;
-    
+
     let rows = stmt.query_map([], |row| {
-        let tags_str: Option<String> = row.get(8)?;
-        let tags = tags_str
-            .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
-            .unwrap_or_default();
         Ok(Case {
             id: row.get(0)?,
             subject: row.get(1)?,
@@ -50,8 +46,7 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
             updated_at: row.get(5)?,
             folder: row.get(6)?,
             notes: row.get(7)?,
-            tags,
-            followup_date: row.get(9)?,
+            tags: Vec::new(),
         })
     }).map_err(|e| e.to_string())?;
 
@@ -59,6 +54,18 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
     for r in rows {
         list.push(r.map_err(|e| e.to_string())?);
     }
+
+    // Bulk-attach tags (one query for all cases instead of one per case).
+    let all_case_tags = list_all_tags_for_scope_type(&app, "case")?;
+    for case in list.iter_mut() {
+        let case_id_str = case.id.to_string();
+        case.tags = all_case_tags
+            .iter()
+            .filter(|t| t.scope_value.as_deref() == Some(case_id_str.as_str()))
+            .cloned()
+            .collect();
+    }
+
     Ok(list)
 }
 
@@ -77,7 +84,8 @@ pub fn add_case(
         params![subject, status, name, created_at, folder],
     ).map_err(|e| format!("[insert case] {e}"))?;
     let id = conn.last_insert_rowid();
-    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder, notes: None, tags: Vec::new(), followup_date: None })
+    let case_id_tag = upsert_tag_internal(&app, TagScope::Case(id), "case_id", Some(&id.to_string()), TagType::System)?;
+    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder, notes: None, tags: vec![case_id_tag] })
 }
 
 #[tauri::command]
@@ -113,6 +121,7 @@ pub async fn create_new_case(
         params![subject, "open", name, created_at, folder],
     ).map_err(|e| format!("[insert case] {e}"))?;
     let id = conn.last_insert_rowid();
+    let case_id_tag = upsert_tag_internal(&app, TagScope::Case(id), "case_id", Some(&id.to_string()), TagType::System)?;
 
     // Save fields to case_fields
     for (key, val) in &field_values {
@@ -238,8 +247,7 @@ pub async fn create_new_case(
         updated_at: None,
         folder: Some(folder),
         notes: None,
-        tags: Vec::new(),
-        followup_date: None,
+        tags: vec![case_id_tag],
     })
 }
 
@@ -261,7 +269,7 @@ pub struct CaseFile {
     pub size_kb: i64,
     pub title: Option<String>,
     pub notes: Option<String>,
-    pub tags: Vec<String>,
+    pub tags: Vec<Tag>,
 }
 
 #[tauri::command]
@@ -328,23 +336,18 @@ pub fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFi
                     }
                 }
 
-                // 3. Query notes and tags from document_annotations
-                let (notes, tags): (Option<String>, Vec<String>) = conn.query_row(
-                    "SELECT notes, tags FROM document_annotations 
-                     WHERE file_path = ?1 
+                // 3. Query notes from document_annotations
+                let notes: Option<String> = conn.query_row(
+                    "SELECT notes FROM document_annotations
+                     WHERE file_path = ?1
                         OR REPLACE(file_path, '\\', '/') = ?2
                         OR (REPLACE(file_path, '\\', '/') LIKE '%' || ?2 AND length(file_path) > 10)
                         OR (?2 LIKE '%' || REPLACE(file_path, '\\', '/') AND length(?2) > 10)",
                     params![path_str, normalized_path],
-                    |row| {
-                        let notes: Option<String> = row.get(0)?;
-                        let tags_str: Option<String> = row.get(1)?;
-                        let tags = tags_str
-                            .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
-                            .unwrap_or_default();
-                        Ok((notes, tags))
-                    }
-                ).unwrap_or((None, Vec::new()));
+                    |row| row.get(0)
+                ).unwrap_or(None);
+
+                let tags = list_tags_for_document_fuzzy(&conn, &path_str).unwrap_or_default();
 
                 files.push(CaseFile {
                     name,
@@ -387,7 +390,6 @@ pub fn verify_folder_in_use(app: AppHandle, folder_path: String) -> Result<bool,
 pub struct DocumentAnnotations {
     pub file_path: String,
     pub notes: Option<String>,
-    pub tags: Vec<String>,
     pub updated_at: String,
 }
 
@@ -396,24 +398,18 @@ pub fn get_document_annotations(app: AppHandle, file_path: String) -> Result<Opt
     let conn = store::open_db(&app)?;
     let normalized = file_path.replace('\\', "/");
     let mut stmt = conn.prepare(
-        "SELECT notes, tags, updated_at FROM document_annotations 
+        "SELECT notes, updated_at FROM document_annotations
          WHERE file_path = ?1 OR REPLACE(file_path, '\\', '/') = ?2"
     ).map_err(|e| e.to_string())?;
-    
+
     let mut rows = stmt.query(params![file_path, normalized]).map_err(|e| e.to_string())?;
     if let Some(row) = rows.next().map_err(|e| e.to_string())? {
         let notes: Option<String> = row.get(0).map_err(|e| e.to_string())?;
-        let tags_str: Option<String> = row.get(1).map_err(|e| e.to_string())?;
-        let updated_at: String = row.get(2).map_err(|e| e.to_string())?;
-        
-        let tags = tags_str
-            .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
-            .unwrap_or_default();
-            
+        let updated_at: String = row.get(1).map_err(|e| e.to_string())?;
+
         Ok(Some(DocumentAnnotations {
             file_path,
             notes,
-            tags,
             updated_at,
         }))
     } else {
@@ -426,22 +422,19 @@ pub fn set_document_annotations(
     app: AppHandle,
     file_path: String,
     notes: Option<String>,
-    tags: Vec<String>,
 ) -> Result<DocumentAnnotations, String> {
     let conn = store::open_db(&app)?;
-    let tags_str = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
     let updated_at = chrono::Utc::now().to_rfc3339();
-    
+
     conn.execute(
-        "INSERT OR REPLACE INTO document_annotations (file_path, notes, tags, updated_at) 
-         VALUES (?1, ?2, ?3, ?4)",
-        params![file_path, notes, tags_str, updated_at],
+        "INSERT OR REPLACE INTO document_annotations (file_path, notes, updated_at)
+         VALUES (?1, ?2, ?3)",
+        params![file_path, notes, updated_at],
     ).map_err(|e| format!("[set_document_annotations] {e}"))?;
-    
+
     Ok(DocumentAnnotations {
         file_path,
         notes,
-        tags,
         updated_at,
     })
 }
@@ -456,50 +449,6 @@ pub fn delete_document_annotations(app: AppHandle, file_path: String) -> Result<
         params![file_path, normalized],
     ).map_err(|e| format!("[delete_document_annotations] {e}"))?;
     Ok(())
-}
-
-#[tauri::command]
-pub fn list_all_annotation_tags(app: AppHandle) -> Result<Vec<String>, String> {
-    let conn = store::open_db(&app)?;
-    let mut all_tags = std::collections::HashSet::new();
-
-    // Query document tags
-    if let Ok(mut stmt) = conn.prepare("SELECT tags FROM document_annotations") {
-        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, Option<String>>(0)) {
-            for r in rows.flatten() {
-                if let Some(tags_str) = r {
-                    if let Ok(tags) = serde_json::from_str::<Vec<String>>(&tags_str) {
-                        for tag in tags {
-                            if !tag.trim().is_empty() {
-                                all_tags.insert(tag);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Query case tags
-    if let Ok(mut stmt) = conn.prepare("SELECT tags FROM case_annotations") {
-        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, Option<String>>(0)) {
-            for r in rows.flatten() {
-                if let Some(tags_str) = r {
-                    if let Ok(tags) = serde_json::from_str::<Vec<String>>(&tags_str) {
-                        for tag in tags {
-                            if !tag.trim().is_empty() {
-                                all_tags.insert(tag);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let mut sorted_tags: Vec<String> = all_tags.into_iter().collect();
-    sorted_tags.sort();
-    Ok(sorted_tags)
 }
 
 #[tauri::command]

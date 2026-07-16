@@ -20,7 +20,6 @@ import SettingBack from "./SettingBack";
 import SettingMenuTab, { TabType } from "./SettingMenuTab";
 
 export const API_KEY_STORAGE_KEY = "claude_api_key";
-export const USER_NAME_STORAGE_KEY = "user_name";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -133,9 +132,6 @@ export default function Settings() {
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
 
   useEffect(() => {
-    const storedName = localStorage.getItem(USER_NAME_STORAGE_KEY);
-    if (storedName) setUsername(storedName);
-
     loadSettings();
 
     // Fetch app version
@@ -157,6 +153,16 @@ export default function Settings() {
   async function loadSettings() {
     setIsLoadingSettings(true);
     try {
+      // Load user settings (display name)
+      try {
+        const res = await invoke<any>("get_user_settings");
+        if (res) {
+          setUsername(res.username);
+        }
+      } catch (e) {
+        console.error("Failed to load user settings:", e);
+      }
+
       // Load email configurations
       try {
         const res = await invoke<any>("get_email_settings");
@@ -216,8 +222,15 @@ export default function Settings() {
     setSaved(false);
 
     localStorage.setItem(API_KEY_STORAGE_KEY, providerApiKey.trim());
-    localStorage.setItem(USER_NAME_STORAGE_KEY, username.trim());
     setLanguage(tempLang);
+
+    // Save user settings (display name)
+    try {
+      await invoke("save_user_settings", { settings: { username: username.trim() } });
+    } catch (e) {
+      console.error("Failed to save user settings:", e);
+      alert("Failed to save user settings: " + e);
+    }
 
     // Save Email Settings
     try {

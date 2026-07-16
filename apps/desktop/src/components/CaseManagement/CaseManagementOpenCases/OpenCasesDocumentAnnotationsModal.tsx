@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "../../ui/button";
+import TagChip from "../../ui/TagChip";
+import type { Tag } from "../CaseManagementTypes";
 
 interface OpenCasesDocumentAnnotationsModalProps {
   fileName: string;
   filePath: string;
   initialNotes?: string;
-  initialTags?: string[];
-  onSave: (notes: string, tags: string[]) => void;
+  initialTags: Tag[];
+  onSave: (notes: string) => void;
+  onTagsChange: (tags: Tag[]) => void;
   onCancel: () => void;
   onDelete: () => void;
 }
@@ -16,14 +19,16 @@ export default function OpenCasesDocumentAnnotationsModal({
   fileName,
   filePath,
   initialNotes = "",
-  initialTags = [],
+  initialTags,
   onSave,
+  onTagsChange,
   onCancel,
   onDelete,
 }: OpenCasesDocumentAnnotationsModalProps) {
   const [notes, setNotes] = useState(initialNotes || "");
-  const [tags, setTags] = useState<string[]>(initialTags || []);
-  const [newTag, setNewTag] = useState("");
+  const [tags, setTags] = useState<Tag[]>(initialTags);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagValue, setNewTagValue] = useState("");
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -33,35 +38,52 @@ export default function OpenCasesDocumentAnnotationsModal({
 
   async function loadSuggestedTags() {
     try {
-      const allTags = await invoke<string[]>("list_all_annotation_tags");
+      const allTags = await invoke<string[]>("list_all_tag_names", { tagType: "user" });
       setSuggestedTags(allTags);
     } catch (e) {
       console.error("Failed to load suggested tags:", e);
     }
   }
 
-  function handleAddTag() {
-    const trimmed = newTag.trim().toLowerCase();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      setNewTag("");
+  function applyTags(next: Tag[]) {
+    setTags(next);
+    onTagsChange(next);
+  }
+
+  async function handleAddTag(name: string, value?: string) {
+    const trimmedName = name.trim().toLowerCase();
+    if (!trimmedName || tags.some((tg) => tg.name === trimmedName)) return;
+    try {
+      const tag = await invoke<Tag>("add_tag", {
+        scopeType: "document",
+        scopeValue: filePath,
+        name: trimmedName,
+        value: value?.trim() || null,
+        tagType: "user",
+      });
+      applyTags([...tags, tag]);
+      setNewTagName("");
+      setNewTagValue("");
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to add tag: ${err}`);
     }
   }
 
-  function handleRemoveTag(tagToRemove: string) {
-    setTags(tags.filter((t) => t !== tagToRemove));
-  }
-
-  function handleAddSuggestedTag(tag: string) {
-    if (!tags.includes(tag)) {
-      setTags([...tags, tag]);
+  async function handleRemoveTag(tag: Tag) {
+    try {
+      await invoke("remove_tag", { scopeType: "document", scopeValue: filePath, name: tag.name });
+      applyTags(tags.filter((tg) => tg.name !== tag.name));
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to remove tag: ${err}`);
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
-      handleAddTag();
+      handleAddTag(newTagName, newTagValue);
     }
   };
 
@@ -72,9 +94,8 @@ export default function OpenCasesDocumentAnnotationsModal({
       await invoke("set_document_annotations", {
         filePath,
         notes: notes ? notes.trim() : null,
-        tags,
       });
-      onSave(notes ? notes.trim() : "", tags);
+      onSave(notes ? notes.trim() : "");
     } catch (err) {
       console.error(err);
       alert(`Failed to save annotations: ${err}`);
@@ -88,6 +109,11 @@ export default function OpenCasesDocumentAnnotationsModal({
     setIsSaving(true);
     try {
       await invoke("delete_document_annotations", { filePath });
+      const userTagsToRemove = tags.filter((tg) => tg.type === "user");
+      for (const tag of userTagsToRemove) {
+        await invoke("remove_tag", { scopeType: "document", scopeValue: filePath, name: tag.name });
+      }
+      applyTags(tags.filter((tg) => tg.type === "system"));
       onDelete();
     } catch (err) {
       console.error(err);
@@ -97,8 +123,11 @@ export default function OpenCasesDocumentAnnotationsModal({
     }
   };
 
+  const userTags = tags.filter((tg) => tg.type === "user");
+  const systemTags = tags.filter((tg) => tg.type === "system");
+
   // Filter suggested tags to exclude currently added ones
-  const filteredSuggestions = suggestedTags.filter((t) => !tags.includes(t));
+  const filteredSuggestions = suggestedTags.filter((name) => !userTags.some((tg) => tg.name === name));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -135,43 +164,45 @@ export default function OpenCasesDocumentAnnotationsModal({
                 <span className="text-[10px] text-muted-foreground">Press Enter or comma to add</span>
               </label>
 
-              {/* Render current tags */}
+              {/* Render current tags (system tags shown read-only, user tags removable) */}
               <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border border-input rounded-lg bg-background/50 focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold select-none border border-primary/20"
-                  >
-                    #{tag}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                      className="hover:bg-primary/20 text-primary/75 hover:text-primary rounded-full p-0.5 leading-none transition-colors"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="10"
-                        height="10"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                      >
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </span>
+                {systemTags.map((tag) => (
+                  <TagChip key={tag.name} tag={tag} />
+                ))}
+                {userTags.map((tag) => (
+                  <TagChip key={tag.name} tag={tag} onRemove={handleRemoveTag} />
                 ))}
                 <input
                   type="text"
                   placeholder={tags.length === 0 ? "Add tags (e.g. signed, contract)..." : ""}
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="flex-1 bg-transparent text-xs text-foreground focus:outline-none border-none p-0.5 min-w-[120px]"
                 />
               </div>
+
+              {/* Optional value for the tag currently being typed */}
+              {newTagName.trim() && (
+                <div className="flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
+                  <input
+                    type="text"
+                    placeholder="Optional value..."
+                    value={newTagValue}
+                    onChange={(e) => setNewTagValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => handleAddTag(newTagName, newTagValue)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
 
               {/* Suggested Tags */}
               {filteredSuggestions.length > 0 && (
@@ -180,14 +211,14 @@ export default function OpenCasesDocumentAnnotationsModal({
                     Suggested Tags:
                   </span>
                   <div className="flex flex-wrap gap-1">
-                    {filteredSuggestions.slice(0, 10).map((tag) => (
+                    {filteredSuggestions.slice(0, 10).map((name) => (
                       <button
-                        key={tag}
+                        key={name}
                         type="button"
-                        onClick={() => handleAddSuggestedTag(tag)}
+                        onClick={() => handleAddTag(name)}
                         className="px-2 py-0.5 rounded-full border border-border bg-background hover:bg-muted text-[10px] text-muted-foreground hover:text-foreground transition-all duration-150"
                       >
-                        +{tag}
+                        +{name}
                       </button>
                     ))}
                   </div>
@@ -210,7 +241,7 @@ export default function OpenCasesDocumentAnnotationsModal({
           {/* Footer Actions (fixed height, mt-auto to sit at the bottom) */}
           <div className="flex items-center justify-between border-t border-border pt-4 mt-auto shrink-0 select-none">
             <div>
-              {(initialNotes || initialTags.length > 0) && (
+              {(initialNotes || userTags.length > 0) && (
                 <Button
                   type="button"
                   variant="destructive"

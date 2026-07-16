@@ -121,7 +121,6 @@ export default function CaseManagementOpenCases() {
         folder: c.folder,
         notes: c.notes,
         tags: c.tags || [],
-        followupDate: c.followup_date,
       }));
       setCases(mapped);
     } catch (err) {
@@ -222,7 +221,7 @@ export default function CaseManagementOpenCases() {
 
   const filtered = cases.filter((c) => {
     if (filter === "followup") {
-      return c.tags?.includes("followup") || !!c.followupDate;
+      return c.tags.some((tg) => tg.name === "followup");
     }
     if (filter !== "all" && c.status !== filter) {
       return false;
@@ -238,8 +237,8 @@ export default function CaseManagementOpenCases() {
     return true;
   });
 
-  const followupCount = cases.filter(
-    (c) => c.tags?.includes("followup") || !!c.followupDate
+  const followupCount = cases.filter((c) =>
+    c.tags.some((tg) => tg.name === "followup")
   ).length;
 
   return (
@@ -318,27 +317,36 @@ export default function CaseManagementOpenCases() {
           caseSubject={editingCaseAnnotations.subject || "No Subject"}
           initialNotes={editingCaseAnnotations.notes}
           initialTags={editingCaseAnnotations.tags}
-          initialFollowupDate={editingCaseAnnotations.followupDate}
           onCancel={() => setEditingCaseAnnotations(null)}
-          onSave={(notes, tags, followupDate) => {
+          onTagsChange={(tags) => {
             setCases((prev) =>
-              prev.map((c) =>
-                c.id === editingCaseAnnotations.id ? { ...c, notes, tags, followupDate } : c
-              )
+              prev.map((c) => (c.id === editingCaseAnnotations.id ? { ...c, tags } : c))
             );
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes, tags, followupDate } : prev
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, tags } : prev
+            );
+          }}
+          onSave={(notes) => {
+            setCases((prev) =>
+              prev.map((c) => (c.id === editingCaseAnnotations.id ? { ...c, notes } : c))
+            );
+            setSelectedCase((prev) =>
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes } : prev
             );
             setEditingCaseAnnotations(null);
           }}
           onDelete={() => {
             setCases((prev) =>
               prev.map((c) =>
-                c.id === editingCaseAnnotations.id ? { ...c, notes: undefined, tags: [], followupDate: undefined } : c
+                c.id === editingCaseAnnotations.id
+                  ? { ...c, notes: undefined, tags: c.tags.filter((tg) => tg.type === "system") }
+                  : c
               )
             );
             setSelectedCase((prev) =>
-              prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes: undefined, tags: [], followupDate: undefined } : prev
+              prev && prev.id === editingCaseAnnotations.id
+                ? { ...prev, notes: undefined, tags: prev.tags.filter((tg) => tg.type === "system") }
+                : prev
             );
             setEditingCaseAnnotations(null);
           }}
@@ -352,18 +360,23 @@ export default function CaseManagementOpenCases() {
           initialNotes={editingDoc.notes}
           initialTags={editingDoc.tags}
           onCancel={() => setEditingDoc(null)}
-          onSave={(notes, tags) => {
+          onTagsChange={(tags) => {
             setDocuments((prev) =>
-              prev.map((d) =>
-                d.path === editingDoc.path ? { ...d, notes, tags } : d
-              )
+              prev.map((d) => (d.path === editingDoc.path ? { ...d, tags } : d))
+            );
+          }}
+          onSave={(notes) => {
+            setDocuments((prev) =>
+              prev.map((d) => (d.path === editingDoc.path ? { ...d, notes } : d))
             );
             setEditingDoc(null);
           }}
           onDelete={() => {
             setDocuments((prev) =>
               prev.map((d) =>
-                d.path === editingDoc.path ? { ...d, notes: undefined, tags: [] } : d
+                d.path === editingDoc.path
+                  ? { ...d, notes: undefined, tags: d.tags.filter((tg) => tg.type === "system") }
+                  : d
               )
             );
             setEditingDoc(null);

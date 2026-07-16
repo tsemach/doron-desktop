@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
+import TagChip from "@/components/ui/TagChip";
 
-import { CaseFile } from "../CaseManagementTypes";
+import { CaseFile, Tag } from "../CaseManagementTypes";
 
 interface OpenCasesUpdateDocumentModalProps {
   caseId: number;
@@ -32,7 +33,12 @@ export default function OpenCasesUpdateDocumentModal({
 
   // Annotations states
   const [notes, setNotes] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
+  // Tags already persisted for this document (only possible on overwrite; unaffected by
+  // re-copying the file content, since tags are keyed by file path, not file content).
+  const [existingTags, setExistingTags] = useState<Tag[]>([]);
+  // New user tags staged here and committed via add_tag once the final file path is known
+  // (a brand-new attachment has no file path to attach a tag to until it's copied in).
+  const [stagedTagNames, setStagedTagNames] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
 
@@ -50,15 +56,16 @@ export default function OpenCasesUpdateDocumentModal({
       );
       if (existingDoc) {
         setNotes(existingDoc.notes || "");
-        setTags(existingDoc.tags || []);
+        setExistingTags(existingDoc.tags || []);
       } else {
         setNotes("");
-        setTags([]);
+        setExistingTags([]);
       }
+      setStagedTagNames([]);
 
       // 2. Load all suggested tags
       try {
-        const allTags = await invoke<string[]>("list_all_annotation_tags");
+        const allTags = await invoke<string[]>("list_all_tag_names", { tagType: "user" });
         setSuggestedTags(allTags);
       } catch (e) {
         console.error("Failed to load suggested tags:", e);
@@ -74,14 +81,14 @@ export default function OpenCasesUpdateDocumentModal({
 
   function handleAddTag() {
     const trimmed = newTag.trim().toLowerCase();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
+    if (trimmed && !stagedTagNames.includes(trimmed) && !existingTags.some((tg) => tg.name === trimmed)) {
+      setStagedTagNames([...stagedTagNames, trimmed]);
       setNewTag("");
     }
   }
 
-  function handleRemoveTag(tagToRemove: string) {
-    setTags(tags.filter((t) => t !== tagToRemove));
+  function handleRemoveStagedTag(tagToRemove: string) {
+    setStagedTagNames(stagedTagNames.filter((t) => t !== tagToRemove));
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -103,12 +110,21 @@ export default function OpenCasesUpdateDocumentModal({
 
       const normalizedFilePath = targetFilePath.replace(/\\/g, "/");
 
-      // 2. Save annotations (notes and tags)
+      // 2. Save notes
       await invoke("set_document_annotations", {
         filePath: normalizedFilePath,
         notes: notes.trim() || null,
-        tags,
       });
+
+      // 2b. Commit staged tags now that the document has a real file path
+      for (const name of stagedTagNames) {
+        await invoke("add_tag", {
+          scopeType: "document",
+          scopeValue: normalizedFilePath,
+          name,
+          tagType: "user",
+        });
+      }
 
       // 3. Remove the file from email attachments
       await invoke("remove_attachment", {
@@ -126,7 +142,9 @@ export default function OpenCasesUpdateDocumentModal({
     }
   }
 
-  const filteredSuggestions = suggestedTags.filter((t) => !tags.includes(t));
+  const filteredSuggestions = suggestedTags.filter(
+    (t) => !stagedTagNames.includes(t) && !existingTags.some((tg) => tg.name === t)
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in duration-200">
@@ -199,15 +217,18 @@ export default function OpenCasesUpdateDocumentModal({
                       <span className="text-[9px] text-muted-foreground/85 normal-case">Press Enter to add</span>
                     </label>
                     <div className="flex flex-wrap gap-1.5 p-2 border border-input rounded-lg bg-background/50 focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all">
-                      {tags.map((tag) => (
+                      {existingTags.map((tag) => (
+                        <TagChip key={tag.name} tag={tag} />
+                      ))}
+                      {stagedTagNames.map((name) => (
                         <span
-                          key={tag}
+                          key={name}
                           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-semibold select-none border border-primary/20"
                         >
-                          #{tag}
+                          #{name}
                           <button
                             type="button"
-                            onClick={() => handleRemoveTag(tag)}
+                            onClick={() => handleRemoveStagedTag(name)}
                             className="hover:bg-primary/20 text-primary/75 hover:text-primary rounded-full p-0.5 leading-none transition-colors"
                           >
                             ×
@@ -216,7 +237,7 @@ export default function OpenCasesUpdateDocumentModal({
                       ))}
                       <input
                         type="text"
-                        placeholder={tags.length === 0 ? "Add tags (e.g. signed, client-edits)..." : ""}
+                        placeholder={existingTags.length === 0 && stagedTagNames.length === 0 ? "Add tags (e.g. signed, client-edits)..." : ""}
                         value={newTag}
                         onChange={(e) => setNewTag(e.target.value)}
                         onKeyDown={handleKeyDown}
@@ -231,7 +252,7 @@ export default function OpenCasesUpdateDocumentModal({
                           <button
                             key={tag}
                             type="button"
-                            onClick={() => setTags([...tags, tag])}
+                            onClick={() => setStagedTagNames([...stagedTagNames, tag])}
                             className="px-2 py-0.5 rounded-full border border-border bg-background hover:bg-muted text-[9px] text-muted-foreground hover:text-foreground transition-all"
                           >
                             +{tag}
