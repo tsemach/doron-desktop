@@ -14,6 +14,7 @@ interface OpenCasesListProps {
   onCloseCase: (id: string) => void;
   onDeleteCase: (c: Case) => void;
   onOpenFolder: (folderPath: string) => void;
+  onEditCaseAnnotations: (c: Case) => void;
 }
 
 export default function OpenCasesList({
@@ -26,6 +27,7 @@ export default function OpenCasesList({
   onCloseCase,
   onDeleteCase,
   onOpenFolder,
+  onEditCaseAnnotations,
 }: OpenCasesListProps) {
   const { t } = useLanguage();
 
@@ -69,6 +71,7 @@ export default function OpenCasesList({
                   onCloseCase={onCloseCase}
                   onDeleteCase={onDeleteCase}
                   onOpenFolder={onOpenFolder}
+                  onEditCaseAnnotations={onEditCaseAnnotations}
                 />
               ))}
             </tbody>
