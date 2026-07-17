@@ -11,7 +11,8 @@ interface OpenCasesListProps {
   isLgScreen: boolean;
   leftPercent: number;
   onSelectCase: (c: Case) => void;
-  onCloseCase: (id: string) => void;
+  onCloseCase: (c: Case) => void;
+  onReopenCase: (c: Case) => void;
   onDeleteCase: (c: Case) => void;
   onOpenFolder: (folderPath: string) => void;
   onEditCaseAnnotations: (c: Case) => void;
@@ -25,6 +26,7 @@ export default function OpenCasesList({
   leftPercent,
   onSelectCase,
   onCloseCase,
+  onReopenCase,
   onDeleteCase,
   onOpenFolder,
   onEditCaseAnnotations,
@@ -69,6 +71,7 @@ export default function OpenCasesList({
                   isSelected={selectedCase?.id === c.id}
                   onSelectCase={onSelectCase}
                   onCloseCase={onCloseCase}
+                  onReopenCase={onReopenCase}
                   onDeleteCase={onDeleteCase}
                   onOpenFolder={onOpenFolder}
                   onEditCaseAnnotations={onEditCaseAnnotations}

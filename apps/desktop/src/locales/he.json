@@ -29,6 +29,7 @@
   "loading_cases": "טוען תיקים...",
   "no_cases_match": "אין תיקים התואמים את המסננים שלך.",
   "close_case_title": "סגור תיק",
+  "reopen_case_title": "פתח תיק מחדש",
   "delete_case_title": "מחק תיק",
   "status_open": "פתוח",
   "status_waiting": "בהמתנה",

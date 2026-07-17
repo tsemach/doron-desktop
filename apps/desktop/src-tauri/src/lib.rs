@@ -86,6 +86,7 @@ pub fn run() {
             case::add_case,
             case::create_new_case,
             case::delete_case,
+            case::update_case_status,
             case::list_case_files,
             case::verify_folder_in_use,
             case::get_document_annotations,
