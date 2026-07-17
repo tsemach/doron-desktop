@@ -33,12 +33,11 @@ export default function OpenCasesDocument({
           : "border-border hover:border-primary/40 dark:hover:border-primary/45 bg-card hover:bg-muted/50"
         }`}
     >
-      <OpenCasesDocumentContent doc={doc} />
+      <OpenCasesDocumentContent doc={doc} onOpenFile={onOpenFile} />
 
       <OpenCasesDocumentControl
         doc={doc}
         onEditAnnotations={onEditAnnotations}
-        onOpenFile={onOpenFile}
         onRemoveDocument={onRemoveDocument}
       />
     </div>

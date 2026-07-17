@@ -510,11 +510,37 @@ export default function CaseManagementOpenCasesDetails() {
             className={`flex flex-col border border-border rounded-xl bg-card overflow-hidden min-h-0 flex-1 ${isLgScreen ? "h-full" : ""} shadow-xs`}
           >
             <div className="bg-muted px-4 py-3 border-b border-border font-semibold text-sm text-foreground flex items-center justify-between shrink-0">
-              <span>
-                {activeRightTab === "emails"
-                  ? (t("emails_exchange") || "Case Email Correspondence")
-                  : (t("document_details") || "Document Details")}
-              </span>
+              <div className="flex items-start gap-1 min-w-0">
+                <span className="truncate">
+                  {activeRightTab === "emails"
+                    ? (t("emails_exchange") || "Case Email Correspondence")
+                    : (t("document_details") || "Document Details")}
+                </span>
+                {activeRightTab === "preview" && selectedDocument && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenFile(selectedDocument.path)}
+                    className="shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10 rounded p-0.5 -mt-0.5 transition-colors"
+                    title={t("open_external")}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M15 3h6v6" />
+                      <path d="M10 14 21 3" />
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               {activeRightTab === "preview" && selectedDocument && (
                 <span className="text-xs text-muted-foreground font-mono font-normal truncate max-w-[200px] align-middle" title={selectedDocument.name}>
                   {selectedDocument.name}
