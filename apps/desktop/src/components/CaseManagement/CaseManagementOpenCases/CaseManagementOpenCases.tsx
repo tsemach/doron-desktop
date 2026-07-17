@@ -279,6 +279,7 @@ export default function CaseManagementOpenCases() {
           onCloseCase={closeCase}
           onDeleteCase={handleDeleteCase}
           onOpenFolder={handleOpenFolder}
+          onEditCaseAnnotations={setEditingCaseAnnotations}
         />
 
         {/* Resizable Divider (rendered only on large screens) */}

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import KebabMenu from "@/components/ui/KebabMenu";
 import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "../../../context/LanguageContext";
 import { getFollowupStatus } from "@/lib/followupStatus";
@@ -24,7 +25,6 @@ export default function OpenDocumentsPanelTopMenu({
   isDetailView = false,
 }: OpenDocumentsPanelTopMenuProps) {
   const { t } = useLanguage();
-  const [showMenu, setShowMenu] = useState(false);
 
   async function handleOpenFolder(folderPath: string) {
     try {
@@ -38,9 +38,18 @@ export default function OpenDocumentsPanelTopMenu({
   return (
     <>
       <div>
-        <h3 className="text-lg font-bold text-foreground leading-snug">
-          {selectedCase?.subject || t("no_subject")}
-        </h3>
+        {selectedCase && !isDetailView ? (
+          <Link
+            to={`/case-management/cases/${selectedCase.id}`}
+            className="text-lg font-bold text-foreground hover:text-primary hover:underline leading-snug block w-fit"
+          >
+            {selectedCase.subject || t("no_subject")}
+          </Link>
+        ) : (
+          <h3 className="text-lg font-bold text-foreground leading-snug">
+            {selectedCase?.subject || t("no_subject")}
+          </h3>
+        )}
         <p className="text-xs text-muted-foreground mt-0.5">
           {t("customer")}: {selectedCase?.name}
         </p>
@@ -124,30 +133,6 @@ export default function OpenDocumentsPanelTopMenu({
         )}
       </div>
       <div className="flex gap-2 shrink-0 items-center">
-        {selectedCase && onEditCaseAnnotations && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onEditCaseAnnotations}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-primary/5"
-            title={t("edit_case_notes_tags")}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2H2v10l9.29 9.29c.39.39 1.02.39 1.41 0l8.59-8.59c.39-.39.39-1.02 0-1.41L12 2z" />
-              <path d="M7 7h.01" />
-            </svg>
-          </Button>
-        )}
         <Button
           size="sm"
           onClick={onAddDocument}
@@ -170,72 +155,57 @@ export default function OpenDocumentsPanelTopMenu({
           {t("add_document")}
         </Button>
 
-        <div className="relative">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowMenu(!showMenu)}
-            className="h-8 w-8 p-0 flex items-center justify-center border-border hover:bg-muted"
-            title="More Options"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="1.2" fill="currentColor" />
-              <circle cx="12" cy="5" r="1.2" fill="currentColor" />
-              <circle cx="12" cy="19" r="1.2" fill="currentColor" />
-            </svg>
-          </Button>
-
-          {showMenu && (
-            <>
-              {/* Invisible overlay to close dropdown on click outside */}
-              <div
-                className="fixed inset-0 z-30"
-                onClick={() => setShowMenu(false)}
-              />
-
-              <div className="absolute right-0 mt-1.5 w-48 rounded-lg border border-border bg-card shadow-lg py-1 z-40 animate-in fade-in slide-in-from-top-1 duration-100">
-                {selectedCase && onTabChange && (
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      onTabChange(activeRightTab === "emails" ? "preview" : "emails");
-                    }}
-                    className={`w-full px-3 py-2 text-left text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer bg-transparent border-none ${
-                      activeRightTab === "emails" ? "text-primary bg-primary/5" : "text-foreground"
-                    }`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={activeRightTab === "emails" ? "text-primary" : "text-muted-foreground"}
-                    >
-                      <rect width="20" height="16" x="2" y="4" rx="2" />
-                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                    </svg>
-                    {t("emails")}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        <KebabMenu
+          triggerClassName="h-8 w-8 p-0 flex items-center justify-center border border-border hover:bg-muted text-foreground"
+          title={t("more_options")}
+          items={[
+            {
+              label: t("emails"),
+              hidden: !selectedCase || !onTabChange,
+              active: activeRightTab === "emails",
+              onClick: () => onTabChange?.(activeRightTab === "emails" ? "preview" : "emails"),
+              icon: (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={activeRightTab === "emails" ? "text-primary" : "text-muted-foreground"}
+                >
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+              ),
+            },
+            {
+              label: t("edit_case_notes_tags"),
+              hidden: !selectedCase || !onEditCaseAnnotations,
+              onClick: () => onEditCaseAnnotations?.(),
+              icon: (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-muted-foreground"
+                >
+                  <path d="M12 2H2v10l9.29 9.29c.39.39 1.02.39 1.41 0l8.59-8.59c.39-.39.39-1.02 0-1.41L12 2z" />
+                  <path d="M7 7h.01" />
+                </svg>
+              ),
+            },
+          ]}
+        />
       </div>
     </>
   );

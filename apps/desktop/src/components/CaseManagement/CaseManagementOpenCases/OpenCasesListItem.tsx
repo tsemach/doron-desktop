@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import KebabMenu from "@/components/ui/KebabMenu";
 import { Case, CaseStatus } from "../CaseManagementTypes";
 import { useLanguage } from "../../../context/LanguageContext";
 import { getFollowupStatus } from "@/lib/followupStatus";
@@ -18,6 +18,7 @@ interface OpenCasesListItemProps {
   onCloseCase: (id: string) => void;
   onDeleteCase: (c: Case) => void;
   onOpenFolder: (folderPath: string) => void;
+  onEditCaseAnnotations: (c: Case) => void;
 }
 
 export default function OpenCasesListItem({
@@ -27,6 +28,7 @@ export default function OpenCasesListItem({
   onCloseCase,
   onDeleteCase,
   onOpenFolder,
+  onEditCaseAnnotations,
 }: OpenCasesListItemProps) {
   const { t } = useLanguage();
 
@@ -112,56 +114,79 @@ export default function OpenCasesListItem({
         {c.createdAt}
       </td>
       <td className="px-4 py-3.5 text-right align-middle" onClick={(e) => e.stopPropagation()}>
-        <div className="flex gap-1 justify-end items-center">
-          {c.status !== "closed" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onCloseCase(c.id)}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              title={t("close_case_title")}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDeleteCase(c)}
-            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            title={t("delete_case_title")}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-              <line x1="10" x2="10" y1="11" y2="17" />
-              <line x1="14" x2="14" y1="11" y2="17" />
-            </svg>
-          </Button>
+        <div className="flex justify-end">
+          <KebabMenu
+            title={t("more_options")}
+            items={[
+              {
+                label: t("edit_case_notes_tags"),
+                onClick: () => onEditCaseAnnotations(c),
+                icon: (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-muted-foreground"
+                  >
+                    <path d="M12 2H2v10l9.29 9.29c.39.39 1.02.39 1.41 0l8.59-8.59c.39-.39.39-1.02 0-1.41L12 2z" />
+                    <path d="M7 7h.01" />
+                  </svg>
+                ),
+              },
+              {
+                label: t("close_case_title"),
+                hidden: c.status === "closed",
+                onClick: () => onCloseCase(c.id),
+                icon: (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-muted-foreground"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                ),
+              },
+              {
+                label: t("delete_case_title"),
+                variant: "destructive",
+                onClick: () => onDeleteCase(c),
+                icon: (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    <line x1="10" x2="10" y1="11" y2="17" />
+                    <line x1="14" x2="14" y1="11" y2="17" />
+                  </svg>
+                ),
+              },
+            ]}
+          />
         </div>
       </td>
     </tr>
