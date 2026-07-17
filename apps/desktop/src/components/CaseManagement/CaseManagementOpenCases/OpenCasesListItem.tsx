@@ -165,7 +165,7 @@ export default function OpenCasesListItem({
               },
               {
                 label: t("reopen_case_title"),
-                hidden: c.status !== "closed",
+                hidden: c.status !== "closed" && c.status !== "waiting",
                 onClick: () => onReopenCase(c),
                 icon: (
                   <svg

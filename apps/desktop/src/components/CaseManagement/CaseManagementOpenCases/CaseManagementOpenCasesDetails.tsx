@@ -641,6 +641,11 @@ export default function CaseManagementOpenCasesDetails() {
               prev && prev.id === editingCaseAnnotations.id ? { ...prev, tags } : prev
             );
           }}
+          onStatusChange={(status) => {
+            setSelectedCase((prev) =>
+              prev && prev.id === editingCaseAnnotations.id ? { ...prev, status } : prev
+            );
+          }}
           onSave={(notes) => {
             setSelectedCase((prev) =>
               prev && prev.id === editingCaseAnnotations.id ? { ...prev, notes } : prev
