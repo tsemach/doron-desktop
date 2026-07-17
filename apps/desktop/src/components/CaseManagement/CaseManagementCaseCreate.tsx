@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Button } from "@/components/ui/button";
 import { CaseTemplate, DocTemplate } from "./CaseManagementTypes";
 import mammoth from "mammoth";
-import DocumentPlaceholderPreview from "./DocumentPlaceholderPreview";
+import CaseManagementCaseCreateForm from "./CaseManagementCaseCreateForm";
+import CaseManagementCaseCreateFormActions from "./CaseManagementCaseCreateFormActions";
+import CaseManagementCaseCreateTemplateFields from "./CaseManagementCaseCreateTemplateFields";
 import { useRowFields } from "@/hooks/useRowFields";
 
 
@@ -368,94 +369,6 @@ export default function CaseManagementCaseCreate() {
 
   const hasFields = selectedTemplateId !== "empty" && templateFields.length > 0;
 
-  const leftFields = (
-    <>
-      {/* Subject */}
-      <div className="space-y-1">
-        <label htmlFor="subject" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Case Subject
-        </label>
-        <input
-          id="subject"
-          type="text"
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder="e.g. Eviction Notice, Acquisition Agreement"
-          className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-          disabled={loading}
-        />
-      </div>
-
-      {/* Customer Name */}
-      <div className="space-y-1">
-        <label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Customer Name
-        </label>
-        <input
-          id="name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. John Doe, Acme Corp"
-          className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-          disabled={loading}
-        />
-      </div>
-
-      {/* Folder Path */}
-      <div className="space-y-1">
-        <label htmlFor="folder" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Case Directory Path
-        </label>
-        <p className="text-xs text-muted-foreground">
-          All templates and case files will reside in this directory.
-        </p>
-        <div className="flex gap-2">
-          <input
-            id="folder"
-            type="text"
-            value={folder}
-            onChange={(e) => setFolder(e.target.value)}
-            placeholder="Select or type folder path..."
-            className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all font-mono"
-            disabled={loading}
-          />
-          <Button type="button" variant="secondary" onClick={handleBrowse} disabled={loading} className="px-5 py-3 h-auto">
-            Browse...
-          </Button>
-        </div>
-      </div>
-
-      {/* Template Selector */}
-      <div className="space-y-1">
-        <label htmlFor="template" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Case Template
-        </label>
-        <div className="relative">
-          <select
-            id="template"
-            value={selectedTemplateId}
-            onChange={(e) => setSelectedTemplateId(e.target.value)}
-            className="w-full rounded-md border-0 bg-background pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[46px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
-            disabled={loading}
-          >
-            <option value="empty">Create Empty Case (No Documents)</option>
-            {templates.map((t) => (
-              <option key={t.id} value={String(t.id)}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          <div className="absolute inset-y-0 right-3.5 rtl:left-3.5 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-
   return (
     <main className="flex-1 overflow-auto p-4 bg-background">
       <div className={`space-y-4 ${hasFields ? "max-w-none w-full" : "max-w-2xl"} transition-all duration-300`}>
@@ -498,7 +411,19 @@ export default function CaseManagementCaseCreate() {
               }`}
               style={hasFields && isLgScreen ? { flex: `0 0 calc(${leftPercent}% - 6px)` } : undefined}
             >
-              {leftFields}
+              <CaseManagementCaseCreateForm
+                subject={subject}
+                onSubjectChange={setSubject}
+                name={name}
+                onNameChange={setName}
+                folder={folder}
+                onFolderChange={setFolder}
+                onBrowse={handleBrowse}
+                templates={templates}
+                selectedTemplateId={selectedTemplateId}
+                onTemplateChange={setSelectedTemplateId}
+                loading={loading}
+              />
             </div>
 
             {/* Resizable Divider (rendered only on large screens when fields are shown) */}
@@ -519,426 +444,48 @@ export default function CaseManagementCaseCreate() {
 
             {/* Right Column: Dynamic Template Fields */}
             {hasFields && (
-              <div
-                id="right-fields-container"
-                className={`rounded-lg border border-border bg-card p-4 animate-in fade-in slide-in-from-right-4 duration-300 min-w-0 flex flex-col gap-2 pb-0 ${
-                  isLgScreen ? "h-full" : ""
-                }`}
-                style={isLgScreen ? { flex: "1 1 0%" } : undefined}
-              >
-                {/* Top portion: fields list */}
-                <div 
-                  className="flex flex-col min-h-0" 
-                  style={(focusedField || showAllPreviews) && isLgScreen ? { height: `${100 - bottomPercent}%` } : { flex: "1 1 0%" }}
-                >
-                  <div className="shrink-0 flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-                        Template Fields ({activeTemplate?.name})
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Enter real values for the template variables. Unfilled fields will remain as placeholders.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={associatedDocs.length === 0}
-                      onClick={() => {
-                        setFocusedField(null);
-                        setExpandedDocId(null);
-                        setShowAllPreviews(true);
-                      }}
-                      className="shrink-0"
-                    >
-                      Show all preview
-                    </Button>
-                  </div>
-
-                  {/* Search and Document Filter Bar */}
-                  <div className="flex flex-col sm:flex-row gap-2 mt-2 mb-2 shrink-0">
-                    <div className="relative w-full sm:flex-1">
-                      <input
-                        type="text"
-                        placeholder="Search fields..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-8 py-2 text-xs rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-foreground font-mono"
-                      />
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                      >
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.3-4.3" />
-                      </svg>
-                      {searchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground font-semibold text-xs cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-
-                    {uniqueRows.length > 0 && (
-                      <div className="relative w-full sm:w-[120px] shrink-0">
-                        <select
-                          value={selectedRow ?? "all"}
-                          onChange={(e) => setSelectedRow(e.target.value === "all" ? null : parseInt(e.target.value, 10))}
-                          className="rounded-md border-0 bg-background pl-3 pr-8 rtl:pr-3 rtl:pl-8 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring h-[34px] w-full shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
-                        >
-                          <option value="all">All Rows</option>
-                          {uniqueRows.map((row) => (
-                            <option key={row} value={row}>
-                              Row {row}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-2.5 rtl:left-2.5 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="m6 9 6 6 6-6" />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-
-                    {associatedDocs.length > 0 && (
-                      <div className="relative w-full sm:w-[220px]">
-                        <select
-                          value={filterDocId ?? "all"}
-                          onChange={(e) => setFilterDocId(e.target.value === "all" ? null : Number(e.target.value))}
-                          className="rounded-md border-0 bg-background pl-3 pr-8 rtl:pr-3 rtl:pl-8 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring h-[34px] w-full shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
-                        >
-                          <option value="all">All Documents ({associatedDocs.length})</option>
-                          {associatedDocs.map((doc) => (
-                            <option key={doc.id} value={doc.id}>
-                              {doc.title || doc.file_name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-2.5 rtl:left-2.5 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="m6 9 6 6 6-6" />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {filteredTemplateFields.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground bg-muted/10 flex-1 flex items-center justify-center">
-                      No template fields match your search/filter query.
-                    </div>
-                  ) : (
-                    <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-2 pb-2">
-                        {filteredTemplateFields.map((field) => {
-                          const isSelected = field === focusedField;
-                          const isFilled = !!fieldValues[field]?.trim();
-                          return (
-                            <div key={field} className="space-y-0.5">
-                              <label
-                                htmlFor={`field-${field}`}
-                                className={`text-xs font-mono font-bold truncate block transition-all w-fit max-w-full ${
-                                  isSelected
-                                    ? isFilled
-                                      ? "text-white bg-emerald-500 px-2 py-0.5 rounded-md shadow-sm shadow-emerald-500/40"
-                                      : "text-white bg-amber-500 px-2 py-0.5 rounded-md shadow-sm shadow-amber-500/40 animate-pulse"
-                                    : "text-muted-foreground font-medium"
-                                }`}
-                                title={field}
-                              >
-                                {field}
-                              </label>
-                              <input
-                                id={`field-${field}`}
-                                type="text"
-                                placeholder={`Value...`}
-                                value={fieldValues[field] || ""}
-                                onChange={(e) => setFieldValues({ ...fieldValues, [field]: e.target.value })}
-                                onFocus={() => {
-                                  setFocusedField(field);
-                                  setShowAllPreviews(false);
-                                }}
-                                className={`w-full rounded-md border px-4 py-2.5 text-sm focus:outline-none transition-all font-mono ${
-                                  isSelected
-                                    ? isFilled
-                                      ? "border-emerald-500/60 ring-2 ring-emerald-400"
-                                      : "border-amber-500/60 ring-2 ring-amber-400"
-                                    : "border-input bg-background focus:ring-2 focus:ring-ring"
-                                }`}
-                                disabled={loading}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Resizable Separation Line */}
-                {(focusedField || showAllPreviews) && isLgScreen && (
-                  <div
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      setIsDraggingHeight(true);
-                    }}
-                    className={`h-[1px] cursor-row-resize z-20 select-none shrink-0 ${
-                      isDraggingHeight ? "bg-primary" : "bg-border hover:bg-primary/50"
-                    } transition-colors relative flex items-center`}
-                  >
-                    <div className="absolute inset-x-0 h-4 top-1/2 -translate-y-1/2 cursor-row-resize" />
-                  </div>
-                )}
-
-                {/* Bottom portion: Document Context drawer */}
-                {(focusedField || showAllPreviews) && (
-                  <div
-                    className="flex flex-col min-h-0 border border-border/80 bg-background/50 rounded-lg pt-4 px-0 pb-0 -mb-px space-y-2 shrink-0"
-                    style={isLgScreen ? { maxHeight: `${bottomPercent}%` } : { maxHeight: "350px" }}
-                  >
-                    <div className="flex justify-between items-center shrink-0 pb-1 border-b border-border/60">
-                      <div className="pl-2">
-                        <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                          {showAllPreviews ? (
-                            "All Document Previews"
-                          ) : (
-                            <>Context for Field: <span className="font-mono text-primary">{focusedField}</span></>
-                          )}
-                        </h4>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {showAllPreviews
-                            ? "Every document in this case template. Select a card below to view its context snippet."
-                            : "Select a document card below to view its context snippet."}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFocusedField(null);
-                          setShowAllPreviews(false);
-                          setExpandedDocId(null);
-                        }}
-                        className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors text-xs font-semibold"
-                        title="Close context drawer"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {/* Context Body: Grid of associated document cards */}
-                    <div className="flex-1 flex flex-col min-h-0 gap-2 -mb-px">
-                      {(() => {
-                        const docs = showAllPreviews
-                          ? associatedDocs
-                          : (focusedField ? fieldToDocsMap[focusedField] || [] : []);
-                        if (docs.length === 0) {
-                          return (
-                            <div className="flex items-center justify-center h-full text-center text-xs text-muted-foreground italic py-4">
-                              {showAllPreviews
-                                ? "This case template has no associated documents."
-                                : "This field is manually added and does not belong to any document templates."}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <>
-                            {/* Horizontal grid of document cards (scrolls independently if too many) */}
-                            <div className="shrink-0 overflow-y-auto max-h-[150px] pr-1">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                {docs.map((doc) => {
-                                  const isExpanded = expandedDocId === doc.id;
-                                  return (
-                                    <div
-                                      key={doc.id}
-                                      className={`rounded-lg p-3 transition-colors duration-150 flex flex-col justify-between cursor-pointer select-none ${
-                                        isExpanded
-                                          ? "bg-primary/10"
-                                          : "bg-muted/30 hover:bg-muted/50"
-                                      }`}
-                                      onClick={() => handleToggleDocContext(doc.id)}
-                                    >
-                                      <div className="flex items-start justify-between gap-2 min-w-0">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="text-primary shrink-0"
-                                          >
-                                            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                                            <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-                                          </svg>
-                                          <div className="min-w-0">
-                                            <p className="text-xs font-bold text-foreground truncate" title={doc.title || doc.file_name}>
-                                              {doc.title || doc.file_name}
-                                            </p>
-                                            <p className="text-[9px] text-muted-foreground font-mono truncate">
-                                              {doc.file_name}
-                                            </p>
-                                          </div>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-1 shrink-0">
-                                          <button
-                                            type="button"
-                                            onClick={(e) => handleOpenTemplateFile(e, doc.marked_path)}
-                                            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all shrink-0"
-                                            title="Open template file"
-                                          >
-                                            <svg
-                                              xmlns="http://www.w3.org/2000/svg"
-                                              width="13"
-                                              height="13"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2.5"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                            >
-                                              <path d="M15 3h6v6" />
-                                              <path d="M10 14 21 3" />
-                                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                            </svg>
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleToggleDocContext(doc.id);
-                                            }}
-                                            className={`p-1 rounded hover:bg-muted transition-all shrink-0 ${
-                                              isExpanded ? "text-primary rotate-180" : "text-muted-foreground"
-                                            }`}
-                                            title={isExpanded ? "Collapse preview" : "Expand preview"}
-                                          >
-                                            <svg
-                                              xmlns="http://www.w3.org/2000/svg"
-                                              width="14"
-                                              height="14"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2.5"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              className="transition-transform duration-200"
-                                            >
-                                              <path d="m6 9 6 6 6-6" />
-                                            </svg>
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Full-width context snippet container below the grid if any card is expanded */}
-                            {expandedDocId && (
-                              <div className="flex-1 min-h-0 flex flex-col border border-border/80 rounded-lg pt-3 px-3 pb-0 bg-muted/20 space-y-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="flex justify-between items-center pb-1 border-b border-border/40 shrink-0">
-                                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                    Document Live Preview
-                                  </span>
-                                  <span className="text-[9px] text-muted-foreground font-mono">
-                                    {docTemplates.find(d => d.id === expandedDocId)?.file_name}
-                                  </span>
-                                </div>
-                                <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
-                                  {loadingContext ? (
-                                    <div className="py-6 flex items-center justify-center text-xs text-muted-foreground">
-                                      <svg
-                                        className="animate-spin -ml-1 mr-3 h-4 w-4 text-primary"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <circle
-                                          className="opacity-25"
-                                          cx="12"
-                                          cy="12"
-                                          r="10"
-                                          stroke="currentColor"
-                                          strokeWidth="4"
-                                        />
-                                        <path
-                                          className="opacity-75"
-                                          fill="currentColor"
-                                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                        />
-                                      </svg>
-                                      Loading template preview...
-                                    </div>
-                                  ) : previewError ? (
-                                    <div className="py-4 text-center text-xs text-destructive bg-destructive/10 rounded border border-destructive/20">
-                                      {previewError}
-                                    </div>
-                                  ) : docHtmlCache[expandedDocId] ? (
-                                    <DocumentPlaceholderPreview
-                                      html={docHtmlCache[expandedDocId]}
-                                      fields={templateFields}
-                                      fieldValues={fieldValues}
-                                      focusedField={focusedField}
-                                      onFieldClick={handleFieldClickFromPreview}
-                                      className="flex-1 min-h-0 w-full overflow-y-auto bg-background/80 dark:bg-background/20 pt-3 px-3 pb-0 rounded-lg border border-border/40 relative select-text"
-                                    />
-                                  ) : (
-                                    <div className="py-4 text-center text-xs text-muted-foreground">
-                                      No preview available
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <CaseManagementCaseCreateTemplateFields
+                isLgScreen={isLgScreen}
+                activeTemplate={activeTemplate}
+                associatedDocs={associatedDocs}
+                showAllPreviews={showAllPreviews}
+                onShowAllPreviewsChange={setShowAllPreviews}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                uniqueRows={uniqueRows}
+                selectedRow={selectedRow}
+                onSelectedRowChange={setSelectedRow}
+                filterDocId={filterDocId}
+                onFilterDocIdChange={setFilterDocId}
+                filteredTemplateFields={filteredTemplateFields}
+                fieldValues={fieldValues}
+                onFieldValuesChange={setFieldValues}
+                focusedField={focusedField}
+                onFocusedFieldChange={setFocusedField}
+                loading={loading}
+                isDraggingHeight={isDraggingHeight}
+                onDraggingHeightChange={setIsDraggingHeight}
+                bottomPercent={bottomPercent}
+                fieldToDocsMap={fieldToDocsMap}
+                expandedDocId={expandedDocId}
+                onExpandedDocIdChange={setExpandedDocId}
+                onToggleDocContext={handleToggleDocContext}
+                onOpenTemplateFile={handleOpenTemplateFile}
+                docTemplates={docTemplates}
+                loadingContext={loadingContext}
+                previewError={previewError}
+                docHtmlCache={docHtmlCache}
+                templateFields={templateFields}
+                onFieldClickFromPreview={handleFieldClickFromPreview}
+              />
             )}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 border-t border-border pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/case-management")}
-              disabled={loading}
-              className="px-6 py-2.5 h-auto"
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading} className="px-6 py-2.5 h-auto">
-              {loading ? "Creating..." : "Create Case"}
-            </Button>
-          </div>
+          <CaseManagementCaseCreateFormActions
+            loading={loading}
+            onCancel={() => navigate("/case-management")}
+          />
         </form>
       </div>
     </main>
