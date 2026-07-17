@@ -1,9 +1,51 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "../../ui/button";
 import TagChip from "../../ui/TagChip";
 import { useLanguage } from "../../../context/LanguageContext";
-import type { Tag } from "../CaseManagementTypes";
+import type { CaseStatus, Tag } from "../CaseManagementTypes";
+import { SPECIAL_STATUS_TAGS, applyCaseSpecialStatus, clearCaseSpecialStatus } from "@/lib/caseSpecialStatus";
+import OpenCasesCaseStatusConfirmModal from "./OpenCasesCaseStatusConfirmModal";
+
+// UI copy for special-status tags a user can type directly into the tag
+// input (i.e. the `tagType: "user"` entries in SPECIAL_STATUS_TAGS — system
+// tags like "closed" are managed elsewhere, e.g. the "Close Case" kebab
+// action, and are never user-typable here). Adding another user-triggerable
+// special tag only needs one entry here, no new confirm-flow code.
+const SPECIAL_TAG_CONFIRM_COPY: Record<string, {
+  title: string;
+  message: ReactNode;
+  confirmLabel: string;
+  notePlaceholder: string;
+  icon: ReactNode;
+  iconClassName: string;
+}> = {
+  waiting: {
+    title: "Move to Waiting",
+    message: (
+      <>Move this case into <span className="font-semibold text-foreground/90">waiting</span> status?</>
+    ),
+    confirmLabel: "Move to Waiting",
+    notePlaceholder: "Reason for waiting, what it's waiting on, etc...",
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    ),
+    iconClassName: "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400",
+  },
+};
 
 interface OpenCasesCaseAnnotationsModalProps {
   caseId: string;
@@ -12,6 +54,7 @@ interface OpenCasesCaseAnnotationsModalProps {
   initialTags: Tag[];
   onSave: (notes: string) => void;
   onTagsChange: (tags: Tag[]) => void;
+  onStatusChange?: (status: CaseStatus) => void;
   onCancel: () => void;
   onDelete: () => void;
 }
@@ -23,6 +66,7 @@ export default function OpenCasesCaseAnnotationsModal({
   initialTags,
   onSave,
   onTagsChange,
+  onStatusChange,
   onCancel,
   onDelete,
 }: OpenCasesCaseAnnotationsModalProps) {
@@ -32,6 +76,7 @@ export default function OpenCasesCaseAnnotationsModal({
   const [newTagValue, setNewTagValue] = useState("");
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingSpecialTag, setPendingSpecialTag] = useState<string | null>(null);
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -55,6 +100,23 @@ export default function OpenCasesCaseAnnotationsModal({
   async function handleAddTag(name: string, value?: string) {
     const trimmedName = name.trim().toLowerCase();
     if (!trimmedName || tags.some((tg) => tg.name === trimmedName)) return;
+
+    // User-triggerable special-status tags (e.g. "waiting") don't get added
+    // directly — they drive a case status change, so confirm first via the
+    // shared modal. System-managed ones (e.g. "closed") have no entry here
+    // and are never typable — they're only ever set via their own flow
+    // (e.g. the "Close Case" kebab action).
+    if (trimmedName in SPECIAL_TAG_CONFIRM_COPY) {
+      setPendingSpecialTag(trimmedName);
+      setNewTagName("");
+      setNewTagValue("");
+      return;
+    }
+    if (trimmedName in SPECIAL_STATUS_TAGS) {
+      alert(`"${trimmedName}" is a system-managed status and can't be added as a tag directly.`);
+      return;
+    }
+
     try {
       const tag = await invoke<Tag>("add_tag", {
         scopeType: "case",
@@ -72,8 +134,33 @@ export default function OpenCasesCaseAnnotationsModal({
     }
   }
 
+  async function handleConfirmSpecialTag(confirmedNotes: string) {
+    if (!pendingSpecialTag) return;
+    try {
+      const result = await applyCaseSpecialStatus(caseId, pendingSpecialTag, tags, confirmedNotes);
+      setPendingSpecialTag(null);
+      setTags(result.tags);
+      onTagsChange(result.tags);
+      onStatusChange?.(result.status);
+      setNotes(confirmedNotes);
+      onSave(confirmedNotes);
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to update case status: ${err}`);
+    }
+  }
+
   async function handleRemoveTag(tag: Tag) {
     try {
+      // Removing a special-status tag (e.g. "waiting") also returns the case
+      // to "open" — same reversal the "Reopen Case" kebab action performs.
+      if (tag.name in SPECIAL_STATUS_TAGS) {
+        const result = await clearCaseSpecialStatus(caseId, tags);
+        applyTags(result.tags);
+        onStatusChange?.(result.status);
+        return;
+      }
+
       await invoke("remove_tag", { scopeType: "case", scopeValue: caseId, name: tag.name });
       applyTags(tags.filter((tg) => tg.name !== tag.name));
     } catch (err) {
@@ -128,8 +215,13 @@ export default function OpenCasesCaseAnnotationsModal({
     try {
       await invoke("delete_case_annotations", { caseId: Number(caseId) });
       const userTagsToRemove = tags.filter((tg) => tg.type === "user");
+      const clearedSpecialTag = userTagsToRemove.some((tg) => tg.name in SPECIAL_STATUS_TAGS);
       for (const tag of userTagsToRemove) {
         await invoke("remove_tag", { scopeType: "case", scopeValue: caseId, name: tag.name });
+      }
+      if (clearedSpecialTag) {
+        await invoke("update_case_status", { id: Number(caseId), status: "open" });
+        onStatusChange?.("open");
       }
       applyTags(tags.filter((tg) => tg.type === "system"));
       onDelete();
@@ -146,12 +238,13 @@ export default function OpenCasesCaseAnnotationsModal({
   const followupTag = userTags.find((tg) => tg.name === "followup");
   const isTypingFollowup = newTagName.trim().toLowerCase() === "followup";
 
-  // Filter suggested tags to exclude currently added ones, and ensure "followup" is always offered if not already added.
-  const filteredSuggestions = [...new Set(["followup", ...suggestedTags])].filter(
+  // Filter suggested tags to exclude currently added ones, and ensure "followup"/"waiting" are always offered if not already added.
+  const filteredSuggestions = [...new Set(["followup", "waiting", ...suggestedTags])].filter(
     (name) => !userTags.some((tg) => tg.name === name)
   );
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       {/* Resizable Modal Container */}
       <div
@@ -323,5 +416,21 @@ export default function OpenCasesCaseAnnotationsModal({
         </div>
       </div>
     </div>
+
+    {pendingSpecialTag && (
+      <OpenCasesCaseStatusConfirmModal
+        tags={tags}
+        title={SPECIAL_TAG_CONFIRM_COPY[pendingSpecialTag].title}
+        message={SPECIAL_TAG_CONFIRM_COPY[pendingSpecialTag].message}
+        confirmLabel={SPECIAL_TAG_CONFIRM_COPY[pendingSpecialTag].confirmLabel}
+        notePlaceholder={SPECIAL_TAG_CONFIRM_COPY[pendingSpecialTag].notePlaceholder}
+        icon={SPECIAL_TAG_CONFIRM_COPY[pendingSpecialTag].icon}
+        iconClassName={SPECIAL_TAG_CONFIRM_COPY[pendingSpecialTag].iconClassName}
+        initialNotes={notes}
+        onConfirm={handleConfirmSpecialTag}
+        onCancel={() => setPendingSpecialTag(null)}
+      />
+    )}
+    </>
   );
 }

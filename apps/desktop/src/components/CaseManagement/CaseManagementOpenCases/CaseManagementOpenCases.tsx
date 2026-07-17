@@ -8,13 +8,14 @@ import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
 import OpenCasesUpdateDocumentModal from "./OpenCasesUpdateDocumentModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesCaseDeleteModal from "./OpenCasesCaseDeleteModal";
-import OpenCasesCaseCloseModal from "./OpenCasesCaseCloseModal";
+import OpenCasesCaseStatusConfirmModal from "./OpenCasesCaseStatusConfirmModal";
 import OpenCasesList from "./OpenCasesList";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
 import OpenCasesHeader from "./OpenCasesHeader";
 import OpenCasesTopBar from "./OpenCasesTopBar";
+import { applyCaseSpecialStatus, clearCaseSpecialStatus } from "@/lib/caseSpecialStatus";
 
-import { Case, CaseFile, CaseStatus, Tag } from "../CaseManagementTypes";
+import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
 
 export default function CaseManagementOpenCases() {
   const navigate = useNavigate();
@@ -180,27 +181,19 @@ export default function CaseManagementOpenCases() {
     setCaseToClose(null);
     setError(null);
     try {
-      await invoke("update_case_status", { id: Number(id), status: "closed" });
-
+      let tags = caseToClose.tags;
       if (hasFollowup) {
         await invoke("remove_tag", { scopeType: "case", scopeValue: id, name: "followup" });
+        tags = tags.filter((tg) => tg.name !== "followup");
       }
-      if (notes) {
-        await invoke("set_case_annotations", { caseId: Number(id), notes });
-      }
-      const closedTag = await invoke<Tag>("add_tag", {
-        scopeType: "case",
-        scopeValue: id,
-        name: "closed",
-        value: null,
-        tagType: "system",
-      });
+
+      const result = await applyCaseSpecialStatus(id, "closed", tags, notes);
 
       applyCaseUpdate(id, (c) => ({
         ...c,
-        status: "closed",
-        notes: notes || c.notes,
-        tags: [...c.tags.filter((tg) => tg.name !== "followup" && tg.name !== "closed"), closedTag],
+        status: result.status,
+        notes: result.notes,
+        tags: result.tags,
       }));
     } catch (err) {
       setError("Failed to close case: " + err);
@@ -210,12 +203,11 @@ export default function CaseManagementOpenCases() {
   async function handleReopenCase(c: Case) {
     setError(null);
     try {
-      await invoke("update_case_status", { id: Number(c.id), status: "open" });
-      await invoke("remove_tag", { scopeType: "case", scopeValue: c.id, name: "closed" });
+      const result = await clearCaseSpecialStatus(c.id, c.tags);
       applyCaseUpdate(c.id, (prev) => ({
         ...prev,
-        status: "open",
-        tags: prev.tags.filter((tg) => tg.name !== "closed"),
+        status: result.status,
+        tags: result.tags,
       }));
     } catch (err) {
       setError("Failed to reopen case: " + err);
@@ -290,6 +282,7 @@ export default function CaseManagementOpenCases() {
   const followupCount = cases.filter((c) =>
     c.tags.some((tg) => tg.name === "followup")
   ).length;
+  const waitingCount = cases.filter((c) => c.status === "waiting").length;
 
   return (
     <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-full">
@@ -312,6 +305,7 @@ export default function CaseManagementOpenCases() {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         followupCount={followupCount}
+        waitingCount={waitingCount}
       />
 
       {/* Main split container */}
@@ -378,6 +372,7 @@ export default function CaseManagementOpenCases() {
               prev && prev.id === editingCaseAnnotations.id ? { ...prev, tags } : prev
             );
           }}
+          onStatusChange={(status) => applyCaseUpdate(editingCaseAnnotations.id, (c) => ({ ...c, status }))}
           onSave={(notes) => {
             setCases((prev) =>
               prev.map((c) => (c.id === editingCaseAnnotations.id ? { ...c, notes } : c))
@@ -479,8 +474,35 @@ export default function CaseManagementOpenCases() {
 
       {/* Confirmation Modal for Case Close */}
       {caseToClose && (
-        <OpenCasesCaseCloseModal
-          caseObj={caseToClose}
+        <OpenCasesCaseStatusConfirmModal
+          tags={caseToClose.tags}
+          title="Close Case"
+          message={
+            <>
+              Are you sure you want to close the case{" "}
+              <span className="font-semibold text-foreground/90">"{caseToClose.subject || "No Subject"}"</span>?
+            </>
+          }
+          confirmLabel="Close Case"
+          notePlaceholder="Reason for closing, final outcome, etc..."
+          initialNotes={caseToClose.notes}
+          showFollowupWarning
+          icon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+          }
           onConfirm={confirmCloseCase}
           onCancel={() => setCaseToClose(null)}
         />
