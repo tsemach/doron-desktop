@@ -29,6 +29,7 @@
   "loading_cases": "Loading cases...",
   "no_cases_match": "No cases match your filters.",
   "close_case_title": "Close Case",
+  "reopen_case_title": "Reopen Case",
   "delete_case_title": "Delete Case",
   "status_open": "Open",
   "status_waiting": "Waiting",

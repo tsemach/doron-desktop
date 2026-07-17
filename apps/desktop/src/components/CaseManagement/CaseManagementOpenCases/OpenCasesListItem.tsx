@@ -15,7 +15,8 @@ interface OpenCasesListItemProps {
   c: Case;
   isSelected: boolean;
   onSelectCase: (c: Case) => void;
-  onCloseCase: (id: string) => void;
+  onCloseCase: (c: Case) => void;
+  onReopenCase: (c: Case) => void;
   onDeleteCase: (c: Case) => void;
   onOpenFolder: (folderPath: string) => void;
   onEditCaseAnnotations: (c: Case) => void;
@@ -26,6 +27,7 @@ export default function OpenCasesListItem({
   isSelected,
   onSelectCase,
   onCloseCase,
+  onReopenCase,
   onDeleteCase,
   onOpenFolder,
   onEditCaseAnnotations,
@@ -142,7 +144,7 @@ export default function OpenCasesListItem({
               {
                 label: t("close_case_title"),
                 hidden: c.status === "closed",
-                onClick: () => onCloseCase(c.id),
+                onClick: () => onCloseCase(c),
                 icon: (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -158,6 +160,28 @@ export default function OpenCasesListItem({
                   >
                     <circle cx="12" cy="12" r="10" />
                     <path d="m9 12 2 2 4-4" />
+                  </svg>
+                ),
+              },
+              {
+                label: t("reopen_case_title"),
+                hidden: c.status !== "closed",
+                onClick: () => onReopenCase(c),
+                icon: (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-muted-foreground"
+                  >
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
                   </svg>
                 ),
               },

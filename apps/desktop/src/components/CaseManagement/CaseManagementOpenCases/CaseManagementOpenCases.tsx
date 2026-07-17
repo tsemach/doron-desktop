@@ -8,12 +8,13 @@ import OpenCasesAddDocumentModal from "./OpenCasesAddDocumentModal";
 import OpenCasesUpdateDocumentModal from "./OpenCasesUpdateDocumentModal";
 import OpenCasesDocumentDeleteModal from "./OpenCasesDocumentDeleteModal";
 import OpenCasesCaseDeleteModal from "./OpenCasesCaseDeleteModal";
+import OpenCasesCaseCloseModal from "./OpenCasesCaseCloseModal";
 import OpenCasesList from "./OpenCasesList";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
 import OpenCasesHeader from "./OpenCasesHeader";
 import OpenCasesTopBar from "./OpenCasesTopBar";
 
-import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
+import { Case, CaseFile, CaseStatus, Tag } from "../CaseManagementTypes";
 
 export default function CaseManagementOpenCases() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export default function CaseManagementOpenCases() {
   const [updatingAttachment, setUpdatingAttachment] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null);
+  const [caseToClose, setCaseToClose] = useState<Case | null>(null);
 
   // General loading/error
   const [error, setError] = useState<string | null>(null);
@@ -162,13 +164,61 @@ export default function CaseManagementOpenCases() {
     }
   }
 
-  function closeCase(id: string) {
-    // For now update locally. We can extend to support database close later.
-    setCases((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: "closed" as const } : c))
-    );
-    if (selectedCase?.id === id) {
-      setSelectedCase((prev) => prev ? { ...prev, status: "closed" as const } : null);
+  function applyCaseUpdate(id: string, updater: (c: Case) => Case) {
+    setCases((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
+    setSelectedCase((prev) => (prev && prev.id === id ? updater(prev) : prev));
+  }
+
+  function handleCloseCase(c: Case) {
+    setCaseToClose(c);
+  }
+
+  async function confirmCloseCase(notes: string) {
+    if (!caseToClose) return;
+    const id = caseToClose.id;
+    const hasFollowup = caseToClose.tags.some((tg) => tg.name === "followup");
+    setCaseToClose(null);
+    setError(null);
+    try {
+      await invoke("update_case_status", { id: Number(id), status: "closed" });
+
+      if (hasFollowup) {
+        await invoke("remove_tag", { scopeType: "case", scopeValue: id, name: "followup" });
+      }
+      if (notes) {
+        await invoke("set_case_annotations", { caseId: Number(id), notes });
+      }
+      const closedTag = await invoke<Tag>("add_tag", {
+        scopeType: "case",
+        scopeValue: id,
+        name: "closed",
+        value: null,
+        tagType: "system",
+      });
+
+      applyCaseUpdate(id, (c) => ({
+        ...c,
+        status: "closed",
+        notes: notes || c.notes,
+        tags: [...c.tags.filter((tg) => tg.name !== "followup" && tg.name !== "closed"), closedTag],
+      }));
+    } catch (err) {
+      setError("Failed to close case: " + err);
+    }
+  }
+
+  async function handleReopenCase(c: Case) {
+    setError(null);
+    try {
+      await invoke("update_case_status", { id: Number(c.id), status: "open" });
+      await invoke("remove_tag", { scopeType: "case", scopeValue: c.id, name: "closed" });
+      applyCaseUpdate(c.id, (prev) => ({
+        ...prev,
+        status: "open",
+        tags: prev.tags.filter((tg) => tg.name !== "closed"),
+      }));
+    } catch (err) {
+      setError("Failed to reopen case: " + err);
     }
   }
 
@@ -276,7 +326,8 @@ export default function CaseManagementOpenCases() {
           isLgScreen={isLgScreen}
           leftPercent={leftPercent}
           onSelectCase={setSelectedCase}
-          onCloseCase={closeCase}
+          onCloseCase={handleCloseCase}
+          onReopenCase={handleReopenCase}
           onDeleteCase={handleDeleteCase}
           onOpenFolder={handleOpenFolder}
           onEditCaseAnnotations={setEditingCaseAnnotations}
@@ -423,6 +474,15 @@ export default function CaseManagementOpenCases() {
           caseSubject={caseToDelete.subject || "No Subject"}
           onConfirm={confirmDeleteCase}
           onCancel={() => setCaseToDelete(null)}
+        />
+      )}
+
+      {/* Confirmation Modal for Case Close */}
+      {caseToClose && (
+        <OpenCasesCaseCloseModal
+          caseObj={caseToClose}
+          onConfirm={confirmCloseCase}
+          onCancel={() => setCaseToClose(null)}
         />
       )}
 

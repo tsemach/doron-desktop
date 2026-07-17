@@ -261,6 +261,17 @@ pub fn delete_case(app: AppHandle, id: i64) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn update_case_status(app: AppHandle, id: i64, status: String) -> Result<(), String> {
+    let conn = store::open_db(&app)?;
+    let updated_at = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE cases SET status = ?1, updated_at = ?2 WHERE id = ?3",
+        params![status, updated_at, id],
+    ).map_err(|e| format!("[update case status] {e}"))?;
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CaseFile {
     pub name: String,
