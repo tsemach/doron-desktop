@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "../../ui/button";
 import { CaseFile, DocTemplate } from "../CaseManagementTypes";
 import DocumentPlaceholderPreview from "../DocumentPlaceholderPreview";
+import CaseManagementCaseCreateField from "../CaseManagementCaseCreateField";
 import mammoth from "mammoth";
 import { useRowFields } from "@/hooks/useRowFields";
 
@@ -177,6 +178,30 @@ export default function OpenCasesDocumentFields({
     });
   }, [getFilteredFields, selectedRow, searchQuery, showOnlyEmpty, initiallyEmptyFields]);
 
+  // Clicking a placeholder in the live preview jumps the fields grid to that
+  // field's input and focuses it, so the user can type a value right away.
+  const handleFieldClickFromPreview = useCallback((field: string) => {
+    const isHidden = !filteredFields.includes(field);
+    if (isHidden) {
+      setSearchQuery("");
+      setSelectedRow(null);
+      setShowOnlyEmpty(false);
+      setInitiallyEmptyFields([]);
+    }
+    setFocusedField(field);
+
+    // Wait for React to actually commit + paint the re-render (filter reset
+    // and/or focused-field highlight) before the target input can be scrolled
+    // to/focused — a double rAF reliably waits for the next painted frame.
+    const focusInput = () => {
+      const input = document.getElementById(`field-${field}`) as HTMLInputElement | null;
+      if (!input) return;
+      input.scrollIntoView({ behavior: "smooth", block: "center" });
+      input.focus({ preventScroll: true });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(focusInput));
+  }, [filteredFields]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-12 text-muted-foreground">
@@ -333,27 +358,16 @@ export default function OpenCasesDocumentFields({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-2.5 pb-2">
               {filteredFields.map((field) => (
-                <div key={field} className="space-y-0.5">
-                  <label
-                    htmlFor={`field-${field}`}
-                    className="text-[10px] font-mono font-medium text-muted-foreground truncate block"
-                    title={field}
-                  >
-                    {field}
-                  </label>
-                  <input
-                    id={`field-${field}`}
-                    type="text"
-                    placeholder="Value..."
-                    value={editedValues[field] || ""}
-                    onChange={(e) =>
-                      setEditedValues({ ...editedValues, [field]: e.target.value })
-                    }
-                    onFocus={() => setFocusedField(field)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring transition-all font-mono"
-                    disabled={saving}
-                  />
-                </div>
+                <CaseManagementCaseCreateField
+                  key={field}
+                  field={field}
+                  value={editedValues[field] || ""}
+                  isSelected={field === focusedField}
+                  isFilled={!!editedValues[field]?.trim()}
+                  disabled={saving}
+                  onChange={(value) => setEditedValues({ ...editedValues, [field]: value })}
+                  onFocus={() => setFocusedField(field)}
+                />
               ))}
             </div>
           )}
@@ -391,6 +405,7 @@ export default function OpenCasesDocumentFields({
               fields={fields}
               fieldValues={editedValues}
               focusedField={focusedField}
+              onFieldClick={handleFieldClickFromPreview}
               style={{ height: `${previewHeight}px` }}
               className="bg-background/80 dark:bg-background/20 p-3 rounded-lg border border-border/40 overflow-y-auto relative select-text"
             />
