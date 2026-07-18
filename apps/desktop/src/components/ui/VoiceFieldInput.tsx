@@ -10,6 +10,12 @@ interface VoiceFieldInputProps {
   onRecordingComplete?: (blob: Blob) => void;
   maxDurationMs?: number;
   className?: string;
+  /** When true, the mic button is non-interactive — e.g. cloud voice engine
+   * selected but the configured AI provider doesn't support audio (see
+   * lib/voiceCapability.ts). */
+  disabled?: boolean;
+  /** Tooltip shown while disabled, explaining why. */
+  disabledTitle?: string;
 }
 
 const DEFAULT_MAX_DURATION_MS = 15000;
@@ -18,6 +24,8 @@ export default function VoiceFieldInput({
   onRecordingComplete,
   maxDurationMs = DEFAULT_MAX_DURATION_MS,
   className = "",
+  disabled = false,
+  disabledTitle,
 }: VoiceFieldInputProps) {
   const [state, setState] = useState<RecordingState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +128,7 @@ export default function VoiceFieldInput({
   }
 
   function handleToggle() {
+    if (disabled) return;
     if (state === "recording") {
       stopRecording();
     } else {
@@ -128,6 +137,11 @@ export default function VoiceFieldInput({
   }
 
   const elapsedSeconds = (elapsedMs / 1000).toFixed(1);
+  const buttonTitle = disabled
+    ? disabledTitle || "Voice input unavailable"
+    : state === "recording"
+      ? "Stop recording"
+      : "Record voice input";
 
   return (
     <div className={`inline-flex flex-col gap-1.5 ${className}`}>
@@ -137,7 +151,8 @@ export default function VoiceFieldInput({
           variant={state === "recording" ? "destructive" : "outline"}
           size="icon-sm"
           onClick={handleToggle}
-          title={state === "recording" ? "Stop recording" : "Record voice input"}
+          disabled={disabled}
+          title={buttonTitle}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />

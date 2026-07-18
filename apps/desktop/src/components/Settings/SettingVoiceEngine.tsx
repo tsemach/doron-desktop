@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Check } from "lucide-react";
-
-const AUDIO_CAPABLE_PROVIDERS = ["gemini", "openai"];
+import { AUDIO_CAPABLE_PROVIDERS } from "@/lib/voiceCapability";
 
 // Mirrors llm_local_mode.rs's whisper model registry entries.
 const VOICE_MODELS = [
