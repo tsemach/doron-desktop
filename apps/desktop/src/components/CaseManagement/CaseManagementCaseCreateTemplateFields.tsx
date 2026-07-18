@@ -94,6 +94,8 @@ export default function CaseManagementCaseCreateTemplateFields({
             onExpandedDocIdChange(null);
             onShowAllPreviewsChange(true);
           }}
+          templateFields={templateFields}
+          onFieldExtracted={(field, value) => onFieldValuesChange({ ...fieldValues, [field]: value })}
         />
 
         {/* Search and Document Filter Bar */}

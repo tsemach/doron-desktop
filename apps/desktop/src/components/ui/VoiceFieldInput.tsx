@@ -1,12 +1,14 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { startRecording as pluginStartRecording, stopRecording as pluginStopRecording } from "tauri-plugin-mic-recorder-api";
 import { Button } from "./button";
 
 type RecordingState = "idle" | "recording" | "error";
 
 interface VoiceFieldInputProps {
-  /** Called with the recorded audio once a recording finishes. Raw MediaRecorder
-   * output (typically audio/webm) — format conversion, if needed, is a concern
-   * for the transcription phase that consumes this, not this component. */
+  /** Called with the recorded audio once a recording finishes, as a WAV blob
+   * (the plugin always writes WAV) — further conversion, if needed, is a
+   * concern for the transcription phase that consumes this, not this component. */
   onRecordingComplete?: (blob: Blob) => void;
   maxDurationMs?: number;
   className?: string;
@@ -33,17 +35,15 @@ export default function VoiceFieldInput({
   const [lastRecordingUrl, setLastRecordingUrl] = useState<string | null>(null);
   const [lastRecordingInfo, setLastRecordingInfo] = useState<{ sizeKb: number; durationMs: number } | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef(0);
   const timerIntervalRef = useRef<number | null>(null);
   const maxDurationTimeoutRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
+  // Mirrors `state === "recording"` in a ref so the unmount cleanup (a stale
+  // closure from mount) can still see the live value.
+  const isRecordingRef = useRef(false);
 
-  const cleanupStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+  function clearTimers() {
     if (timerIntervalRef.current !== null) {
       window.clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
@@ -52,15 +52,25 @@ export default function VoiceFieldInput({
       window.clearTimeout(maxDurationTimeoutRef.current);
       maxDurationTimeoutRef.current = null;
     }
-  }, []);
+  }
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      cleanupStream();
+      clearTimers();
+      // If a recording is still active when this component unmounts (e.g.
+      // the user navigates away without clicking to stop, or a dev-mode
+      // hot-reload swaps this component out), the native plugin's stream
+      // stays open and its internal "is_recording" flag stays stuck true
+      // forever — permanently blocking any future recording until the app
+      // process restarts. Stop it here so that can't happen; the blob (if
+      // any) is discarded since there's no mounted consumer left.
+      if (isRecordingRef.current) {
+        pluginStopRecording().catch(() => {});
+      }
     };
-  }, [cleanupStream]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -69,42 +79,43 @@ export default function VoiceFieldInput({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastRecordingUrl]);
 
-  function stopRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
+  // Captures audio natively via tauri-plugin-mic-recorder (cpal), not the
+  // browser's getUserMedia — WebView2 on Windows has no reliable permission
+  // story for getUserMedia, so mic access instead goes through the OS's
+  // native audio APIs (WASAPI/CoreAudio/ALSA), gated only by the OS-level
+  // microphone privacy setting rather than a per-webview browser prompt.
+  async function stopRecording() {
+    clearTimers();
+    isRecordingRef.current = false;
     if (isMountedRef.current) setState("idle");
+    try {
+      const durationMs = Date.now() - startTimeRef.current;
+      const savePath = await pluginStopRecording();
+      const bytes = await invoke<number[]>("read_file_bytes", { path: savePath });
+      const blob = new Blob([new Uint8Array(bytes)], { type: "audio/wav" });
+      if (!isMountedRef.current) return;
+      setLastRecordingUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(blob);
+      });
+      setLastRecordingInfo({ sizeKb: Math.round((blob.size / 1024) * 10) / 10, durationMs });
+      onRecordingComplete?.(blob);
+    } catch (err) {
+      console.error("Failed to stop voice recording:", err);
+      if (isMountedRef.current) {
+        setError(`Could not save the recording: ${String(err)}`);
+        setState("error");
+      }
+    }
   }
 
   async function startRecording() {
     setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      chunksRef.current = [];
-
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        const durationMs = Date.now() - startTimeRef.current;
-        cleanupStream();
-        if (!isMountedRef.current) return;
-        setLastRecordingUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return URL.createObjectURL(blob);
-        });
-        setLastRecordingInfo({ sizeKb: Math.round((blob.size / 1024) * 10) / 10, durationMs });
-        onRecordingComplete?.(blob);
-      };
+      await pluginStartRecording();
 
       startTimeRef.current = Date.now();
-      recorder.start();
+      isRecordingRef.current = true;
       setState("recording");
       setElapsedMs(0);
 
@@ -117,13 +128,9 @@ export default function VoiceFieldInput({
       }, maxDurationMs);
     } catch (err) {
       console.error("Failed to start voice recording:", err);
-      setError(
-        err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Microphone access denied. Allow microphone access to use voice input."
-          : "Could not access the microphone."
-      );
+      setError(`Could not access the microphone: ${String(err)}`);
       setState("error");
-      cleanupStream();
+      clearTimers();
     }
   }
 
