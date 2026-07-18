@@ -125,4 +125,60 @@ impl OpenAiProvider {
         };
         self.execute_request(prompt, Some(&system_prompt), true, temperature).await
     }
+
+    /// Transcribes audio via OpenAI's dedicated `/audio/transcriptions`
+    /// endpoint. Uses "whisper-1" regardless of `self.model` — the configured
+    /// chat model (e.g. "gpt-4o-mini") isn't necessarily valid for this
+    /// endpoint, whereas whisper-1 is the universally-available baseline.
+    pub async fn transcribe(&self, audio_bytes: Vec<u8>, language_hint: Option<&str>) -> Result<String, String> {
+        let client = reqwest::Client::new();
+        let base_url = self.base_url.as_deref().unwrap_or("https://api.openai.com/v1");
+        let url = format!("{}/audio/transcriptions", base_url);
+
+        let mut form = reqwest::multipart::Form::new()
+            .part(
+                "file",
+                reqwest::multipart::Part::bytes(audio_bytes)
+                    .file_name("audio.wav")
+                    .mime_str("audio/wav")
+                    .map_err(|e| e.to_string())?,
+            )
+            .text("model", "whisper-1")
+            .text("response_format", "json");
+
+        if let Some(lang) = language_hint {
+            if lang != "auto" {
+                form = form.text("language", lang.to_string());
+            }
+        }
+
+        let mut request = client.post(&url);
+        if !self.api_key.trim().is_empty() {
+            request = request.header("Authorization", format!("Bearer {}", self.api_key));
+        }
+
+        let response = request
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| format!("OpenAI transcription request failed: {e}"))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("OpenAI transcription error {status}: {body}"));
+        }
+
+        #[derive(Deserialize)]
+        struct OpenAiTranscriptionResponse {
+            text: String,
+        }
+
+        let resp: OpenAiTranscriptionResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse OpenAI transcription response: {e}"))?;
+
+        Ok(resp.text.trim().to_string())
+    }
 }
