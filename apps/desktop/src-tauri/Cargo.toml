@@ -29,7 +29,7 @@ arboard = "3.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.31", features = ["bundled-full"] }
-reqwest     = { version = "0.12", features = ["json", "multipart"] }
+reqwest     = { version = "0.12", features = ["json"] }
 tokio       = { version = "1", features = ["full"] }
 calamine    = "0.24"
 zip         = "2"
@@ -46,7 +46,6 @@ native-tls  = "0.2"
 md5         = "0.7.0"
 sha2        = "0.10"
 clap        = { version = "4.5", features = ["derive"] }
-base64      = "0.22"
 
 [[bin]]
 name = "eval"
