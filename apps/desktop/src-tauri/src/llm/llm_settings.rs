@@ -9,15 +9,6 @@ pub struct AiConfig {
     pub provider: String,      // "gemini" | "openai" | "anthropic" | "other"
     pub ai_model: String,      // e.g. "gpt-4o-mini", "gemini-1.5-flash", etc.
     pub api_key_enc: String,   // Encrypted API key (saved for BYOM)
-    // Independent of ai_mode — voice input's own transcription engine choice.
-    // Defaulted so existing callers (e.g. check_ai_health) that don't send this
-    // field still deserialize without needing to be updated.
-    #[serde(default = "default_voice_engine")]
-    pub voice_engine: String,  // "local" | "cloud"
-}
-
-fn default_voice_engine() -> String {
-    "local".to_string()
 }
 
 /// Tauri command to load current AI settings
@@ -25,7 +16,7 @@ fn default_voice_engine() -> String {
 pub fn get_ai_settings(app: AppHandle) -> Result<Option<AiConfig>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
-        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc, voice_engine FROM ai_configurations LIMIT 1")
+        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc FROM ai_configurations LIMIT 1")
         .map_err(|e| e.to_string())?;
 
     let row = stmt.query_row([], |r| {
@@ -34,7 +25,6 @@ pub fn get_ai_settings(app: AppHandle) -> Result<Option<AiConfig>, String> {
             provider: r.get(1)?,
             ai_model: r.get(2)?,
             api_key_enc: r.get(3).unwrap_or_default(),
-            voice_engine: r.get(4).unwrap_or_else(|_| default_voice_engine()),
         })
     });
 
@@ -51,8 +41,8 @@ pub fn save_ai_settings(app: AppHandle, config: AiConfig) -> Result<(), String> 
     let conn = store::open_db(&app)?;
     conn.execute("DELETE FROM ai_configurations", []).map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO ai_configurations (ai_mode, provider, ai_model, api_key_enc, voice_engine) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![config.ai_mode, config.provider, config.ai_model, config.api_key_enc, config.voice_engine],
+        "INSERT INTO ai_configurations (ai_mode, provider, ai_model, api_key_enc) VALUES (?1, ?2, ?3, ?4)",
+        params![config.ai_mode, config.provider, config.ai_model, config.api_key_enc],
     ).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -61,7 +51,7 @@ pub fn save_ai_settings(app: AppHandle, config: AiConfig) -> Result<(), String> 
 pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
     let conn = store::open_db(app).ok()?;
     let mut stmt = conn
-        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc, voice_engine FROM ai_configurations LIMIT 1")
+        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc FROM ai_configurations LIMIT 1")
         .ok()?;
 
     stmt.query_row([], |r| {
@@ -70,7 +60,6 @@ pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
             provider: r.get(1)?,
             ai_model: r.get(2)?,
             api_key_enc: r.get(3).unwrap_or_default(),
-            voice_engine: r.get(4).unwrap_or_else(|_| default_voice_engine()),
         })
     }).ok()
 }

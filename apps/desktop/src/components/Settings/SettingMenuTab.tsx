@@ -1,7 +1,7 @@
-import { User, Mail, Server, RefreshCw, Mic } from "lucide-react";
+import { User, Mail, Server, RefreshCw } from "lucide-react";
 import SettingMenuTabItem from "./SettingMenuTabItem";
 
-export type TabType = "preferences" | "email" | "ai" | "voice" | "update";
+export type TabType = "preferences" | "email" | "ai" | "update";
 
 type SettingMenuTabProps = {
   activeTab: TabType;
@@ -45,13 +45,6 @@ export default function SettingMenuTab({
         ) : undefined}
       />
       
-      <SettingMenuTabItem
-        isActive={activeTab === "voice"}
-        onClick={() => handleTabChange("voice")}
-        icon={Mic}
-        label="Voice Input Engine"
-      />
-
       <SettingMenuTabItem
         isActive={activeTab === "email"}
         onClick={() => handleTabChange("email")}
