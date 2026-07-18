@@ -58,13 +58,6 @@ pub fn get_model_filename(model_name: &str) -> Result<&'static str, String> {
         "gemma 4 12b (q4)" | "gemma-4-12b-it-q4" | "gemma-4-12b-it-local" | "gemma-4-12b" | "gemma 4 12b" => {
             Ok("gemma-4-12B-it-Q4_K_M.gguf")
         }
-        // Whisper (voice input, local engine) — same download/registry pattern as the LLM models above.
-        "ivrit-ai whisper large-v3-turbo (hebrew)" | "ivrit-whisper-large-v3-turbo" | "whisper-hebrew-local" => {
-            Ok("ggml-ivrit-whisper-large-v3-turbo.bin")
-        }
-        "whisper multilingual (small)" | "whisper-small-multilingual" | "whisper-multilingual-local" => {
-            Ok("ggml-small.bin")
-        }
         _ => Err(format!("Unknown local model: {}", model_name)),
     }
 }
@@ -89,18 +82,49 @@ fn get_model_url(model_name: &str) -> Result<&'static str, String> {
         "gemma 4 12b (q4)" | "gemma-4-12b-it-q4" | "gemma-4-12b-it-local" | "gemma-4-12b" | "gemma 4 12b" => {
             Ok("https://huggingface.co/lmstudio-community/gemma-4-12B-it-GGUF/resolve/main/gemma-4-12B-it-Q4_K_M.gguf")
         }
-        // TODO(verify): exact filename within ivrit-ai/whisper-large-v3-turbo-ggml
-        // needs confirmation before this URL is used for a real download.
-        "ivrit-ai whisper large-v3-turbo (hebrew)" | "ivrit-whisper-large-v3-turbo" | "whisper-hebrew-local" => {
-            Ok("https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/resolve/main/ggml-model.bin")
-        }
-        // Canonical official GGML conversions, referenced by whisper.cpp's own
-        // models/download-ggml-model.sh script.
-        "whisper multilingual (small)" | "whisper-small-multilingual" | "whisper-multilingual-local" => {
-            Ok("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin")
-        }
         _ => Err(format!("Unknown local model URL for: {}", model_name)),
     }
+}
+
+pub fn get_sidecar_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let target = match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+        ("macos", "x86_64") => "x86_64-apple-darwin",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        _ => return Err("Unsupported platform for local model execution".to_string()),
+    };
+    let suffix = if cfg!(windows) { ".exe" } else { "" };
+    let sidecar_filename = format!("llama-server-{}{}", target, suffix);
+
+    // Try relative paths in development environment first
+    let mut paths_to_try = vec![
+        std::env::current_dir().unwrap_or_default().join("apps/desktop/src-tauri/bin").join(&sidecar_filename),
+        std::env::current_dir().unwrap_or_default().join("src-tauri/bin").join(&sidecar_filename),
+    ];
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            paths_to_try.push(exe_dir.join(&sidecar_filename));
+            paths_to_try.push(exe_dir.join("bin").join(&sidecar_filename));
+            // target/debug/ -> target/ -> src-tauri/ -> src-tauri/bin/
+            if let Some(target_dir) = exe_dir.parent() {
+                if let Some(src_tauri_dir) = target_dir.parent() {
+                    paths_to_try.push(src_tauri_dir.join("bin").join(&sidecar_filename));
+                }
+            }
+        }
+    }
+
+    for path in paths_to_try {
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    let sidecar_name = format!("bin/{}", sidecar_filename);
+    app.path().resolve(&sidecar_name, tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("Failed to resolve sidecar path: {}", e))
 }
 
 #[tauri::command]

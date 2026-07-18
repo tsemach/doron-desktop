@@ -297,16 +297,6 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
         let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_engine TEXT NOT NULL DEFAULT 'local';", []);
     }
 
-    // Which whisper model to use when voice_engine == 'local'.
-    let voice_model_exists: bool = conn.query_row(
-        "SELECT COUNT(1) FROM pragma_table_info('ai_configurations') WHERE name='voice_model'",
-        [],
-        |row| row.get(0)
-    ).unwrap_or(0) > 0;
-    if !voice_model_exists {
-        let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_model TEXT NOT NULL DEFAULT 'whisper multilingual (small)';", []);
-    }
-
     // Migrate old AI configuration to the new ai_configurations table if new table is empty
     let has_ai_config: bool = conn.query_row(
         "SELECT COUNT(1) FROM ai_configurations",

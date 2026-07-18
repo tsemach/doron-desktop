@@ -130,8 +130,6 @@ pub fn run() {
             llm::install_local_model,
             llm::delete_local_model,
             llm::stop_llama_server,
-            llm::stop_whisper_server,
-            llm::transcribe_audio_local,
             email::confirm_email_alert,
             email::delete_email_alert,
             email::list_case_emails,
@@ -147,9 +145,8 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                println!("[Rust Backend] Tauri app exiting. Terminating local sidecars...");
+                println!("[Rust Backend] Tauri app exiting. Terminating local sidecar...");
                 crate::llm::stop_llama_server();
-                crate::llm::stop_whisper_server();
             }
         });
 }

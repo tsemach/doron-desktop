@@ -46,7 +46,6 @@ export default function Settings() {
   const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
   const [voiceEngine, setVoiceEngineState] = useState("local");
-  const [voiceModel, setVoiceModelState] = useState("whisper multilingual (small)");
 
   const [savedConfig, setSavedConfig] = useAtom(aiConfigAtom);
   const [savedConfigStatus, setSavedConfigStatus] = useAtom(aiConfigStatusAtom);
@@ -64,8 +63,7 @@ export default function Settings() {
     aiProvider !== savedConfig.provider ||
     aiModel !== savedConfig.aiModel ||
     providerApiKey !== savedConfig.apiKey ||
-    voiceEngine !== savedConfig.voiceEngine ||
-    voiceModel !== savedConfig.voiceModel);
+    voiceEngine !== savedConfig.voiceEngine);
 
   // Mode-specific selection history to preserve UI selections on tab toggle
   const [localProvider, setLocalProvider] = useState("gemini");
@@ -113,11 +111,6 @@ export default function Settings() {
 
   const handleSetVoiceEngine = (val: string) => {
     setVoiceEngineState(val);
-    setSaved(false);
-  };
-
-  const handleSetVoiceModel = (val: string) => {
-    setVoiceModelState(val);
     setSaved(false);
   };
 
@@ -200,14 +193,12 @@ export default function Settings() {
           const model = res.ai_model || "";
           const apiKey = res.api_key_enc || "";
           const voiceEngineValue = res.voice_engine || "local";
-          const voiceModelValue = res.voice_model || "whisper multilingual (small)";
 
           setAiMode(mode);
           setAiProvider(provider);
           setAiModel(model);
           setProviderApiKey(apiKey);
           setVoiceEngineState(voiceEngineValue);
-          setVoiceModelState(voiceModelValue);
 
           setSavedConfig({
             aiMode: mode,
@@ -215,7 +206,6 @@ export default function Settings() {
             aiModel: model,
             apiKey: apiKey,
             voiceEngine: voiceEngineValue,
-            voiceModel: voiceModelValue,
           });
 
           if (mode === "local") {
@@ -310,7 +300,6 @@ export default function Settings() {
             ai_model: aiModel,
             api_key_enc: providerApiKey.trim(),
             voice_engine: voiceEngine,
-            voice_model: voiceModel,
           }
         });
         setSavedConfig({
@@ -319,7 +308,6 @@ export default function Settings() {
           aiModel,
           apiKey: providerApiKey.trim(),
           voiceEngine,
-          voiceModel,
         });
       } catch (e) {
         console.error("Failed to save AI configurations:", e);
@@ -442,8 +430,6 @@ export default function Settings() {
           <SettingVoiceEngine
             voiceEngine={voiceEngine}
             setVoiceEngine={handleSetVoiceEngine}
-            voiceModel={voiceModel}
-            setVoiceModel={handleSetVoiceModel}
             aiProvider={aiProvider}
           />
         );
