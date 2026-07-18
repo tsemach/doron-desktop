@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 
 import { Button } from "../ui/button";
+import CaseStatusBadge from "../ui/CaseStatusBadge";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
+import type { CaseStatus, Tag } from "../CaseManagement/CaseManagementTypes";
 
 const DOC_TYPES = [
   "contract",
@@ -23,6 +25,34 @@ type TagFilter = {
   name: string;
   value?: string;
 };
+
+type SearchTarget = "documents" | "cases" | "both";
+
+type CaseSearchEntry = {
+  id: string;
+  folder: string;
+  subject: string;
+  status: CaseStatus;
+  tags: Tag[];
+  notes: string | null;
+};
+
+// Open cases surface first, then anything still needing attention, closed last.
+const STATUS_PRIORITY: Record<CaseStatus, number> = { open: 0, waiting: 1, followup: 2, closed: 3 };
+
+function searchCases(allCases: CaseSearchEntry[], filters: TagFilter[], notesContains: string): CaseSearchEntry[] {
+  const needle = notesContains.trim().toLowerCase();
+  return allCases
+    .filter((c) => {
+      const tagsMatch = filters.every((f) =>
+        c.tags.some((tg) => tg.name === f.name && (!f.value || tg.value === f.value))
+      );
+      if (!tagsMatch) return false;
+      if (needle && !(c.notes && c.notes.toLowerCase().includes(needle))) return false;
+      return true;
+    })
+    .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
+}
 
 type DocumentRow = {
   id: number;
@@ -107,10 +137,13 @@ export default function DocsManagementSearch() {
   const [newTagFilterName, setNewTagFilterName] = useState("");
   const [newTagFilterValue, setNewTagFilterValue] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [searchTarget, setSearchTarget] = useState<SearchTarget>("documents");
   const [results, setResults] = useState<DocumentRow[] | null>(null);
+  const [caseResults, setCaseResults] = useState<CaseSearchEntry[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cases, setCases] = useState<{ id: string; folder: string; subject: string }[]>([]);
+  const [cases, setCases] = useState<CaseSearchEntry[]>([]);
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
@@ -136,6 +169,9 @@ export default function DocsManagementSearch() {
         id: String(c.id),
         folder: c.folder,
         subject: c.subject,
+        status: c.status,
+        tags: c.tags ?? [],
+        notes: c.notes ?? null,
       })));
     } catch (err) {
       console.error("Failed to load cases in search:", err);
@@ -170,14 +206,26 @@ export default function DocsManagementSearch() {
     setIsSearching(true);
     setError(null);
     try {
-      const rows = await invoke<DocumentRow[]>("query_search_documents", {
-        query: queryString,
-        apiKey,
-        limit: 20,
-        tags: tagFilters.length > 0 ? tagFilters : undefined,
-        notesContains: notesContains.trim() || undefined,
-      });
-      setResults(rows);
+      if (searchTarget !== "cases") {
+        const rows = await invoke<DocumentRow[]>("query_search_documents", {
+          query: queryString,
+          apiKey,
+          limit: 20,
+          tags: tagFilters.length > 0 ? tagFilters : undefined,
+          notesContains: notesContains.trim() || undefined,
+        });
+        setResults(rows);
+      } else {
+        setResults(null);
+      }
+
+      // Case matching is advance-search-driven only (tags/notes) — free
+      // text, doc type, and date filters stay document-specific.
+      if (searchTarget !== "documents" && hasStructuredFilters) {
+        setCaseResults(searchCases(cases, tagFilters, notesContains));
+      } else {
+        setCaseResults(null);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -193,6 +241,9 @@ export default function DocsManagementSearch() {
     setDocType("");
     setDateFrom("");
     setDateTo("");
+  }
+
+  function handleClearAdvancedSearch() {
     setTagFilters([]);
     setNotesContains("");
     setNewTagFilterName("");
@@ -250,7 +301,7 @@ export default function DocsManagementSearch() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-all flex items-center gap-1 ${
-                showFilters || docType || dateFrom || dateTo || hasStructuredFilters
+                showFilters || docType || dateFrom || dateTo
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-border bg-background text-muted-foreground hover:text-foreground"
               }`}
@@ -279,54 +330,51 @@ export default function DocsManagementSearch() {
           </div>
         </div>
 
-        {/* Collapsible Advanced Filters */}
-        {showFilters && (
+        {/* Advance search link — separate section from Filters, opens the tag/notes panel below */}
+        <button
+          type="button"
+          onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+          className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+        >
+          Advance search
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className={`transition-transform duration-200 ${showAdvancedSearch ? "rotate-180" : ""}`}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {/* Collapsible Advance Search (tags + notes) */}
+        {showAdvancedSearch && (
           <div className="pt-3 border-t border-border/50 space-y-3 text-xs animate-fade-in-down">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="font-semibold text-muted-foreground">Doc Type:</label>
-                <select
-                  value={docType}
-                  onChange={(e) => setDocType(e.target.value)}
-                  className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="">Any</option>
-                  {DOC_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </option>
-                  ))}
-                </select>
+            {/* Search target */}
+            <div className="flex items-center gap-2">
+              <label className="font-semibold text-muted-foreground shrink-0">Search in:</label>
+              <div className="inline-flex rounded-md border border-input overflow-hidden">
+                {(["documents", "cases", "both"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setSearchTarget(opt)}
+                    className={`px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors ${
+                      opt !== "documents" ? "border-l border-input" : ""
+                    } ${
+                      searchTarget === opt
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
               </div>
-
-              <div className="flex items-center gap-2">
-                <label className="font-semibold text-muted-foreground">From:</label>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <label className="font-semibold text-muted-foreground">To:</label>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-
-              {(docType || dateFrom || dateTo || hasStructuredFilters) && (
-                <button
-                  onClick={handleClearFilters}
-                  className="text-red-500 font-semibold hover:underline ml-auto"
-                >
-                  Clear Filters
-                </button>
-              )}
             </div>
 
             {/* Tag filters */}
@@ -404,6 +452,66 @@ export default function DocsManagementSearch() {
                 className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
+
+            {hasStructuredFilters && (
+              <button
+                type="button"
+                onClick={handleClearAdvancedSearch}
+                className="text-red-500 font-semibold hover:underline"
+              >
+                Clear Advance Search
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Collapsible Advanced Filters */}
+        {showFilters && (
+          <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4 text-xs animate-fade-in-down">
+            <div className="flex items-center gap-2">
+              <label className="font-semibold text-muted-foreground">Doc Type:</label>
+              <select
+                value={docType}
+                onChange={(e) => setDocType(e.target.value)}
+                className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">Any</option>
+                {DOC_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="font-semibold text-muted-foreground">From:</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="font-semibold text-muted-foreground">To:</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            {(docType || dateFrom || dateTo) && (
+              <button
+                onClick={handleClearFilters}
+                className="text-red-500 font-semibold hover:underline ml-auto"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -424,18 +532,52 @@ export default function DocsManagementSearch() {
       )}
 
       {/* Search Results */}
-      {results !== null ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {results.length === 0
-                ? "No matching documents found."
-                : `Showing ${results.length} relevant document${results.length !== 1 ? "s" : ""}`}
-            </span>
-          </div>
+      {(results !== null || caseResults !== null) ? (
+        <div className="space-y-6">
+          {/* Case Results */}
+          {caseResults !== null && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {caseResults.length === 0
+                    ? "No matching cases found."
+                    : `Showing ${caseResults.length} matching case${caseResults.length !== 1 ? "s" : ""}`}
+                </span>
+              </div>
 
-          <div className="space-y-3">
-            {results.map((doc) => {
+              <div className="space-y-2">
+                {caseResults.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => navigate(`/case-management/cases/${c.id}`)}
+                    className="rounded-xl border border-border bg-card p-3.5 hover:shadow-xs transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer hover:border-border-hover"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-foreground truncate">{c.subject || "Untitled Case"}</div>
+                      {c.folder && (
+                        <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5">{c.folder}</div>
+                      )}
+                    </div>
+                    <CaseStatusBadge status={c.status} className="shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Document Results */}
+          {results !== null && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {results.length === 0
+                    ? "No matching documents found."
+                    : `Showing ${results.length} relevant document${results.length !== 1 ? "s" : ""}`}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {results.map((doc) => {
               const fileExtension = doc.file_name.split(".").pop() || "";
               const matchedCase = findCaseForFile(doc.file_path);
               return (
@@ -560,7 +702,9 @@ export default function DocsManagementSearch() {
                 </div>
               );
             })}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Search Landing/Idle State suggestions */
