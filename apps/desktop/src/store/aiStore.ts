@@ -6,6 +6,7 @@ export interface AiConfig {
   provider: string;
   aiModel: string;
   apiKey: string;
+  voiceEngine: string;
 }
 
 export const aiConfigAtom = atom<AiConfig | null>(null);
@@ -28,6 +29,7 @@ export async function triggerGlobalHealthCheck() {
       provider: res.provider || "gemini",
       aiModel: res.ai_model || "",
       apiKey: res.api_key_enc || "",
+      voiceEngine: res.voice_engine || "local",
     };
     store.set(aiConfigAtom, config);
 
