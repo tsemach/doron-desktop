@@ -115,6 +115,10 @@ export default function DocsManagementSearch() {
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
   const hasStructuredFilters = tagFilters.length > 0 || !!notesContains.trim();
+  // Only the free-text/natural-language box is an AI-driven search — tag,
+  // notes, doc type, and date filters are deterministic SQL, so they
+  // shouldn't be blocked by a missing API key.
+  const needsApiKey = !!text.trim();
   const [aiConfig, setAiConfig] = useState<any>(null);
 
   useEffect(() => {
@@ -162,7 +166,7 @@ export default function DocsManagementSearch() {
   }
 
   async function handleSearch() {
-    if ((!queryString.trim() && !hasStructuredFilters) || showWarning) return;
+    if ((!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning)) return;
     setIsSearching(true);
     setError(null);
     try {
@@ -267,7 +271,7 @@ export default function DocsManagementSearch() {
             </button>
             <Button
               onClick={handleSearch}
-              disabled={(!queryString.trim() && !hasStructuredFilters) || showWarning || isSearching}
+              disabled={(!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning) || isSearching}
               size="sm"
             >
               {isSearching ? "Searching..." : "Search"}
