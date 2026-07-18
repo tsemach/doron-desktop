@@ -7,6 +7,7 @@ export interface AiConfig {
   aiModel: string;
   apiKey: string;
   voiceEngine: string;
+  voiceModel: string;
 }
 
 export const aiConfigAtom = atom<AiConfig | null>(null);
@@ -30,6 +31,7 @@ export async function triggerGlobalHealthCheck() {
       aiModel: res.ai_model || "",
       apiKey: res.api_key_enc || "",
       voiceEngine: res.voice_engine || "local",
+      voiceModel: res.voice_model || "whisper multilingual (small)",
     };
     store.set(aiConfigAtom, config);
 
