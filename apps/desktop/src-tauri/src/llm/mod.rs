@@ -4,12 +4,14 @@ pub mod llm_local_mode;
 pub mod sidecar;
 pub mod whisper_local;
 pub mod cloud_transcribe;
+pub mod field_extraction;
 
 pub use llm_settings::*;
 pub use llm_local_mode::*;
 pub use sidecar::get_sidecar_path;
 pub use whisper_local::*;
 pub use cloud_transcribe::*;
+pub use field_extraction::*;
 use serde::{Deserialize, Serialize};
 
 const EXTRACTION_PROMPT: &str = r#"You are a document analyst. Read the document text below and extract metadata as a single JSON object. Be concise and precise. Use null for any field you cannot determine.
@@ -191,7 +193,7 @@ pub async fn call_claude_raw(text: &str, api_key: &str, model: &str, system_prom
 }
 
 // strips markdown code fences and finds the JSON object boundaries
-fn clean_json(raw: &str) -> String {
+pub(crate) fn clean_json(raw: &str) -> String {
     let s = raw.trim();
 
     let s = if s.starts_with("```") {
