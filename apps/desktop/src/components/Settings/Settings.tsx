@@ -12,6 +12,7 @@ import { check } from "@tauri-apps/plugin-updater";
 import SettingPreferences from "./SettingPreferences";
 import SettingEmailIntegration from "./SettingEmailIntegration";
 import SettingAiProvider from "./SettingAiProvider";
+import SettingVoiceEngine from "./SettingVoiceEngine";
 import SettingSoftwareUpdate from "./SettingSoftwareUpdate";
 import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
 import SettingAiProviderHelp from "./SettingAiProviderHelp";
@@ -44,6 +45,7 @@ export default function Settings() {
   const [aiProvider, setAiProvider] = useState("gemini");
   const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
+  const [voiceEngine, setVoiceEngineState] = useState("local");
 
   const [savedConfig, setSavedConfig] = useAtom(aiConfigAtom);
   const [savedConfigStatus, setSavedConfigStatus] = useAtom(aiConfigStatusAtom);
@@ -60,7 +62,8 @@ export default function Settings() {
     aiMode !== savedConfig.aiMode ||
     aiProvider !== savedConfig.provider ||
     aiModel !== savedConfig.aiModel ||
-    providerApiKey !== savedConfig.apiKey);
+    providerApiKey !== savedConfig.apiKey ||
+    voiceEngine !== savedConfig.voiceEngine);
 
   // Mode-specific selection history to preserve UI selections on tab toggle
   const [localProvider, setLocalProvider] = useState("gemini");
@@ -104,6 +107,11 @@ export default function Settings() {
     if (aiMode === "byom") {
       setByomApiKey(val);
     }
+  };
+
+  const handleSetVoiceEngine = (val: string) => {
+    setVoiceEngineState(val);
+    setSaved(false);
   };
 
   const handleSetAiMode = (mode: string) => {
@@ -184,17 +192,20 @@ export default function Settings() {
           const provider = res.provider || "gemini";
           const model = res.ai_model || "";
           const apiKey = res.api_key_enc || "";
+          const voiceEngineValue = res.voice_engine || "local";
 
           setAiMode(mode);
           setAiProvider(provider);
           setAiModel(model);
           setProviderApiKey(apiKey);
+          setVoiceEngineState(voiceEngineValue);
 
           setSavedConfig({
             aiMode: mode,
             provider: provider,
             aiModel: model,
             apiKey: apiKey,
+            voiceEngine: voiceEngineValue,
           });
 
           if (mode === "local") {
@@ -288,6 +299,7 @@ export default function Settings() {
             provider: aiProvider,
             ai_model: aiModel,
             api_key_enc: providerApiKey.trim(),
+            voice_engine: voiceEngine,
           }
         });
         setSavedConfig({
@@ -295,6 +307,7 @@ export default function Settings() {
           provider: aiProvider,
           aiModel,
           apiKey: providerApiKey.trim(),
+          voiceEngine,
         });
       } catch (e) {
         console.error("Failed to save AI configurations:", e);
@@ -410,6 +423,14 @@ export default function Settings() {
               setActiveHelp(null);
               setHealthCheckResult(res);
             }}
+          />
+        );
+      case "voice":
+        return (
+          <SettingVoiceEngine
+            voiceEngine={voiceEngine}
+            setVoiceEngine={handleSetVoiceEngine}
+            aiProvider={aiProvider}
           />
         );
       case "update":

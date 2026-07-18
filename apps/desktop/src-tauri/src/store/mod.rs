@@ -285,6 +285,18 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
         let _ = conn.execute("ALTER TABLE pending_email_alerts ADD COLUMN body_text TEXT;", []);
     }
 
+    // Ensure 'voice_engine' column exists in 'ai_configurations' — independent of ai_mode,
+    // since a user's chat-LLM provider choice doesn't imply the same preference for voice
+    // transcription (e.g. local chat + cloud STT, or vice versa, are both reasonable).
+    let voice_engine_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('ai_configurations') WHERE name='voice_engine'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !voice_engine_exists {
+        let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_engine TEXT NOT NULL DEFAULT 'local';", []);
+    }
+
     // Migrate old AI configuration to the new ai_configurations table if new table is empty
     let has_ai_config: bool = conn.query_row(
         "SELECT COUNT(1) FROM ai_configurations",
