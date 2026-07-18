@@ -136,7 +136,6 @@ export default function DocsManagementSearch() {
   const [availableTagNames, setAvailableTagNames] = useState<string[]>([]);
   const [newTagFilterName, setNewTagFilterName] = useState("");
   const [newTagFilterValue, setNewTagFilterValue] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [searchTarget, setSearchTarget] = useState<SearchTarget>("documents");
   const [results, setResults] = useState<DocumentRow[] | null>(null);
@@ -237,13 +236,10 @@ export default function DocsManagementSearch() {
     if (e.key === "Enter") handleSearch();
   }
 
-  function handleClearFilters() {
+  function handleClearAdvancedSearch() {
     setDocType("");
     setDateFrom("");
     setDateTo("");
-  }
-
-  function handleClearAdvancedSearch() {
     setTagFilters([]);
     setNotesContains("");
     setNewTagFilterName("");
@@ -298,28 +294,6 @@ export default function DocsManagementSearch() {
             className="w-full rounded-lg border border-input bg-background pl-11 pr-24 py-3 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <div className="absolute right-2 flex items-center gap-1.5">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-all flex items-center gap-1 ${
-                showFilters || docType || dateFrom || dateTo
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border bg-background text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Filters
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className={`transition-transform duration-200 ${showFilters ? "rotate-180" : ""}`}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
             <Button
               onClick={handleSearch}
               disabled={(!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning) || isSearching}
@@ -330,7 +304,7 @@ export default function DocsManagementSearch() {
           </div>
         </div>
 
-        {/* Advance search link — separate section from Filters, opens the tag/notes panel below */}
+        {/* Advance search link — opens the combined tag/notes/doc-type/date panel below */}
         <button
           type="button"
           onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
@@ -453,63 +427,53 @@ export default function DocsManagementSearch() {
               />
             </div>
 
-            {hasStructuredFilters && (
+            {/* Doc type / date range — merged into Advance Search */}
+            <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">Doc Type:</label>
+                <select
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Any</option>
+                  {DOC_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">From:</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">To:</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+            </div>
+
+            {(hasStructuredFilters || docType || dateFrom || dateTo) && (
               <button
                 type="button"
                 onClick={handleClearAdvancedSearch}
                 className="text-red-500 font-semibold hover:underline"
               >
                 Clear Advance Search
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Collapsible Advanced Filters */}
-        {showFilters && (
-          <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4 text-xs animate-fade-in-down">
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">Doc Type:</label>
-              <select
-                value={docType}
-                onChange={(e) => setDocType(e.target.value)}
-                className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="">Any</option>
-                {DOC_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">From:</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">To:</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-
-            {(docType || dateFrom || dateTo) && (
-              <button
-                onClick={handleClearFilters}
-                className="text-red-500 font-semibold hover:underline ml-auto"
-              >
-                Clear Filters
               </button>
             )}
           </div>
