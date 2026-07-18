@@ -1,13 +1,18 @@
 use std::collections::{HashMap, HashSet};
 use rusqlite::Connection;
-use super::types::{QueryAnalysis, DocumentRow};
+use super::types::{QueryAnalysis, DocumentRow, TagFilter};
 use super::helpers::{fts_term, row_to_doc, has_embeddings};
 
 /// Formulate and run a dynamic SQL query to get document IDs passing hard filters
+/// (date range, tag filters, and notes-contains). Tags/notes are looked up via
+/// `documents.file_path`, which is how `tags`/`document_annotations` scope to a
+/// document (there's no case FK on `documents`).
 fn get_filtered_document_ids(
     conn: &Connection,
     date_from: Option<&str>,
     date_to: Option<&str>,
+    tags: Option<&[TagFilter]>,
+    notes_contains: Option<&str>,
 ) -> Option<HashSet<i64>> {
     let mut clauses = Vec::new();
     let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -24,6 +29,45 @@ fn get_filtered_document_ids(
             clauses.push(format!("doc_date <= ?{}", params.len() + 1));
             params.push(Box::new(dt.to_string()));
         }
+    }
+
+    // Each selected tag must be present (intersected via AND) — a document
+    // needs ALL selected tags, not just one of them.
+    for tag in tags.into_iter().flatten() {
+        let name = tag.name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        // tags.scope_value is always stored slash-normalized for document scope
+        // (see TagScope::Document), while documents.file_path keeps native
+        // separators — normalize the same way here or the match silently misses
+        // on Windows.
+        match tag.value.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+            Some(value) => {
+                clauses.push(format!(
+                    "REPLACE(file_path, '\\', '/') IN (SELECT scope_value FROM tags WHERE scope_type = 'document' AND name = ?{} AND value = ?{})",
+                    params.len() + 1,
+                    params.len() + 2
+                ));
+                params.push(Box::new(name.to_string()));
+                params.push(Box::new(value.to_string()));
+            }
+            None => {
+                clauses.push(format!(
+                    "REPLACE(file_path, '\\', '/') IN (SELECT scope_value FROM tags WHERE scope_type = 'document' AND name = ?{})",
+                    params.len() + 1
+                ));
+                params.push(Box::new(name.to_string()));
+            }
+        }
+    }
+
+    if let Some(notes) = notes_contains.map(str::trim).filter(|n| !n.is_empty()) {
+        clauses.push(format!(
+            "file_path IN (SELECT file_path FROM document_annotations WHERE notes LIKE ?{})",
+            params.len() + 1
+        ));
+        params.push(Box::new(format!("%{}%", notes)));
     }
 
     if clauses.is_empty() {
@@ -235,21 +279,29 @@ pub fn query_smart_execute(
     conn: &Connection,
     analysis: &QueryAnalysis,
     query_text: &str,
+    tags: Option<&[TagFilter]>,
+    notes_contains: Option<&str>,
     limit: usize,
 ) -> Vec<DocumentRow> {
-    // 1. Resolve structured filters (dates only)
+    // 1. Resolve structured filters (dates, tags, notes)
     let date_range_from = analysis.date_range.as_ref().and_then(|r| r.from.as_deref());
     let date_range_to = analysis.date_range.as_ref().and_then(|r| r.to.as_deref());
+    let has_explicit_filter = tags.is_some_and(|t| !t.is_empty())
+        || notes_contains.is_some_and(|s| !s.trim().is_empty());
     let mut filter_ids = get_filtered_document_ids(
         conn,
         date_range_from,
         date_range_to,
+        tags,
+        notes_contains,
     );
 
-    // Resilient Fallback: If hard filters (dates only) matched 0 documents,
-    // fallback to searching everything instead of returning empty results immediately.
+    // Resilient Fallback: If only soft (AI-guessed) date filters matched 0
+    // documents, fallback to searching everything instead of returning empty
+    // results immediately. Explicit tag/notes filters are user picks, not
+    // guesses — 0 matches there should mean 0 results, not a silent broadening.
     if let Some(ref set) = filter_ids {
-        if set.is_empty() {
+        if set.is_empty() && !has_explicit_filter {
             filter_ids = None;
         }
     }

@@ -19,6 +19,11 @@ const DOC_TYPES = [
   "other",
 ];
 
+type TagFilter = {
+  name: string;
+  value?: string;
+};
+
 type DocumentRow = {
   id: number;
   file_path: string;
@@ -96,6 +101,11 @@ export default function DocsManagementSearch() {
   const [docType, setDocType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [tagFilters, setTagFilters] = useState<TagFilter[]>([]);
+  const [notesContains, setNotesContains] = useState("");
+  const [availableTagNames, setAvailableTagNames] = useState<string[]>([]);
+  const [newTagFilterName, setNewTagFilterName] = useState("");
+  const [newTagFilterValue, setNewTagFilterValue] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [results, setResults] = useState<DocumentRow[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -104,11 +114,13 @@ export default function DocsManagementSearch() {
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
+  const hasStructuredFilters = tagFilters.length > 0 || !!notesContains.trim();
   const [aiConfig, setAiConfig] = useState<any>(null);
 
   useEffect(() => {
     loadCases();
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
+    invoke<string[]>("list_all_tag_names", { tagType: "user" }).then(setAvailableTagNames).catch(() => { });
   }, []);
 
   const showWarning = aiConfig ? (aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc) : !apiKey;
@@ -150,7 +162,7 @@ export default function DocsManagementSearch() {
   }
 
   async function handleSearch() {
-    if (!queryString.trim() || showWarning) return;
+    if ((!queryString.trim() && !hasStructuredFilters) || showWarning) return;
     setIsSearching(true);
     setError(null);
     try {
@@ -158,6 +170,8 @@ export default function DocsManagementSearch() {
         query: queryString,
         apiKey,
         limit: 20,
+        tags: tagFilters.length > 0 ? tagFilters : undefined,
+        notesContains: notesContains.trim() || undefined,
       });
       setResults(rows);
     } catch (e) {
@@ -175,6 +189,29 @@ export default function DocsManagementSearch() {
     setDocType("");
     setDateFrom("");
     setDateTo("");
+    setTagFilters([]);
+    setNotesContains("");
+    setNewTagFilterName("");
+    setNewTagFilterValue("");
+  }
+
+  function handleAddTagFilter(name: string, value?: string) {
+    const trimmedName = name.trim().toLowerCase();
+    if (!trimmedName || tagFilters.some((f) => f.name === trimmedName)) return;
+    setTagFilters([...tagFilters, { name: trimmedName, value: value?.trim() || undefined }]);
+    setNewTagFilterName("");
+    setNewTagFilterValue("");
+  }
+
+  function handleRemoveTagFilter(name: string) {
+    setTagFilters(tagFilters.filter((f) => f.name !== name));
+  }
+
+  function handleTagFilterKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      handleAddTagFilter(newTagFilterName, newTagFilterValue);
+    }
   }
 
   return (
@@ -209,7 +246,7 @@ export default function DocsManagementSearch() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-all flex items-center gap-1 ${
-                showFilters || docType || dateFrom || dateTo
+                showFilters || docType || dateFrom || dateTo || hasStructuredFilters
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-border bg-background text-muted-foreground hover:text-foreground"
               }`}
@@ -230,7 +267,7 @@ export default function DocsManagementSearch() {
             </button>
             <Button
               onClick={handleSearch}
-              disabled={!queryString.trim() || showWarning || isSearching}
+              disabled={(!queryString.trim() && !hasStructuredFilters) || showWarning || isSearching}
               size="sm"
             >
               {isSearching ? "Searching..." : "Search"}
@@ -240,51 +277,129 @@ export default function DocsManagementSearch() {
 
         {/* Collapsible Advanced Filters */}
         {showFilters && (
-          <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4 text-xs animate-fade-in-down">
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">Doc Type:</label>
-              <select
-                value={docType}
-                onChange={(e) => setDocType(e.target.value)}
-                className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="">Any</option>
-                {DOC_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </option>
-                ))}
-              </select>
+          <div className="pt-3 border-t border-border/50 space-y-3 text-xs animate-fade-in-down">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">Doc Type:</label>
+                <select
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Any</option>
+                  {DOC_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">From:</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">To:</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              {(docType || dateFrom || dateTo || hasStructuredFilters) && (
+                <button
+                  onClick={handleClearFilters}
+                  className="text-red-500 font-semibold hover:underline ml-auto"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
 
+            {/* Tag filters */}
+            <div className="flex flex-wrap items-start gap-2">
+              <label className="font-semibold text-muted-foreground pt-1.5 shrink-0">Tags:</label>
+              <div className="flex-1 min-w-[220px] space-y-1.5">
+                <div className="flex flex-wrap items-center gap-1.5 min-h-[28px] px-2 py-1 border border-input rounded-md bg-background/50 focus-within:ring-1 focus-within:ring-ring transition-all">
+                  {tagFilters.map((f) => (
+                    <span
+                      key={f.name}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/5 text-primary/80 text-[10px] font-medium lowercase select-none"
+                    >
+                      #{f.value ? `${f.name}: ${f.value}` : f.name}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTagFilter(f.name)}
+                        className="hover:bg-primary/20 text-primary/75 hover:text-primary rounded-full p-0.5 leading-none transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    list="doc-search-tag-suggestions"
+                    placeholder={tagFilters.length === 0 ? "e.g. important..." : ""}
+                    value={newTagFilterName}
+                    onChange={(e) => setNewTagFilterName(e.target.value)}
+                    onKeyDown={handleTagFilterKeyDown}
+                    className="flex-1 bg-transparent text-xs focus:outline-none border-none p-0.5 min-w-[100px]"
+                  />
+                  <datalist id="doc-search-tag-suggestions">
+                    {availableTagNames
+                      .filter((n) => !tagFilters.some((f) => f.name === n))
+                      .map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                  </datalist>
+                </div>
+
+                {newTagFilterName.trim() && (
+                  <div className="flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
+                    <input
+                      type="text"
+                      placeholder="Optional value..."
+                      value={newTagFilterValue}
+                      onChange={(e) => setNewTagFilterValue(e.target.value)}
+                      onKeyDown={handleTagFilterKeyDown}
+                      className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => handleAddTagFilter(newTagFilterName, newTagFilterValue)}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notes filter */}
             <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">From:</label>
+              <label className="font-semibold text-muted-foreground shrink-0">Notes contain:</label>
               <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                type="text"
+                value={notesContains}
+                onChange={(e) => setNotesContains(e.target.value)}
+                placeholder="e.g. sign-off"
+                className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
-
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">To:</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-
-            {(docType || dateFrom || dateTo) && (
-              <button
-                onClick={handleClearFilters}
-                className="text-red-500 font-semibold hover:underline ml-auto"
-              >
-                Clear Filters
-              </button>
-            )}
           </div>
         )}
       </div>

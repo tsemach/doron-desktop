@@ -70,6 +70,8 @@ async fn test_integration_document_search_flow() {
             use_llm_query_analysis: true,
             use_llm_rerank: true,
         },
+        None,
+        None,
     )
     .await
     .expect("Search failed");
@@ -93,6 +95,8 @@ async fn test_integration_document_search_flow() {
             use_llm_query_analysis: true,
             use_llm_rerank: true,
         },
+        None,
+        None,
     )
     .await
     .expect("Search failed");
@@ -115,6 +119,8 @@ async fn test_integration_document_search_flow() {
             use_llm_query_analysis: true,
             use_llm_rerank: true,
         },
+        None,
+        None,
     )
     .await
     .expect("Search failed");
@@ -137,6 +143,8 @@ async fn test_integration_document_search_flow() {
             use_llm_query_analysis: true,
             use_llm_rerank: true,
         },
+        None,
+        None,
     )
     .await
     .expect("Search failed");

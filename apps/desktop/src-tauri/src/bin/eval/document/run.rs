@@ -363,7 +363,7 @@ async fn evaluate_queries(
     for q in queries {
         let start = Instant::now();
         let search_results =
-            match query_search_documents_core(db_path, provider, &q.query, 5, &search_options).await {
+            match query_search_documents_core(db_path, provider, &q.query, 5, &search_options, None, None).await {
                 Ok(results) => results,
                 Err(e) => {
                     eprintln!("Error executing query '{}': {}", q.query, e);

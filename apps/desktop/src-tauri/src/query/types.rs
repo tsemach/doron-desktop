@@ -6,6 +6,12 @@ pub struct DateRange {
     pub to: Option<String>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct TagFilter {
+    pub name: String,
+    pub value: Option<String>,
+}
+
 #[derive(Deserialize, Debug, Default)]
 pub struct QueryAnalysis {
     pub keywords: Option<Vec<String>>,
