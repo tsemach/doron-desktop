@@ -16,7 +16,6 @@ import SettingVoiceEngine from "./SettingVoiceEngine";
 import SettingSoftwareUpdate from "./SettingSoftwareUpdate";
 import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
 import SettingAiProviderHelp from "./SettingAiProviderHelp";
-import SettingVoiceEngineHelp from "./SettingVoiceEngineHelp";
 import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
 import SettingBack from "./SettingBack";
 import SettingMenuTab, { TabType } from "./SettingMenuTab";
@@ -27,7 +26,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>("preferences");
-  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | null>(null);
+  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | null>(null);
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
   
   const [username, setUsername] = useState("");
@@ -446,11 +445,6 @@ export default function Settings() {
             voiceModel={voiceModel}
             setVoiceModel={handleSetVoiceModel}
             aiProvider={aiProvider}
-            onToggleHelp={() => {
-              setHealthCheckResult(null);
-              setActiveHelp(activeHelp === "voice" ? null : "voice");
-            }}
-            activeHelp={activeHelp}
           />
         );
       case "update":
@@ -518,13 +512,6 @@ export default function Settings() {
                         aiMode={aiMode}
                         aiProvider={aiProvider}
                         aiModel={aiModel}
-                      />
-                    )}
-                    {activeHelp === "voice" && (
-                      <SettingVoiceEngineHelp
-                        onClose={() => setActiveHelp(null)}
-                        voiceEngine={voiceEngine}
-                        voiceModel={voiceModel}
                       />
                     )}
                   </>

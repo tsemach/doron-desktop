@@ -17,8 +17,6 @@ interface SettingVoiceEngineProps {
   voiceModel: string;
   setVoiceModel: (val: string) => void;
   aiProvider: string;
-  onToggleHelp: () => void;
-  activeHelp: string | null;
 }
 
 export default function SettingVoiceEngine({
@@ -27,8 +25,6 @@ export default function SettingVoiceEngine({
   voiceModel,
   setVoiceModel,
   aiProvider,
-  onToggleHelp,
-  activeHelp,
 }: SettingVoiceEngineProps) {
   const supportsAudio = AUDIO_CAPABLE_PROVIDERS.includes(aiProvider);
 
@@ -137,23 +133,7 @@ export default function SettingVoiceEngine({
   return (
     <div data-testid="voice-engine-setting" className="space-y-3 rounded-xl border border-border bg-card p-4">
       <div>
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-          Voice Input Engine
-          <button
-            type="button"
-            onClick={onToggleHelp}
-            className={`text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5 rounded hover:bg-muted ${
-              activeHelp === "voice" ? "text-foreground bg-muted" : ""
-            }`}
-            title="Voice Input Help"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3.5">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </button>
-        </h3>
+        <h3 className="text-sm font-bold text-foreground">Voice Input Engine</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Choose how spoken field input (e.g. in New Case or Document Details) is transcribed. Independent of the AI provider above.
         </p>
