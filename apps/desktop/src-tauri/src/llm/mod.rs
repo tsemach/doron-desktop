@@ -3,13 +3,11 @@ pub mod llm_settings;
 pub mod llm_local_mode;
 pub mod sidecar;
 pub mod whisper_local;
-pub mod cloud_transcribe;
 
 pub use llm_settings::*;
 pub use llm_local_mode::*;
 pub use sidecar::get_sidecar_path;
 pub use whisper_local::*;
-pub use cloud_transcribe::*;
 use serde::{Deserialize, Serialize};
 
 const EXTRACTION_PROMPT: &str = r#"You are a document analyst. Read the document text below and extract metadata as a single JSON object. Be concise and precise. Use null for any field you cannot determine.

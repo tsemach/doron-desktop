@@ -132,7 +132,6 @@ pub fn run() {
             llm::stop_llama_server,
             llm::stop_whisper_server,
             llm::transcribe_audio_local,
-            llm::transcribe_audio_cloud,
             email::confirm_email_alert,
             email::delete_email_alert,
             email::list_case_emails,
