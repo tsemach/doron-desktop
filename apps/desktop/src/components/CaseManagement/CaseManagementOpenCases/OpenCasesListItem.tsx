@@ -1,15 +1,9 @@
 import { Link } from "react-router-dom";
 import KebabMenu from "@/components/ui/KebabMenu";
-import { Case, CaseStatus } from "../CaseManagementTypes";
+import CaseStatusBadge from "@/components/ui/CaseStatusBadge";
+import { Case } from "../CaseManagementTypes";
 import { useLanguage } from "../../../context/LanguageContext";
 import { getFollowupStatus } from "@/lib/followupStatus";
-
-const STATUS_STYLES: Record<CaseStatus, string> = {
-  open: "bg-zinc-100 text-zinc-700 dark:bg-zinc-900/30 dark:text-zinc-300",
-  waiting: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
-  closed: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
-  followup: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-};
 
 interface OpenCasesListItemProps {
   c: Case;
@@ -108,9 +102,7 @@ export default function OpenCasesListItem({
         )}
       </td>
       <td className="px-4 py-3.5 align-middle">
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[c.status]}`}>
-          {c.status === "open" ? t("status_open") : c.status === "waiting" ? t("status_waiting") : c.status === "followup" ? t("status_followup") : t("status_closed")}
-        </span>
+        <CaseStatusBadge status={c.status} />
       </td>
       <td className="px-4 py-3.5 align-middle text-xs text-muted-foreground whitespace-nowrap">
         {c.createdAt}

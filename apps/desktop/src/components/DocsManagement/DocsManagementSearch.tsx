@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 
 import { Button } from "../ui/button";
+import CaseStatusBadge from "../ui/CaseStatusBadge";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
+import type { CaseStatus, Tag } from "../CaseManagement/CaseManagementTypes";
 
 const DOC_TYPES = [
   "contract",
@@ -18,6 +20,39 @@ const DOC_TYPES = [
   "manual",
   "other",
 ];
+
+type TagFilter = {
+  name: string;
+  value?: string;
+};
+
+type SearchTarget = "documents" | "cases" | "both";
+
+type CaseSearchEntry = {
+  id: string;
+  folder: string;
+  subject: string;
+  status: CaseStatus;
+  tags: Tag[];
+  notes: string | null;
+};
+
+// Open cases surface first, then anything still needing attention, closed last.
+const STATUS_PRIORITY: Record<CaseStatus, number> = { open: 0, waiting: 1, followup: 2, closed: 3 };
+
+function searchCases(allCases: CaseSearchEntry[], filters: TagFilter[], notesContains: string): CaseSearchEntry[] {
+  const needle = notesContains.trim().toLowerCase();
+  return allCases
+    .filter((c) => {
+      const tagsMatch = filters.every((f) =>
+        c.tags.some((tg) => tg.name === f.name && (!f.value || tg.value === f.value))
+      );
+      if (!tagsMatch) return false;
+      if (needle && !(c.notes && c.notes.toLowerCase().includes(needle))) return false;
+      return true;
+    })
+    .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
+}
 
 type DocumentRow = {
   id: number;
@@ -96,19 +131,32 @@ export default function DocsManagementSearch() {
   const [docType, setDocType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [tagFilters, setTagFilters] = useState<TagFilter[]>([]);
+  const [notesContains, setNotesContains] = useState("");
+  const [availableTagNames, setAvailableTagNames] = useState<string[]>([]);
+  const [newTagFilterName, setNewTagFilterName] = useState("");
+  const [newTagFilterValue, setNewTagFilterValue] = useState("");
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [searchTarget, setSearchTarget] = useState<SearchTarget>("documents");
   const [results, setResults] = useState<DocumentRow[] | null>(null);
+  const [caseResults, setCaseResults] = useState<CaseSearchEntry[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cases, setCases] = useState<{ id: string; folder: string; subject: string }[]>([]);
+  const [cases, setCases] = useState<CaseSearchEntry[]>([]);
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
+  const hasStructuredFilters = tagFilters.length > 0 || !!notesContains.trim();
+  // Only the free-text/natural-language box is an AI-driven search — tag,
+  // notes, doc type, and date filters are deterministic SQL, so they
+  // shouldn't be blocked by a missing API key.
+  const needsApiKey = !!text.trim();
   const [aiConfig, setAiConfig] = useState<any>(null);
 
   useEffect(() => {
     loadCases();
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
+    invoke<string[]>("list_all_tag_names", { tagType: "user" }).then(setAvailableTagNames).catch(() => { });
   }, []);
 
   const showWarning = aiConfig ? (aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc) : !apiKey;
@@ -120,6 +168,9 @@ export default function DocsManagementSearch() {
         id: String(c.id),
         folder: c.folder,
         subject: c.subject,
+        status: c.status,
+        tags: c.tags ?? [],
+        notes: c.notes ?? null,
       })));
     } catch (err) {
       console.error("Failed to load cases in search:", err);
@@ -150,16 +201,30 @@ export default function DocsManagementSearch() {
   }
 
   async function handleSearch() {
-    if (!queryString.trim() || showWarning) return;
+    if ((!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning)) return;
     setIsSearching(true);
     setError(null);
     try {
-      const rows = await invoke<DocumentRow[]>("query_search_documents", {
-        query: queryString,
-        apiKey,
-        limit: 20,
-      });
-      setResults(rows);
+      if (searchTarget !== "cases") {
+        const rows = await invoke<DocumentRow[]>("query_search_documents", {
+          query: queryString,
+          apiKey,
+          limit: 20,
+          tags: tagFilters.length > 0 ? tagFilters : undefined,
+          notesContains: notesContains.trim() || undefined,
+        });
+        setResults(rows);
+      } else {
+        setResults(null);
+      }
+
+      // Case matching is advance-search-driven only (tags/notes) — free
+      // text, doc type, and date filters stay document-specific.
+      if (searchTarget !== "documents" && hasStructuredFilters) {
+        setCaseResults(searchCases(cases, tagFilters, notesContains));
+      } else {
+        setCaseResults(null);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -171,10 +236,33 @@ export default function DocsManagementSearch() {
     if (e.key === "Enter") handleSearch();
   }
 
-  function handleClearFilters() {
+  function handleClearAdvancedSearch() {
     setDocType("");
     setDateFrom("");
     setDateTo("");
+    setTagFilters([]);
+    setNotesContains("");
+    setNewTagFilterName("");
+    setNewTagFilterValue("");
+  }
+
+  function handleAddTagFilter(name: string, value?: string) {
+    const trimmedName = name.trim().toLowerCase();
+    if (!trimmedName || tagFilters.some((f) => f.name === trimmedName)) return;
+    setTagFilters([...tagFilters, { name: trimmedName, value: value?.trim() || undefined }]);
+    setNewTagFilterName("");
+    setNewTagFilterValue("");
+  }
+
+  function handleRemoveTagFilter(name: string) {
+    setTagFilters(tagFilters.filter((f) => f.name !== name));
+  }
+
+  function handleTagFilterKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      handleAddTagFilter(newTagFilterName, newTagFilterValue);
+    }
   }
 
   return (
@@ -206,31 +294,9 @@ export default function DocsManagementSearch() {
             className="w-full rounded-lg border border-input bg-background pl-11 pr-24 py-3 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <div className="absolute right-2 flex items-center gap-1.5">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-all flex items-center gap-1 ${
-                showFilters || docType || dateFrom || dateTo
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border bg-background text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Filters
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className={`transition-transform duration-200 ${showFilters ? "rotate-180" : ""}`}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
             <Button
               onClick={handleSearch}
-              disabled={!queryString.trim() || showWarning || isSearching}
+              disabled={(!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning) || isSearching}
               size="sm"
             >
               {isSearching ? "Searching..." : "Search"}
@@ -238,51 +304,176 @@ export default function DocsManagementSearch() {
           </div>
         </div>
 
-        {/* Collapsible Advanced Filters */}
-        {showFilters && (
-          <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4 text-xs animate-fade-in-down">
+        {/* Advance search link — opens the combined tag/notes/doc-type/date panel below */}
+        <button
+          type="button"
+          onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+          className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+        >
+          Advance search
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className={`transition-transform duration-200 ${showAdvancedSearch ? "rotate-180" : ""}`}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {/* Collapsible Advance Search (tags + notes) */}
+        {showAdvancedSearch && (
+          <div className="pt-3 border-t border-border/50 space-y-3 text-xs animate-fade-in-down">
+            {/* Search target */}
             <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">Doc Type:</label>
-              <select
-                value={docType}
-                onChange={(e) => setDocType(e.target.value)}
-                className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="">Any</option>
-                {DOC_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </option>
+              <label className="font-semibold text-muted-foreground shrink-0">Search in:</label>
+              <div className="inline-flex rounded-md border border-input overflow-hidden">
+                {(["documents", "cases", "both"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setSearchTarget(opt)}
+                    className={`px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors ${
+                      opt !== "documents" ? "border-l border-input" : ""
+                    } ${
+                      searchTarget === opt
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {opt}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
+            {/* Tag filters */}
+            <div className="flex flex-wrap items-start gap-2">
+              <label className="font-semibold text-muted-foreground pt-1.5 shrink-0">Tags:</label>
+              <div className="flex-1 min-w-[220px] space-y-1.5">
+                <div className="flex flex-wrap items-center gap-1.5 min-h-[28px] px-2 py-1 border border-input rounded-md bg-background/50 focus-within:ring-1 focus-within:ring-ring transition-all">
+                  {tagFilters.map((f) => (
+                    <span
+                      key={f.name}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/5 text-primary/80 text-[10px] font-medium lowercase select-none"
+                    >
+                      #{f.value ? `${f.name}: ${f.value}` : f.name}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTagFilter(f.name)}
+                        className="hover:bg-primary/20 text-primary/75 hover:text-primary rounded-full p-0.5 leading-none transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    list="doc-search-tag-suggestions"
+                    placeholder={tagFilters.length === 0 ? "e.g. important..." : ""}
+                    value={newTagFilterName}
+                    onChange={(e) => setNewTagFilterName(e.target.value)}
+                    onKeyDown={handleTagFilterKeyDown}
+                    className="flex-1 bg-transparent text-xs focus:outline-none border-none p-0.5 min-w-[100px]"
+                  />
+                  <datalist id="doc-search-tag-suggestions">
+                    {availableTagNames
+                      .filter((n) => !tagFilters.some((f) => f.name === n))
+                      .map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                  </datalist>
+                </div>
+
+                {newTagFilterName.trim() && (
+                  <div className="flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
+                    <input
+                      type="text"
+                      placeholder="Optional value..."
+                      value={newTagFilterValue}
+                      onChange={(e) => setNewTagFilterValue(e.target.value)}
+                      onKeyDown={handleTagFilterKeyDown}
+                      className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => handleAddTagFilter(newTagFilterName, newTagFilterValue)}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notes filter */}
             <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">From:</label>
+              <label className="font-semibold text-muted-foreground shrink-0">Notes contain:</label>
               <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                type="text"
+                value={notesContains}
+                onChange={(e) => setNotesContains(e.target.value)}
+                placeholder="e.g. sign-off"
+                className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground">To:</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              />
+            {/* Doc type / date range — merged into Advance Search */}
+            <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">Doc Type:</label>
+                <select
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Any</option>
+                  {DOC_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">From:</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-muted-foreground">To:</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
             </div>
 
-            {(docType || dateFrom || dateTo) && (
+            {(hasStructuredFilters || docType || dateFrom || dateTo) && (
               <button
-                onClick={handleClearFilters}
-                className="text-red-500 font-semibold hover:underline ml-auto"
+                type="button"
+                onClick={handleClearAdvancedSearch}
+                className="text-red-500 font-semibold hover:underline"
               >
-                Clear Filters
+                Clear Advance Search
               </button>
             )}
           </div>
@@ -305,18 +496,52 @@ export default function DocsManagementSearch() {
       )}
 
       {/* Search Results */}
-      {results !== null ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {results.length === 0
-                ? "No matching documents found."
-                : `Showing ${results.length} relevant document${results.length !== 1 ? "s" : ""}`}
-            </span>
-          </div>
+      {(results !== null || caseResults !== null) ? (
+        <div className="space-y-6">
+          {/* Case Results */}
+          {caseResults !== null && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {caseResults.length === 0
+                    ? "No matching cases found."
+                    : `Showing ${caseResults.length} matching case${caseResults.length !== 1 ? "s" : ""}`}
+                </span>
+              </div>
 
-          <div className="space-y-3">
-            {results.map((doc) => {
+              <div className="space-y-2">
+                {caseResults.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => navigate(`/case-management/cases/${c.id}`)}
+                    className="rounded-xl border border-border bg-card p-3.5 hover:shadow-xs transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer hover:border-border-hover"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-foreground truncate">{c.subject || "Untitled Case"}</div>
+                      {c.folder && (
+                        <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5">{c.folder}</div>
+                      )}
+                    </div>
+                    <CaseStatusBadge status={c.status} className="shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Document Results */}
+          {results !== null && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {results.length === 0
+                    ? "No matching documents found."
+                    : `Showing ${results.length} relevant document${results.length !== 1 ? "s" : ""}`}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {results.map((doc) => {
               const fileExtension = doc.file_name.split(".").pop() || "";
               const matchedCase = findCaseForFile(doc.file_path);
               return (
@@ -441,7 +666,9 @@ export default function DocsManagementSearch() {
                 </div>
               );
             })}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Search Landing/Idle State suggestions */

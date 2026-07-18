@@ -65,6 +65,8 @@ async fn test_decoupled_index_and_search_pipeline() {
             use_llm_query_analysis: true,
             use_llm_rerank: true,
         },
+        None,
+        None,
     )
     .await
     .expect("Search documents core should succeed");

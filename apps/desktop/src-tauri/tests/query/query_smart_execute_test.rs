@@ -1,7 +1,7 @@
 use std::path::Path;
-use rusqlite::Connection;
+use rusqlite::{Connection, params};
 use tauri_app_lib::{
-    query::{query_smart_execute, QueryAnalysis, DateRange},
+    query::{query_smart_execute, QueryAnalysis, DateRange, TagFilter},
     store,
     embeddings::{get_passage_embeddings, vec_to_bytes},
 };
@@ -54,6 +54,33 @@ fn insert_test_chunk(
     store::insert_document_chunk(conn, doc_id, index, text, &bytes).expect("Should insert chunk");
 }
 
+/// `common::setup_test_db` only initializes the documents/FTS/chunks schema.
+/// Tag/notes filter tests also need the `tags` and `document_annotations`
+/// tables, which live in `store::open_db_by_path`'s full schema init.
+fn setup_full_test_db(db_path: &Path) -> Connection {
+    if db_path.exists() {
+        let _ = std::fs::remove_file(db_path);
+    }
+    store::open_db_by_path(db_path).expect("Should open full-schema test db")
+}
+
+fn insert_test_document_tag(conn: &Connection, file_path: &str, name: &str, value: Option<&str>) {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO tags (scope_type, scope_value, name, value, type, created_at, updated_at)
+         VALUES ('document', ?1, ?2, ?3, 'user', ?4, ?4)",
+        params![file_path, name, value, now],
+    ).expect("Should insert test tag");
+}
+
+fn insert_test_document_notes(conn: &Connection, file_path: &str, notes: &str) {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO document_annotations (file_path, notes, updated_at) VALUES (?1, ?2, ?3)",
+        params![file_path, notes, now],
+    ).expect("Should insert test notes");
+}
+
 #[test]
 fn test_query_smart_execute_basic_fts() {
     let db_path = Path::new("tests/query/query_smart_basic_fts_test.db");
@@ -88,7 +115,7 @@ fn test_query_smart_execute_basic_fts() {
         summary_importance: None,
     };
 
-    let results = query_smart_execute(&conn, &analysis, "rental lease contract", 5);
+    let results = query_smart_execute(&conn, &analysis, "rental lease contract", None, None, 5);
 
     assert!(!results.is_empty(), "Results should not be empty");
     let returned_ids: Vec<i64> = results.iter().map(|d| d.id).collect();
@@ -126,10 +153,134 @@ fn test_query_smart_execute_resilient_fallback() {
     };
 
     // query_smart_execute should see date filter matches 0 documents and fallback to searching all documents
-    let results = query_smart_execute(&conn, &analysis, "project status", 5);
+    let results = query_smart_execute(&conn, &analysis, "project status", None, None, 5);
 
     assert!(!results.is_empty(), "Should fallback and return the matching document");
     assert_eq!(results[0].id, doc_id, "Should find the document ID");
+
+    let _ = std::fs::remove_file(db_path);
+}
+
+#[test]
+fn test_query_smart_execute_tag_and_notes_filters() {
+    let db_path = Path::new("tests/query/query_smart_tag_filter_test.db");
+    let conn = setup_full_test_db(db_path);
+
+    let doc_id_important = insert_test_doc_with_details(
+        &conn,
+        "important_report.txt",
+        "Important Report",
+        "Quarterly project status update.",
+        Some("report"),
+        None,
+        "[\"project\", \"status\"]",
+    );
+
+    let doc_id_other = insert_test_doc_with_details(
+        &conn,
+        "other_report.txt",
+        "Other Report",
+        "Another quarterly project status update.",
+        Some("report"),
+        None,
+        "[\"project\", \"status\"]",
+    );
+
+    insert_test_document_tag(&conn, "important_report.txt", "important", None);
+    insert_test_document_tag(&conn, "important_report.txt", "priority", Some("high"));
+    insert_test_document_notes(&conn, "important_report.txt", "Needs partner sign-off before Friday.");
+
+    let analysis = QueryAnalysis {
+        keywords: Some(vec!["project".to_string(), "status".to_string()]),
+        entities: None,
+        doc_types: None,
+        date_range: None,
+        summary_importance: None,
+    };
+
+    // Tag name only (no value) should match by presence.
+    let by_tag_name = query_smart_execute(
+        &conn,
+        &analysis,
+        "project status",
+        Some(&[TagFilter { name: "important".to_string(), value: None }]),
+        None,
+        5,
+    );
+    let tag_name_ids: Vec<i64> = by_tag_name.iter().map(|d| d.id).collect();
+    assert!(tag_name_ids.contains(&doc_id_important), "Tag filter should include the tagged document");
+    assert!(!tag_name_ids.contains(&doc_id_other), "Tag filter should exclude the untagged document");
+
+    // Multiple tags are intersected (AND) — document needs both.
+    let by_both_tags = query_smart_execute(
+        &conn,
+        &analysis,
+        "project status",
+        Some(&[
+            TagFilter { name: "important".to_string(), value: None },
+            TagFilter { name: "priority".to_string(), value: Some("high".to_string()) },
+        ]),
+        None,
+        5,
+    );
+    assert_eq!(by_both_tags.len(), 1, "Intersected tag filters should still return the matching document");
+    assert_eq!(by_both_tags[0].id, doc_id_important);
+
+    // Tag value mismatch should exclude the document.
+    let by_wrong_value = query_smart_execute(
+        &conn,
+        &analysis,
+        "project status",
+        Some(&[TagFilter { name: "priority".to_string(), value: Some("low".to_string()) }]),
+        None,
+        5,
+    );
+    assert!(by_wrong_value.is_empty(), "Tag filter with a non-matching value should return no results, not fall back");
+
+    // Notes-contains filter.
+    let by_notes = query_smart_execute(&conn, &analysis, "project status", None, Some("sign-off"), 5);
+    let notes_ids: Vec<i64> = by_notes.iter().map(|d| d.id).collect();
+    assert!(notes_ids.contains(&doc_id_important), "Notes filter should include the matching document");
+    assert!(!notes_ids.contains(&doc_id_other), "Notes filter should exclude documents without matching notes");
+
+    let _ = std::fs::remove_file(db_path);
+}
+
+#[test]
+fn test_query_smart_execute_explicit_filter_no_fallback() {
+    let db_path = Path::new("tests/query/query_smart_tag_no_fallback_test.db");
+    let conn = setup_full_test_db(db_path);
+
+    insert_test_doc_with_details(
+        &conn,
+        "doc.txt",
+        "Some Document",
+        "Quarterly project status update.",
+        Some("report"),
+        None,
+        "[\"project\", \"status\"]",
+    );
+
+    let analysis = QueryAnalysis {
+        keywords: Some(vec!["project".to_string()]),
+        entities: None,
+        doc_types: None,
+        date_range: None,
+        summary_importance: None,
+    };
+
+    // No document has this tag — unlike the date-range fallback case, an
+    // explicit tag filter matching 0 documents must NOT fall back to an
+    // unfiltered search.
+    let results = query_smart_execute(
+        &conn,
+        &analysis,
+        "project",
+        Some(&[TagFilter { name: "nonexistent".to_string(), value: None }]),
+        None,
+        5,
+    );
+    assert!(results.is_empty(), "Explicit tag filter with 0 matches should return no results, not fall back");
 
     let _ = std::fs::remove_file(db_path);
 }
@@ -177,7 +328,7 @@ fn test_query_smart_execute_with_vector() {
         summary_importance: None,
     };
 
-    let results = query_smart_execute(&conn, &analysis, "apartment lease rental", 5);
+    let results = query_smart_execute(&conn, &analysis, "apartment lease rental", None, None, 5);
 
     assert!(!results.is_empty(), "Results should not be empty");
     assert_eq!(results[0].id, doc_id_rental, "Rental contract should be returned first");
@@ -240,7 +391,7 @@ fn test_query_smart_execute_thresholding() {
         summary_importance: None,
     };
 
-    let results = query_smart_execute(&conn, &analysis, "best exact query", 5);
+    let results = query_smart_execute(&conn, &analysis, "best exact query", None, None, 5);
 
     assert!(!results.is_empty(), "Results should not be empty");
     let returned_ids: Vec<i64> = results.iter().map(|d| d.id).collect();
@@ -316,7 +467,7 @@ async fn test_query_smart_execute_phi() {
     println!("Phi generated analysis: {:?}", analysis);
 
     // Call query_smart_execute with the LLM analysis and the query text
-    let results = query_smart_execute(&conn, &analysis, query, 5);
+    let results = query_smart_execute(&conn, &analysis, query, None, None, 5);
 
     assert!(!results.is_empty(), "Results should contain matches");
     assert_eq!(results[0].id, doc_id_rental, "Should match and rank the rental agreement first");
@@ -386,7 +537,7 @@ async fn test_query_smart_execute_qwen() {
     println!("Qwen generated analysis: {:?}", analysis);
 
     // Call query_smart_execute with the LLM analysis and the query text
-    let results = query_smart_execute(&conn, &analysis, query, 5);
+    let results = query_smart_execute(&conn, &analysis, query, None, None, 5);
 
     assert!(!results.is_empty(), "Results should contain matches");
     assert_eq!(results[0].id, doc_id_rental, "Should match and rank the rental agreement first");

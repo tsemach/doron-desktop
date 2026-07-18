@@ -3,7 +3,7 @@ mod helpers;
 mod queries;
 pub mod llm;
 
-pub use types::{DocumentRow, SearchOptions, QueryAnalysis, DateRange};
+pub use types::{DocumentRow, SearchOptions, QueryAnalysis, DateRange, TagFilter};
 pub use queries::query_by_vector;
 pub use queries::query_by_fts;
 pub use queries::query_smart_execute;
@@ -23,6 +23,8 @@ pub async fn query_search_documents_core(
     query: &str,
     limit: usize,
     options: &SearchOptions,
+    tags: Option<&[TagFilter]>,
+    notes_contains: Option<&str>,
 ) -> Result<Vec<DocumentRow>, String> {
     let analysis = if options.use_llm_query_analysis && !USE_FTS_ONLY {
         llm::query_llm_analyze_query(query, provider).await?
@@ -32,7 +34,7 @@ pub async fn query_search_documents_core(
 
     let local_results = {
         let conn = store::open_db_by_path(db_path)?;
-        queries::query_smart_execute(&conn, &analysis, query, limit * 2)
+        queries::query_smart_execute(&conn, &analysis, query, tags, notes_contains, limit * 2)
     };
 
     if options.use_llm_rerank && !USE_FTS_ONLY {
@@ -49,6 +51,8 @@ pub async fn query_search_documents(
     api_key: String,
     limit: Option<usize>,
     model: Option<String>,
+    tags: Option<Vec<TagFilter>>,
+    notes_contains: Option<String>,
 ) -> Result<Vec<DocumentRow>, String> {
     let limit = limit.unwrap_or(10);
 
@@ -64,7 +68,15 @@ pub async fn query_search_documents(
     };
 
     let db_path = store::db_path(&app);
-    query_search_documents_core(&db_path, &provider, &query, limit, &options).await
+    query_search_documents_core(
+        &db_path,
+        &provider,
+        &query,
+        limit,
+        &options,
+        tags.as_deref(),
+        notes_contains.as_deref(),
+    ).await
 }
 
 #[cfg(test)]
