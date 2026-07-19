@@ -1,15 +1,20 @@
 import { Button } from "@/components/ui/button";
+import VoiceFieldFiller from "@/components/ui/VoiceFieldFiller";
 
 interface CaseManagementCaseCreateTemplateFieldsHeaderProps {
   activeTemplateName: string | undefined;
   associatedDocsCount: number;
   onShowAllPreview: () => void;
+  templateFields: string[];
+  onFieldExtracted: (field: string, value: string) => void;
 }
 
 export default function CaseManagementCaseCreateTemplateFieldsHeader({
   activeTemplateName,
   associatedDocsCount,
   onShowAllPreview,
+  templateFields,
+  onFieldExtracted,
 }: CaseManagementCaseCreateTemplateFieldsHeaderProps) {
   return (
     <div className="shrink-0 flex items-start justify-between gap-2">
@@ -21,16 +26,18 @@ export default function CaseManagementCaseCreateTemplateFieldsHeader({
           Enter real values for the template variables. Unfilled fields will remain as placeholders.
         </p>
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={associatedDocsCount === 0}
-        onClick={onShowAllPreview}
-        className="shrink-0"
-      >
-        Show all preview
-      </Button>
+      <div className="flex items-center gap-2 shrink-0">
+        <VoiceFieldFiller availableFields={templateFields} onFieldExtracted={onFieldExtracted} />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={associatedDocsCount === 0}
+          onClick={onShowAllPreview}
+        >
+          Show all preview
+        </Button>
+      </div>
     </div>
   );
 }

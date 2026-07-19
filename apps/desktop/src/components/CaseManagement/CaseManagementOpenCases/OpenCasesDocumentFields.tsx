@@ -4,6 +4,7 @@ import { Button } from "../../ui/button";
 import { CaseFile, DocTemplate } from "../CaseManagementTypes";
 import DocumentPlaceholderPreview from "../DocumentPlaceholderPreview";
 import CaseManagementCaseCreateField from "../CaseManagementCaseCreateField";
+import VoiceFieldFiller from "@/components/ui/VoiceFieldFiller";
 import mammoth from "mammoth";
 import { useRowFields } from "@/hooks/useRowFields";
 
@@ -263,8 +264,13 @@ export default function OpenCasesDocumentFields({
             </p>
           </div>
           
-          {/* Controls: Toggle Empty & Search bar */}
+          {/* Controls: Voice input, Toggle Empty & Search bar */}
           <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <VoiceFieldFiller
+              availableFields={fields}
+              onFieldExtracted={(field, value) => setEditedValues({ ...editedValues, [field]: value })}
+            />
+
             <Button
               type="button"
               variant={showOnlyEmpty ? "default" : "outline"}
