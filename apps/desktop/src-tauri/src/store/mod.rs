@@ -307,6 +307,38 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
         let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_model TEXT NOT NULL DEFAULT 'whisper multilingual (small)';", []);
     }
 
+    // Cloud provider + API key dedicated to voice input (transcription AND
+    // field extraction when voice_engine == 'cloud') — independent of the
+    // main ai_mode/provider/api_key_enc, so a user can keep chat on local
+    // while still using a cloud provider for voice, without switching their
+    // main AI Provider setting.
+    let voice_cloud_provider_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('ai_configurations') WHERE name='voice_cloud_provider'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !voice_cloud_provider_exists {
+        let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_cloud_provider TEXT NOT NULL DEFAULT 'gemini';", []);
+    }
+
+    let voice_cloud_api_key_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('ai_configurations') WHERE name='voice_cloud_api_key'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !voice_cloud_api_key_exists {
+        let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_cloud_api_key TEXT NOT NULL DEFAULT '';", []);
+    }
+
+    let voice_cloud_model_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('ai_configurations') WHERE name='voice_cloud_model'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !voice_cloud_model_exists {
+        let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_cloud_model TEXT NOT NULL DEFAULT 'gemini-3.5-flash';", []);
+    }
+
     // Migrate old AI configuration to the new ai_configurations table if new table is empty
     let has_ai_config: bool = conn.query_row(
         "SELECT COUNT(1) FROM ai_configurations",

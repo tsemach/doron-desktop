@@ -1,6 +1,7 @@
 use tauri::AppHandle;
 use serde::{Deserialize, Serialize};
 use super::clean_json;
+use super::llm_provider::{ProviderConfig, get_active_provider};
 
 const FIELD_EXTRACTION_PROMPT: &str = r#"You are a form-filling assistant. The user spoke a short phrase describing what field to fill and its value. Given the list of available field names below, determine which field they meant and what value to fill it with.
 
@@ -16,6 +17,7 @@ Rules:
 - "field" must be EXACTLY one of the available field names listed above, verbatim, or null. Never invent a field name that isn't in the list.
 - Match based on meaning, not just exact wording (e.g. a spoken "full name" could match a field literally named "name" or "full_name").
 - If the text doesn't clearly reference any of the available fields, return {"field": null, "value": null}.
+- When the value is a spoken sequence of digits (phone number, ID number, zip code, account number, amount, etc.), combine them into a single whole number/string with no separators — e.g. "seven two three eight" becomes "7238", never "7, 2, 3, 8".
 
 Respond ONLY with valid JSON. No markdown, no explanation.
 
@@ -46,10 +48,14 @@ fn parse_and_validate(raw: &str, available_fields: &[String]) -> Result<FieldExt
 
 /// Given transcribed text and the current template/document's actual field
 /// names, extracts which field the user meant and what value to fill it
-/// with. Engine-independent — unlike transcription, plain text extraction
-/// works the same regardless of which LLM provider is configured (including
-/// Claude and the local text model, which don't support audio input but are
-/// perfectly fine for this text-only step).
+/// with. Provider resolution: when `provider` is given (e.g. the dedicated
+/// voice-cloud setting, used so voice's cloud engine doesn't depend on the
+/// main AI Provider setting staying on a cloud provider), it's used
+/// directly; otherwise falls back to the normal active-provider resolution,
+/// which is engine-independent since plain text extraction works the same
+/// regardless of which LLM provider is configured (including Claude and the
+/// local text model, which don't support audio input but are perfectly fine
+/// for this text-only step).
 #[tauri::command]
 pub async fn extract_field_value(
     app: AppHandle,
@@ -57,15 +63,24 @@ pub async fn extract_field_value(
     available_fields: Vec<String>,
     api_key: String,
     model: Option<String>,
+    provider: Option<String>,
 ) -> Result<FieldExtractionResult, String> {
-    let provider = super::load_active_provider(&app, api_key, model);
+    let resolved_provider = match provider {
+        Some(provider_type) => get_active_provider(ProviderConfig {
+            provider_type,
+            api_key,
+            model: model.unwrap_or_default(),
+            base_url: None,
+        }),
+        None => super::load_active_provider(&app, api_key, model),
+    };
 
     let fields_list = available_fields.join(", ");
     let prompt = FIELD_EXTRACTION_PROMPT
         .replace("{fields}", &fields_list)
         .replace("{text}", &text);
 
-    let raw = provider.call_structured(&prompt, None, Some(0.0)).await?;
+    let raw = resolved_provider.call_structured(&prompt, None, Some(0.0)).await?;
     parse_and_validate(&raw, &available_fields)
 }
 

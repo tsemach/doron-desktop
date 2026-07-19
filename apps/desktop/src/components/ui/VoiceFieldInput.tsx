@@ -18,6 +18,11 @@ interface VoiceFieldInputProps {
   disabled?: boolean;
   /** Tooltip shown while disabled, explaining why. */
   disabledTitle?: string;
+  /** Called when the user clears the recording preview (the "x" button) —
+   * lets a parent pipeline (e.g. VoiceFieldFiller) discard any in-flight
+   * transcribe/extract result for this recording instead of still showing
+   * it once it resolves. */
+  onReset?: () => void;
 }
 
 const DEFAULT_MAX_DURATION_MS = 15000;
@@ -28,6 +33,7 @@ export default function VoiceFieldInput({
   className = "",
   disabled = false,
   disabledTitle,
+  onReset,
 }: VoiceFieldInputProps) {
   const [state, setState] = useState<RecordingState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +149,44 @@ export default function VoiceFieldInput({
     }
   }
 
+  function handleResetRecording() {
+    setLastRecordingUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setLastRecordingInfo(null);
+    setError(null);
+    onReset?.();
+  }
+
+  // Force-resets everything, including the native plugin's own internal
+  // "is_recording" flag — that flag lives in a Rust static and can get
+  // stuck true (e.g. a dev hot-reload, or a start/stop call racing with a
+  // crash) with no way to clear it except restarting the whole app. Calling
+  // stop_recording unconditionally clears it even when nothing is actually
+  // recording client-side; the "No recording in progress" error that comes
+  // back in that case is expected and safely ignored.
+  async function handleForceReset() {
+    clearTimers();
+    isRecordingRef.current = false;
+    try {
+      await pluginStopRecording();
+    } catch {
+      // Expected when nothing was actually recording — the goal here is
+      // just to clear any stuck native-side state, not to capture audio.
+    }
+    if (!isMountedRef.current) return;
+    setState("idle");
+    setError(null);
+    setElapsedMs(0);
+    setLastRecordingUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setLastRecordingInfo(null);
+    onReset?.();
+  }
+
   const elapsedSeconds = (elapsedMs / 1000).toFixed(1);
   const buttonTitle = disabled
     ? disabledTitle || "Voice input unavailable"
@@ -179,7 +223,24 @@ export default function VoiceFieldInput({
           </span>
         )}
 
-        {error && <span className="text-[11px] text-destructive">{error}</span>}
+        {error && (
+          <>
+            <span className="text-[11px] text-destructive">{error}</span>
+            <button
+              type="button"
+              onClick={handleForceReset}
+              title="Reset voice input (clears a stuck recording state)"
+              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5 rounded hover:bg-muted shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 0 1 15.36-6.36L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-15.36 6.36L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
 
       {lastRecordingUrl && lastRecordingInfo && (
@@ -189,6 +250,17 @@ export default function VoiceFieldInput({
           <span>
             {(lastRecordingInfo.durationMs / 1000).toFixed(1)}s · {lastRecordingInfo.sizeKb}KB
           </span>
+          <button
+            type="button"
+            onClick={handleResetRecording}
+            title="Clear recording"
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5 rounded hover:bg-muted"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
       )}
     </div>

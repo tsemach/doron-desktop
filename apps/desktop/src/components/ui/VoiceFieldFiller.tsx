@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import VoiceFieldInput from "./VoiceFieldInput";
 import { Button } from "./button";
@@ -27,6 +27,9 @@ interface AiSettings {
   api_key_enc?: string;
   voice_engine?: string;
   voice_model?: string;
+  voice_cloud_provider?: string;
+  voice_cloud_api_key?: string;
+  voice_cloud_model?: string;
 }
 
 /**
@@ -40,6 +43,10 @@ interface AiSettings {
 export default function VoiceFieldFiller({ availableFields, onFieldExtracted }: VoiceFieldFillerProps) {
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [pipeline, setPipeline] = useState<PipelineState>({ status: "idle" });
+  // Tauri's invoke() has no cancel token, so an in-flight transcribe/extract
+  // call can't be aborted server-side once started — this flag just makes
+  // the UI discard the result instead of showing it once it resolves.
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     invoke<AiSettings>("get_ai_settings").then(setAiSettings).catch(() => {});
@@ -47,14 +54,25 @@ export default function VoiceFieldFiller({ availableFields, onFieldExtracted }: 
 
   const capability = checkVoiceCapability(aiSettings);
 
+  function handleCancelPipeline() {
+    cancelledRef.current = true;
+    setPipeline({ status: "idle" });
+  }
+
   async function handleRecordingComplete(blob: Blob) {
+    cancelledRef.current = false;
     setPipeline({ status: "processing" });
     try {
-      const fallbackApiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
-      const apiKey = aiSettings?.api_key_enc || fallbackApiKey;
       const voiceEngine = aiSettings?.voice_engine || "local";
 
       let transcript: string;
+      // Extraction's provider override — only set for the cloud engine, so
+      // the local engine keeps using the normal active-provider resolution
+      // (unchanged) for field extraction.
+      let extractionProvider: string | undefined;
+      let extractionApiKey = "";
+      let extractionModel: string | undefined;
+
       if (voiceEngine === "local") {
         const wav = await blobToWav16kMono(blob);
         const audioBytes = Array.from(new Uint8Array(await wav.arrayBuffer()));
@@ -63,15 +81,29 @@ export default function VoiceFieldFiller({ availableFields, onFieldExtracted }: 
           modelName: aiSettings?.voice_model || "whisper multilingual (small)",
           language: null,
         });
+        const fallbackApiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
+        extractionApiKey = aiSettings?.api_key_enc || fallbackApiKey;
       } else {
+        // Cloud engine: both transcription AND extraction use the dedicated
+        // voice-cloud provider/key, independent of the main AI Provider
+        // setting (which may be on local mode for chat/other features).
+        const cloudProvider = aiSettings?.voice_cloud_provider || "gemini";
+        const cloudApiKey = aiSettings?.voice_cloud_api_key || "";
+        const cloudModel = aiSettings?.voice_cloud_model || "gemini-3.5-flash";
         const audioBytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
         transcript = await invoke<string>("transcribe_audio_cloud", {
           audioBytes,
-          apiKey,
-          model: null,
+          apiKey: cloudApiKey,
+          model: cloudModel,
           language: null,
+          provider: cloudProvider,
         });
+        extractionProvider = cloudProvider;
+        extractionApiKey = cloudApiKey;
+        extractionModel = cloudModel;
       }
+
+      if (cancelledRef.current) return;
 
       if (!transcript.trim()) {
         setPipeline({ status: "error", message: "No speech detected — try again." });
@@ -81,12 +113,16 @@ export default function VoiceFieldFiller({ availableFields, onFieldExtracted }: 
       const extraction = await invoke<{ field: string | null; value: string | null }>("extract_field_value", {
         text: transcript,
         availableFields,
-        apiKey,
-        model: null,
+        apiKey: extractionApiKey,
+        model: extractionModel,
+        provider: extractionProvider,
       });
+
+      if (cancelledRef.current) return;
 
       setPipeline({ status: "confirm", transcript, field: extraction.field, value: extraction.value });
     } catch (err) {
+      if (cancelledRef.current) return;
       setPipeline({ status: "error", message: String(err) });
     }
   }
@@ -102,6 +138,7 @@ export default function VoiceFieldFiller({ availableFields, onFieldExtracted }: 
     <div className="relative inline-flex items-center gap-2">
       <VoiceFieldInput
         onRecordingComplete={handleRecordingComplete}
+        onReset={handleCancelPipeline}
         disabled={capability.disabled || pipeline.status === "processing"}
         disabledTitle={capability.reason ?? undefined}
       />

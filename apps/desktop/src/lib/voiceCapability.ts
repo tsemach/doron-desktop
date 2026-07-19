@@ -13,24 +13,27 @@ export interface VoiceCapabilityResult {
  * `get_ai_settings` Tauri command), determines whether voice input is usable
  * right now, and if not, why — for gating a mic button with an explanatory
  * tooltip. The "local" voice engine never needs this check (it doesn't touch
- * the cloud provider at all); only "cloud" depends on the configured
- * provider supporting audio.
+ * any cloud provider at all). "cloud" uses its own dedicated
+ * voice_cloud_provider/voice_cloud_api_key settings (independent of the main
+ * AI Provider config) for both transcription and field extraction, so
+ * capability just depends on whether an API key is set for that provider.
  */
 export function checkVoiceCapability(
-  settings: { voice_engine?: string; provider?: string } | null
+  settings: { voice_engine?: string; voice_cloud_provider?: string; voice_cloud_api_key?: string } | null
 ): VoiceCapabilityResult {
   const voiceEngine = settings?.voice_engine || "local";
   if (voiceEngine === "local") {
     return { disabled: false, reason: null };
   }
 
-  const provider = settings?.provider || "";
-  if (AUDIO_CAPABLE_PROVIDERS.includes(provider)) {
+  const provider = settings?.voice_cloud_provider || "";
+  const apiKey = settings?.voice_cloud_api_key || "";
+  if (AUDIO_CAPABLE_PROVIDERS.includes(provider) && apiKey.trim()) {
     return { disabled: false, reason: null };
   }
 
   return {
     disabled: true,
-    reason: "Voice input needs an OpenAI or Gemini API key. Switch your AI provider in Settings, or use the local voice engine.",
+    reason: "Voice input needs a cloud provider and API key set in Settings → Voice Input Engine → Cloud.",
   };
 }

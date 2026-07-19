@@ -18,6 +18,15 @@ pub struct AiConfig {
     // llm_local_mode::get_model_filename's whisper entries).
     #[serde(default = "default_voice_model")]
     pub voice_model: String,
+    // Cloud provider + API key dedicated to voice input (used for BOTH
+    // transcription and field extraction when voice_engine == "cloud"),
+    // independent of `provider`/`api_key_enc` above.
+    #[serde(default = "default_voice_cloud_provider")]
+    pub voice_cloud_provider: String, // "gemini" | "openai"
+    #[serde(default)]
+    pub voice_cloud_api_key: String,
+    #[serde(default = "default_voice_cloud_model")]
+    pub voice_cloud_model: String,
 }
 
 fn default_voice_engine() -> String {
@@ -28,12 +37,20 @@ fn default_voice_model() -> String {
     "whisper multilingual (small)".to_string()
 }
 
+fn default_voice_cloud_provider() -> String {
+    "gemini".to_string()
+}
+
+fn default_voice_cloud_model() -> String {
+    "gemini-3.5-flash".to_string()
+}
+
 /// Tauri command to load current AI settings
 #[tauri::command]
 pub fn get_ai_settings(app: AppHandle) -> Result<Option<AiConfig>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
-        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc, voice_engine, voice_model FROM ai_configurations LIMIT 1")
+        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc, voice_engine, voice_model, voice_cloud_provider, voice_cloud_api_key, voice_cloud_model FROM ai_configurations LIMIT 1")
         .map_err(|e| e.to_string())?;
 
     let row = stmt.query_row([], |r| {
@@ -44,6 +61,9 @@ pub fn get_ai_settings(app: AppHandle) -> Result<Option<AiConfig>, String> {
             api_key_enc: r.get(3).unwrap_or_default(),
             voice_engine: r.get(4).unwrap_or_else(|_| default_voice_engine()),
             voice_model: r.get(5).unwrap_or_else(|_| default_voice_model()),
+            voice_cloud_provider: r.get(6).unwrap_or_else(|_| default_voice_cloud_provider()),
+            voice_cloud_api_key: r.get(7).unwrap_or_default(),
+            voice_cloud_model: r.get(8).unwrap_or_else(|_| default_voice_cloud_model()),
         })
     });
 
@@ -60,8 +80,8 @@ pub fn save_ai_settings(app: AppHandle, config: AiConfig) -> Result<(), String> 
     let conn = store::open_db(&app)?;
     conn.execute("DELETE FROM ai_configurations", []).map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO ai_configurations (ai_mode, provider, ai_model, api_key_enc, voice_engine, voice_model) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![config.ai_mode, config.provider, config.ai_model, config.api_key_enc, config.voice_engine, config.voice_model],
+        "INSERT INTO ai_configurations (ai_mode, provider, ai_model, api_key_enc, voice_engine, voice_model, voice_cloud_provider, voice_cloud_api_key, voice_cloud_model) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![config.ai_mode, config.provider, config.ai_model, config.api_key_enc, config.voice_engine, config.voice_model, config.voice_cloud_provider, config.voice_cloud_api_key, config.voice_cloud_model],
     ).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -70,7 +90,7 @@ pub fn save_ai_settings(app: AppHandle, config: AiConfig) -> Result<(), String> 
 pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
     let conn = store::open_db(app).ok()?;
     let mut stmt = conn
-        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc, voice_engine, voice_model FROM ai_configurations LIMIT 1")
+        .prepare("SELECT ai_mode, provider, ai_model, api_key_enc, voice_engine, voice_model, voice_cloud_provider, voice_cloud_api_key, voice_cloud_model FROM ai_configurations LIMIT 1")
         .ok()?;
 
     stmt.query_row([], |r| {
@@ -81,6 +101,9 @@ pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
             api_key_enc: r.get(3).unwrap_or_default(),
             voice_engine: r.get(4).unwrap_or_else(|_| default_voice_engine()),
             voice_model: r.get(5).unwrap_or_else(|_| default_voice_model()),
+            voice_cloud_provider: r.get(6).unwrap_or_else(|_| default_voice_cloud_provider()),
+            voice_cloud_api_key: r.get(7).unwrap_or_default(),
+            voice_cloud_model: r.get(8).unwrap_or_else(|_| default_voice_cloud_model()),
         })
     }).ok()
 }

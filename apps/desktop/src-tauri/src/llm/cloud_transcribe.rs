@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tauri::AppHandle;
-use super::llm_provider::LlmProvider;
+use super::llm_provider::{LlmProvider, ProviderConfig, get_active_provider};
 
 /// Only Gemini and OpenAI support audio input — Claude, the local text
 /// model, and mock all return an explicit "unsupported" error rather than
@@ -24,11 +24,11 @@ async fn transcribe_via_provider(provider: LlmProvider, audio_bytes: Vec<u8>, la
     }
 }
 
-/// Transcribes audio via the user's configured cloud AI provider. Resolves
-/// the provider the exact same way other commands do (`load_active_provider`,
-/// also used by `query_search_documents`), so this stays in sync with
-/// whatever the user has configured in Settings without re-deriving that
-/// logic here.
+/// Transcribes audio via a cloud AI provider. When `provider` is given
+/// (e.g. from the dedicated voice-cloud setting, independent of the main
+/// AI Provider config), it's used directly — otherwise falls back to
+/// resolving the provider the same way other commands do
+/// (`load_active_provider`, also used by `query_search_documents`).
 #[tauri::command]
 pub async fn transcribe_audio_cloud(
     app: AppHandle,
@@ -36,9 +36,18 @@ pub async fn transcribe_audio_cloud(
     api_key: String,
     model: Option<String>,
     language: Option<String>,
+    provider: Option<String>,
 ) -> Result<String, String> {
-    let provider = super::llm_settings::load_active_provider(&app, api_key, model);
-    transcribe_via_provider(provider, audio_bytes, language).await
+    let resolved_provider = match provider {
+        Some(provider_type) => get_active_provider(ProviderConfig {
+            provider_type,
+            api_key,
+            model: model.unwrap_or_default(),
+            base_url: None,
+        }),
+        None => super::llm_settings::load_active_provider(&app, api_key, model),
+    };
+    transcribe_via_provider(resolved_provider, audio_bytes, language).await
 }
 
 #[cfg(test)]

@@ -8,6 +8,9 @@ export interface AiConfig {
   apiKey: string;
   voiceEngine: string;
   voiceModel: string;
+  voiceCloudProvider: string;
+  voiceCloudApiKey: string;
+  voiceCloudModel: string;
 }
 
 export const aiConfigAtom = atom<AiConfig | null>(null);
@@ -32,6 +35,9 @@ export async function triggerGlobalHealthCheck() {
       apiKey: res.api_key_enc || "",
       voiceEngine: res.voice_engine || "local",
       voiceModel: res.voice_model || "whisper multilingual (small)",
+      voiceCloudProvider: res.voice_cloud_provider || "gemini",
+      voiceCloudApiKey: res.voice_cloud_api_key || "",
+      voiceCloudModel: res.voice_cloud_model || "gemini-3.5-flash",
     };
     store.set(aiConfigAtom, config);
 
