@@ -2,10 +2,16 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    // Check if sidecar llama-server is present for the current target, download if missing
-    if let Err(e) = ensure_sidecar_binary() {
+    // Check if sidecar binaries are present for the current target, download if missing
+    if let Err(e) = ensure_sidecar_binary("llama-server", llama_release_url, &["libllama.so", "libllama.so.0"], "libllama-server-impl.dylib") {
         println!(
-            "cargo:warning=Failed to check/download sidecar binary: {}",
+            "cargo:warning=Failed to check/download llama-server sidecar binary: {}",
+            e
+        );
+    }
+    if let Err(e) = ensure_sidecar_binary("whisper-server", whisper_release_url, &["libwhisper.so", "libwhisper.so.1"], "libwhisper.dylib") {
+        println!(
+            "cargo:warning=Failed to check/download whisper-server sidecar binary: {}",
             e
         );
     }
@@ -14,14 +20,54 @@ fn main() {
     tauri_build::build();
 }
 
-fn ensure_sidecar_binary() -> Result<(), String> {
+/// Precompiled llama.cpp release URLs (tag b9827).
+fn llama_release_url(target: &str) -> Option<&'static str> {
+    if target.contains("x86_64-pc-windows") {
+        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-win-cpu-x64.zip")
+    } else if target.contains("x86_64-unknown-linux") {
+        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-ubuntu-x64.tar.gz")
+    } else if target.contains("aarch64-apple-darwin") {
+        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-macos-arm64.tar.gz")
+    } else if target.contains("x86_64-apple-darwin") {
+        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-macos-x64.tar.gz")
+    } else {
+        None
+    }
+}
+
+/// Precompiled whisper.cpp release URLs (tag v1.9.1). whisper.cpp's official
+/// releases don't publish a standalone macOS server binary (only an
+/// xcframework meant for Swift/ObjC integration), so there's no automated
+/// path for apple-darwin targets yet — falls through to None, which surfaces
+/// as a non-fatal cargo:warning rather than failing the build.
+fn whisper_release_url(target: &str) -> Option<&'static str> {
+    if target.contains("x86_64-pc-windows") {
+        Some("https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip")
+    } else if target.contains("x86_64-unknown-linux") {
+        Some("https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-ubuntu-x64.tar.gz")
+    } else {
+        None
+    }
+}
+
+/// Ensures `bin/{binary_base_name}-{target}[.exe]` exists, downloading and
+/// extracting it from `url_for_target(target)` (plus its shared libs) if
+/// missing or incomplete. `linux_markers` / `dylib_marker` name the
+/// shared-library files that indicate a complete (not just partially
+/// extracted) install on Linux / macOS respectively.
+fn ensure_sidecar_binary(
+    binary_base_name: &str,
+    url_for_target: fn(&str) -> Option<&'static str>,
+    linux_markers: &[&str],
+    dylib_marker: &str,
+) -> Result<(), String> {
     let target =
         std::env::var("TARGET").map_err(|e| format!("Could not read TARGET env var: {}", e))?;
 
     let is_windows = target.contains("windows");
     let suffix = if is_windows { ".exe" } else { "" };
 
-    let sidecar_filename = format!("bin/llama-server-{}{}", target, suffix);
+    let sidecar_filename = format!("bin/{}-{}{}", binary_base_name, target, suffix);
     let out_dir = std::env::var("CARGO_MANIFEST_DIR")
         .map_err(|e| format!("Could not read CARGO_MANIFEST_DIR: {}", e))?;
 
@@ -39,7 +85,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
         let _ = std::fs::File::create(placeholder_so);
     }
 
-    if sidecar_is_complete(&dest_path, dest_dir, &target) {
+    if sidecar_is_complete(&dest_path, dest_dir, &target, linux_markers, dylib_marker) {
         return Ok(());
     }
 
@@ -50,20 +96,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
         let _ = std::fs::remove_file(&dest_path);
     }
 
-    // Map targets to precompiled llama.cpp release URLs (tag b9827)
-    let url = if target.contains("x86_64-pc-windows") {
-        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-win-cpu-x64.zip")
-    } else if target.contains("x86_64-unknown-linux") {
-        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-ubuntu-x64.tar.gz")
-    } else if target.contains("aarch64-apple-darwin") {
-        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-macos-arm64.tar.gz")
-    } else if target.contains("x86_64-apple-darwin") {
-        Some("https://github.com/ggml-org/llama.cpp/releases/download/b9827/llama-b9827-bin-macos-x64.tar.gz")
-    } else {
-        None
-    };
-
-    let url = match url {
+    let url = match url_for_target(&target) {
         Some(u) => u,
         None => {
             return Err(format!(
@@ -85,7 +118,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
             "$ProgressPreference = 'SilentlyContinue'; \
              Invoke-WebRequest -Uri '{}' -OutFile '{}'; \
              Expand-Archive -Path '{}' -DestinationPath '{}' -Force; \
-             Get-ChildItem -Path '{}' -Filter 'llama-server.exe' -Recurse | Select-Object -First 1 | Move-Item -Destination '{}' -Force; \
+             Get-ChildItem -Path '{}' -Filter '{}.exe' -Recurse | Select-Object -First 1 | Move-Item -Destination '{}' -Force; \
              Get-ChildItem -Path '{}' -Filter '*.dll' -Recurse | Copy-Item -Destination '{}' -Force; \
              Remove-Item -Path '{}' -Force; \
              Remove-Item -Path '{}' -Recurse -Force",
@@ -94,6 +127,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
             temp_zip.to_string_lossy(),
             temp_extracted.to_string_lossy(),
             temp_extracted.to_string_lossy(),
+            binary_base_name,
             dest_path.to_string_lossy(),
             temp_extracted.to_string_lossy(),
             dest_dir.to_string_lossy(),
@@ -116,7 +150,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
             "curl -L -o '{}' '{}' && \
              mkdir -p '{}' && \
              tar -xzf '{}' -C '{}' && \
-             mv \"$(find '{}' -name 'llama-server' -type f | head -n 1)\" '{}' && \
+             mv \"$(find '{}' -name '{}' -type f | head -n 1)\" '{}' && \
              find '{}' \\( -name '*.so*' -o -name '*.dylib*' \\) -exec cp -d {{}} '{}' \\; && \
              chmod +x '{}' && \
              rm -f '{}' && \
@@ -127,6 +161,7 @@ fn ensure_sidecar_binary() -> Result<(), String> {
             temp_tar.to_string_lossy(),
             temp_extracted.to_string_lossy(),
             temp_extracted.to_string_lossy(),
+            binary_base_name,
             dest_path.to_string_lossy(),
             temp_extracted.to_string_lossy(),
             dest_dir.to_string_lossy(),
@@ -152,9 +187,15 @@ fn ensure_sidecar_binary() -> Result<(), String> {
     Ok(())
 }
 
-/// The llama-server executable is a thin launcher; it cannot run without platform libs
+/// The sidecar executable is a thin launcher; it cannot run without platform libs
 /// copied alongside it during extraction. A prior partial install may leave only the exe.
-fn sidecar_is_complete(dest_path: &PathBuf, dest_dir: &std::path::Path, target: &str) -> bool {
+fn sidecar_is_complete(
+    dest_path: &PathBuf,
+    dest_dir: &std::path::Path,
+    target: &str,
+    linux_markers: &[&str],
+    dylib_marker: &str,
+) -> bool {
     if !dest_path.exists() {
         return false;
     }
@@ -176,8 +217,8 @@ fn sidecar_is_complete(dest_path: &PathBuf, dest_dir: &std::path::Path, target: 
     }
 
     if target.contains("apple-darwin") {
-        return dest_dir.join("libllama-server-impl.dylib").exists();
+        return dest_dir.join(dylib_marker).exists();
     }
 
-    dest_dir.join("libllama.so").exists() || dest_dir.join("libllama.so.0").exists()
+    linux_markers.iter().any(|marker| dest_dir.join(marker).exists())
 }

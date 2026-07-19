@@ -30,7 +30,8 @@
       "nsis"
     ],
     "externalBin": [
-      "bin/llama-server"
+      "bin/llama-server",
+      "bin/whisper-server"
     ],
     "resources": [],
     "createUpdaterArtifacts": true,

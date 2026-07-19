@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { Language } from "../../locales/translations";
 import { invoke } from "@tauri-apps/api/core";
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { aiConfigAtom, aiConfigStatusAtom } from "../../store/aiStore";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
@@ -12,9 +12,11 @@ import { check } from "@tauri-apps/plugin-updater";
 import SettingPreferences from "./SettingPreferences";
 import SettingEmailIntegration from "./SettingEmailIntegration";
 import SettingAiProvider from "./SettingAiProvider";
+import SettingVoiceEngine from "./SettingVoiceEngine";
 import SettingSoftwareUpdate from "./SettingSoftwareUpdate";
 import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
 import SettingAiProviderHelp from "./SettingAiProviderHelp";
+import SettingVoiceEngineHelp from "./SettingVoiceEngineHelp";
 import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
 import SettingBack from "./SettingBack";
 import SettingMenuTab, { TabType } from "./SettingMenuTab";
@@ -25,7 +27,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>("preferences");
-  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | null>(null);
+  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | null>(null);
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
   
   const [username, setUsername] = useState("");
@@ -44,9 +46,14 @@ export default function Settings() {
   const [aiProvider, setAiProvider] = useState("gemini");
   const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
+  const [voiceEngine, setVoiceEngineState] = useState("local");
+  const [voiceModel, setVoiceModelState] = useState("whisper multilingual (small)");
+  const [voiceCloudProvider, setVoiceCloudProviderState] = useState("gemini");
+  const [voiceCloudApiKey, setVoiceCloudApiKeyState] = useState("");
+  const [voiceCloudModel, setVoiceCloudModelState] = useState("gemini-3.5-flash");
 
   const [savedConfig, setSavedConfig] = useAtom(aiConfigAtom);
-  const [savedConfigStatus, setSavedConfigStatus] = useAtom(aiConfigStatusAtom);
+  const savedConfigStatus = useAtomValue(aiConfigStatusAtom);
   const [healthStatus, setHealthStatus] = useState<"idle" | "verified" | "failed">("idle");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
@@ -60,7 +67,12 @@ export default function Settings() {
     aiMode !== savedConfig.aiMode ||
     aiProvider !== savedConfig.provider ||
     aiModel !== savedConfig.aiModel ||
-    providerApiKey !== savedConfig.apiKey);
+    providerApiKey !== savedConfig.apiKey ||
+    voiceEngine !== savedConfig.voiceEngine ||
+    voiceModel !== savedConfig.voiceModel ||
+    voiceCloudProvider !== savedConfig.voiceCloudProvider ||
+    voiceCloudApiKey !== savedConfig.voiceCloudApiKey ||
+    voiceCloudModel !== savedConfig.voiceCloudModel);
 
   // Mode-specific selection history to preserve UI selections on tab toggle
   const [localProvider, setLocalProvider] = useState("gemini");
@@ -104,6 +116,31 @@ export default function Settings() {
     if (aiMode === "byom") {
       setByomApiKey(val);
     }
+  };
+
+  const handleSetVoiceEngine = (val: string) => {
+    setVoiceEngineState(val);
+    setSaved(false);
+  };
+
+  const handleSetVoiceModel = (val: string) => {
+    setVoiceModelState(val);
+    setSaved(false);
+  };
+
+  const handleSetVoiceCloudProvider = (val: string) => {
+    setVoiceCloudProviderState(val);
+    setSaved(false);
+  };
+
+  const handleSetVoiceCloudApiKey = (val: string) => {
+    setVoiceCloudApiKeyState(val);
+    setSaved(false);
+  };
+
+  const handleSetVoiceCloudModel = (val: string) => {
+    setVoiceCloudModelState(val);
+    setSaved(false);
   };
 
   const handleSetAiMode = (mode: string) => {
@@ -184,17 +221,32 @@ export default function Settings() {
           const provider = res.provider || "gemini";
           const model = res.ai_model || "";
           const apiKey = res.api_key_enc || "";
+          const voiceEngineValue = res.voice_engine || "local";
+          const voiceModelValue = res.voice_model || "whisper multilingual (small)";
+          const voiceCloudProviderValue = res.voice_cloud_provider || "gemini";
+          const voiceCloudApiKeyValue = res.voice_cloud_api_key || "";
+          const voiceCloudModelValue = res.voice_cloud_model || "gemini-3.5-flash";
 
           setAiMode(mode);
           setAiProvider(provider);
           setAiModel(model);
           setProviderApiKey(apiKey);
+          setVoiceEngineState(voiceEngineValue);
+          setVoiceModelState(voiceModelValue);
+          setVoiceCloudProviderState(voiceCloudProviderValue);
+          setVoiceCloudApiKeyState(voiceCloudApiKeyValue);
+          setVoiceCloudModelState(voiceCloudModelValue);
 
           setSavedConfig({
             aiMode: mode,
             provider: provider,
             aiModel: model,
             apiKey: apiKey,
+            voiceEngine: voiceEngineValue,
+            voiceModel: voiceModelValue,
+            voiceCloudProvider: voiceCloudProviderValue,
+            voiceCloudApiKey: voiceCloudApiKeyValue,
+            voiceCloudModel: voiceCloudModelValue,
           });
 
           if (mode === "local") {
@@ -249,38 +301,9 @@ export default function Settings() {
       alert("Failed to save email configurations: " + e);
     }
 
-    // Save AI Settings
+    // Save AI Settings — persists only; health is checked on-demand via the
+    // "Run Health Check" buttons, never automatically as a side effect of saving.
     if (aiMode) {
-      // 1. Run health check
-      let checkSucceeded = false;
-      let checkMessage = "";
-      try {
-        const response = await invoke<string>("check_ai_health", {
-          config: {
-            ai_mode: aiMode,
-            provider: aiProvider,
-            ai_model: aiModel,
-            api_key_enc: providerApiKey,
-          }
-        });
-        checkSucceeded = true;
-        checkMessage = response;
-      } catch (e: any) {
-        checkSucceeded = false;
-        checkMessage = e.toString();
-      }
-
-      // Update states
-      setSavedConfigStatus(checkSucceeded ? "verified" : "failed");
-      setHealthStatus(checkSucceeded ? "verified" : "failed");
-      setHealthCheckResult({
-        success: checkSucceeded,
-        message: checkMessage,
-        modelName: aiModel,
-        providerName: aiProvider,
-        mode: aiMode,
-      });
-
       try {
         await invoke("save_ai_settings", {
           config: {
@@ -288,6 +311,11 @@ export default function Settings() {
             provider: aiProvider,
             ai_model: aiModel,
             api_key_enc: providerApiKey.trim(),
+            voice_engine: voiceEngine,
+            voice_model: voiceModel,
+            voice_cloud_provider: voiceCloudProvider,
+            voice_cloud_api_key: voiceCloudApiKey.trim(),
+            voice_cloud_model: voiceCloudModel,
           }
         });
         setSavedConfig({
@@ -295,6 +323,11 @@ export default function Settings() {
           provider: aiProvider,
           aiModel,
           apiKey: providerApiKey.trim(),
+          voiceEngine,
+          voiceModel,
+          voiceCloudProvider,
+          voiceCloudApiKey: voiceCloudApiKey.trim(),
+          voiceCloudModel,
         });
       } catch (e) {
         console.error("Failed to save AI configurations:", e);
@@ -412,6 +445,34 @@ export default function Settings() {
             }}
           />
         );
+      case "voice":
+        return (
+          <SettingVoiceEngine
+            voiceEngine={voiceEngine}
+            setVoiceEngine={handleSetVoiceEngine}
+            voiceModel={voiceModel}
+            setVoiceModel={handleSetVoiceModel}
+            voiceCloudProvider={voiceCloudProvider}
+            setVoiceCloudProvider={handleSetVoiceCloudProvider}
+            voiceCloudApiKey={voiceCloudApiKey}
+            setVoiceCloudApiKey={handleSetVoiceCloudApiKey}
+            voiceCloudModel={voiceCloudModel}
+            setVoiceCloudModel={handleSetVoiceCloudModel}
+            onToggleHelp={() => {
+              setHealthCheckResult(null);
+              setActiveHelp(activeHelp === "voice" ? null : "voice");
+            }}
+            activeHelp={activeHelp}
+            onSave={handleSave}
+            saved={saved}
+            hasChanges={hasChanges}
+            isSaving={isSaving}
+            setHealthCheckResult={(res) => {
+              setActiveHelp(null);
+              setHealthCheckResult(res);
+            }}
+          />
+        );
       case "update":
         return (
           <SettingSoftwareUpdate
@@ -477,6 +538,13 @@ export default function Settings() {
                         aiMode={aiMode}
                         aiProvider={aiProvider}
                         aiModel={aiModel}
+                      />
+                    )}
+                    {activeHelp === "voice" && (
+                      <SettingVoiceEngineHelp
+                        onClose={() => setActiveHelp(null)}
+                        voiceEngine={voiceEngine}
+                        voiceModel={voiceModel}
                       />
                     )}
                   </>
