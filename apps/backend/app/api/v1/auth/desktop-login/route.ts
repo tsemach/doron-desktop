@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "../../../../../database";
-import { users, desktopSessions } from "../../../../../database/schema";
-
-const DESKTOP_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+import { users } from "../../../../../database/schema";
+import { createDesktopSession } from "../../../../../lib/desktopSession";
 
 export async function POST(request: Request) {
   try {
@@ -21,14 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    const token = randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + DESKTOP_SESSION_TTL_MS);
-
-    await db.insert(desktopSessions).values({
-      userId: user.id,
-      token,
-      expiresAt,
-    });
+    const { token, expiresAt } = await createDesktopSession(user.id);
 
     return NextResponse.json({
       token,

@@ -4,11 +4,6 @@ use tauri::AppHandle;
 
 use crate::store;
 
-// TODO: not configurable yet — every desktop-backend endpoint (this module,
-// future Phase 2/3 calls) will need a real build-time/env-driven base URL
-// before a production release. Out of scope for Phase 0's 12 issues.
-const BACKEND_BASE_URL: &str = "http://localhost:3000";
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
     pub token: String,
@@ -92,11 +87,16 @@ pub fn clear_session(app: AppHandle) -> Result<(), String> {
 /// Password login (0.7) — direct API call, no browser involved. OAuth login
 /// (0.9) goes through the deep-link hand-off in lib.rs instead and calls
 /// save_session directly once the token arrives.
+///
+/// `backend_url` is passed in by the caller rather than hardcoded here,
+/// mirroring `doc_template::download::download_and_process_template` — the
+/// frontend is the single source of truth for the backend URL (Vite's
+/// `VITE_BACKEND_URL`), not a second copy living independently in Rust.
 #[tauri::command]
-pub async fn login_with_credentials(app: AppHandle, email: String, password: String) -> Result<Session, String> {
+pub async fn login_with_credentials(app: AppHandle, backend_url: String, email: String, password: String) -> Result<Session, String> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{BACKEND_BASE_URL}/api/v1/auth/desktop-login"))
+        .post(format!("{backend_url}/api/v1/auth/desktop-login"))
         .json(&serde_json::json!({ "email": email, "password": password }))
         .send()
         .await

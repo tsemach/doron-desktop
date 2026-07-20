@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { auth } from "../../../../../auth";
 import { db } from "../../../../../database";
-import { users, desktopSessions } from "../../../../../database/schema";
-
-const DESKTOP_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+import { users } from "../../../../../database/schema";
+import { createDesktopSession } from "../../../../../lib/desktopSession";
 
 // Mints a desktop session token for the user already authenticated via the
 // NextAuth web session (browser cookie) — used right after an OAuth login
@@ -23,14 +21,7 @@ export async function POST() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const token = randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + DESKTOP_SESSION_TTL_MS);
-
-    await db.insert(desktopSessions).values({
-      userId: user.id,
-      token,
-      expiresAt,
-    });
+    const { token, expiresAt } = await createDesktopSession(user.id);
 
     return NextResponse.json({
       token,

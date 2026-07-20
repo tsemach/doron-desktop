@@ -5,8 +5,8 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { refreshSession, sessionAtom } from "@/store/authStore";
 import { useAtomValue } from "jotai";
 
-// TODO: not configurable yet, same as auth/mod.rs's BACKEND_BASE_URL on the Rust side.
-const BACKEND_BASE_URL = "http://localhost:3000";
+// Same VITE_BACKEND_URL convention as DocsManagementTemplatesDownloadModal.tsx.
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
 // 0.6 — password login (0.7) is a direct Tauri command call, no browser.
 // Google/Facebook (0.9) open the system browser and come back via the
@@ -42,7 +42,7 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await invoke("login_with_credentials", { email, password });
+      await invoke("login_with_credentials", { backendUrl: BACKEND_URL, email, password });
       await refreshSession();
     } catch (err: any) {
       setError(typeof err === "string" ? err : "Invalid email or password");
@@ -53,7 +53,7 @@ export default function Login() {
   async function handleSocial(provider: "google" | "facebook") {
     setError("");
     setWaitingForOAuth(true);
-    await openUrl(`${BACKEND_BASE_URL}/login?platform=desktop&provider=${provider}`);
+    await openUrl(`${BACKEND_URL}/login?platform=desktop&provider=${provider}`);
   }
 
   return (
