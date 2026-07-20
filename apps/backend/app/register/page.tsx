@@ -21,9 +21,12 @@ function RegisterForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // After registration: desktop-originated signups continue to plan selection
-  // (0.4); plain web signups keep today's behavior and land on the portal home.
-  const nextUrl = platform === "desktop" ? "/register/plan?platform=desktop" : "/";
+  // Google/Facebook here don't distinguish "register" from "login" -- both
+  // this button and login/page.tsx's equivalent point at the same landing
+  // pages, which decide fresh-account-needs-a-plan vs returning-user based
+  // on users.planSelectedAt (desktop-complete does the same check before
+  // minting a session).
+  const oauthCallbackUrl = platform === "desktop" ? "/auth/desktop-complete" : "/auth/oauth-complete";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,7 +78,7 @@ function RegisterForm() {
     setError("");
     setLoading(true);
     try {
-      await signIn(provider, { callbackUrl: nextUrl });
+      await signIn(provider, { callbackUrl: oauthCallbackUrl });
     } catch {
       setError(`Failed to start ${provider} sign-up`);
       setLoading(false);

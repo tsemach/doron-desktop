@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await db.update(users).set({ tier: "free" }).where(eq(users.id, session.user.id));
+    await db.update(users).set({ tier: "free", planSelectedAt: new Date() }).where(eq(users.id, session.user.id));
 
     return NextResponse.json({ tier: "free" });
   } catch (error: any) {

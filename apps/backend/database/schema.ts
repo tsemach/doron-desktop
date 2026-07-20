@@ -11,6 +11,12 @@ export const users = pgTable("users", {
   image: text("image"),
   passwordHash: text("password_hash"), // Nullable for social-only accounts
   tier: text("tier", { enum: ["free", "pro"] }).default("free").notNull(),
+  // Null until the user has actually chosen Free or Pro (select-plan / the
+  // payments webhook). `tier` alone can't distinguish "explicitly chose
+  // Free" from "never chosen anything" since it defaults to 'free' -- this
+  // is what the OAuth callback pages check to decide whether to route a
+  // fresh sign-in to /register/plan or straight into the app.
+  planSelectedAt: timestamp("plan_selected_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

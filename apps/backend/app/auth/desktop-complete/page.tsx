@@ -1,19 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import AuthCard from "../../../components/auth/AuthCard";
 import { errorClass } from "../../../components/auth/formStyles";
 
 // Landing point for the OAuth branch of desktop *login* (0.9) — reached via
-// signIn(provider, { callbackUrl: "/auth/desktop-complete" }) from the
-// desktop-aware login page. By the time this renders, the NextAuth session
-// cookie is already set; this page's only job is to mint a desktop token for
-// that session and hand it back to the app via the doron-desktop:// scheme.
+// signIn(provider, { callbackUrl: "/auth/desktop-complete" }) from either
+// the desktop-aware register or login page (Google/Facebook don't
+// distinguish those two). By the time this renders, the NextAuth session
+// cookie is already set. First checks users.planSelectedAt -- a brand-new
+// account (or one that registered but never finished plan selection) goes
+// to /register/plan instead of straight into the desktop app, same as the
+// web equivalent (oauth-complete/page.tsx).
 export default function DesktopCompletePage() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [deepLink, setDeepLink] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (status !== "authenticated") return;
+
+    const planSelectedAt = (session?.user as { planSelectedAt?: string | Date | null } | undefined)?.planSelectedAt;
+    if (!planSelectedAt) {
+      router.replace("/register/plan?platform=desktop");
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -39,7 +54,7 @@ export default function DesktopCompletePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [status, session, router]);
 
   return (
     <AuthCard title="Signing you in" subtitle="Completing your Amicus desktop login.">

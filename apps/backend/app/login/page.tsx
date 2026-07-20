@@ -70,8 +70,10 @@ function LoginForm() {
     setError("");
     setLoading(true);
     try {
+      // Same landing pages as register/page.tsx's social buttons -- OAuth
+      // doesn't know or care whether this click meant "register" or "login".
       await signIn(provider, {
-        callbackUrl: platform === "desktop" ? "/auth/desktop-complete" : "/",
+        callbackUrl: platform === "desktop" ? "/auth/desktop-complete" : "/auth/oauth-complete",
       });
     } catch {
       setError(`Failed to start ${provider} sign-in`);
