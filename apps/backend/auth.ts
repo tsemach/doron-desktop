@@ -4,8 +4,8 @@ import Credentials from "next-auth/providers/credentials";
 import { db } from "./database";
 import { users, accounts, sessions, verificationTokens } from "./database/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 import authConfig from "./auth.config";
+import { verifyCredentials } from "./lib/verifyCredentials";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
@@ -27,34 +27,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const email = credentials.email as string;
-        const password = credentials.password as string;
-
-        // Look up user in PostgreSQL via Drizzle
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
-
-        if (!user || !user.passwordHash) {
+        const result = await verifyCredentials(credentials.email as string, credentials.password as string);
+        if ("error" in result) {
           return null;
         }
 
-        // Compare password hashes
-        const isValid = bcrypt.compareSync(password, user.passwordHash);
-        if (!isValid) {
-          return null;
-        }
-
-        // Return user to populate the session
         return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
+          id: result.user.id,
+          name: result.user.name,
+          email: result.user.email,
+          image: result.user.image,
         };
       },
     }),
   ],
+  events: {
+    // Google/Facebook already proved the email -- no separate verification
+    // step needed for those (only Credentials-based signups go through
+    // lib/emailVerification.ts). Not conditioned on the current
+    // emailVerified value (NextAuth's base User type doesn't expose it here)
+    // -- re-stamping an already-verified OAuth user is a harmless no-op.
+    async signIn({ user, account }) {
+      if (account?.provider !== "credentials" && user.id) {
+        await db.update(users).set({ emailVerified: new Date() }).where(eq(users.id, user.id));
+      }
+    },
+  },
 });

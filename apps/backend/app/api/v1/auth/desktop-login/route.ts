@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
-import { db } from "../../../../../database";
-import { users } from "../../../../../database/schema";
 import { createDesktopSession } from "../../../../../lib/desktopSession";
+import { verifyCredentials } from "../../../../../lib/verifyCredentials";
 
 export async function POST(request: Request) {
   try {
@@ -13,11 +10,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing email or password" }, { status: 400 });
     }
 
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-
-    if (!user || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    const result = await verifyCredentials(email, password);
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 401 });
     }
+    const { user } = result;
 
     const { token, expiresAt } = await createDesktopSession(user.id);
 

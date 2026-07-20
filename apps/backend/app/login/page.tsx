@@ -12,6 +12,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const platform = searchParams.get("platform"); // "desktop" when opened from the Amicus desktop app
   const autoProvider = searchParams.get("provider") as "google" | "facebook" | null;
+  const justVerified = searchParams.get("justVerified") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +42,15 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      router.push("/");
+      // Fresh signup completing its flow (just clicked the verification
+      // link) continues on to plan selection, same as it would have before
+      // email verification broke the register -> plan continuity into two
+      // separate visits. A normal returning login never carries this param.
+      if (justVerified) {
+        router.push(platform === "desktop" ? "/register/plan?platform=desktop" : "/register/plan");
+      } else {
+        router.push("/");
+      }
       router.refresh();
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");

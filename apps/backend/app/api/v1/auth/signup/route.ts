@@ -3,10 +3,11 @@ import { db } from "../../../../../database";
 import { users } from "../../../../../database/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { createEmailVerification } from "../../../../../lib/emailVerification";
 
 export async function POST(request: Request) {
   try {
-    const { fullName, email, password } = await request.json();
+    const { fullName, email, password, platform } = await request.json();
 
     // Basic Validation
     if (!fullName || !email || !password) {
@@ -41,7 +42,8 @@ export async function POST(request: Request) {
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(password, salt);
 
-    // Create the user
+    // Create the user (emailVerified stays null until they click the
+    // verification link -- login is blocked until then, see verifyCredentials.ts)
     const [newUser] = await db
       .insert(users)
       .values({
@@ -55,6 +57,9 @@ export async function POST(request: Request) {
         email: users.email,
         createdAt: users.createdAt,
       });
+
+    const origin = new URL(request.url).origin;
+    await createEmailVerification(email, origin, platform);
 
     return NextResponse.json({ success: true, user: newUser }, { status: 201 });
   } catch (error: any) {

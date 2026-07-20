@@ -37,22 +37,18 @@ function RegisterForm() {
       const res = await fetch("/api/v1/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, password }),
+        body: JSON.stringify({ fullName, email, password, platform }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Failed to create account");
       }
 
-      const loginRes = await signIn("credentials", { email, password, redirect: false });
-      if (loginRes?.error) {
-        setError("Account created, but automatic sign-in failed. Please sign in manually.");
-        setLoading(false);
-        return;
-      }
-
-      router.push(nextUrl);
-      router.refresh();
+      // No auto sign-in -- login is blocked until the email is verified
+      // (lib/verifyCredentials.ts), so the account isn't usable yet.
+      const params = new URLSearchParams({ email });
+      if (platform === "desktop") params.set("platform", "desktop");
+      router.push(`/register/check-email?${params.toString()}`);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
       setLoading(false);
