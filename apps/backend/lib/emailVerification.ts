@@ -2,7 +2,7 @@ import { randomBytes } from "crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "../database";
 import { users, verificationTokens } from "../database/schema";
-import { getEmailProvider } from "./email/mock-provider";
+import { getEmailProvider } from "./email";
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 

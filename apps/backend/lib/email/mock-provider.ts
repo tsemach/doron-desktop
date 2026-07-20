@@ -9,7 +9,3 @@ export class MockEmailProvider implements EmailProvider {
     console.log(`[MockEmailProvider] Verification link for ${email}:\n${verifyUrl}`);
   }
 }
-
-export function getEmailProvider(): EmailProvider {
-  return new MockEmailProvider();
-}
