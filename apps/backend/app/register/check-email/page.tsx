@@ -13,9 +13,6 @@ function CheckEmailContent() {
       <p className="text-center text-sm text-muted-foreground">
         We&apos;ve sent a verification link to this address. Click it to continue.
       </p>
-      <p className="mt-4 text-center text-xs text-muted-foreground">
-        No email provider is connected yet (mock mode) — check the backend server&apos;s console output for the link instead of your inbox.
-      </p>
     </AuthCard>
   );
 }
