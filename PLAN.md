@@ -94,34 +94,32 @@ Deferred: Case simulation (5.11), multi-user/firm accounts
 
 **Goal**: registration captures Free/Pro choice; backend has a real source of truth for it; Free is fully functional with zero payment friction.
 
-**[MODIFY] `apps/backend/database/schema.ts`** — add to `users`:
-```ts
-tier: text("tier", { enum: ["free", "pro"] }).default("free").notNull(),
-```
-(Using `tier` rather than `implementation_plan.md`'s proposed boolean `isPro` — a string enum matches `SubscriptionTier` in `featureGating.ts` exactly and avoids a second boolean-vs-string mapping layer later if a third tier ever appears. Small deviation from the prior draft, flagged here rather than silently changed.)
+**Already shipped in Phase 0** (pulled forward since 0.4 genuinely needed them): `users.tier` column (`apps/backend/database/schema.ts`) and the plan-selection UI (`apps/backend/app/register/plan/page.tsx`) both already exist. What's actually left below is the payment plumbing behind the (currently disabled, "Coming soon") Pro option on that page.
 
-**[MODIFY] `apps/backend/app/api/v1/auth/signup/route.ts`** — accept `tier` in the signup payload, default `"free"` if omitted.
+**Decisions made**: Pro is **$49/month**. Payment provider work starts against a **mock `PaymentProvider`**, not real Paddle — no Paddle vendor/API credentials exist yet. The interface is designed so swapping the mock for a real `paddle-provider.ts` later touches only one new file, not the plan page or webhook route.
 
-**[NEW] Plan-selection UI** — 0.4 above.
-
-**[NEW] `PaymentProvider` abstraction, not a direct Paddle integration** — Paddle is the current lead candidate but explicitly not final, so this mirrors the same swappable-provider pattern already established twice in this codebase (`llm/llm_provider.rs`'s trait for LLM backends, `featureGating.ts`'s `FeatureGateProvider` for the gating stub): a small interface —
+**[NEW] `apps/backend/lib/payments/types.ts`** — the swappable interface, mirroring the pattern already used twice in this codebase (`llm/llm_provider.rs`'s trait, `featureGating.ts`'s `FeatureGateProvider`):
 ```ts
 interface PaymentProvider {
-  createCheckoutSession(userId: string, plan: "pro"): Promise<{ checkoutUrl: string }>;
+  createCheckoutSession(userId: string, email: string): Promise<{ checkoutUrl: string }>;
   verifyAndParseWebhook(req: Request): Promise<{ userId: string; tier: "free" | "pro" } | null>;
 }
 ```
-— with `apps/backend/lib/payments/paddle-provider.ts` as the concrete implementation and everything else (the plan-selection page, the webhook route) coded against the interface, not against Paddle's SDK directly. Swapping providers later means writing one new file, not touching 0.4 or the webhook route.
 
-**[NEW] `apps/backend/app/api/v1/webhooks/payments/route.ts`** — provider-agnostic route name (not `/webhooks/paddle`, for the same swappability reason): calls `PaymentProvider.verifyAndParseWebhook`, then on a resolved `{userId, tier}` writes `users.tier` accordingly. Paddle's specific event names (`subscription.activated`/`subscription.canceled`, etc. — confirm exact names against current Paddle docs when building, their event taxonomy differs from Stripe's `checkout.session.completed` style assumed in the original `implementation_plan.md` draft) are mapped to `{userId, tier}` entirely inside `paddle-provider.ts`.
+**[NEW] `apps/backend/lib/payments/mock-provider.ts`** — `createCheckoutSession` returns a link to a local mock checkout page (not a real payment page) that immediately "succeeds" and fires the webhook itself; `verifyAndParseWebhook` trusts the payload with no signature check (a real provider's implementation must verify a signature — noted so this isn't mistaken for how the real one should work).
 
-**Open decision needed before this phase starts**: Pro pricing — not decided anywhere yet (PRD §8.5). Payment provider is now tentatively Paddle rather than fully open, per your steer, but still described as "not final" — the abstraction above is specifically so that isn't a blocking decision for starting the schema/UI work.
+**[NEW] `apps/backend/app/api/v1/payments/checkout/route.ts`** — authenticated (`auth()`), calls `PaymentProvider.createCheckoutSession`, returns `{checkoutUrl}`. Called when the plan page's Pro button is clicked.
+
+**[NEW] `apps/backend/app/api/v1/webhooks/payments/route.ts`** — provider-agnostic route name (not `/webhooks/paddle`, for the same swappability reason): calls `PaymentProvider.verifyAndParseWebhook`, then on a resolved `{userId, tier}` writes `users.tier` accordingly.
+
+**[MODIFY] `apps/backend/app/register/plan/page.tsx`** — Pro card becomes clickable: calls the checkout route, redirects to `checkoutUrl`. Free path (`select-plan`) is unchanged — it stays a separate, synchronous, immediate path, since Free never needs a checkout round-trip.
+
+**Deferred to when real Paddle credentials exist**: `apps/backend/lib/payments/paddle-provider.ts` (the real implementation), webhook signature verification, and Paddle's actual event-name mapping (`subscription.activated`/`.canceled` etc. — confirm exact names against Paddle's docs when building this, their taxonomy differs from Stripe's `checkout.session.completed` style `implementation_plan.md` originally assumed).
 
 **Verification**
-- New signup with Free selected → `users.tier = 'free'`, no payment flow triggered.
-- New signup with Pro selected → redirected to checkout → webhook flips `tier` to `'pro'` on completion.
-- Downgrade path (subscription cancelled) flips back to `'free'` without deleting any user data.
-- Swapping `paddle-provider.ts` for a stub/mock provider in a test doesn't require touching the plan-selection page or webhook route — confirms the abstraction actually isolates Paddle-specific code.
+- New signup with Free selected → `users.tier = 'free'`, no checkout triggered (unchanged from Phase 0).
+- New signup with Pro selected → mock checkout → webhook flips `tier` to `'pro'`.
+- Swapping `mock-provider.ts` for a different implementation in a test doesn't require touching the plan-selection page or webhook route — confirms the abstraction actually isolates provider-specific code.
 
 ---
 
