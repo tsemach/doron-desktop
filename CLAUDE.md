@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Doron Desktop is a legal/case management platform, structured as a `pnpm` + Turborepo monorepo with two apps:
+Amicus (the repo, directory, app identifier, and build artifacts still use the pre-rename name `doron-desktop` — see `.claude/rules/project-naming.md`) is a legal/case management platform, structured as a `pnpm` + Turborepo monorepo with two apps:
 
 - **`apps/desktop/`** — Tauri v2 desktop client: React + TypeScript frontend (Vite, Tailwind v4, shadcn/ui) with a Rust backend. This is where almost all product logic lives (document indexing/search, case management, templates, email ingestion, local/cloud LLM providers).
 - **`apps/backend/`** — Next.js 15 web portal: auth (NextAuth v5 + Drizzle/Postgres), user login/signup, and installer download redirects for the desktop app's auto-updater.
 - **`packages/ui/`** — Shared UI components/config consumed by the workspaces (`@workspace/ui`).
 
 The desktop app's frontend is bundled by Vite and served from `apps/desktop/dist` in production. The Rust side exposes commands via `#[tauri::command]` that the frontend calls with `invoke()` from `@tauri-apps/api/core`.
+
+Product vision and feature scope live in `PRD.md`; the phased implementation roadmap (including what's already built vs. planned) lives in `PLAN.md` — both at the repo root. Consult those before assuming a feature is in scope or already implemented.
 
 ## Commands
 
