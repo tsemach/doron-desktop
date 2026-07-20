@@ -22,9 +22,11 @@ function App() {
     triggerGlobalHealthCheck().catch((err) => {
       console.error("[App] Initial health check failed:", err);
     });
-    if (AUTH_REQUIRED) {
-      refreshSession();
-    }
+    // Always refreshed, not just when AUTH_REQUIRED is on (Phase 2 / AMI-55):
+    // feature gating (featureGating.ts) needs the real tier from whatever
+    // session happens to exist locally, independent of whether the login
+    // wall is enforced.
+    refreshSession();
   }, []);
 
   const gated = AUTH_REQUIRED && sessionStatus === "ready" && !session;

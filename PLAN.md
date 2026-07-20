@@ -125,18 +125,18 @@ interface PaymentProvider {
 
 ## Phase 2 — Wire feature gating to real identity
 
-**Goal**: replace the hardcoded `CURRENT_TIER` stub with the real session tier from Phase 0/1, and merge the gating infra into `master`.
+**Goal**: replace the hardcoded `CURRENT_TIER` stub with the real session tier from Phase 0/1, and merge the gating infra into the stack.
 
-**[MODIFY] `apps/desktop/src/lib/featureGating.ts`** (currently only on open PR #61, not in `master` — merge that first) — replace:
-```ts
-const CURRENT_TIER: SubscriptionTier = "pro"; // hardcoded stub
-```
-with a read from the Phase-0 session (`get_session` Tauri command → `tier` field), falling back to `"free"` when signed out or offline past the cache TTL decided in Phase 1.
+**Already shipped in Phase 0**: `sessionAtom`/`sessionStatusAtom`/`refreshSession()` (`apps/desktop/src/store/authStore.ts`) — this phase originally called for building that; it existed already by the time this phase started.
 
-**[MODIFY] `apps/desktop/src/store/aiStore.ts`-style store** — new `sessionAtom` (jotai, matching the existing `aiConfigAtom` pattern) populated by a `triggerSessionRefresh()` analogous to `triggerGlobalHealthCheck()`, called at app startup.
+**[DONE] Merged AMI-36's branch** (`featureGating.ts`, previously independent of the auth work) into this stack.
+
+**[MODIFY] `apps/desktop/src/lib/featureGating.ts`** — `getCurrentSubscriptionTier()` now reads `getDefaultStore().get(sessionAtom)` instead of the hardcoded `CURRENT_TIER` constant, falling back to `"free"` when there's no session. No separate TTL check needed here — `sessionAtom` already holds `null` past `expires_at` (see `refreshSession()`).
+
+**[FIX] `apps/desktop/src/App.tsx`** — `refreshSession()` was only called when `AUTH_REQUIRED` was `true`; changed to always run on startup, since feature gating needs the real tier regardless of whether the login wall is enforced.
 
 **Verification**
-- Signed-in Free user: `isFeatureEnabled("voice_recording")` / `isFeatureEnabled("emails")` return `false` per current `FEATURE_GATES` (both are `pro`-only per your last edit); signed-in Pro user gets `true`.
+- Signed-in Free user: `isFeatureEnabled("voice_recording")` / `isFeatureEnabled("emails")` return `false` per current `FEATURE_GATES` (both are `pro`-only); signed-in Pro user gets `true`.
 - Signed-out / offline-past-TTL falls back to Free, never silently grants Pro.
 
 ---

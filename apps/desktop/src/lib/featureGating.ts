@@ -1,3 +1,6 @@
+import { getDefaultStore } from "jotai";
+import { sessionAtom } from "@/store/authStore";
+
 export type FeatureKey = "voice_recording" | "emails";
 export type SubscriptionTier = "free" | "pro";
 export type GateState = "enabled" | "disabled";
@@ -13,14 +16,6 @@ const FEATURE_GATES: Record<FeatureKey, Record<SubscriptionTier, GateState>> = {
   voice_recording: { free: "disabled", pro: "enabled" },
   emails: { free: "disabled", pro: "enabled" },
 };
-
-/**
- * Stand-in for the desktop app's current subscription tier. There is no
- * auth/billing integration yet, so this is a hardcoded constant a developer
- * edits to test the "pro" path -- swap point for whatever reads the real
- * subscription once that exists.
- */
-const CURRENT_TIER: SubscriptionTier = "pro";
 
 export interface FeatureGateProvider {
   isEnabled(feature: FeatureKey, tier: SubscriptionTier): boolean;
@@ -53,8 +48,18 @@ class LocalFeatureGateProvider implements FeatureGateProvider {
 
 export const featureGateProvider: FeatureGateProvider = new LocalFeatureGateProvider();
 
+/**
+ * Reads the real session (apps/desktop/src/store/authStore.ts) rather than
+ * a hardcoded stub. `sessionAtom` already holds `null` for signed-out and
+ * for a locally-cached session past its `expires_at` (see
+ * authStore.ts::refreshSession), so there's no separate TTL check needed
+ * here -- reading the atom's current value is enough. Falls back to "free"
+ * whenever there's no valid session, so a stale/missing read never silently
+ * grants Pro.
+ */
 export function getCurrentSubscriptionTier(): SubscriptionTier {
-  return CURRENT_TIER;
+  const session = getDefaultStore().get(sessionAtom);
+  return session?.tier === "pro" ? "pro" : "free";
 }
 
 export function isFeatureEnabled(feature: FeatureKey): boolean {
