@@ -55,6 +55,11 @@
       "endpoints": [
         "https://github.com/tsemach/doron-desktop/releases/latest/download/latest.json"
       ]
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["doron-desktop"]
+      }
     }
   }
 }

@@ -1,6 +1,8 @@
 use tauri::Manager;
+use tauri_plugin_deep_link::DeepLinkExt;
 
 pub mod store;
+pub mod auth;
 pub mod extractor;
 pub mod llm;
 pub mod indexer;
@@ -51,6 +53,35 @@ pub fn run() {
                     }
                 }
             });
+            // OAuth login hand-off (0.9): the backend redirects the system browser to
+            // doron-desktop://auth?token=... once a desktop-originated Google/Facebook
+            // login completes. Persist that token as the local session the same way
+            // password login (auth::login_with_credentials) does.
+            // Ensures the doron-desktop:// scheme is registered even for unbundled
+            // `tauri dev` runs (Windows/Linux) or an improperly-installed AppImage —
+            // production installers already register it from tauri.conf.json at
+            // install time, so this is a harmless no-op there. macOS doesn't need
+            // this call (handled via Info.plist at bundle time).
+            #[cfg(any(windows, target_os = "linux"))]
+            if let Err(e) = app.deep_link().register_all() {
+                eprintln!("[Rust Backend] Failed to register deep link scheme: {e}");
+            }
+
+            let handle_deep_link = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    if url.scheme() != "doron-desktop" {
+                        continue;
+                    }
+                    let param = |key: &str| {
+                        url.query_pairs().find(|(k, _)| k == key).map(|(_, v)| v.to_string())
+                    };
+                    let (token, email, tier, expires_at) = (param("token"), param("email"), param("tier"), param("expires_at"));
+                    if let Err(e) = crate::auth::complete_oauth_login(&handle_deep_link, token, email, tier, expires_at) {
+                        eprintln!("[Rust Backend] OAuth deep-link session save failed: {e}");
+                    }
+                }
+            });
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -58,6 +89,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_mic_recorder::init())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             store::get_db_path,
@@ -117,6 +149,11 @@ pub fn run() {
             // user settings
             user_settings::get_user_settings,
             user_settings::save_user_settings,
+            // auth
+            auth::get_session,
+            auth::save_session,
+            auth::clear_session,
+            auth::login_with_credentials,
             // email commands
             email::get_email_settings,
             email::save_email_settings,

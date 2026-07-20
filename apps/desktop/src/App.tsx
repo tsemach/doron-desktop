@@ -10,6 +10,15 @@ import { triggerGlobalHealthCheck } from "./store/aiStore";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "./store/indexStore";
 import DocsManagementScanBackgroundIndexer from "./components/DocsManagement/DocsManagementScanBackgroundIndexer";
+import AuthLanding from "./components/Auth/AuthLanding";
+import Login from "./components/Auth/Login";
+import { refreshSession, sessionAtom, sessionStatusAtom } from "./store/authStore";
+
+// 0.10 — the sole switch for the register/login cutover. Defaulted to false
+// so this ships without locking out any existing (currently session-less)
+// user; flipping to true is a deliberate, separate follow-up once 0.1-0.9
+// are verified working end to end. See PLAN.md Phase 0.
+const AUTH_REQUIRED = false;
 
 function Home() {
   const navigate = useNavigate();
@@ -128,22 +137,37 @@ function Home() {
 }
 
 function App() {
+  const session = useAtomValue(sessionAtom);
+  const sessionStatus = useAtomValue(sessionStatusAtom);
+
   useEffect(() => {
     triggerGlobalHealthCheck().catch((err) => {
       console.error("[App] Initial health check failed:", err);
     });
+    if (AUTH_REQUIRED) {
+      refreshSession();
+    }
   }, []);
+
+  const gated = AUTH_REQUIRED && sessionStatus === "ready" && !session;
 
   return (
     <LanguageProvider>
       <UpdateBanner />
       <DocsManagementScanBackgroundIndexer />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/case-management/*" element={<CaseManagement />} />
-        <Route path="/docs-management/*" element={<DocsManagement />} />
-        <Route path="/settings" element={<Settings />} />
-      </Routes>
+      {gated ? (
+        <Routes>
+          <Route path="/auth/login" element={<Login />} />
+          <Route path="*" element={<AuthLanding />} />
+        </Routes>
+      ) : (
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/case-management/*" element={<CaseManagement />} />
+          <Route path="/docs-management/*" element={<DocsManagement />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      )}
     </LanguageProvider>
   );
 }
