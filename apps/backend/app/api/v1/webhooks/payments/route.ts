@@ -15,7 +15,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
     }
 
-    await db.update(users).set({ tier: result.tier }).where(eq(users.id, result.userId));
+    // planSelectedAt too, same as select-plan's Free path (Phase 0) -- a Pro
+    // checkout completing means this user has chosen a plan, which is what
+    // the OAuth callback pages check to decide whether to route to
+    // /register/plan or straight into the app.
+    await db.update(users).set({ tier: result.tier, planSelectedAt: new Date() }).where(eq(users.id, result.userId));
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
