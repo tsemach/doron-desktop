@@ -43,6 +43,29 @@ function PlanForm() {
     }
   }
 
+  async function selectPro() {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/v1/payments/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to start checkout");
+      }
+      // checkoutUrl may be relative (mock provider) or an absolute external
+      // URL (a real provider's hosted checkout page) — a full navigation
+      // handles both, unlike router.push which only works for the former.
+      window.location.href = data.checkoutUrl;
+    } catch (err: any) {
+      setError(err.message || "Something went wrong");
+      setLoading(false);
+    }
+  }
+
   if (status !== "authenticated") {
     return null;
   }
@@ -65,22 +88,24 @@ function PlanForm() {
           </div>
         </button>
 
-        <div className="rounded-lg border border-border bg-background p-4 text-left opacity-70">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-foreground">Pro</span>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              Coming soon
-            </span>
+        <button
+          type="button"
+          onClick={selectPro}
+          disabled={loading}
+          className="rounded-lg border border-primary bg-background p-4 text-left transition-colors hover:bg-accent disabled:opacity-50"
+        >
+          <div className="text-sm font-semibold text-foreground">Pro</div>
+          <div className="mt-1 text-2xl font-bold text-foreground">
+            $49<span className="text-xs font-normal text-muted-foreground">/mo</span>
           </div>
-          <div className="mt-1 text-2xl font-bold text-foreground">—</div>
           <div className="mt-2 text-xs text-muted-foreground">
-            Adds AI-powered features. Billing isn&apos;t live yet — you&apos;ll be started on Free and we&apos;ll let you know when Pro is available.
+            Everything in Free, plus AI-powered features.
           </div>
-        </div>
+        </button>
       </div>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        {loading ? "Setting up your account…" : "You can pick Pro later once billing is available."}
+        {loading ? "Setting up your account…" : "You can switch plans later from your account."}
       </p>
     </AuthCard>
   );
