@@ -36,30 +36,54 @@ Deferred: Case simulation (5.11), multi-user/firm accounts
 
 ## Phase 0 — Desktop ↔ Backend identity bridge
 
-**Goal**: a lawyer can register and log in from inside the desktop app (email/password or Google), and the desktop app holds a session it can present to the backend afterward. This is the PRD's #1 and #2, and the foundation everything else in Phase 1–3 sits on.
+**Goal**: PRD #1/#2/#3 exactly as specified — desktop opens on a Register/Login screen; Register hands off to the backend for account creation (password or Google/Facebook) and plan selection, then tells the user to return to the desktop; Login is a separate, explicit step back in the desktop app. This is the foundation everything in Phase 1–3 sits on.
 
-Design source: `implementation_plan.md`'s "Authentication Flow" section already worked out the hard part — Google/Facebook block OAuth inside embedded webviews, so OAuth must open the user's system browser, and the result has to come back into the Tauri app via a custom URL scheme. Reusing that design here rather than re-deriving it.
+**Design note (deviates from `implementation_plan.md`'s original sketch)**: because registration ends with the user manually returning to the app rather than an automatic hand-off, the *registration* half needs no token transfer at all — it's plain browser pages. The hard problem (OAuth blocked inside embedded webviews) only resurfaces for the **Google/Facebook branch of Login**, which still has to leave the app. Password login stays a direct API call, no browser needed. This narrows the deep-link/hand-off machinery to one sub-flow instead of the whole feature.
 
-**[NEW] Tauri deep-link plugin** — not present today (`tauri-plugin-deep-link` absent from `Cargo.toml`/`package.json`, confirmed). Add it, register the `doron-desktop://` scheme in `src-tauri/tauri.conf.json` and `src-tauri/capabilities/default.json`.
+**Open call for 0.9 below**: deep-link (`doron-desktop://`, OS registers the app as a URL handler, auto-focuses the app when OAuth completes) vs. a pairing-code the desktop polls for (backend shows a short code, desktop asks "has this code been claimed?" every few seconds — no OS scheme registration, no per-platform quirks, but a slightly slower UX). Tasks below assume deep-link, matching the prior draft and the pattern most desktop apps (Slack, GitHub Desktop, Discord) use for this exact problem — flag if you'd rather do pairing-codes instead, it swaps out cleanly at 0.9 only.
 
-**[NEW] `apps/desktop/src-tauri/src/auth/mod.rs`**
-- `save_session(app, token, user_email, tier) -> Result<()>` — persist the session in the local SQLite `user_settings`-style table (new `auth_session` table: `token`, `email`, `tier`, `expires_at`).
-- `get_session(app) -> Option<Session>`, `clear_session(app)`.
-- `#[tauri::command] async fn login_with_credentials(email, password) -> Result<Session, String>` — POSTs to a new backend endpoint, stores result.
-- `#[tauri::command] fn start_oauth_login(provider: "google"|"facebook")` — opens `http://<backend>/login?platform=desktop&provider=...` via `tauri_plugin_opener`.
-- Deep-link event listener (registered in `lib.rs::run()`) — on `doron-desktop://auth?token=...`, calls `save_session`.
+**Cross-cutting requirement — visual design**: every new backend page in this phase (0.3, 0.4, 0.5, 0.9) must use the desktop app's actual design system, not the backend's current look. Checked directly: `apps/backend/app/globals.css` is a bare `@import "tailwindcss";` with none of the desktop's shadcn/ui theme tokens, and the one existing auth page (`apps/backend/app/login/page.tsx`) is a hand-rolled glassmorphic gradient design branded "Doron Client Portal" — visually unrelated to the desktop app's actual shadcn/ui "radix-nova" style (`apps/desktop/src/styles/globals.css`, `apps/desktop/components.json`). Concretely: pull the same `@theme inline` CSS-variable block + `shadcn/tailwind.css` import into `apps/backend/app/globals.css`, and grow `packages/ui/src/components/` (currently just `button.tsx`) with the shared primitives these pages need (input, card, tabs) instead of each app hand-rolling its own. **This requirement must be stated explicitly in the PR description** for whichever of 0.3/0.4/0.5/0.9 lands first, so it isn't reviewed as if it were a from-scratch design.
 
-**[MODIFY] `apps/backend/app/page.tsx`** (or a new `app/login/desktop-callback/page.tsx`) — after a successful NextAuth session with `?platform=desktop` in the query string, render a page whose only job is `<a href="doron-desktop://auth?token=...">` (or auto-redirect via `window.location`), matching the design already in `implementation_plan.md`.
+**Cross-cutting requirement — API path convention**: every backend JSON API route this plan touches or adds lives under `/api/v1/` — established here as the convention for all of `apps/backend`'s hand-written API routes going forward (NextAuth's own framework-owned routes, `/api/auth/[...nextauth]`, are exempt — they're not ours to version). Concretely for this phase: the existing `apps/backend/app/api/auth/signup/route.ts` moves to `apps/backend/app/api/v1/auth/signup/route.ts`, and every new route below (0.7, 0.9, Phase 1's webhook) is created under `/api/v1/` from the start. Note this only affects JSON API routes, not page routes — `/register`, `/register/plan`, `/register/complete`, `/login` stay as plain pages, they just call `/api/v1/...` endpoints. Pre-existing unversioned routes outside this phase's scope (`/api/templates`, `/api/download`) are left alone for now — flagging as a follow-up cleanup rather than pulling them into Phase 0.
 
-**[NEW] `apps/backend/app/api/auth/desktop-token/route.ts`** — issues a long-lived opaque token (or signed JWT) for the desktop client, separate from the NextAuth web session cookie, since desktop can't hold browser cookies across app restarts the same way.
+### Registration sub-flow (browser-only, no session created)
 
-**[MODIFY] Desktop Settings UI** (`apps/desktop/src/components/Settings/`) — new `SettingAccount.tsx` (or extend `SettingPreferences.tsx`, matching `implementation_plan.md`'s original placement): email/password fields, "Sign in with Google" / "Sign in with Facebook" buttons, signed-in-as indicator, sign-out.
+**0.1 — [NEW] Desktop auth landing screen** — `apps/desktop/src/components/Auth/AuthLanding.tsx`: the component only, two buttons ("Register" → 0.2, "Login" → 0.6). Not wired into the app's default routing here — that cutover belongs solely to 0.10, so this component can merge standalone with zero effect on current users.
 
-**[NEW] Registration entry point** — either reuse the backend's existing `/api/auth/signup` route by opening it in-browser (fastest, reuses working code) or build a native desktop signup form calling it directly (`fetch` from Rust or the frontend to the backend host). Recommend the browser route for v1 to avoid duplicating validation/bcrypt logic in two places — revisit only if a fully-native flow is required later.
+**0.2 — [NEW] Desktop "Register" action** — opens `http://<backend>/register?platform=desktop` via `tauri_plugin_opener` (already a dependency, no new plugin needed for this half). This is a page route, not an API call — the page itself calls `/api/v1/auth/signup` (see below). No token/code generated here — registration doesn't report back to the app at all.
+
+**0.3 — [NEW/restructure] Backend registration page** — `apps/backend/app/register/page.tsx`. Don't build from scratch: `apps/backend/app/login/page.tsx` already has a working signup tab (full name/email/password/confirm fields, `signIn("credentials")` after signup, Google/Facebook social buttons) — split that logic out into its own route and restyle it per the design requirement above. Calls `POST /api/v1/auth/signup` (moved per the path convention above), plus "Continue with Google" / "Continue with Facebook" via `next-auth`'s `signIn()`, reusing the providers already configured in `auth.config.ts`. Reuse the existing validation/bcrypt logic — don't duplicate it.
+
+**0.4 — [NEW] Backend plan-selection page** — `apps/backend/app/register/plan/page.tsx`: Free ($0) / Pro (paid) cards, styled per the design requirement above. Free writes `users.tier = 'free'` immediately and continues; Pro starts a checkout session through Phase 1's `PaymentProvider` abstraction (Paddle is the lead candidate, not final — see Phase 1) and shows "activating" until the webhook confirms. **Depends on Phase 1's `users.tier` column existing** — Phase 0 and Phase 1 are now interleaved for this page specifically, not strictly sequential.
+
+**0.5 — [NEW] Backend "return to desktop" page** — `apps/backend/app/register/complete/page.tsx`: confirmation, styled per the design requirement above — "You're all set — return to the Amicus desktop app and log in." No token issued, no deep link fired as part of the required flow. See 0.5a for an optional convenience addition.
+
+**0.5a — [NEW, low priority/optional] "Open Amicus" button on the complete page** — a button that, if clicked, brings the desktop app to focus if it's already running, or launches it if not. Cheap to add *because* 0.9 already brings in `tauri-plugin-deep-link` for OAuth login — this is one more link (`<a href="doron-desktop://">`, no token/params needed, just a ping) rather than new infrastructure. The one addition it does need on top of 0.9: `tauri-plugin-single-instance`, paired with deep-link so a second launch focuses the existing window instead of spawning a duplicate process (the standard Tauri pattern for this). If that pairing turns out fiddly in practice, drop this task — it's explicitly a nice-to-have, not required for the flow to work (the user can already just alt-tab back).
+
+### Login sub-flow (desktop-side, separate explicit action)
+
+**0.6 — [NEW] Desktop login screen** — `apps/desktop/src/components/Auth/Login.tsx`: email + password fields, plus "Login with Google" / "Login with Facebook" buttons. Reached from 0.1's "Login" button.
+
+**0.7 — [NEW] Password login (no browser)** — `apps/backend/app/api/v1/auth/desktop-login/route.ts`: accepts `{email, password}`, validates via the same bcrypt-compare logic the NextAuth Credentials provider already uses (`auth.ts`), returns a desktop-specific token (opaque or signed JWT — distinct from the NextAuth web session cookie, since the desktop app can't hold browser cookies across restarts). Desktop frontend calls this directly (`fetch`/`invoke` → Rust `reqwest`), no browser popout.
+
+**0.8 — [NEW] `apps/desktop/src-tauri/src/auth/mod.rs`** — local session persistence: new `auth_session` SQLite table (`token`, `email`, `tier`, `expires_at`). Commands: `save_session`, `get_session`, `clear_session`, registered in `lib.rs`'s `generate_handler!`. Called after both 0.7 (password) and 0.9 (OAuth) succeed.
+
+**0.9 — [NEW/restructure] OAuth login hand-off** — the one genuinely hard piece, per the open call above:
+- Add `tauri-plugin-deep-link` (absent from `Cargo.toml`/`package.json` today, confirmed) — register `doron-desktop://` in `tauri.conf.json` + `capabilities/default.json`.
+- Desktop "Login with Google/Facebook" opens `http://<backend>/login?platform=desktop&provider=google` via `tauri_plugin_opener`.
+- Restyle/restructure the existing `apps/backend/app/login/page.tsx` (see design requirement above — its social-login handlers already exist and work, they just need the `platform=desktop` branch and new styling) so that on success it redirects to a page whose only job is `<a href="doron-desktop://auth?token=...">` (auto-clicked via `window.location`), where the token comes from a new `apps/backend/app/api/v1/auth/desktop-token/route.ts` (same token shape as 0.7's).
+- Deep-link event listener in `lib.rs::run()` receives `doron-desktop://auth?token=...`, calls `save_session` (0.8).
+
+**0.10 — [MODIFY] App shell gating** — `App.tsx`: the sole owner of the actual cutover (0.1 only builds the component, unwired). Route to 0.1 when `get_session()` returns none/expired; route to the existing main UI once a session exists — gated behind an `AUTH_REQUIRED` constant, **defaulted to `false`**, so this can ship in the same PR as 0.1–0.9 without locking out any existing user the moment it merges. Flipping it to `true` is a deliberate, separate, one-line follow-up once 0.1–0.9 are verified working end to end. Confirms the "opening screen" framing — flagged above as worth confirming against the offline-first NFR before building.
+
+**0.11 — Error/edge states** — backend registration page reachable without `platform=desktop` (e.g. a lawyer just visits the marketing site) should still work as plain web signup, not assume desktop context. OAuth login timeout/cancel in the system browser should leave the desktop login screen in a clear "waiting… / try again" state rather than hanging silently.
 
 **Verification**
-- Fresh desktop install → Settings → Sign In → complete Google OAuth in system browser → app receives deep link → session persisted → app restart still shows signed-in.
-- Email/password login and signup both work end-to-end against a local backend instance.
+- Fresh desktop install → Register → complete signup + Free plan selection in browser → confirmation page → return to desktop → Login with the same email/password → session persisted, app restart still shows signed-in.
+- Same flow with Google instead of password at registration, then "Login with Google" at the desktop login screen → deep link fires → session persisted.
+- Registering via the plain web portal (no `platform=desktop`) still works unmodified.
+- Every new/restyled backend page visually matches the desktop app's shadcn/ui theme (shared CSS variables, not a distinct look) — spot-check side by side, not just "it renders."
+- All new/moved API calls hit `/api/v1/...` paths; no new route created outside that prefix.
 - No case/document data leaves the machine as a side effect of adding this (privacy NFR from PRD §6) — confirm via a network trace during normal case-management use.
 
 ---
@@ -74,18 +98,28 @@ tier: text("tier", { enum: ["free", "pro"] }).default("free").notNull(),
 ```
 (Using `tier` rather than `implementation_plan.md`'s proposed boolean `isPro` — a string enum matches `SubscriptionTier` in `featureGating.ts` exactly and avoids a second boolean-vs-string mapping layer later if a third tier ever appears. Small deviation from the prior draft, flagged here rather than silently changed.)
 
-**[MODIFY] `apps/backend/app/api/auth/signup/route.ts`** — accept `tier` in the signup payload, default `"free"` if omitted.
+**[MODIFY] `apps/backend/app/api/v1/auth/signup/route.ts`** — accept `tier` in the signup payload, default `"free"` if omitted.
 
-**[NEW] Plan-selection UI** — on the backend's signup page (`apps/backend/app/`), a simple two-card Free/$0 vs Pro/$X selector before/during signup.
+**[NEW] Plan-selection UI** — 0.4 above.
 
-**[NEW] `apps/backend/app/api/webhooks/payments/route.ts`** — Stripe (or equivalent) webhook, exactly as scoped in `implementation_plan.md`: `checkout.session.completed`/`invoice.paid` → `tier = "pro"`, `customer.subscription.deleted`/`invoice.payment_failed` → `tier = "free"`.
+**[NEW] `PaymentProvider` abstraction, not a direct Paddle integration** — Paddle is the current lead candidate but explicitly not final, so this mirrors the same swappable-provider pattern already established twice in this codebase (`llm/llm_provider.rs`'s trait for LLM backends, `featureGating.ts`'s `FeatureGateProvider` for the gating stub): a small interface —
+```ts
+interface PaymentProvider {
+  createCheckoutSession(userId: string, plan: "pro"): Promise<{ checkoutUrl: string }>;
+  verifyAndParseWebhook(req: Request): Promise<{ userId: string; tier: "free" | "pro" } | null>;
+}
+```
+— with `apps/backend/lib/payments/paddle-provider.ts` as the concrete implementation and everything else (the plan-selection page, the webhook route) coded against the interface, not against Paddle's SDK directly. Swapping providers later means writing one new file, not touching 0.4 or the webhook route.
 
-**Open decision needed before this phase starts**: actual payment provider and Pro pricing — not decided anywhere yet (PRD §8.5). Stripe is assumed only because `implementation_plan.md` already assumed it.
+**[NEW] `apps/backend/app/api/v1/webhooks/payments/route.ts`** — provider-agnostic route name (not `/webhooks/paddle`, for the same swappability reason): calls `PaymentProvider.verifyAndParseWebhook`, then on a resolved `{userId, tier}` writes `users.tier` accordingly. Paddle's specific event names (`subscription.activated`/`subscription.canceled`, etc. — confirm exact names against current Paddle docs when building, their event taxonomy differs from Stripe's `checkout.session.completed` style assumed in the original `implementation_plan.md` draft) are mapped to `{userId, tier}` entirely inside `paddle-provider.ts`.
+
+**Open decision needed before this phase starts**: Pro pricing — not decided anywhere yet (PRD §8.5). Payment provider is now tentatively Paddle rather than fully open, per your steer, but still described as "not final" — the abstraction above is specifically so that isn't a blocking decision for starting the schema/UI work.
 
 **Verification**
 - New signup with Free selected → `users.tier = 'free'`, no payment flow triggered.
 - New signup with Pro selected → redirected to checkout → webhook flips `tier` to `'pro'` on completion.
 - Downgrade path (subscription cancelled) flips back to `'free'` without deleting any user data.
+- Swapping `paddle-provider.ts` for a stub/mock provider in a test doesn't require touching the plan-selection page or webhook route — confirms the abstraction actually isolates Paddle-specific code.
 
 ---
 
