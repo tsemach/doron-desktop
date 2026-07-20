@@ -2,11 +2,18 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { Eye, EyeOff } from "lucide-react";
 import { refreshSession, sessionAtom } from "@/store/authStore";
 import { useAtomValue } from "jotai";
 
 // Same VITE_BACKEND_URL convention as DocsManagementTemplatesDownloadModal.tsx.
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+
+// Same shape the backend's signup route enforces server-side
+// (apps/backend/lib/validation.ts) -- kept light here since this is just
+// login, not account creation: a malformed email simply won't match any
+// account and fails safely either way.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // 0.6 — password login (0.7) is a direct Tauri command call, no browser.
 // Google/Facebook (0.9) open the system browser and come back via the
@@ -21,6 +28,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [waitingForOAuth, setWaitingForOAuth] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -40,6 +48,12 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!EMAIL_RE.test(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     setLoading(true);
     try {
       await invoke("login_with_credentials", { backendUrl: BACKEND_URL, email, password });
@@ -94,13 +108,25 @@ export default function Login() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    maxLength={16}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 pr-9 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-2 flex items-center text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"

@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@workspace/ui";
 import AuthCard from "../../components/auth/AuthCard";
+import PasswordInput from "../../components/auth/PasswordInput";
 import { errorClass, inputClass, labelClass } from "../../components/auth/formStyles";
+import { isValidEmail, isValidFullName, isValidPasswordLength } from "../../lib/validation";
 
 function RegisterForm() {
   const router = useRouter();
@@ -27,6 +29,20 @@ function RegisterForm() {
     e.preventDefault();
     setError("");
 
+    // Client-side checks are only for immediate feedback -- the signup route
+    // enforces the same rules server-side and is the actual source of truth.
+    if (!isValidFullName(fullName)) {
+      setError("Full name contains invalid characters.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!isValidPasswordLength(password)) {
+      setError("Password must be between 6 and 16 characters long.");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -97,26 +113,12 @@ function RegisterForm() {
 
         <div>
           <label className={labelClass}>Password</label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-            placeholder="••••••••"
-          />
+          <PasswordInput value={password} onChange={setPassword} placeholder="••••••••" autoComplete="new-password" />
         </div>
 
         <div>
           <label className={labelClass}>Confirm password</label>
-          <input
-            type="password"
-            required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className={inputClass}
-            placeholder="••••••••"
-          />
+          <PasswordInput value={confirmPassword} onChange={setConfirmPassword} placeholder="••••••••" autoComplete="new-password" />
         </div>
 
         <Button type="submit" disabled={loading} className="mt-2 w-full">

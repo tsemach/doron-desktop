@@ -4,6 +4,7 @@ import { users } from "../../../../../database/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { createEmailVerification } from "../../../../../lib/emailVerification";
+import { isValidEmail, isValidFullName, isValidPasswordLength } from "../../../../../lib/validation";
 
 export async function POST(request: Request) {
   try {
@@ -17,9 +18,26 @@ export async function POST(request: Request) {
       )
     }
 
-    if (password.length < 6) {
+    // Server-side is the enforcement source of truth -- the client-side
+    // checks in register/page.tsx are only for immediate UX feedback and
+    // can't be trusted on their own.
+    if (!isValidFullName(fullName)) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters long" },
+        { error: "Full name contains invalid characters." },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        { error: "Please enter a valid email address." },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidPasswordLength(password)) {
+      return NextResponse.json(
+        { error: "Password must be between 6 and 16 characters long." },
         { status: 400 }
       );
     }

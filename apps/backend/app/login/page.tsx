@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@workspace/ui";
 import AuthCard from "../../components/auth/AuthCard";
+import PasswordInput from "../../components/auth/PasswordInput";
 import { errorClass, inputClass, labelClass } from "../../components/auth/formStyles";
+import { isValidEmail } from "../../lib/validation";
 
 function LoginForm() {
   const router = useRouter();
@@ -34,6 +36,12 @@ function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await signIn("credentials", { email, password, redirect: false });
@@ -94,14 +102,7 @@ function LoginForm() {
 
             <div>
               <label className={labelClass}>Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputClass}
-                placeholder="••••••••"
-              />
+              <PasswordInput value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" />
             </div>
 
             <Button type="submit" disabled={loading} className="mt-2 w-full">
