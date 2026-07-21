@@ -64,20 +64,20 @@ export default function AppHome() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-background text-foreground justify-center items-center px-4 py-12">
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-6 right-6">
         <KebabMenu
           title="Account"
-          triggerIcon={<User className="size-4" />}
-          triggerClassName="h-9 w-9 rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-accent"
+          triggerIcon={<User className="size-6" />}
+          triggerClassName="h-14 w-14 rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-accent"
           items={[
             {
               label: t("settings_footer"),
-              icon: <Settings className="size-3.5" />,
+              icon: <Settings className="size-4" />,
               onClick: handleSettings,
             },
             {
               label: "Upgrade to Pro",
-              icon: <Sparkles className="size-3.5" />,
+              icon: <Sparkles className="size-4" />,
               onClick: handleUpgrade,
               hidden: tier === "pro",
             },
