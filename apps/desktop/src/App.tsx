@@ -8,11 +8,10 @@ import { refreshSession, sessionAtom, sessionStatusAtom } from "./store/authStor
 import AppMain from "./components/App/AppMain";
 import AppLogin from "./components/App/AppLogin";
 
-// 0.10 — the sole switch for the register/login cutover. Defaulted to false
-// so this ships without locking out any existing (currently session-less)
-// user; flipping to true is a deliberate, separate follow-up once 0.1-0.9
-// are verified working end to end. See PLAN.md Phase 0.
-const AUTH_REQUIRED = false;
+// 0.10 — the sole switch for the register/login cutover. Flipped on
+// 2026-07-21 once 0.1-0.9 were verified working end to end. See PLAN.md
+// Phase 0.
+const AUTH_REQUIRED = true;
 
 function App() {
   const session = useAtomValue(sessionAtom);
