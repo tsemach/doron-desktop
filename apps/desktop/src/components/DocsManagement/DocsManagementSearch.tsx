@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { Button } from "../ui/button";
 import CaseStatusBadge from "../ui/CaseStatusBadge";
+import FileTypeIcon from "../ui/FileTypeIcon";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
 import type { CaseStatus, Tag } from "../CaseManagement/CaseManagementTypes";
 
@@ -79,32 +80,6 @@ function buildQuery(text: string, docType: string, dateFrom: string, dateTo: str
   else if (dateFrom) parts.push(`from ${dateFrom}`);
   else if (dateTo) parts.push(`until ${dateTo}`);
   return parts.join(", ");
-}
-
-function FileIcon({ ext }: { ext: string }) {
-  const normalized = ext.toLowerCase().replace(".", "");
-  let color = "bg-blue-50 text-blue-600 border-blue-200";
-  let symbol = "📄";
-
-  if (normalized === "pdf") {
-    color = "bg-red-50 text-red-600 border-red-200";
-    symbol = "PDF";
-  } else if (["docx", "doc", "txt"].includes(normalized)) {
-    color = "bg-indigo-50 text-indigo-600 border-indigo-200";
-    symbol = "DOC";
-  } else if (["xlsx", "xls"].includes(normalized)) {
-    color = "bg-emerald-50 text-emerald-600 border-emerald-200";
-    symbol = "XLS";
-  }
-
-  return (
-    <div className={`w-10 h-10 shrink-0 rounded-lg border ${color} flex flex-col items-center justify-center text-[10px] font-bold shadow-xs`}>
-      <span className="text-base leading-none select-none">
-        {normalized === "pdf" ? "📕" : normalized === "xlsx" || normalized === "xls" ? "📗" : "📘"}
-      </span>
-      <span className="text-[7px] uppercase mt-0.5 tracking-wider">{symbol}</span>
-    </div>
-  );
 }
 
 function ConfidenceBadge({ value }: { value: number | null }) {
@@ -550,7 +525,7 @@ export default function DocsManagementSearch() {
                   className="rounded-xl border border-border bg-card p-4 hover:shadow-xs transition-all duration-200 flex items-start gap-4 hover:border-border-hover"
                 >
                   {/* File Type Icon */}
-                  <FileIcon ext={fileExtension} />
+                  <FileTypeIcon ext={fileExtension} />
 
                   {/* Document details */}
                   <div className="flex-1 min-w-0 space-y-2">

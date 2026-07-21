@@ -124,6 +124,7 @@ export default function CaseManagementOpenCases() {
         folder: c.folder,
         notes: c.notes,
         tags: c.tags || [],
+        fields: c.fields ?? {},
       }));
       setCases(mapped);
     } catch (err) {
@@ -274,7 +275,11 @@ export default function CaseManagementOpenCases() {
       const nameMatch = c.name?.toLowerCase().includes(q) ?? false;
       const folderMatch = c.folder?.toLowerCase().includes(q) ?? false;
       const idMatch = c.id.toLowerCase().includes(q);
-      return subjectMatch || nameMatch || folderMatch || idMatch;
+      const notesMatch = c.notes?.toLowerCase().includes(q) ?? false;
+      const fieldsMatch = Object.values(c.fields ?? {}).some((value) =>
+        value.toLowerCase().includes(q)
+      );
+      return subjectMatch || nameMatch || folderMatch || idMatch || notesMatch || fieldsMatch;
     }
     return true;
   });

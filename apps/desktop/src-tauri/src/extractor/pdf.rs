@@ -26,8 +26,12 @@ fn fix_rtl(text: &str) -> String {
 pub fn extract_pdf(path: &Path) -> Result<(String, i32), String> {
     let raw = pdf_extract::extract_text(path).map_err(|e| e.to_string())?;
     let text = fix_rtl(&raw);
-    
-    let page_count = match lopdf::Document::load(path) {
+    let page_count = page_count(path);
+    Ok((text, page_count))
+}
+
+fn page_count(path: &Path) -> i32 {
+    match lopdf::Document::load(path) {
         Ok(doc) => doc.get_pages().len() as i32,
         Err(err) => {
             eprintln!(
@@ -36,7 +40,68 @@ pub fn extract_pdf(path: &Path) -> Result<(String, i32), String> {
             );
             1
         }
-    };
-    
-    Ok((text, page_count))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn fix_rtl_reverses_predominantly_hebrew_lines() {
+        // pdf_extract often emits Hebrew in visual (reversed) order.
+        let visual = "חוטיב הרפס";
+        let fixed = fix_rtl(visual);
+        assert_eq!(fixed, "ספרה ביטוח");
+    }
+
+    #[test]
+    fn fix_rtl_leaves_english_lines_unchanged() {
+        let line = "Hello PDF search test";
+        assert_eq!(fix_rtl(line), line);
+    }
+
+    #[test]
+    fn fix_rtl_leaves_mixed_low_hebrew_lines_unchanged() {
+        let line = "Report 2024 - ref #12345";
+        assert_eq!(fix_rtl(line), line);
+    }
+
+    #[test]
+    fn fix_rtl_handles_multiline_documents() {
+        let input = "Hello PDF search test\nחוטיב הרפס\ncontract agreement";
+        let output = fix_rtl(input);
+        assert!(output.contains("Hello PDF search test"));
+        assert!(output.contains("ספרה ביטוח"));
+        assert!(output.contains("contract agreement"));
+    }
+
+    #[test]
+    fn extract_pdf_reads_text_from_fixture() {
+        let path = Path::new("tests/docs/sample-search.pdf");
+        assert!(path.exists(), "missing fixture: {:?}", path);
+
+        let (text, pages) = extract_pdf(path).expect("PDF extraction should succeed");
+
+        assert!(pages >= 1, "expected at least one page");
+        assert!(
+            text.contains("Hello PDF search test"),
+            "expected English phrase in extracted text, got: {text:?}"
+        );
+        assert!(
+            text.contains("contract agreement"),
+            "expected second phrase in extracted text, got: {text:?}"
+        );
+    }
+
+    #[test]
+    fn extract_routes_pdf_through_mod_extract() {
+        let path = Path::new("tests/docs/sample-search.pdf");
+        let extracted = crate::extractor::extract(path).expect("extract() should route PDF");
+
+        assert!(!extracted.text.is_empty());
+        assert_eq!(extracted.page_count, Some(1));
+        assert!(extracted.text.contains("Hello PDF search test"));
+    }
 }

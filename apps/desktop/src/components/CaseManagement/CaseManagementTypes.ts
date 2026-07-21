@@ -26,6 +26,7 @@ export interface Case {
   folder?: string;
   notes?: string;
   tags: Tag[];
+  fields?: Record<string, string>;
 }
 
 export interface CaseFile {

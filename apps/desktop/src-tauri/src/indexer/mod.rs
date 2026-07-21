@@ -111,7 +111,12 @@ async fn index_file_core_impl(
     // Extract text from the file
     let extracted = extractor::extract(file_path).map_err(|e| format!("extraction failed: {e}"))?;
     if extracted.text.trim().is_empty() {
-        return Err("no text extracted".to_string());
+        let msg = if ext == "pdf" {
+            "no text extracted (PDF may be scanned/image-only)"
+        } else {
+            "no text extracted"
+        };
+        return Err(msg.to_string());
     }
 
     let file_name = file_path

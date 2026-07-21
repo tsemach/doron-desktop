@@ -65,7 +65,7 @@ export default function OpenCasesTopBar({
       <CaseManagementSearch
         value={searchQuery}
         onChange={setSearchQuery}
-        placeholder="Search cases by subject, customer, folder..."
+        placeholder="Search cases by subject, customer, folder, fields..."
         containerClassName="relative flex items-center w-full sm:w-80"
         inputClassName="w-full rounded-md border border-input bg-background pl-9 pr-8 py-1.5 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
         searchIconSize={14}

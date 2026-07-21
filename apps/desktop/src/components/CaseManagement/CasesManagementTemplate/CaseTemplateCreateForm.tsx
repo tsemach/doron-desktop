@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "../../ui/button";
+import FileTypeIcon from "@/components/ui/FileTypeIcon";
 import { DocTemplate } from "../CaseManagementTypes";
 
 interface TemplateCreateFormProps {
@@ -174,9 +175,7 @@ export default function CaseTemplateCreateForm({
                         </span>
                       )}
                       <span className="inline-flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground font-mono">
-                        <span className="uppercase text-[8px] bg-muted px-1 py-0.2 rounded border">
-                          {doc.file_ext}
-                        </span>
+                        <FileTypeIcon ext={doc.file_ext} size="sm" />
                         <span>{getDocFieldCount(doc)} fields</span>
                       </span>
                     </div>

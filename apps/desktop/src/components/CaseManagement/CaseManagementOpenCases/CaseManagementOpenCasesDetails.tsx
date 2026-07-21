@@ -44,6 +44,7 @@ export default function CaseManagementOpenCasesDetails() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<"html" | "text" | "pdf" | null>(null);
 
   // General loading/error
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +169,7 @@ export default function CaseManagementOpenCasesDetails() {
     if (!selectedDocument) {
       setPreviewHtml(null);
       setPreviewText(null);
+      setPreviewMode(null);
       setPreviewError(null);
       return;
     }
@@ -179,21 +181,27 @@ export default function CaseManagementOpenCasesDetails() {
       setPreviewError(null);
       setPreviewHtml(null);
       setPreviewText(null);
+      setPreviewMode(null);
 
       try {
         const ext = selectedDocument!.ext.toLowerCase();
-        if (ext === "docx") {
+        if (ext === "pdf") {
+          if (!active) return;
+          setPreviewMode("pdf");
+        } else if (ext === "docx") {
           const bytes = await invoke<number[]>("read_file_bytes", { path: selectedDocument!.path });
           if (!active) return;
           const arrayBuffer = new Uint8Array(bytes).buffer;
           const result = await mammoth.convertToHtml({ arrayBuffer });
           if (!active) return;
           setPreviewHtml(result.value);
+          setPreviewMode("html");
         } else if (ext === "txt" || ext === "json" || ext === "md") {
           const bytes = await invoke<number[]>("read_file_bytes", { path: selectedDocument!.path });
           if (!active) return;
           const text = new TextDecoder().decode(new Uint8Array(bytes));
           setPreviewText(text);
+          setPreviewMode("text");
         } else {
           setPreviewError("Direct preview is only supported for Word (.docx) and Text (.txt, .md) files. Please use the open icon to view this file in your default application.");
         }
@@ -214,6 +222,13 @@ export default function CaseManagementOpenCasesDetails() {
       active = false;
     };
   }, [selectedDocument]);
+
+  // PDF documents don't support field editing — reset sub-tab if needed
+  useEffect(() => {
+    if (selectedDocument?.ext.toLowerCase() !== "docx" && docSubTab === "fields") {
+      setDocSubTab("preview");
+    }
+  }, [selectedDocument, docSubTab]);
 
   async function loadCase(id: string) {
     setLoading(true);
@@ -571,16 +586,18 @@ export default function CaseManagementOpenCasesDetails() {
                 >
                   Version History
                 </button>
-                <button
-                  onClick={() => setDocSubTab("fields")}
-                  className={`text-xs font-semibold pb-1 border-b-2 px-1 transition-all focus:outline-none focus:ring-0 cursor-pointer ${
-                    docSubTab === "fields"
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t("document_fields") || "Document fields"}
-                </button>
+                {selectedDocument.ext.toLowerCase() === "docx" && (
+                  <button
+                    onClick={() => setDocSubTab("fields")}
+                    className={`text-xs font-semibold pb-1 border-b-2 px-1 transition-all focus:outline-none focus:ring-0 cursor-pointer ${
+                      docSubTab === "fields"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {t("document_fields") || "Document fields"}
+                  </button>
+                )}
               </div>
             )}
 
@@ -621,6 +638,7 @@ export default function CaseManagementOpenCasesDetails() {
                   previewError={previewError}
                   previewHtml={previewHtml}
                   previewText={previewText}
+                  previewMode={previewMode}
                   onOpenFile={handleOpenFile}
                 />
               )}
