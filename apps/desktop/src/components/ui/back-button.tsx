@@ -26,7 +26,7 @@ export default function BackButton({ className, navigateTo, iconOnly }: BackButt
         size="icon"
         onClick={handleClick}
         aria-label="Back"
-        className={className}
+        className={`border-0 ${className || ""}`}
       >
         <ArrowLeft className="size-4" />
       </Button>
