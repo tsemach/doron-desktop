@@ -15,6 +15,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verificationTokensTable: verificationTokens,
   }),
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    // authConfig.session (shared with middleware.ts's edge-runtime auth
+    // instance, which has no DB access) just copies the JWT's cached tier
+    // -- stale after a tier change (e.g. mock checkout) until the token
+    // rotates on next sign-in. Re-fetches fresh here instead, since this
+    // path only runs in the full Node.js runtime (route handlers, server
+    // components, /api/auth/session) which does have DB access. Middleware
+    // never reads session.user.tier -- only isLoggedIn -- so it doesn't
+    // need this and deliberately keeps using the cheaper JWT-only version.
+    async session(params) {
+      const session = await authConfig.callbacks!.session!(params);
+      if (session.user?.id) {
+        const [row] = await db.select({ tier: users.tier }).from(users).where(eq(users.id, session.user.id)).limit(1);
+        if (row) {
+          (session.user as { tier?: string }).tier = row.tier;
+        }
+      }
+      return session;
+    },
+  },
   providers: [
     ...authConfig.providers,
     Credentials({
