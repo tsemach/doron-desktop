@@ -3,8 +3,8 @@ import type { EmailProvider } from "./types";
 
 // onboarding@resend.dev works without verifying a custom domain, but
 // Resend's own docs say explicitly not to use it in production -- swap
-// RESEND_FROM_ADDRESS to a verified-domain address once one exists.
-const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "onboarding@resend.dev";
+// RESEND_SEND_ADDRESS to a verified-domain address once one exists.
+const FROM_ADDRESS = process.env.RESEND_SEND_ADDRESS || "onboarding@resend.dev";
 
 export class ResendEmailProvider implements EmailProvider {
   private client: Resend;
