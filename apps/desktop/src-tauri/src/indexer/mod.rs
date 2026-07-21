@@ -300,8 +300,11 @@ pub async fn index_file(
         LlmProvider::Local(_) => true,
         _ => false,
     };
+    // Free tier falls back to extract_heuristic_metadata below, same as
+    // local mode already does -- indexing itself stays free (PRD 5.5),
+    // only the LLM-based extraction step is Pro-gated (PLAN.md Phase 3).
     let options = IndexOptions {
-        run_llm_metadata: !is_local,
+        run_llm_metadata: !is_local && crate::auth::is_pro_tier(&app),
         run_vector_embeddings: true,
     };
 
@@ -362,8 +365,11 @@ pub async fn index_folder(
         LlmProvider::Local(_) => true,
         _ => false,
     };
+    // Free tier falls back to extract_heuristic_metadata below, same as
+    // local mode already does -- indexing itself stays free (PRD 5.5),
+    // only the LLM-based extraction step is Pro-gated (PLAN.md Phase 3).
     let options = IndexOptions {
-        run_llm_metadata: !is_local,
+        run_llm_metadata: !is_local && crate::auth::is_pro_tier(&app),
         run_vector_embeddings: true,
     };
     
