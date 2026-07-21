@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Check, Activity } from "lucide-react";
 import { AUDIO_CAPABLE_PROVIDERS } from "@/lib/voiceCapability";
 import VoiceFieldInput from "@/components/ui/VoiceFieldInput";
+import SettingByomLink from "./SettingByomLink";
 
 // Fast/cheap-first model choices for cloud voice (transcription + field
 // extraction) — independent of the main AI Provider's model list, since
@@ -55,6 +56,15 @@ export default function SettingVoiceEngine({
   setHealthCheckResult,
 }: SettingVoiceEngineProps) {
   const [checkingCloudHealth, setCheckingCloudHealth] = useState(false);
+
+  // Mirrors AI Provider's BYOM link (SettingAiProviderByomLink): the API
+  // key field is hidden behind an "advanced" reveal rather than always
+  // shown. Voice has no separate "managed key" mode to switch to/from --
+  // this is a plain visibility toggle, not a real settings change -- so it
+  // auto-shows once a key is already saved (async-loaded), independent of
+  // whether the user has clicked it this session.
+  const [byomOpen, setByomOpen] = useState(false);
+  const showApiKeyField = byomOpen || !!voiceCloudApiKey.trim();
 
   function handleVoiceCloudProviderChange(provider: string) {
     setVoiceCloudProvider(provider);
@@ -191,22 +201,31 @@ export default function SettingVoiceEngine({
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-foreground">API Key</label>
-          <input
-            type="password"
-            value={voiceCloudApiKey}
-            onChange={(e) => setVoiceCloudApiKey(e.target.value)}
-            placeholder={`Your ${voiceCloudProvider === "gemini" ? "Gemini" : "OpenAI"} API key`}
-            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        <div className="pt-1">
+          <SettingByomLink
+            isActive={showApiKeyField}
+            onClick={() => setByomOpen(!showApiKeyField)}
           />
-        </div>
 
-        {!voiceCloudApiKey.trim() && (
-          <p className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40 rounded-lg px-3 py-2">
-            Add an API key above to enable voice input.
-          </p>
-        )}
+          {showApiKeyField && (
+            <div className="space-y-1.5 pt-3">
+              <label className="text-xs font-semibold text-foreground">API Key</label>
+              <input
+                type="password"
+                value={voiceCloudApiKey}
+                onChange={(e) => setVoiceCloudApiKey(e.target.value)}
+                placeholder={`Your ${voiceCloudProvider === "gemini" ? "Gemini" : "OpenAI"} API key`}
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+
+              {!voiceCloudApiKey.trim() && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40 rounded-lg px-3 py-2">
+                  Add an API key above to enable voice input.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-end">
           <button

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, KeyRound } from "lucide-react";
+import SettingByomLink from "./SettingByomLink";
 
 interface SettingAiProviderByomLinkProps {
   aiMode: string;
@@ -23,21 +23,14 @@ export default function SettingAiProviderByomLink({
   const isActive = aiMode === "byom";
 
   return (
-    <button
-      type="button"
+    <SettingByomLink
+      isActive={isActive}
       onClick={() => {
         setAiMode(isActive ? "online" : "byom");
         setSaved(false);
         setHealthStatus("idle");
         if (!isActive) onOpenHelp();
       }}
-      className={`flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors ${
-        isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {isActive ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-      <KeyRound className="size-3.5" />
-      Bring Your Own (BYOM), advanced
-    </button>
+    />
   );
 }
