@@ -32,67 +32,10 @@ export default function SettingAiProviderHelp({
     summary: string;
   }
 
-  const getModelImplications = (mode: string, provider: string, model: string): ModelImplication | null => {
+  const getModelImplications = (mode: string, provider: string): ModelImplication | null => {
     if (!mode) return null;
 
     const provLower = (provider || "").toLowerCase();
-    const modelLower = (model || "").toLowerCase();
-
-    if (mode === "local") {
-      let latency = "Moderate (2-3s response)";
-      let privacy = "100% Private (No data leaves your computer)";
-      let ramUsage = "8GB - 12GB RAM";
-      let cpuUsage = "High multi-core load (spikes to 80-100% during active inference)";
-      let diskSpace = "4GB - 6GB SSD storage required";
-      let internet = "None (Fully offline operation)";
-      let summary = "Runs the model completely on your local CPU/GPU hardware. Maximum privacy, but consumes notable system resources.";
-
-      if (provLower === "gemini") {
-        if (modelLower.includes("flash")) {
-          latency = "Fast (1-2s response)";
-          ramUsage = "4GB - 6GB RAM footprint";
-          cpuUsage = "Moderate CPU overhead; optimized for quick tasks";
-          diskSpace = "Approx. 4.5GB disk space";
-          summary = "Lightweight, highly optimized local Gemini model. Balanced speed and memory footprint with minimal host system impact.";
-        } else if (modelLower.includes("pro")) {
-          latency = "Slow to Moderate (3-5s response on standard CPUs)";
-          ramUsage = "12GB - 16GB RAM footprint";
-          cpuUsage = "Heavy multi-core utilization; fans may run at maximum speed";
-          diskSpace = "Approx. 8.5GB disk space";
-          summary = "Advanced local Gemini model. Highly capable for complex reasoning but demands high CPU/RAM resources.";
-        }
-      } else if (provLower === "openai") {
-        if (modelLower.includes("mini")) {
-          latency = "Fast (1-2s response)";
-          ramUsage = "4GB RAM footprint";
-          cpuUsage = "Low to moderate background overhead";
-          diskSpace = "Approx. 3.8GB disk space";
-          summary = "Local GPT-4o-mini distillation. Very lightweight and quick, perfect for background classifying with zero system lag.";
-        } else {
-          latency = "Moderate (2-4s response)";
-          ramUsage = "10GB - 14GB RAM footprint";
-          cpuUsage = "Heavy CPU/GPU utilization during active tasks";
-          diskSpace = "Approx. 7.5GB disk space";
-          summary = "Local GPT-4o model. Highly accurate for content indexing, but requires robust local computer hardware.";
-        }
-      } else if (provLower === "anthropic") {
-        if (modelLower.includes("sonnet")) {
-          latency = "Slow to Moderate (3-5s response)";
-          ramUsage = "12GB - 16GB RAM footprint";
-          cpuUsage = "High CPU load; recommended to run on Apple Silicon or with GPU";
-          diskSpace = "Approx. 8.2GB disk space";
-          summary = "Local Claude 3.5 Sonnet representation. Top-tier offline intelligence at the cost of high computing load.";
-        } else {
-          latency = "Fast (1-2s response)";
-          ramUsage = "5GB - 7GB RAM footprint";
-          cpuUsage = "Low background overhead; laptop-friendly";
-          diskSpace = "Approx. 4.0GB disk space";
-          summary = "Local Claude 3 Haiku representation. Fast execution and gentle on battery life/system memory.";
-        }
-      }
-
-      return { latency, privacy, ramUsage, cpuUsage, diskSpace, internet, summary };
-    }
 
     if (mode === "online") {
       let latency = "Fast (0.5s - 1.5s, network dependent)";
@@ -131,7 +74,7 @@ export default function SettingAiProviderHelp({
   };
 
   const renderResourceProfile = () => {
-    const imp = getModelImplications(aiMode || "", aiProvider || "", aiModel || "");
+    const imp = getModelImplications(aiMode || "", aiProvider || "");
     if (!imp) return null;
 
     return (
@@ -231,29 +174,9 @@ export default function SettingAiProviderHelp({
       </h3>
 
       <div className="text-xs text-muted-foreground space-y-4 leading-relaxed">
-        {/* 1. Use Local Model */}
+        {/* 1. Use Online Model */}
         <div className="space-y-1.5 pb-4 border-b border-border/60">
-          <p className="font-semibold text-foreground">1. Use Local Model</p>
-          <p>
-            Runs the selected LLM completely on your local machine (e.g. via local API hooks or standard wrappers). 
-            This mode has maximum privacy since no text ever leaves your machine, and it does not require an active internet connection.
-          </p>
-          <div className="text-[11px] leading-relaxed text-muted-foreground bg-muted/40 p-2.5 rounded-xl border border-border/50 mt-2 space-y-1.5">
-            <p className="font-bold text-foreground">System Resource Requirements:</p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li><strong>Memory (RAM):</strong> Requires 8GB to 16GB of system RAM for light models. 32GB+ is highly recommended for larger, advanced models.</li>
-              <li><strong>Compute (CPU/GPU):</strong> Runs best with Apple Silicon or dedicated NVIDIA/AMD GPUs. On standard CPUs, utilization spikes to 80-100% during active classification.</li>
-              <li><strong>Storage (Disk):</strong> Requires 4GB to 8GB of persistent SSD space per model.</li>
-              <li><strong>Power & Thermals:</strong> Faster laptop battery drain and cooling fan speed increases during background classify passes.</li>
-            </ul>
-          </div>
-
-          {isSelected("local") && renderResourceProfile()}
-        </div>
-
-        {/* 2. Use Online Model */}
-        <div className="space-y-1.5 pb-4 border-b border-border/60">
-          <p className="font-semibold text-foreground">2. Use Online Model (Requires Pro)</p>
+          <p className="font-semibold text-foreground">1. Use Online Model (Requires Pro)</p>
           <p>
             Uses our pre-configured fast online cloud servers. This gives you instant access to optimized models like GPT-4o-mini or Gemini Flash without needing any local hardware setup, powered by our shared API gateway services.
           </p>
@@ -261,11 +184,11 @@ export default function SettingAiProviderHelp({
           {isSelected("online") && renderResourceProfile()}
         </div>
 
-        {/* 3. Bring Your Own Model (BYOM) */}
+        {/* 2. Bring Your Own Model (BYOM) */}
         <div className="space-y-1.5 pb-4 border-b border-border/60">
-          <p className="font-semibold text-foreground">3. Bring Your Own Model (BYOM)</p>
+          <p className="font-semibold text-foreground">2. Bring Your Own Model (BYOM)</p>
           <p>
-            Gives you absolute customization by letting you connect your personal API credentials. 
+            Gives you absolute customization by letting you connect your personal API credentials.
             You enter your own API key directly for Google Gemini, OpenAI, or Anthropic (Claude), and the app will route LLM classification directly to your account.
           </p>
 
@@ -275,8 +198,8 @@ export default function SettingAiProviderHelp({
         <div className="space-y-1.5 pt-1">
           <p className="font-semibold text-foreground">How does the Health Check work?</p>
           <p>
-            Clicking the <strong>Health Check</strong> button will verify if your selected model setup is working properly. 
-            For BYOM, it performs a real connection check to the API. For local and online pro modes, it runs a simulated system sanity verification to confirm readiness.
+            Clicking the <strong>Health Check</strong> button will verify if your selected model setup is working properly.
+            For BYOM, it performs a real connection check to the API. For online pro mode, it runs a simulated system sanity verification to confirm readiness.
           </p>
         </div>
       </div>

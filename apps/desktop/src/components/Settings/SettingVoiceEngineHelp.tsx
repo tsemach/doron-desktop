@@ -2,17 +2,11 @@ import { X } from "lucide-react";
 
 interface SettingVoiceEngineHelpProps {
   onClose: () => void;
-  voiceEngine?: string;
-  voiceModel?: string;
 }
 
 export default function SettingVoiceEngineHelp({
   onClose,
-  voiceEngine,
-  voiceModel,
 }: SettingVoiceEngineHelpProps) {
-  const isSelected = (engine: string) => voiceEngine === engine;
-
   return (
     <div className="space-y-5 animate-fade-in relative">
       <button
@@ -29,45 +23,17 @@ export default function SettingVoiceEngineHelp({
       </h3>
 
       <div className="text-xs text-muted-foreground space-y-4 leading-relaxed">
-        {/* 1. Local */}
         <div className="space-y-1.5 pb-4 border-b border-border/60">
-          <p className="font-semibold text-foreground">1. Local (offline)</p>
+          <p className="font-semibold text-foreground">How it works</p>
           <p>
-            Transcribes your voice completely on this device using a local speech-to-text model — no audio ever leaves your machine, and it works without an internet connection. Requires downloading a model once, and uses a bit more disk space and CPU during transcription.
-          </p>
-
-          {isSelected("local") && (
-            <div className="text-[11px] leading-relaxed text-muted-foreground bg-muted/40 p-2.5 rounded-xl border border-border/50 mt-2 space-y-1.5">
-              <p className="font-bold text-foreground">Model choice:</p>
-              <ul className="list-disc pl-4 space-y-1">
-                <li>
-                  <strong>Hebrew (ivrit-ai, large-v3-turbo):</strong> a Whisper fine-tune specialized for Hebrew speech — noticeably more accurate for Hebrew, less reliable for other languages.
-                </li>
-                <li>
-                  <strong>Multilingual (small, faster):</strong> the standard multilingual Whisper model — handles English and Hebrew reasonably, downloads faster and runs lighter.
-                </li>
-              </ul>
-              {voiceModel && (
-                <p className="pt-1">
-                  Currently selected: <span className="font-semibold text-foreground">{voiceModel}</span>
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* 2. Cloud */}
-        <div className="space-y-1.5 pb-4 border-b border-border/60">
-          <p className="font-semibold text-foreground">2. Cloud</p>
-          <p>
-            Sends the recorded audio to your configured AI provider's transcription API. Faster to set up (no download) and typically higher accuracy, but audio leaves your device and requires an internet connection. Only Gemini and OpenAI support audio transcription — if your configured AI provider is Claude, or a mock/unset setup, voice input is disabled until you switch providers above.
+            Sends the recorded audio to your configured cloud provider's transcription API. Only Gemini and OpenAI support audio transcription — the provider selected here is independent of the main AI Provider (LLM) setting, so that one can stay on a different provider while voice uses whichever of the two has audio support.
           </p>
         </div>
 
         <div className="space-y-1.5 pt-1">
-          <p className="font-semibold text-foreground">Which should I use?</p>
+          <p className="font-semibold text-foreground">Setup</p>
           <p>
-            If you're working with sensitive documents and want everything to stay on-device, use Local. If you already have a working Gemini or OpenAI key configured above and want the simplest setup, use Cloud.
+            Add an API key for your chosen provider above, then use Run Health Check to confirm it's working before relying on it in New Case or Document Details.
           </p>
         </div>
       </div>
