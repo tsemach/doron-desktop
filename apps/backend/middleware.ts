@@ -10,16 +10,16 @@ export default auth((req) => {
   const { nextUrl } = req;
 
   const isLoginPage = nextUrl.pathname.startsWith("/login");
-  // /register (and its sub-pages) and /verify-email must stay reachable
-  // before signing in -- they're the registration + email-verification
-  // entry points (PLAN.md Phase 0).
-  const isPublicAuthPage =
-    isLoginPage ||
-    nextUrl.pathname.startsWith("/register") ||
-    nextUrl.pathname.startsWith("/verify-email");
 
-  if (!isPublicAuthPage && !isLoggedIn) {
-    // Redirect unauthenticated users to login page
+  // The site is a public portal by default (marketing/home, registration,
+  // downloads) -- login is only required for specific functions, not to
+  // browse the site. /templates is the internal document-template admin
+  // tool; /checkout is the paid-plan flow.
+  const requiresAuth =
+    nextUrl.pathname.startsWith("/templates") ||
+    nextUrl.pathname.startsWith("/checkout");
+
+  if (requiresAuth && !isLoggedIn) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 

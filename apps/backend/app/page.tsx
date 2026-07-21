@@ -16,11 +16,14 @@ import MainHelpEmailCorrespondencesSync from "@/components/main/MainHelpEmailCor
 
 export default function Home() {
   const router = useRouter();
-  const [userName, setUserName] = useState<string>("User");
+  // null = not signed in (the portal is public now, so this is a normal,
+  // common state -- not just a loading placeholder).
+  const [userName, setUserName] = useState<string | null>(null);
+  const [tier, setTier] = useState<string | null>(null);
   const [MainHelpFeatureSelected, setMainHelpFeatureSelected] = useState<string>("central-working-space");
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: "/" });
   };
 
   // Fetch current session info on mount
@@ -30,10 +33,9 @@ export default function Home() {
         const res = await fetch("/api/auth/session");
         if (res.ok) {
           const session = await res.json();
-          if (session?.user?.name) {
-            setUserName(session.user.name);
-          } else if (session?.user?.email) {
-            setUserName(session.user.email);
+          if (session?.user?.name || session?.user?.email) {
+            setUserName(session.user.name || session.user.email);
+            setTier(session.user.tier || "free");
           }
         }
       } catch (err) {
@@ -51,7 +53,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
 
-      <MainTopBar userName={userName} handleLogout={handleLogout} />
+      <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
       {/* Main Content Area - Split Layout with Desktop App Styling */}
       <main className="flex-grow w-full px-6 py-12 flex flex-col lg:flex-row gap-10 justify-between items-start">
