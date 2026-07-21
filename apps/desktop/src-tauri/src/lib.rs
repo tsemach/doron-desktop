@@ -171,6 +171,7 @@ pub fn run() {
             auth::save_session,
             auth::clear_session,
             auth::login_with_credentials,
+            auth::verify_session,
             // email commands
             email::get_email_settings,
             email::save_email_settings,
