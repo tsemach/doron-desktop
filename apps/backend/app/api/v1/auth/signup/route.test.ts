@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockSelectLimit, mockInsertReturning, mockCreateEmailVerification } = vi.hoisted(() => ({
+const { mockSelectLimit, mockInsertReturning, mockDeleteWhere, mockCreateEmailVerification } = vi.hoisted(() => ({
   mockSelectLimit: vi.fn(),
   mockInsertReturning: vi.fn(),
+  mockDeleteWhere: vi.fn(),
   mockCreateEmailVerification: vi.fn(),
 }));
 
@@ -19,6 +20,9 @@ vi.mock("../../../../../database", () => ({
       values: () => ({
         returning: mockInsertReturning,
       }),
+    }),
+    delete: () => ({
+      where: mockDeleteWhere,
     }),
   },
 }));
@@ -48,6 +52,7 @@ describe("POST /api/v1/auth/signup", () => {
   beforeEach(() => {
     mockSelectLimit.mockReset();
     mockInsertReturning.mockReset();
+    mockDeleteWhere.mockReset().mockResolvedValue(undefined);
     mockCreateEmailVerification.mockReset().mockResolvedValue(undefined);
   });
 
@@ -111,5 +116,23 @@ describe("POST /api/v1/auth/signup", () => {
     const data = await res.json();
     expect(data.success).toBe(true);
     expect(mockCreateEmailVerification).toHaveBeenCalledWith("jane@example.com", "http://localhost:3000", "desktop");
+  });
+
+  it("rolls back the created user when sending the verification email fails", async () => {
+    mockSelectLimit.mockResolvedValue([]);
+    mockInsertReturning.mockResolvedValue([
+      { id: "1", name: "Jane Doe", email: "jane@example.com", createdAt: new Date() },
+    ]);
+    mockCreateEmailVerification.mockRejectedValue(new Error("Resend domain not verified"));
+
+    const res = await POST(makeRequest({ fullName: "Jane Doe", email: "jane@example.com", password: "password1" }));
+
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.error).toMatch(/verification email failed to send/i);
+    expect(data.error).toMatch(/try registering again/i);
+    // The user row must actually be deleted -- otherwise a retry would hit
+    // "account already exists" with no way to recover except manual cleanup.
+    expect(mockDeleteWhere).toHaveBeenCalled();
   });
 });

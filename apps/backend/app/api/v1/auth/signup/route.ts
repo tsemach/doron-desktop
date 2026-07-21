@@ -76,8 +76,20 @@ export async function POST(request: Request) {
         createdAt: users.createdAt,
       });
 
-    const origin = new URL(request.url).origin;
-    await createEmailVerification(email, origin, platform);
+    // If sending the verification email fails (e.g. the configured Resend
+    // domain isn't verified yet), roll back the user row we just created --
+    // otherwise it's stuck forever: unverified (so login stays blocked) and
+    // unretriable (a second signup attempt hits "account already exists"),
+    // with no way out except manual DB cleanup.
+    try {
+      const origin = new URL(request.url).origin;
+      await createEmailVerification(email, origin, platform);
+    } catch (verificationError: any) {
+      await db.delete(users).where(eq(users.id, newUser.id));
+      throw new Error(
+        `Account created but the verification email failed to send: ${verificationError.message}. Please try registering again.`
+      );
+    }
 
     return NextResponse.json({ success: true, user: newUser }, { status: 201 });
   } catch (error: any) {
