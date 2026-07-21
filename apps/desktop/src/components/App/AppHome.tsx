@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "../../store/indexStore";
+import PlanBadge from "../ui/PlanBadge";
 
 export default function AppHome() {
   const navigate = useNavigate();
@@ -51,7 +52,13 @@ export default function AppHome() {
         {/* Welcome Title & Input */}
         <div className="text-center space-y-4">
           <h2 className="text-3xl font-bold tracking-tight">
-            {username ? `${t("welcome")}, ${username}` : t("welcome_workspace")}
+            {username ? (
+              <>
+                {t("welcome")}, {username} <PlanBadge />
+              </>
+            ) : (
+              t("welcome_workspace")
+            )}
           </h2>
 
           {/* Show input below the heading if name doesn't exist */}
