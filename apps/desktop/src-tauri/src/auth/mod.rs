@@ -13,13 +13,17 @@ pub struct Session {
     pub expires_at: String,
 }
 
+// Success and error responses from /api/v1/auth/desktop-login share no
+// required fields (the error shape is just `{ error }`), so every field
+// here must be optional -- otherwise serde fails to decode the error shape
+// at all and the real backend message never reaches the user.
 #[derive(Deserialize)]
 struct DesktopLoginResponse {
-    token: String,
-    email: String,
-    tier: String,
+    token: Option<String>,
+    email: Option<String>,
+    tier: Option<String>,
     #[serde(rename = "expiresAt")]
-    expires_at: String,
+    expires_at: Option<String>,
     error: Option<String>,
 }
 
@@ -129,21 +133,23 @@ pub async fn login_with_credentials(app: AppHandle, backend_url: String, email: 
         .await
         .map_err(|e| format!("Failed to reach the server: {e}"))?;
 
+    const GENERIC_ERROR: &str = "Something went wrong while signing in. Please try again.";
+
     let status = response.status();
     let body: DesktopLoginResponse = response
         .json()
         .await
-        .map_err(|e| format!("Unexpected response from server: {e}"))?;
+        .map_err(|_| GENERIC_ERROR.to_string())?;
 
     if !status.is_success() {
         return Err(body.error.unwrap_or_else(|| "Login failed".to_string()));
     }
 
     let session = Session {
-        token: body.token,
-        email: body.email,
-        tier: body.tier,
-        expires_at: body.expires_at,
+        token: body.token.ok_or(GENERIC_ERROR)?,
+        email: body.email.ok_or(GENERIC_ERROR)?,
+        tier: body.tier.ok_or(GENERIC_ERROR)?,
+        expires_at: body.expires_at.ok_or(GENERIC_ERROR)?,
     };
     save_session_internal(&app, &session)?;
     Ok(session)
