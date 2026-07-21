@@ -1,0 +1,642 @@
+[
+  {
+    "id": "legal_client_update",
+    "sender": "yossi.cohen@gmail.com",
+    "subject": "עדכון תיק 12345/23 - כהן נ' לוי",
+    "snippet": "שלום עו\"ד, רציתי לעדכן לגבי הדיון הקבוע לשבוע הבא.",
+    "injected": {
+      "summary": "Client update about upcoming hearing in case 12345/23",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן",
+        "דיון",
+        "עדכון"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן",
+        "דיון",
+        "עדכון"
+      ]
+    }
+  },
+  {
+    "id": "legal_known_sender_only",
+    "sender": "Danny Stern <danny.stern@gmail.com>",
+    "subject": "שאלה לגבי התיק",
+    "snippet": "שלום, האם קיבלתם את המסמכים?",
+    "injected": {
+      "summary": "Client asking whether documents were received",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן",
+        "מסמכים"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן",
+        "מסמכים"
+      ]
+    }
+  },
+  {
+    "id": "newsletter_ignore",
+    "sender": "news@shop.co.il",
+    "subject": "מבצע השבוע - קנו עכשיו",
+    "snippet": "הנחות מיוחדות לזמן מוגבל בלבד.",
+    "injected": {
+      "summary": "Retail promotional sale newsletter",
+      "review": false,
+      "review_reason": "Classified as marketing; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן"
+      ]
+    }
+  },
+  {
+    "id": "legal_no_case_match",
+    "sender": "prospect@example.com",
+    "subject": "שאלה כללית",
+    "snippet": "שלום, אני מחפש ייעוץ משפטי בנושא חדש לגמרי.",
+    "injected": {
+      "summary": "Prospective client seeking advice on a new matter",
+      "review": true,
+      "review_reason": "Classified as new_inquiry.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "ייעוץ משפטי"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "ייעוץ משפטי"
+      ]
+    }
+  },
+  {
+    "id": "mixed_promo_and_case",
+    "sender": "yossi.cohen@gmail.com",
+    "subject": "הנחה ללקוחות + עדכון תיק 12345/23",
+    "snippet": "שלום עו\"ד, רציתי לעדכן לגבי הדיון. בנוסף, ראיתי שיש לכם מבצע ללקוחות קיימים.",
+    "injected": {
+      "summary": "Client updates on hearing but also mentions a promotional offer",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן",
+        "דיון",
+        "עדכון"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן",
+        "דיון",
+        "עדכון"
+      ]
+    }
+  },
+  {
+    "id": "court_hearing_notice",
+    "sender": "noreply@courts.gov.il",
+    "subject": "הזמנה לדיון בתיק 12345/23",
+    "snippet": "בית משפט השלום בתל אביב קובע דיון בתיק 12345/23 ליום 12.08.2026.",
+    "injected": {
+      "summary": "Court hearing notice for case 12345/23",
+      "review": true,
+      "review_reason": "Classified as court_or_authority.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "דיון",
+        "בית משפט"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "דיון",
+        "בית משפט"
+      ]
+    }
+  },
+  {
+    "id": "client_billing_invoice",
+    "sender": "billing@lawfirm.co.il",
+    "subject": "חשבונית שכ\"ט - כהן נ' לוי",
+    "snippet": "מצורפת חשבונית עבור שכר טרחה בתיק 12345/23.",
+    "injected": {
+      "summary": "Fee invoice for case Cohen v Levy",
+      "review": true,
+      "review_reason": "Classified as billing_or_invoice.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "חשבונית",
+        "שכר טרחה"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "חשבונית",
+        "שכר טרחה"
+      ]
+    }
+  },
+  {
+    "id": "opposing_counsel_motion",
+    "sender": "adv.levy@opposing.co.il",
+    "subject": "בקשה להארכת מועד - תיק 12345/23",
+    "snippet": "בא כוח הנתבע מתכבד להגיש בקשה להארכת מועד להגשת כתב הגנה.",
+    "injected": {
+      "summary": "Opposing counsel requests extension in case 12345/23",
+      "review": true,
+      "review_reason": "Classified as opposing_counsel.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "הארכת מועד",
+        "כתב הגנה"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "הארכת מועד",
+        "כתב הגנה"
+      ]
+    }
+  },
+  {
+    "id": "system_otp_ignore",
+    "sender": "noreply@google.com",
+    "subject": "קוד אימות לחשבון שלך",
+    "snippet": "קוד האימות שלך הוא 482910. לא שתף קוד זה.",
+    "injected": {
+      "summary": "Automated OTP verification code",
+      "review": false,
+      "review_reason": "Classified as system_notification; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן"
+      ]
+    }
+  },
+  {
+    "id": "cle_marketing_only",
+    "sender": "events@bar.org.il",
+    "subject": "הזמנה לכנס לשכת עורכי הדין - הנחה למנויים",
+    "snippet": "הצטרפו לכנס השנתי! מבצע מיוחד לחברי לשכה. הרשמה עד סוף החודש.",
+    "injected": {
+      "summary": "Bar association conference marketing invitation",
+      "review": false,
+      "review_reason": "Classified as marketing; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "כנס",
+        "הרשמה"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "כנס",
+        "הרשמה"
+      ]
+    }
+  },
+  {
+    "id": "en_legal_client_update",
+    "sender": "john.smith@gmail.com",
+    "subject": "Case update 12345/23 - Smith v. Jones",
+    "snippet": "Hi, I wanted to update you regarding the hearing scheduled for next week.",
+    "injected": {
+      "summary": "Client update about upcoming hearing",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "John Smith",
+        "David Williams",
+        "hearing",
+        "update"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "John Smith",
+        "David Williams",
+        "hearing",
+        "update"
+      ]
+    }
+  },
+  {
+    "id": "en_legal_known_sender_only",
+    "sender": "David Williams <david.williams@gmail.com>",
+    "subject": "Question about the case",
+    "snippet": "Hello, did you receive the documents I sent?",
+    "injected": {
+      "summary": "Client asking whether documents were received",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "John Smith",
+        "David Williams",
+        "documents"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "John Smith",
+        "David Williams",
+        "documents"
+      ]
+    }
+  },
+  {
+    "id": "en_newsletter_ignore",
+    "sender": "deals@shop.com",
+    "subject": "Weekly sale - shop now",
+    "snippet": "Exclusive discounts for a limited time only.",
+    "injected": {
+      "summary": "Retail promotional sale email",
+      "review": false,
+      "review_reason": "Classified as marketing; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "John Smith"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "John Smith"
+      ]
+    }
+  },
+  {
+    "id": "en_legal_no_case_match",
+    "sender": "prospect@example.com",
+    "subject": "General question",
+    "snippet": "Hello, I am looking for legal advice on a completely new matter.",
+    "injected": {
+      "summary": "Prospective client seeking advice on a new matter",
+      "review": true,
+      "review_reason": "Classified as new_inquiry.",
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "legal advice"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "legal advice"
+      ]
+    }
+  },
+  {
+    "id": "en_mixed_promo_and_case",
+    "sender": "john.smith@gmail.com",
+    "subject": "Special offer + hearing update 12345/23",
+    "snippet": "Hi, confirming next week's hearing. Also saw your firm's client referral discount program.",
+    "injected": {
+      "summary": "Client confirms hearing and mentions a promotional referral program",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "hearing"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "hearing"
+      ]
+    }
+  },
+  {
+    "id": "personal_unrelated_he",
+    "sender": "friend@gmail.com",
+    "subject": "מסיבת יום הולדת ביום שישי",
+    "snippet": "היי, אתה מגיע ליום הולדת שלי ביום שישי בערב? נשמח לראות אותך!",
+    "injected": {
+      "summary": "Friend inviting to a birthday party on Friday",
+      "review": false,
+      "review_reason": "Classified as personal_unrelated; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן"
+      ]
+    }
+  },
+  {
+    "id": "personal_unrelated_en",
+    "sender": "friend@gmail.com",
+    "subject": "Birthday party on Friday",
+    "snippet": "Hey, are you coming to my birthday party on Friday evening?",
+    "injected": {
+      "summary": "Friend inviting to a birthday party",
+      "review": false,
+      "review_reason": "Classified as personal_unrelated; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "John Smith"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "John Smith"
+      ]
+    }
+  },
+  {
+    "id": "case_admin_paralegal",
+    "sender": "paralegal@lawfirm.co.il",
+    "subject": "הקצאת משימה - תיק 12345/23",
+    "snippet": "שלום, אנא הכן טיוטת כתב תביעה לתיק כהן נ' לוי עד יום ראשון.",
+    "injected": {
+      "summary": "Internal paralegal task assignment for case 12345/23",
+      "review": true,
+      "review_reason": "Classified as case_administration.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "כתב תביעה",
+        "תיק"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "כתב תביעה",
+        "תיק"
+      ]
+    }
+  },
+  {
+    "id": "vague_client_by_name",
+    "sender": "yossi.cohen@gmail.com",
+    "subject": "לגבי העניין שלנו",
+    "snippet": "שלום עו\"ד, רציתי לשאול שאלה קצרה לגבי ההמשך.",
+    "injected": {
+      "summary": "Client asking a brief follow-up question about their matter",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "67890/22",
+        "יוסי כהן",
+        "דני שטרן"
+      ]
+    }
+  },
+  {
+    "id": "law_firm_seo_newsletter",
+    "sender": "newsletter@competitor-law.co.il",
+    "subject": "5 טיפים לניהול תיקים משפטיים - ניוזלטר חינם",
+    "snippet": "הירשמו לניוזלטר שלנו וקבלו טיפים לניהול תיקים, לקוחות ושיווק לעורכי דין.",
+    "injected": {
+      "summary": "Competitor law firm newsletter about case management tips",
+      "review": false,
+      "review_reason": "Classified as marketing; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "תיקים",
+        "עורכי דין"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "תיקים",
+        "עורכי דין"
+      ]
+    }
+  },
+  {
+    "id": "wrong_case_ref",
+    "sender": "noreply@courts.gov.il",
+    "subject": "הזמנה לדיון בתיק 99999/99",
+    "snippet": "בית משפט השלום קובע דיון בתיק 99999/99 ליום 15.09.2026.",
+    "injected": {
+      "summary": "Court hearing notice for an unknown case number",
+      "review": true,
+      "review_reason": "Classified as court_or_authority.",
+      "search_terms": [
+        "99999/99",
+        "12345/23",
+        "יוסי כהן",
+        "דיון"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "99999/99",
+        "12345/23",
+        "יוסי כהן",
+        "דיון"
+      ]
+    }
+  },
+  {
+    "id": "en_court_hearing_notice",
+    "sender": "noreply@courts.gov",
+    "subject": "Hearing notice - Case 12345/23",
+    "snippet": "The district court schedules a hearing in case 12345/23 on August 12, 2026.",
+    "injected": {
+      "summary": "Court hearing notice for case 12345/23",
+      "review": true,
+      "review_reason": "Classified as court_or_authority.",
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "hearing",
+        "court"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "hearing",
+        "court"
+      ]
+    }
+  },
+  {
+    "id": "en_opposing_counsel_motion",
+    "sender": "counsel@opposing.com",
+    "subject": "Motion for extension - Case 12345/23",
+    "snippet": "Counsel for defendant respectfully requests an extension to file the answer.",
+    "injected": {
+      "summary": "Opposing counsel requests filing extension in case 12345/23",
+      "review": true,
+      "review_reason": "Classified as opposing_counsel.",
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "extension",
+        "answer"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "extension",
+        "answer"
+      ]
+    }
+  },
+  {
+    "id": "en_cle_marketing_only",
+    "sender": "events@bar.org",
+    "subject": "CLE conference invitation - member discount",
+    "snippet": "Join our annual conference! Special offer for bar members. Register by month end.",
+    "injected": {
+      "summary": "Bar association CLE conference marketing email",
+      "review": false,
+      "review_reason": "Classified as marketing; no lawyer attention needed.",
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "conference",
+        "CLE"
+      ]
+    },
+    "expected": {
+      "review": false,
+      "search_terms": [
+        "12345/23",
+        "John Smith",
+        "conference",
+        "CLE"
+      ]
+    }
+  },
+  {
+    "id": "mixed_billing_and_update",
+    "sender": "yossi.cohen@gmail.com",
+    "subject": "שאלה על חשבונית + עדכון דיון 12345/23",
+    "snippet": "שלום עו\"ד, קיבלתי את החשבונית ורציתי לוודא לגבי הדיון בשבוע הבא בתיק.",
+    "injected": {
+      "summary": "Client asks about invoice and confirms upcoming hearing in case 12345/23",
+      "review": true,
+      "review_reason": "Classified as client_correspondence.",
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "חשבונית",
+        "דיון"
+      ]
+    },
+    "expected": {
+      "review": true,
+      "search_terms": [
+        "12345/23",
+        "יוסי כהן",
+        "חשבונית",
+        "דיון"
+      ]
+    }
+  }
+]
