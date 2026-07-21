@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LanguageProvider } from "./context/LanguageContext";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
@@ -42,6 +43,21 @@ function App() {
       unlisten.then((f) => f());
     };
   }, [navigate]);
+
+  useEffect(() => {
+    // Revalidates the cached session (verify_session, AMI-64) whenever the
+    // window regains focus, not just at startup -- otherwise a tier change
+    // made elsewhere (e.g. upgrading to Pro from the web portal) never
+    // reaches an already-running desktop app until it's restarted.
+    const unlistenPromise = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (focused) {
+        refreshSession();
+      }
+    });
+    return () => {
+      unlistenPromise.then((f) => f());
+    };
+  }, []);
 
   const gated = AUTH_REQUIRED && sessionStatus === "ready" && !session;
 
