@@ -1,3 +1,5 @@
+mod dataset;
+
 pub mod examples;
 pub mod generate;
 pub mod run;
