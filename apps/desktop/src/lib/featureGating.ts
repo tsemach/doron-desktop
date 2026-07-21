@@ -1,4 +1,4 @@
-import { getDefaultStore } from "jotai";
+import { getDefaultStore, useAtomValue } from "jotai";
 import { sessionAtom } from "@/store/authStore";
 
 export type FeatureKey = "voice_recording" | "emails" | "ai_features";
@@ -71,4 +71,21 @@ export function getCurrentSubscriptionTier(): SubscriptionTier {
 
 export function isFeatureEnabled(feature: FeatureKey): boolean {
   return featureGateProvider.isEnabled(feature, getCurrentSubscriptionTier());
+}
+
+/**
+ * Reactive counterparts to getCurrentSubscriptionTier/isFeatureEnabled --
+ * those read the session atom's current value directly (fine for one-off
+ * checks), but a component that needs to re-render when the session changes
+ * (e.g. after verify_session revalidates it) must actually subscribe via
+ * useAtomValue rather than just reading the store once.
+ */
+export function useSubscriptionTier(): SubscriptionTier {
+  const session = useAtomValue(sessionAtom);
+  return session?.tier === "pro" ? "pro" : "free";
+}
+
+export function useFeatureEnabled(feature: FeatureKey): boolean {
+  const tier = useSubscriptionTier();
+  return featureGateProvider.isEnabled(feature, tier);
 }

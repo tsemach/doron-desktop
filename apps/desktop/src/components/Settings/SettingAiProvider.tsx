@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Check, Activity } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { ProviderSelector, ModelSelector } from "./SettingAiComponents";
-import SettingAiProviderLocal from "./SettingAiProviderLocal";
-import SettingAiProviderOnline from "./SettingAiProviderOnline";
-import SettingAiProviderByom from "./SettingAiProviderByom";
 import SettingAiProviderByomApiKey from "./SettingAiProviderByomApiKey";
+import SettingAiProviderByomLink from "./SettingAiProviderByomLink";
 import SettingAiProviderSelectionHeader from "./SettingAiProviderSelectionHeader";
 import SettingAiProviderStatusBar from "./SettingAiProviderStatusBar";
 import SettingAiProviderHeader from "./SettingAiProviderHeader";
@@ -66,23 +63,6 @@ export default function SettingAiProvider({
   const [checkingHealth, setCheckingHealth] = useState(false);
   const isCancelledRef = useRef(false);
 
-  // Model download and installation states
-  const [isModelInstalled, setIsModelInstalled] = useState<boolean>(true);
-  const [isInstalling, setIsInstalling] = useState<boolean>(false);
-  const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  const [downloadPercent, setDownloadPercent] = useState<number>(0);
-  const [installError, setInstallError] = useState<string | null>(null);
-
-  // Model lists mappings
-  const localModels: Record<string, string[]> = {
-    google: ["Gemma 4 E4B (Q4)", "Gemma 4 12B"],
-    microsoft: [
-      "Phi-4-mini-instruct (3.8B Q4)",
-      "Phi-3.5-mini-instruct (3.8B Q4)"
-    ],
-    alibaba: ["Qwen-2.5-1.5B-Instruct (Q4)", "Qwen-2.5-3B-Instruct (Q4)"],
-  };
-
   const onlineModels: Record<string, string[]> = {
     gemini: ["gemini-2.0-flash-exp", "gemini-1.5-pro-online"],
     openai: ["gpt-4o-online", "o1-mini"],
@@ -90,159 +70,15 @@ export default function SettingAiProvider({
     other: ["deepseek-chat", "perplexity"],
   };
 
-  const aiModelRef = useRef(aiModel);
-  useEffect(() => {
-    aiModelRef.current = aiModel;
-  }, [aiModel]);
-
-  // Global mount listener for download progress events
-  useEffect(() => {
-    let unlistenFn: (() => void) | null = null;
-
-    const setupListener = async () => {
-      try {
-        unlistenFn = await listen<any>("model-download-progress", (event) => {
-          const payload = event.payload;
-          if (payload.model_name === aiModelRef.current) {
-            setDownloadPercent(Math.round(payload.percent));
-            if (payload.status === "completed") {
-              setIsModelInstalled(true);
-              setIsInstalling(false);
-              setDownloadPercent(100);
-            } else if (payload.status === "failed") {
-              setInstallError(payload.error || "Download failed");
-              setIsInstalling(false);
-            }
-          }
-        });
-      } catch (err) {
-        console.error("Failed to subscribe to download progress:", err);
-      }
-    };
-
-    setupListener();
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
-  }, []);
-
-  // Check if local model is downloaded when mode or model selection changes
-  useEffect(() => {
-    if (aiMode === "local") {
-      checkModelInstalled(aiModel);
-    } else {
-      setIsModelInstalled(true);
-      setIsInstalling(false);
-      setInstallError(null);
-    }
-  }, [aiMode, aiModel]);
-
-  const checkModelInstalled = async (model: string) => {
-    if (!model) return;
-    try {
-      const installed = await invoke<boolean>("check_local_model_status", { modelName: model });
-      setIsModelInstalled(installed);
-      
-      if (!installed) {
-        // Query if this model has a background download in progress
-        const downloading = await invoke<boolean>("check_model_downloading", { modelName: model });
-        if (downloading) {
-          setIsInstalling(true);
-        } else {
-          setIsInstalling(false);
-        }
-      } else {
-        setIsInstalling(false);
-      }
-    } catch (err) {
-      console.error("Failed to check model status:", err);
-      setIsModelInstalled(false);
-      setIsInstalling(false);
-    }
-  };
-
-  const handleInstallModel = async () => {
-    setIsInstalling(true);
-    setDownloadPercent(0);
-    setInstallError(null);
-    try {
-      // Call Rust to start the installation
-      await invoke("install_local_model", { modelName: aiModel });
-    } catch (err: any) {
-      setInstallError(err.toString());
-      setIsInstalling(false);
-    }
-  };
-
-  const handleCancelDownload = async () => {
-    try {
-      await invoke("cancel_model_download", { modelName: aiModel });
-    } catch (err) {
-      console.error("Failed to cancel download:", err);
-    }
-  };
-
-  const handleDeleteModel = async () => {
-    if (window.confirm(`Are you sure you want to delete the model '${aiModel}'? This will free up disk space.`)) {
-      setIsDeleting(true);
-      try {
-        await invoke("delete_local_model", { modelName: aiModel });
-        setIsModelInstalled(false);
-        setHealthStatus("idle");
-        setHealthCheckResult(null);
-      } catch (err: any) {
-        console.error("Failed to delete model:", err);
-        alert(`Failed to delete model: ${err.toString()}`);
-      } finally {
-        setIsDeleting(false);
-      }
-    }
-  };
-
-  // Adjust model options when provider or mode changes, and map names back and forth
+  // Reset the model to the new provider's first option whenever the
+  // provider changes (online and byom share the same provider/model lists).
   useEffect(() => {
     if (!aiProvider) return;
-
-    if (aiMode === "local") {
-      // Map old online provider names to local equivalents
-      if (aiProvider === "gemini") {
-        setAiProvider("google");
-        return;
-      } else if (aiProvider === "openai") {
-        setAiProvider("microsoft");
-        return;
-      } else if (aiProvider === "anthropic" || aiProvider === "other") {
-        setAiProvider("alibaba");
-        return;
-      }
-    } else if (aiMode === "online" || aiMode === "byom") {
-      // Map local provider names back to online equivalents
-      if (aiProvider === "google") {
-        setAiProvider("gemini");
-        return;
-      } else if (aiProvider === "microsoft") {
-        setAiProvider("openai");
-        return;
-      } else if (aiProvider === "alibaba") {
-        setAiProvider("gemini");
-        return;
-      }
-    }
-    
-    let list: string[] = [];
-    if (aiMode === "local") {
-      list = localModels[aiProvider.toLowerCase()] || [];
-    } else if (aiMode === "online" || aiMode === "byom") {
-      list = onlineModels[aiProvider.toLowerCase()] || [];
-    }
-
+    const list = onlineModels[aiProvider.toLowerCase()] || [];
     if (list.length > 0 && !list.includes(aiModel)) {
       setAiModel(list[0]);
     }
-  }, [aiMode, aiProvider]);
+  }, [aiProvider]);
 
   const handleHealthCheck = async () => {
     isCancelledRef.current = false;
@@ -299,53 +135,19 @@ export default function SettingAiProvider({
   */
 
   const getAvailableModels = () => {
-    const key = aiProvider.toLowerCase();
-    if (aiMode === "local") {
-      return localModels[key] || [];
-    }
-    return onlineModels[key] || [];
+    return onlineModels[aiProvider.toLowerCase()] || [];
   };
 
-  const getAvailableProviders = () => {
-    if (aiMode === "local") {
-      return [
-        { id: "google", name: "Google" },
-        { id: "microsoft", name: "Microsoft" },
-        { id: "alibaba", name: "Alibaba" },
-      ];
-    }
-    return [
-      { id: "gemini", name: "Gemini" },
-      { id: "openai", name: "OpenAI" },
-      { id: "anthropic", name: "Anthropic" },
-      { id: "other", name: "Other" },
-    ];
-  };
-
-  const getModelDescription = (model: string) => {
-    switch (model) {
-      case "Qwen-2.5-1.5B-Instruct (Q4)":
-        return "Low Performance / Battery Saver Mode (RAM footprint: ~1.1 GB). Best for older or 8GB RAM machines. Fast execution on basic email classification, but may struggle with highly complex, lengthy contracts.";
-      case "Qwen-2.5-3B-Instruct (Q4)":
-        return "Balanced / Standard Mode (RAM footprint: ~1.9 GB). The standard baseline choice. Exceptional at structured JSON formatting and metadata parsing, runs smoothly on average CPUs.";
-      case "Phi-4-mini-instruct (3.8B Q4)":
-        return "Advanced / Long Documents Mode (RAM footprint: ~2.2 GB). Best for 16GB RAM machines. Features a native 128K context window, ideal for long trial transcripts or complex contracts.";
-      case "Phi-3.5-mini-instruct (3.8B Q4)":
-        return "Stable Baseline / Balanced Mode (RAM footprint: ~2.2 GB). Best for 16GB RAM machines. Outstanding performance-to-size ratio with a native 128K context window.";
-      case "Gemma 4 E4B (Q4)":
-        return "Alternative Capable Mode (RAM footprint: ~2.5 GB). Strong multimodal and agentic capability, slightly higher memory overhead.";
-      case "Gemma 4 12B":
-        return "High Performance Mode (RAM footprint: ~7.5 GB). Recommended for 16GB+ RAM machines. Outstanding reasoning and multimodal capabilities.";
-      default:
-        return "";
-    }
-  };
-
-
+  const getAvailableProviders = () => [
+    { id: "gemini", name: "Gemini" },
+    { id: "openai", name: "OpenAI" },
+    { id: "anthropic", name: "Anthropic" },
+    { id: "other", name: "Other" },
+  ];
 
   return (
     <div className="bg-card border border-border/80 shadow-lg rounded-2xl p-6 md:p-8 space-y-6 w-full animate-fade-in">
-      
+
       {/* Header */}
       <SettingAiProviderHeader healthStatus={healthStatus} />
 
@@ -357,87 +159,56 @@ export default function SettingAiProvider({
         />
       )}
 
-      {/* Mode selection - modern card selectors */}
-      <div className="space-y-2">
-        <SettingAiProviderSelectionHeader
-          onToggleHelp={onToggleHelp}
-          activeHelp={activeHelp}
-        />
+      <SettingAiProviderSelectionHeader
+        onToggleHelp={onToggleHelp}
+        activeHelp={activeHelp}
+      />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Local Mode Card */}
-          <SettingAiProviderLocal
-            aiMode={aiMode}
-            setAiMode={setAiMode}
-            setSaved={setSaved}
-            setHealthStatus={setHealthStatus}
-            aiProvider={aiProvider}
-            setAiProvider={setAiProvider}
-            onOpenHelp={onOpenHelp}
-          />
+      <div className="space-y-4 pt-2 border-t border-border/40 animate-fade-in">
+        <div className="grid grid-cols-2 gap-4">
+          {/* Provider Selector - Reusable */}
+          <div className="col-span-2 sm:col-span-1">
+            <ProviderSelector
+              value={aiProvider}
+              onChange={(val) => {
+                setAiProvider(val);
+                setSaved(false);
+                setHealthStatus("idle");
+              }}
+              providers={getAvailableProviders()}
+              onToggleHelp={onToggleHelp}
+              activeHelp={activeHelp}
+            />
+          </div>
 
-          {/* Online Pro Mode Card */}
-          <SettingAiProviderOnline
-            aiMode={aiMode}
-            setAiMode={setAiMode}
-            setSaved={setSaved}
-            setHealthStatus={setHealthStatus}
-            aiProvider={aiProvider}
-            setAiProvider={setAiProvider}
-            onOpenHelp={onOpenHelp}
-          />
-
-          {/* BYOM Card */}
-          <SettingAiProviderByom
-            aiMode={aiMode}
-            setAiMode={setAiMode}
-            setSaved={setSaved}
-            setHealthStatus={setHealthStatus}
-            aiProvider={aiProvider}
-            setAiProvider={setAiProvider}
-            onOpenHelp={onOpenHelp}
-          />
+          {/* Model Selector */}
+          <div className="col-span-2 sm:col-span-1">
+            <ModelSelector
+              value={aiModel}
+              onChange={(val) => {
+                setAiModel(val);
+                setSaved(false);
+                setHealthStatus("idle");
+              }}
+              models={getAvailableModels()}
+              onToggleHelp={onToggleHelp}
+              activeHelp={activeHelp}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Dynamic Settings Fields based on operational mode */}
-      {aiMode && (
-        <div className="space-y-4 pt-2 border-t border-border/40 animate-fade-in">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Provider Selector - Reusable */}
-            <div className="col-span-2 sm:col-span-1">
-              <ProviderSelector
-                value={aiProvider}
-                onChange={(val) => {
-                  setAiProvider(val);
-                  setSaved(false);
-                  setHealthStatus("idle");
-                }}
-                disabled={isInstalling}
-                providers={getAvailableProviders()}
-                onToggleHelp={onToggleHelp}
-                activeHelp={activeHelp}
-              />
-            </div>
+        {/* BYOM: advanced, opt-in link that reveals the API key field */}
+        <div className="pt-1">
+          <SettingAiProviderByomLink
+            aiMode={aiMode}
+            setAiMode={setAiMode}
+            setSaved={setSaved}
+            setHealthStatus={setHealthStatus}
+            onOpenHelp={onOpenHelp}
+          />
 
-            {/* Model Selector */}
-            <div className="col-span-2 sm:col-span-1">
-              <ModelSelector
-                value={aiModel}
-                onChange={(val) => {
-                  setAiModel(val);
-                  setSaved(false);
-                  setHealthStatus("idle");
-                }}
-                disabled={isInstalling}
-                models={getAvailableModels()}
-                onToggleHelp={onToggleHelp}
-                activeHelp={activeHelp}
-              />
-            </div>
-
-            {/* API Key Input (only for BYOM) */}
-            {aiMode === "byom" && (
+          {aiMode === "byom" && (
+            <div className="grid grid-cols-2 gap-4 pt-3">
               <SettingAiProviderByomApiKey
                 providerApiKey={providerApiKey}
                 setProviderApiKey={setProviderApiKey}
@@ -446,139 +217,32 @@ export default function SettingAiProvider({
                 onToggleHelp={onToggleHelp}
                 activeHelp={activeHelp}
               />
-            )}
-          </div>
-
-          {/* Local Mode Details (Descriptions & Downloads) */}
-          {aiMode === "local" && (
-            <div className="space-y-3 pt-2">
-              {/* Hardware Requirements Description */}
-              {getModelDescription(aiModel) && (
-                <div className="p-3 bg-muted/40 border border-border/40 rounded-xl text-xs text-muted-foreground leading-relaxed">
-                  <span className="font-bold text-foreground block mb-0.5">Resource Requirements:</span>
-                  {getModelDescription(aiModel)}
-                </div>
-              )}
-
-              {/* Model Not Installed warning and action banner */}
-              {!isModelInstalled && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 space-y-3 animate-fade-in">
-                  <div className="flex items-start gap-3">
-                    <div className="text-amber-500 mt-0.5">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 9v4" />
-                        <path d="M12 17h.01" />
-                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                      </svg>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-amber-500">Model Not Installed</h4>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        The selected model <span className="font-semibold text-foreground">{aiModel}</span> exists but is not yet downloaded. You must download it to use local mode.
-                      </p>
-                    </div>
-                  </div>
-
-                  {isInstalling ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center text-xs font-semibold text-foreground">
-                        <span className="flex items-center gap-2">
-                          <span className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
-                          Downloading model...
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span>{downloadPercent}%</span>
-                          <button
-                            type="button"
-                            onClick={handleCancelDownload}
-                            className="px-2 py-1 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded transition-all cursor-pointer shadow-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                      <div className="w-full bg-accent rounded-full h-1.5 overflow-hidden">
-                        <div 
-                          className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                          style={{ width: `${downloadPercent}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-4 pt-1">
-                      {installError && (
-                        <span className="text-[10px] text-red-500 font-semibold truncate max-w-[200px]">
-                          Error: {installError}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleInstallModel}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition-all shadow-md cursor-pointer ml-auto"
-                      >
-                        Install Model
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Model Installed info and remove action banner */}
-              {isModelInstalled && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 space-y-3 animate-fade-in">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="text-emerald-500 mt-0.5">
-                        <Check className="size-4.5" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-bold text-emerald-500">Model Installed</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          The selected model <span className="font-semibold text-foreground">{aiModel}</span> is fully downloaded and ready to use locally.
-                        </p>
-                      </div>
-                    </div>
-                    {isDeleting ? (
-                      <span className="size-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin self-center"></span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleDeleteModel}
-                        disabled={checkingHealth}
-                        className="px-3 py-1.5 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 text-red-500 font-semibold text-xs rounded-lg transition-all shadow-sm cursor-pointer self-center"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
-
-          {/* Action Row - Health Check */}
-          <div className="flex justify-end items-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleHealthCheck}
-              disabled={checkingHealth || isInstalling || !isModelInstalled || (aiMode === "byom" && !providerApiKey)}
-              className="flex items-center gap-1.5 px-4 py-2 border border-border bg-background hover:bg-accent disabled:opacity-50 text-foreground text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
-            >
-              {checkingHealth ? (
-                <>
-                  <span className="size-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin"></span>
-                  Running check...
-                </>
-              ) : (
-                <>
-                  <Activity className="size-3.5" />
-                  Run Health Check
-                </>
-              )}
-            </button>
-          </div>
         </div>
-      )}
+
+        {/* Action Row - Health Check */}
+        <div className="flex justify-end items-center gap-2 pt-2">
+          <button
+            type="button"
+            onClick={handleHealthCheck}
+            disabled={checkingHealth || (aiMode === "byom" && !providerApiKey)}
+            className="flex items-center gap-1.5 px-4 py-2 border border-border bg-background hover:bg-accent disabled:opacity-50 text-foreground text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
+          >
+            {checkingHealth ? (
+              <>
+                <span className="size-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin"></span>
+                Running check...
+              </>
+            ) : (
+              <>
+                <Activity className="size-3.5" />
+                Run Health Check
+              </>
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* Separator line */}
       <div className="border-t border-border/60 my-6"></div>
@@ -587,7 +251,7 @@ export default function SettingAiProvider({
       <div className="pt-2">
         <button
           onClick={onSave}
-          disabled={!aiMode || !hasChanges || isSaving || isInstalling || !isModelInstalled}
+          disabled={!aiMode || !hasChanges || isSaving}
           className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all cursor-pointer shadow-md ${
             saved
               ? "bg-emerald-600 text-white hover:bg-emerald-700 animate-pulse"

@@ -7,18 +7,19 @@ import MainTopBarUser from "./MainTopBarUser";
 import MainTopBarDownload from "./MainTopDownloads";
 
 type Props = {
-  userName: string;
+  userName: string | null;
+  tier?: string | null;
   handleLogout: () => void;
 }
 
-export default function MainTopBar({ userName, handleLogout }: Props) {
+export default function MainTopBar({ userName, tier, handleLogout }: Props) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   return (
     <header className="bg-teal-950 border-b border-teal-900 px-6 py-1.5 flex items-center justify-between">
       <MainTopBarDownload />
-      <MainTopBarUser userName={userName} handleLogout={handleLogout} />
+      <MainTopBarUser userName={userName} tier={tier} handleLogout={handleLogout} />
     </header>
   );
 }

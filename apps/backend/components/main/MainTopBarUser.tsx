@@ -3,11 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type MainTopBarUserProps = {
-  userName: string;
+  // null = not signed in -- renders a "Log in" link instead of the
+  // name/avatar/dropdown, since the portal no longer requires login to browse.
+  userName: string | null;
+  tier?: string | null;
   handleLogout: () => void;
 }
 
-export default function MainTopBarUser({ userName, handleLogout }: MainTopBarUserProps) {
+export default function MainTopBarUser({ userName, tier, handleLogout }: MainTopBarUserProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -23,14 +26,34 @@ export default function MainTopBarUser({ userName, handleLogout }: MainTopBarUse
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-  
+
+  if (!userName) {
+    return (
+      <Link
+        href="/login"
+        className="text-sm font-semibold text-teal-200 hover:text-white transition-colors cursor-pointer"
+      >
+        Log in
+      </Link>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3">
-      
+
       <span className="text-sm font-semibold text-teal-200 select-none">
-        {userName}
+        {userName} <span className="text-teal-400">({tier === "pro" ? "PRO" : "FREE"})</span>
       </span>
-      
+
+      {tier !== "pro" && (
+        <Link
+          href="/register/plan"
+          className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-teal-400 text-teal-950 hover:bg-teal-300 transition-colors cursor-pointer"
+        >
+          Upgrade
+        </Link>
+      )}
+
       <div className="relative w-fit" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -49,16 +72,14 @@ export default function MainTopBarUser({ userName, handleLogout }: MainTopBarUse
             <FileText className="w-3.5 h-3.5" />
             Templates
           </Link>
-          <button
-            onClick={() => {
-              setDropdownOpen(false);
-              alert("Profile page coming soon!");
-            }}
+          <Link
+            href="/profile"
+            onClick={() => setDropdownOpen(false)}
             className="w-full text-left px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
           >
             <User className="w-3.5 h-3.5" />
             Profile
-          </button>
+          </Link>
           <button
             onClick={() => {
               setDropdownOpen(false);

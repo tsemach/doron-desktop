@@ -24,6 +24,7 @@ export default {
         // NextAuth's narrow base User type -- planSelectedAt/tier exist on
         // it at runtime even though the base type doesn't declare them.
         token.planSelectedAt = (user as { planSelectedAt?: Date | null }).planSelectedAt ?? null;
+        token.tier = (user as { tier?: string }).tier ?? "free";
       }
       return token;
     },
@@ -31,6 +32,7 @@ export default {
       if (session.user) {
         session.user.id = token.id as string;
         (session.user as { planSelectedAt?: Date | null }).planSelectedAt = token.planSelectedAt as Date | null;
+        (session.user as { tier?: string }).tier = (token.tier as string) ?? "free";
       }
       return session;
     },

@@ -91,18 +91,6 @@ function RegisterForm() {
         {error && <div className={errorClass}>{error}</div>}
 
         <div>
-          <label className={labelClass}>Full name</label>
-          <input
-            type="text"
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className={inputClass}
-            placeholder="Jane Cohen"
-          />
-        </div>
-
-        <div>
           <label className={labelClass}>Email address</label>
           <input
             type="email"
@@ -111,6 +99,18 @@ function RegisterForm() {
             onChange={(e) => setEmail(e.target.value)}
             className={inputClass}
             placeholder="you@example.com"
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Full name</label>
+          <input
+            type="text"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className={inputClass}
+            placeholder="Jane Cohen"
           />
         </div>
 

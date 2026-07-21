@@ -1,13 +1,24 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@workspace/ui";
 import AuthCard from "../../../components/auth/AuthCard";
 
 function CompleteContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const isDesktop = searchParams.get("platform") === "desktop";
+
+  // 0.5a — brings the desktop app to focus (and onto its login screen, via
+  // lib.rs's doron-desktop://login handler) if it's already running, or
+  // launches it if not. A custom-scheme navigation doesn't take the browser
+  // tab away on its own, so this page then sends itself back to the portal
+  // home instead of sitting on "You're all set" forever.
+  function handleOpenAmicus() {
+    window.location.href = "doron-desktop://login";
+    setTimeout(() => router.push("/"), 300);
+  }
 
   return (
     <AuthCard title="You're all set" subtitle="Your Amicus account is ready.">
@@ -17,16 +28,10 @@ function CompleteContent() {
           : "You can now sign in from the Amicus desktop app."}
       </p>
 
-      {/* 0.5a — low priority convenience button: brings the desktop app to
-          focus if it's already running, or launches it if not, via the same
-          doron-desktop:// scheme registered for OAuth login (0.9). Purely a
-          convenience — the flow works fine without it (alt-tab back). */}
       {isDesktop && (
-        <a href="doron-desktop://" className="mt-6 block">
-          <Button type="button" className="w-full">
-            Open Amicus
-          </Button>
-        </a>
+        <Button type="button" onClick={handleOpenAmicus} className="mt-6 w-full">
+          Open Amicus
+        </Button>
       )}
     </AuthCard>
   );

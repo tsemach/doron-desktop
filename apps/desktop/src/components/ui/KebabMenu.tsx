@@ -15,9 +15,11 @@ interface KebabMenuProps {
   items: KebabMenuItem[];
   triggerClassName?: string;
   title?: string;
+  /** Overrides the default 3-dot trigger icon (e.g. a User icon for an account menu). */
+  triggerIcon?: ReactNode;
 }
 
-export default function KebabMenu({ items, triggerClassName, title }: KebabMenuProps) {
+export default function KebabMenu({ items, triggerClassName, title, triggerIcon }: KebabMenuProps) {
   const [open, setOpen] = useState(false);
   const visibleItems = items.filter((item) => !item.hidden);
 
@@ -32,21 +34,23 @@ export default function KebabMenu({ items, triggerClassName, title }: KebabMenuP
         className={triggerClassName ?? "h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"}
         title={title ?? "More options"}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="1.2" fill="currentColor" />
-          <circle cx="12" cy="5" r="1.2" fill="currentColor" />
-          <circle cx="12" cy="19" r="1.2" fill="currentColor" />
-        </svg>
+        {triggerIcon ?? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+            <circle cx="12" cy="5" r="1.2" fill="currentColor" />
+            <circle cx="12" cy="19" r="1.2" fill="currentColor" />
+          </svg>
+        )}
       </Button>
 
       {open && (
