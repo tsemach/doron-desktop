@@ -1,7 +1,7 @@
 import { getDefaultStore } from "jotai";
 import { sessionAtom } from "@/store/authStore";
 
-export type FeatureKey = "voice_recording" | "emails";
+export type FeatureKey = "voice_recording" | "emails" | "ai_features";
 export type SubscriptionTier = "free" | "pro";
 export type GateState = "enabled" | "disabled";
 
@@ -15,6 +15,13 @@ export type GateState = "enabled" | "disabled";
 const FEATURE_GATES: Record<FeatureKey, Record<SubscriptionTier, GateState>> = {
   voice_recording: { free: "disabled", pro: "enabled" },
   emails: { free: "disabled", pro: "enabled" },
+  // Covers the hard-blocked AI surfaces (voice transcription, field
+  // extraction, cloud AI settings/health check, cloud model install) --
+  // Local AI stays intentionally excluded from this gate (deprecated, being
+  // removed later); indexing metadata extraction and search reranking are
+  // also excluded since those degrade gracefully to a non-AI fallback
+  // instead of being blocked outright (see PLAN.md Phase 3).
+  ai_features: { free: "disabled", pro: "enabled" },
 };
 
 export interface FeatureGateProvider {
