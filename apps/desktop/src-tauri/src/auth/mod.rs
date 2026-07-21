@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -22,9 +23,12 @@ struct DesktopLoginResponse {
     error: Option<String>,
 }
 
-#[tauri::command]
-pub fn get_session(app: AppHandle) -> Result<Option<Session>, String> {
-    let conn = store::open_db(&app)?;
+/// Reads the local session, treating a past (or unparsable) `expires_at` as
+/// no session at all -- previously this check only existed client-side in
+/// authStore.ts::refreshSession, so a Rust-side caller (as Phase 3's
+/// is_pro_tier now is) would have seen a stale session as still valid.
+fn read_session_internal(app: &AppHandle) -> Result<Option<Session>, String> {
+    let conn = store::open_db(app)?;
     let mut stmt = conn
         .prepare("SELECT token, email, tier, expires_at FROM auth_session LIMIT 1")
         .map_err(|e| e.to_string())?;
@@ -38,11 +42,34 @@ pub fn get_session(app: AppHandle) -> Result<Option<Session>, String> {
         })
     });
 
-    match row {
-        Ok(session) => Ok(Some(session)),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(e) => Err(e.to_string()),
-    }
+    let session = match row {
+        Ok(session) => session,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+
+    let is_expired = DateTime::parse_from_rfc3339(&session.expires_at)
+        .map(|expires| expires.with_timezone(&Utc) < Utc::now())
+        .unwrap_or(true);
+
+    Ok(if is_expired { None } else { Some(session) })
+}
+
+#[tauri::command]
+pub fn get_session(app: AppHandle) -> Result<Option<Session>, String> {
+    read_session_internal(&app)
+}
+
+/// Free falls back to whenever the session can't be read at all (signed
+/// out, expired, or a DB error) -- a stale/missing read should never
+/// silently grant Pro. Used by the AI-gating checks added in Phase 3
+/// (indexer, query reranking, email ingestion, llm commands).
+pub fn is_pro_tier(app: &AppHandle) -> bool {
+    read_session_internal(app)
+        .ok()
+        .flatten()
+        .map(|s| s.tier == "pro")
+        .unwrap_or(false)
 }
 
 pub fn save_session_internal(app: &AppHandle, session: &Session) -> Result<(), String> {

@@ -38,6 +38,11 @@ pub fn list_case_emails(app: AppHandle, case_id: i64) -> Result<Vec<CaseEmail>, 
 
 #[tauri::command]
 pub async fn trigger_email_ingestion(app: AppHandle) -> Result<(), String> {
+    // Email is Pro-only (AMI-60) -- full block, not a degraded fallback: no
+    // IMAP connection at all for Free tier, not even the config lookup.
+    if !crate::auth::is_pro_tier(&app) {
+        return Err("Email is a Pro feature. Upgrade to Pro to enable email ingestion.".to_string());
+    }
     println!("[Rust Backend] trigger_email_ingestion called!");
     if let Some(config) = get_email_settings_internal(&app) {
         // Await the check directly so the frontend refresh spinner stays active during the network operation
@@ -52,6 +57,12 @@ pub async fn poll_emails_background(app: AppHandle) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
     loop {
         interval.tick().await;
+        // Skip silently for Free tier -- this runs unattended every 5
+        // minutes, an error every tick would just spam the log for
+        // something that isn't actually wrong.
+        if !crate::auth::is_pro_tier(&app) {
+            continue;
+        }
         if let Some(config) = get_email_settings_internal(&app) {
             if let Err(e) = check_and_ingest_emails(&app, &config).await {
                 println!("[Email Background Worker Error] {}", e);

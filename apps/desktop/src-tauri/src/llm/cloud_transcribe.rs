@@ -38,6 +38,12 @@ pub async fn transcribe_audio_cloud(
     language: Option<String>,
     provider: Option<String>,
 ) -> Result<String, String> {
+    // Cloud voice transcription is Pro-only ("voice_recording" FeatureKey,
+    // PLAN.md Phase 3) -- the local whisper engine (transcribe_audio_local)
+    // is a separate command and stays completely ungated.
+    if !crate::auth::is_pro_tier(&app) {
+        return Err("Voice transcription (cloud) is a Pro feature.".to_string());
+    }
     let resolved_provider = match provider {
         Some(provider_type) => get_active_provider(ProviderConfig {
             provider_type,
