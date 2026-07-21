@@ -20,17 +20,17 @@ export default function AuthLanding() {
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          onClick={handleRegister}
-          className="w-full rounded-md bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 transition-opacity cursor-pointer"
-        >
-          Register
-        </button>
-        <button
-          type="button"
           onClick={() => navigate("/auth/login")}
           className="w-full rounded-md border border-border py-2.5 text-sm font-medium hover:bg-accent transition-colors cursor-pointer"
         >
           Login
+        </button>
+        <button
+          type="button"
+          onClick={handleRegister}
+          className="w-full rounded-md bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          Register
         </button>
       </div>
     </AuthCard>

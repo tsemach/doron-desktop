@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { listen } from "@tauri-apps/api/event";
 import { LanguageProvider } from "./context/LanguageContext";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
@@ -16,6 +18,7 @@ const AUTH_REQUIRED = true;
 function App() {
   const session = useAtomValue(sessionAtom);
   const sessionStatus = useAtomValue(sessionStatusAtom);
+  const navigate = useNavigate();
 
   useEffect(() => {
     triggerGlobalHealthCheck().catch((err) => {
@@ -27,6 +30,18 @@ function App() {
     // wall is enforced.
     refreshSession();
   }, []);
+
+  useEffect(() => {
+    // Sent by lib.rs's doron-desktop://login handler -- the email
+    // verification page's "sign in" link, for a desktop-originated
+    // registration, deep-links here instead of opening the browser login.
+    const unlisten = listen<string>("deep-link-navigate", (event) => {
+      navigate(event.payload);
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, [navigate]);
 
   const gated = AUTH_REQUIRED && sessionStatus === "ready" && !session;
 

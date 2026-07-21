@@ -39,7 +39,12 @@ function VerifyEmailContent() {
     })();
   }, [email, token]);
 
-  const loginUrl = `/login?justVerified=1${platform === "desktop" ? "&platform=desktop" : ""}`;
+  // A desktop-originated registration deep-links straight back into the
+  // desktop app's own login form (doron-desktop://login, handled in
+  // apps/desktop/src-tauri/src/lib.rs) instead of opening a second,
+  // browser-based login -- the user already has the app open.
+  const isDesktop = platform === "desktop";
+  const loginUrl = isDesktop ? "doron-desktop://login" : "/login?justVerified=1";
 
   return (
     <AuthCard title="Verify your email">
@@ -48,7 +53,7 @@ function VerifyEmailContent() {
         <div className="text-center">
           <p className="text-sm text-foreground">Your email is verified.</p>
           <a href={loginUrl} className="mt-4 inline-block font-medium text-foreground underline">
-            Continue to sign in
+            {isDesktop ? "Return to the Amicus app to sign in" : "Continue to sign in"}
           </a>
         </div>
       )}

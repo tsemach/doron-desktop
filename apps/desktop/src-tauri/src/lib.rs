@@ -1,4 +1,4 @@
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 pub mod store;
@@ -73,6 +73,23 @@ pub fn run() {
                     if url.scheme() != "doron-desktop" {
                         continue;
                     }
+
+                    if let Some(window) = handle_deep_link.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+
+                    // doron-desktop://login -- sent from the email-verification
+                    // confirmation page's "sign in" link when registration
+                    // originated on desktop, so it lands the user back on the
+                    // desktop's own login form instead of the browser's.
+                    // Carries no token: this is a focus+navigate hint only,
+                    // not a session hand-off (that stays OAuth-only, below).
+                    if url.host_str() == Some("login") {
+                        let _ = handle_deep_link.emit("deep-link-navigate", "/auth/login");
+                        continue;
+                    }
+
                     let param = |key: &str| {
                         url.query_pairs().find(|(k, _)| k == key).map(|(_, v)| v.to_string())
                     };
@@ -154,6 +171,7 @@ pub fn run() {
             auth::save_session,
             auth::clear_session,
             auth::login_with_credentials,
+            auth::verify_session,
             // email commands
             email::get_email_settings,
             email::save_email_settings,
