@@ -182,6 +182,12 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
         return Ok("Connection successful! Local model server is running and healthy.".to_string());
     }
 
+    // Cloud/BYOM health checks are Pro-only ("ai_features" FeatureKey,
+    // PLAN.md Phase 3) -- local mode already returned above, ungated.
+    if !crate::auth::is_pro_tier(&app) {
+        return Err("Cloud AI is a Pro feature.".to_string());
+    }
+
     // For BYOM/online, perform a real network/service call!
     let provider = crate::llm::llm_provider::get_active_provider(
         crate::llm::llm_provider::ProviderConfig {
