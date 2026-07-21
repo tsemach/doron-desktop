@@ -1,7 +1,7 @@
 use tauri::AppHandle;
 use serde::{Deserialize, Serialize};
 use super::clean_json;
-use super::llm_provider::{ProviderConfig, get_active_provider};
+use super::llm_provider::{LlmProvider, ProviderConfig, get_active_provider};
 
 const FIELD_EXTRACTION_PROMPT: &str = r#"You are a form-filling assistant. The user spoke a short phrase describing what field to fill and its value. Given the list of available field names below, determine which field they meant and what value to fill it with.
 
@@ -74,6 +74,13 @@ pub async fn extract_field_value(
         }),
         None => super::load_active_provider(&app, api_key, model),
     };
+
+    // Free tier only for local-provider extraction ("ai_features"
+    // FeatureKey, PLAN.md Phase 3) -- local AI stays completely ungated.
+    let is_local = matches!(resolved_provider, LlmProvider::Local(_));
+    if !is_local && !crate::auth::is_pro_tier(&app) {
+        return Err("Field extraction via a cloud AI provider is a Pro feature.".to_string());
+    }
 
     let fields_list = available_fields.join(", ");
     let prompt = FIELD_EXTRACTION_PROMPT

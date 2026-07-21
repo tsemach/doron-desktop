@@ -1,3 +1,5 @@
+import { isFeatureEnabled } from "./featureGating";
+
 // Providers that support audio transcription via transcribe_audio_cloud
 // (apps/desktop/src-tauri/src/llm/cloud_transcribe.rs) — Claude has no audio
 // input support, so it (and local/mock) are excluded.
@@ -24,6 +26,12 @@ export function checkVoiceCapability(
   const voiceEngine = settings?.voice_engine || "local";
   if (voiceEngine === "local") {
     return { disabled: false, reason: null };
+  }
+
+  // Cloud voice is Pro-only (matches transcribe_audio_cloud's server-side
+  // gate, PLAN.md Phase 3) — local voice stays free regardless of tier.
+  if (!isFeatureEnabled("voice_recording")) {
+    return { disabled: true, reason: "Cloud voice input is a Pro feature. Switch to the local voice engine, or upgrade to Pro." };
   }
 
   const provider = settings?.voice_cloud_provider || "";

@@ -1,0 +1,28 @@
+import type { ReactNode } from "react";
+
+interface AuthCardProps {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}
+
+// Shared shell for the register/login/plan/complete pages — centered card on
+// the app's actual background/card/border tokens (apps/backend/app/globals.css),
+// replacing the previous bespoke "Doron Client Portal" gradient design so the
+// web portal looks like the same product as the desktop app, not a separate one.
+export default function AuthCard({ title, subtitle, children }: AuthCardProps) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-sm">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <span className="text-lg font-semibold">A</span>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

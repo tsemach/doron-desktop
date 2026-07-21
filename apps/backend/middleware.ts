@@ -10,8 +10,15 @@ export default auth((req) => {
   const { nextUrl } = req;
 
   const isLoginPage = nextUrl.pathname.startsWith("/login");
+  // /register (and its sub-pages) and /verify-email must stay reachable
+  // before signing in -- they're the registration + email-verification
+  // entry points (PLAN.md Phase 0).
+  const isPublicAuthPage =
+    isLoginPage ||
+    nextUrl.pathname.startsWith("/register") ||
+    nextUrl.pathname.startsWith("/verify-email");
 
-  if (!isLoginPage && !isLoggedIn) {
+  if (!isPublicAuthPage && !isLoggedIn) {
     // Redirect unauthenticated users to login page
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
