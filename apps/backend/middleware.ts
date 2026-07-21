@@ -14,10 +14,12 @@ export default auth((req) => {
   // The site is a public portal by default (marketing/home, registration,
   // downloads) -- login is only required for specific functions, not to
   // browse the site. /templates is the internal document-template admin
-  // tool; /checkout is the paid-plan flow.
+  // tool; /checkout is the paid-plan flow; /profile is the user's own
+  // account/subscription page.
   const requiresAuth =
     nextUrl.pathname.startsWith("/templates") ||
-    nextUrl.pathname.startsWith("/checkout");
+    nextUrl.pathname.startsWith("/checkout") ||
+    nextUrl.pathname.startsWith("/profile");
 
   if (requiresAuth && !isLoggedIn) {
     return NextResponse.redirect(new URL("/login", nextUrl));

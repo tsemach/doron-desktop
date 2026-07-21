@@ -72,16 +72,14 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
             <FileText className="w-3.5 h-3.5" />
             Templates
           </Link>
-          <button
-            onClick={() => {
-              setDropdownOpen(false);
-              alert("Profile page coming soon!");
-            }}
+          <Link
+            href="/profile"
+            onClick={() => setDropdownOpen(false)}
             className="w-full text-left px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
           >
             <User className="w-3.5 h-3.5" />
             Profile
-          </button>
+          </Link>
           <button
             onClick={() => {
               setDropdownOpen(false);
