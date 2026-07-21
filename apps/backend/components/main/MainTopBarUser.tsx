@@ -45,6 +45,15 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
         {userName} <span className="text-teal-400">({tier === "pro" ? "PRO" : "FREE"})</span>
       </span>
 
+      {tier !== "pro" && (
+        <Link
+          href="/register/plan"
+          className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-teal-400 text-teal-950 hover:bg-teal-300 transition-colors cursor-pointer"
+        >
+          Upgrade
+        </Link>
+      )}
+
       <div className="relative w-fit" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
