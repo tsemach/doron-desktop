@@ -27,6 +27,16 @@ struct DesktopLoginResponse {
     error: Option<String>,
 }
 
+// Same shape as DesktopLoginResponse minus `token` -- verification never
+// reissues the token, only confirms the existing one is still valid.
+#[derive(Deserialize)]
+struct DesktopSessionVerifyResponse {
+    email: Option<String>,
+    tier: Option<String>,
+    #[serde(rename = "expiresAt")]
+    expires_at: Option<String>,
+}
+
 /// Reads the local session, treating a past (or unparsable) `expires_at` as
 /// no session at all -- previously this check only existed client-side in
 /// authStore.ts::refreshSession, so a Rust-side caller (as Phase 3's
@@ -108,11 +118,15 @@ pub fn complete_oauth_login(
     save_session_internal(app, &Session { token, email, tier, expires_at })
 }
 
-#[tauri::command]
-pub fn clear_session(app: AppHandle) -> Result<(), String> {
-    let conn = store::open_db(&app)?;
+fn clear_session_internal(app: &AppHandle) -> Result<(), String> {
+    let conn = store::open_db(app)?;
     conn.execute("DELETE FROM auth_session", []).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn clear_session(app: AppHandle) -> Result<(), String> {
+    clear_session_internal(&app)
 }
 
 /// Password login (0.7) — direct API call, no browser involved. OAuth login
@@ -153,4 +167,55 @@ pub async fn login_with_credentials(app: AppHandle, backend_url: String, email: 
     };
     save_session_internal(&app, &session)?;
     Ok(session)
+}
+
+/// Re-checks the cached local session against the backend -- deleting a
+/// user (or downgrading their tier) only takes effect server-side; nothing
+/// previously told an already-logged-in desktop app about it, so it kept
+/// trusting the cached session for up to its full 30-day TTL regardless.
+/// Called from authStore.ts::refreshSession on every app startup/focus.
+///
+/// A network failure (offline, backend unreachable) is NOT treated as
+/// invalidation -- it falls back to the cached session, preserving the
+/// offline-first behavior PLAN.md's Phase 0 assumptions call for. Only an
+/// explicit rejection from the backend (401: token no longer exists, or
+/// expired server-side) clears the local session.
+#[tauri::command]
+pub async fn verify_session(app: AppHandle, backend_url: String) -> Result<Option<Session>, String> {
+    let Some(local_session) = read_session_internal(&app)? else {
+        return Ok(None);
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{backend_url}/api/v1/auth/desktop-session"))
+        .json(&serde_json::json!({ "token": local_session.token }))
+        .timeout(std::time::Duration::from_secs(8))
+        .send()
+        .await;
+
+    let response = match response {
+        Ok(r) => r,
+        Err(_) => return Ok(Some(local_session)),
+    };
+
+    let status = response.status();
+    let body: DesktopSessionVerifyResponse = match response.json().await {
+        Ok(b) => b,
+        Err(_) => return Ok(Some(local_session)),
+    };
+
+    if !status.is_success() {
+        clear_session_internal(&app)?;
+        return Ok(None);
+    }
+
+    let refreshed = Session {
+        token: local_session.token,
+        email: body.email.unwrap_or(local_session.email),
+        tier: body.tier.unwrap_or(local_session.tier),
+        expires_at: body.expires_at.unwrap_or(local_session.expires_at),
+    };
+    save_session_internal(&app, &refreshed)?;
+    Ok(Some(refreshed))
 }
