@@ -145,15 +145,36 @@ interface PaymentProvider {
 
 **Goal**: every AI-backed capability actually checks the gate before running, not just the two features already named in `FEATURE_GATES`.
 
-**[MODIFY] `apps/desktop/src-tauri/src/llm/mod.rs`** command entry points — add a tier check at the top of the Tauri commands already registered in `lib.rs` (`get_ai_settings`, `check_ai_health`, `check_local_model_status`, `install_local_model`, `transcribe_audio_local`, `transcribe_audio_cloud`, `extract_field_value`, etc.) — reject with a clear "Pro required" error for Free-tier sessions, mirroring how `voice_recording`/`emails` are already modeled as `FeatureKey`s. This likely means adding `ai_features` (or similar) as a new `FeatureKey` alongside `voice_recording`/`emails` in `featureGating.ts`, and passing the caller's tier through from the frontend on each `invoke()`.
+**Decisions made**:
+- **Local AI stays completely ungated** — it's deprecated and will be removed later; not worth gating now. None of the tasks below touch local-mode behavior.
+- Three AI-touching surfaces already have a **working non-LLM fallback today**, discovered by reading the actual code rather than assumed — these just need a tier check ANDed into their *existing* local/cloud condition, no new fallback logic:
+  - **Indexing metadata extraction** (`indexer/mod.rs`, both `index_file` and `index_folder`): `run_llm_metadata: !is_local` → `!is_local && is_pro_tier(&app)`. Falls back to the already-existing `extract_heuristic_metadata` (the same function local mode already uses).
+  - **Search reranking** (`query/mod.rs`): `use_llm_rerank: !is_local` → `!is_local && is_pro_tier(&app)`. Falls back to the already-existing raw hybrid FTS+vector results (reranking was already a pure optional enhancement).
+- **Email is a full block, not a degraded fallback** — different treatment from the two above. `emails_ai.rs::run_cascade_classification` already has a working embeddings-only fallback when no LLM is configured, but the decision here is that Free tier shouldn't get *any* email pulling at all, not even that degraded classification. This completes wiring the `emails` `FeatureKey`, which has existed in `FEATURE_GATES` since Phase 0/AMI-36 but was never connected to actual functionality.
+- **Everything else is a hard block**: voice transcription, direct field extraction, cloud AI provider settings/health check, cloud model install — no non-AI equivalent, reject + disable in UI.
+
+**Real bug found while scoping this**: `auth::get_session` (Rust) never checks `expires_at` against now — only the TS side (`authStore.ts::refreshSession`) does. Since this phase adds the first Rust-side consumer of tier info, fixing this at the source rather than propagating the gap into a second, inconsistent expiry check.
+
+**[NEW] `apps/desktop/src-tauri/src/auth/mod.rs`** — fix `get_session`'s missing expiry check; add `is_pro_tier(app: &AppHandle) -> bool`.
+
+**[MODIFY] `apps/desktop/src/lib/featureGating.ts`** — add `"ai_features"` to `FeatureKey`/`FEATURE_GATES` (pro-only, matching `voice_recording`/`emails`).
+
+**[MODIFY] `apps/desktop/src-tauri/src/indexer/mod.rs`** — gate `run_llm_metadata` per above.
+
+**[MODIFY] `apps/desktop/src-tauri/src/query/mod.rs`** — gate `use_llm_rerank` per above.
+
+**[MODIFY] `apps/desktop/src-tauri/src/email/emails_ops.rs`** — `trigger_email_ingestion` returns a clear "Email is a Pro feature" error immediately for Free tier, before touching `get_email_settings_internal`/IMAP at all; `poll_emails_background` skips the tick entirely for Free tier (no IMAP connection attempt at all) rather than erroring, since it runs unattended every 5 minutes.
+
+**[MODIFY] `apps/desktop/src-tauri/src/llm/mod.rs`** command entry points — reject with a clear "Pro required" error for Free-tier sessions on commands with no non-AI equivalent: voice transcription (`transcribe_audio_local`/`transcribe_audio_cloud`), `extract_field_value`, cloud AI provider settings/health check (`check_ai_health`), cloud model install. Local model management itself stays ungated per the decision above.
 
 **[MODIFY] Frontend AI entry points** (`SettingAiProvider.tsx`, `VoiceFieldFiller.tsx`, search UI reranking trigger) — disable/hide the control and show an upgrade prompt when `isFeatureEnabled("ai_features")` is `false`, rather than letting the user hit a Rust-side error.
 
-**Decision needed**: does "AI is Pro-only" include the local on-device model, or only cloud AI? PRD says "AI is Pro-only" without distinguishing — local inference has near-zero marginal cost to you, so gating it too is a product choice, not a technical necessity. Flag for confirmation; this plan assumes **both** are gated, since the PRD text doesn't carve out an exception.
-
 **Verification**
-- Free-tier user: every AI-touching button (voice, email classification, search rerank, template field extraction) is visibly disabled with an upgrade CTA, not silently broken.
-- Pro-tier user: unchanged behavior from today.
+- Free-tier user: every hard-blocked AI-touching button (voice, template field extraction) is visibly disabled with an upgrade CTA, not silently broken.
+- Free-tier user: indexing and search still work, using heuristic metadata / non-reranked results respectively.
+- Free-tier user: email ingestion never runs — no IMAP connection attempted, manual trigger shows a clear upgrade message.
+- Pro-tier user: unchanged behavior from today across all of the above.
+- Local AI mode: unchanged behavior for both tiers.
 
 ---
 

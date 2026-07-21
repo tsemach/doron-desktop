@@ -62,9 +62,13 @@ pub async fn query_search_documents(
         LlmProvider::Local(_) => true,
         _ => false,
     };
+    // Free tier falls back to the already-existing non-LLM paths --
+    // analyze_query_heuristically and raw (non-reranked) local_results --
+    // rather than being blocked outright (PLAN.md Phase 3).
+    let is_pro = crate::auth::is_pro_tier(&app);
     let options = SearchOptions {
-        use_llm_query_analysis: !is_local,
-        use_llm_rerank: !is_local,
+        use_llm_query_analysis: !is_local && is_pro,
+        use_llm_rerank: !is_local && is_pro,
     };
 
     let db_path = store::db_path(&app);
