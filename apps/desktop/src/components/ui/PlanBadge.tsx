@@ -5,13 +5,7 @@ export default function PlanBadge() {
   const isPro = tier === "pro";
 
   return (
-    <span
-      className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider align-middle ${
-        isPro
-          ? "bg-black text-white dark:bg-white dark:text-black"
-          : "bg-muted text-muted-foreground border border-border"
-      }`}
-    >
+    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider align-middle bg-white text-gray-500 border border-border">
       {isPro ? "Pro" : "Free"}
     </span>
   );
