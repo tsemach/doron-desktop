@@ -11,6 +11,7 @@ export default function AppMain() {
       <Route path="/case-management/*" element={<CaseManagement />} />
       <Route path="/docs-management/*" element={<DocsManagement />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="*" element={<AppHome />} />
     </Routes>
   );
 }
