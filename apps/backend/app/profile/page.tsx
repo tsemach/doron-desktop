@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, CircleAlert, Loader2 } from "lucide-react";
 import MainTopBar from "@/components/main/MainTopBar";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface Profile {
   name: string | null;
@@ -19,6 +20,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState("");
+  const [confirmDowngradeOpen, setConfirmDowngradeOpen] = useState(false);
 
   async function loadProfile() {
     try {
@@ -63,9 +65,7 @@ export default function ProfilePage() {
   }
 
   async function handleDowngrade() {
-    if (!confirm("Switch back to the Free plan? You'll lose Pro features (AI, voice input, email sync) immediately.")) {
-      return;
-    }
+    setConfirmDowngradeOpen(false);
     setPlanError("");
     setPlanLoading(true);
     try {
@@ -192,7 +192,7 @@ export default function ProfilePage() {
               <div className="flex justify-end">
                 {isPro ? (
                   <button
-                    onClick={handleDowngrade}
+                    onClick={() => setConfirmDowngradeOpen(true)}
                     disabled={planLoading}
                     className="text-sm font-semibold text-slate-500 hover:text-red-600 disabled:opacity-50 transition-colors cursor-pointer"
                   >
@@ -212,6 +212,16 @@ export default function ProfilePage() {
           </>
         )}
       </main>
+
+      <ConfirmDialog
+        open={confirmDowngradeOpen}
+        title="Switch to the Free plan?"
+        message="You'll lose Pro features (AI, voice input, email sync) immediately."
+        confirmLabel="Downgrade to Free"
+        danger
+        onConfirm={handleDowngrade}
+        onCancel={() => setConfirmDowngradeOpen(false)}
+      />
     </div>
   );
 }
