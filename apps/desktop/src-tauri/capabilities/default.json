@@ -18,6 +18,7 @@
     "dialog:default",
     "updater:default",
     "process:allow-restart",
-    "mic-recorder:default"
+    "mic-recorder:default",
+    "deep-link:default"
   ]
 }

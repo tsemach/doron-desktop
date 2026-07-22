@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AuthSessionProvider from "../components/AuthSessionProvider";
 
 export const metadata: Metadata = {
-  title: "Doron Desktop Portal",
-  description: "Download the Doron Desktop application",
+  title: "Amicus",
+  description: "Sign in or create your Amicus account",
 };
 
 export default function RootLayout({
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthSessionProvider>{children}</AuthSessionProvider>
+      </body>
     </html>
   );
 }

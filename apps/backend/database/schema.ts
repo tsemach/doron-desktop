@@ -10,6 +10,13 @@ export const users = pgTable("users", {
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
   passwordHash: text("password_hash"), // Nullable for social-only accounts
+  tier: text("tier", { enum: ["free", "pro"] }).default("free").notNull(),
+  // Null until the user has actually chosen Free or Pro (select-plan / the
+  // payments webhook). `tier` alone can't distinguish "explicitly chose
+  // Free" from "never chosen anything" since it defaults to 'free' -- this
+  // is what the OAuth callback pages check to decide whether to route a
+  // fresh sign-in to /register/plan or straight into the app.
+  planSelectedAt: timestamp("plan_selected_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -61,6 +68,20 @@ export const verificationTokens = pgTable(
     },
   ]
 );
+
+// Opaque bearer tokens for the desktop app, separate from NextAuth's web
+// session cookie since the desktop client can't hold browser cookies across
+// restarts. Stored (not signed-JWT) so a token is revocable by deleting the
+// row, mirroring the existing `sessions` table's shape/intent above.
+export const desktopSessions = pgTable("desktop_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").unique().notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
 
 export const documentTemplates = pgTable("document_templates", {
   id: uuid("id").primaryKey().defaultRandom(),

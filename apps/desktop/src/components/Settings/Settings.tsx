@@ -8,6 +8,7 @@ import { aiConfigAtom, aiConfigStatusAtom } from "../../store/aiStore";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { check } from "@tauri-apps/plugin-updater";
+import { useFeatureEnabled } from "../../lib/featureGating";
 
 import SettingPreferences from "./SettingPreferences";
 import SettingEmailIntegration from "./SettingEmailIntegration";
@@ -41,12 +42,15 @@ export default function Settings() {
   const [emailPassword, setEmailPassword] = useState("");
   const [showEmailPassword, setShowEmailPassword] = useState(false);
 
-  // AI Provider (LLM) Configuration States
-  const [aiMode, setAiMode] = useState("");
+  // AI Provider (LLM) Configuration States. Local mode is deprecated and no
+  // longer selectable from Settings (see AMI-65) -- "online" is now the
+  // implicit default instead of an unset "" that used to force picking a
+  // mode card first.
+  const [aiMode, setAiMode] = useState("online");
   const [aiProvider, setAiProvider] = useState("gemini");
   const [aiModel, setAiModel] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
-  const [voiceEngine, setVoiceEngineState] = useState("local");
+  const [voiceEngine, setVoiceEngineState] = useState("cloud");
   const [voiceModel, setVoiceModelState] = useState("whisper multilingual (small)");
   const [voiceCloudProvider, setVoiceCloudProviderState] = useState("gemini");
   const [voiceCloudApiKey, setVoiceCloudApiKeyState] = useState("");
@@ -57,6 +61,18 @@ export default function Settings() {
   const [healthStatus, setHealthStatus] = useState<"idle" | "verified" | "failed">("idle");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  // Free-tier gating for the AI Provider and Voice Input Engine tabs.
+  const aiTabEnabled = useFeatureEnabled("ai_features");
+  const voiceTabEnabled = useFeatureEnabled("voice_recording");
+
+  // Bounce off a gated tab if the tier changes (e.g. a Pro subscription
+  // lapsing) while it's the active one, so the nav's disabled state never
+  // shows stale content still sitting behind it.
+  useEffect(() => {
+    if (!aiTabEnabled && activeTab === "ai") setActiveTab("preferences");
+    if (!voiceTabEnabled && activeTab === "voice") setActiveTab("preferences");
+  }, [aiTabEnabled, voiceTabEnabled, activeTab]);
 
   // Sync healthStatus with savedConfigStatus on mount or startup check completion
   useEffect(() => {
@@ -75,9 +91,6 @@ export default function Settings() {
     voiceCloudModel !== savedConfig.voiceCloudModel);
 
   // Mode-specific selection history to preserve UI selections on tab toggle
-  const [localProvider, setLocalProvider] = useState("gemini");
-  const [localModel, setLocalModel] = useState("gemini-1.5-flash-local");
-
   const [onlineProvider, setOnlineProvider] = useState("gemini");
   const [onlineModel, setOnlineModel] = useState("gemini-2.0-flash-exp");
 
@@ -89,9 +102,7 @@ export default function Settings() {
   const handleSetAiProvider = (val: string) => {
     setAiProvider(val);
     setSaved(false);
-    if (aiMode === "local") {
-      setLocalProvider(val);
-    } else if (aiMode === "online") {
+    if (aiMode === "online") {
       setOnlineProvider(val);
     } else if (aiMode === "byom") {
       setByomProvider(val);
@@ -101,9 +112,7 @@ export default function Settings() {
   const handleSetAiModel = (val: string) => {
     setAiModel(val);
     setSaved(false);
-    if (aiMode === "local") {
-      setLocalModel(val);
-    } else if (aiMode === "online") {
+    if (aiMode === "online") {
       setOnlineModel(val);
     } else if (aiMode === "byom") {
       setByomModel(val);
@@ -116,16 +125,6 @@ export default function Settings() {
     if (aiMode === "byom") {
       setByomApiKey(val);
     }
-  };
-
-  const handleSetVoiceEngine = (val: string) => {
-    setVoiceEngineState(val);
-    setSaved(false);
-  };
-
-  const handleSetVoiceModel = (val: string) => {
-    setVoiceModelState(val);
-    setSaved(false);
   };
 
   const handleSetVoiceCloudProvider = (val: string) => {
@@ -146,11 +145,7 @@ export default function Settings() {
   const handleSetAiMode = (mode: string) => {
     setAiMode(mode);
     setSaved(false);
-    if (mode === "local") {
-      setAiProvider(localProvider);
-      setAiModel(localModel);
-      setProviderApiKey("");
-    } else if (mode === "online") {
+    if (mode === "online") {
       setAiProvider(onlineProvider);
       setAiModel(onlineModel);
       setProviderApiKey("");
@@ -217,11 +212,21 @@ export default function Settings() {
       try {
         const res = await invoke<any>("get_ai_settings");
         if (res) {
-          const mode = res.ai_mode || "";
-          const provider = res.provider || "gemini";
-          const model = res.ai_model || "";
+          // Local mode is no longer selectable from Settings (AMI-65) -- a
+          // config saved before that change is displayed/compared here as
+          // "online" (remapping its local-only provider id to an online
+          // equivalent). The Rust backend still gets the raw value at
+          // startup via aiStore.ts::triggerGlobalHealthCheck, so an existing
+          // local-mode user's app keeps behaving exactly as before until
+          // they interact with Settings again.
+          const rawMode = res.ai_mode || "";
+          const mode = rawMode === "local" ? "online" : (rawMode || "online");
+          const rawProvider = res.provider || "gemini";
+          const localToOnlineProvider: Record<string, string> = { google: "gemini", microsoft: "openai", alibaba: "gemini" };
+          const provider = rawMode === "local" ? (localToOnlineProvider[rawProvider] || "gemini") : rawProvider;
+          const model = rawMode === "local" ? "" : (res.ai_model || "");
           const apiKey = res.api_key_enc || "";
-          const voiceEngineValue = res.voice_engine || "local";
+          const voiceEngineValue = res.voice_engine === "local" ? "cloud" : (res.voice_engine || "cloud");
           const voiceModelValue = res.voice_model || "whisper multilingual (small)";
           const voiceCloudProviderValue = res.voice_cloud_provider || "gemini";
           const voiceCloudApiKeyValue = res.voice_cloud_api_key || "";
@@ -249,10 +254,7 @@ export default function Settings() {
             voiceCloudModel: voiceCloudModelValue,
           });
 
-          if (mode === "local") {
-            setLocalProvider(provider);
-            setLocalModel(model);
-          } else if (mode === "online") {
+          if (mode === "online") {
             setOnlineProvider(provider);
             setOnlineModel(model);
           } else if (mode === "byom") {
@@ -448,10 +450,6 @@ export default function Settings() {
       case "voice":
         return (
           <SettingVoiceEngine
-            voiceEngine={voiceEngine}
-            setVoiceEngine={handleSetVoiceEngine}
-            voiceModel={voiceModel}
-            setVoiceModel={handleSetVoiceModel}
             voiceCloudProvider={voiceCloudProvider}
             setVoiceCloudProvider={handleSetVoiceCloudProvider}
             voiceCloudApiKey={voiceCloudApiKey}
@@ -511,7 +509,9 @@ export default function Settings() {
             setActiveHelp={setActiveHelp}
             setHealthCheckResult={setHealthCheckResult}
             t={t}
-            aiMode={aiMode}
+            aiMode={savedConfig?.aiMode || ""}
+            aiTabEnabled={aiTabEnabled}
+            voiceTabEnabled={voiceTabEnabled}
           />
 
           {/* Right Content Area */}
@@ -541,11 +541,7 @@ export default function Settings() {
                       />
                     )}
                     {activeHelp === "voice" && (
-                      <SettingVoiceEngineHelp
-                        onClose={() => setActiveHelp(null)}
-                        voiceEngine={voiceEngine}
-                        voiceModel={voiceModel}
-                      />
+                      <SettingVoiceEngineHelp onClose={() => setActiveHelp(null)} />
                     )}
                   </>
                 )}

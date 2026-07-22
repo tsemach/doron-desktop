@@ -3,6 +3,14 @@ import SettingMenuTabItem from "./SettingMenuTabItem";
 
 export type TabType = "preferences" | "email" | "ai" | "voice" | "update";
 
+function ProBadge() {
+  return (
+    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+      Pro
+    </span>
+  );
+}
+
 type SettingMenuTabProps = {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
@@ -10,6 +18,8 @@ type SettingMenuTabProps = {
   setHealthCheckResult: (result: any) => void;
   t: (key: any) => string;
   aiMode: string;
+  aiTabEnabled: boolean;
+  voiceTabEnabled: boolean;
 };
 
 export default function SettingMenuTab({
@@ -19,6 +29,8 @@ export default function SettingMenuTab({
   setHealthCheckResult,
   t,
   aiMode,
+  aiTabEnabled,
+  voiceTabEnabled,
 }: SettingMenuTabProps) {
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
@@ -34,22 +46,29 @@ export default function SettingMenuTab({
         icon={User}
         label={t("setting_system_preferences")}
       />
-      
+
       <SettingMenuTabItem
         isActive={activeTab === "ai"}
         onClick={() => handleTabChange("ai")}
         icon={Server}
         label="AI Provider (LLM)"
-        rightElement={aiMode ? (
-          <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="AI operational" />
-        ) : undefined}
+        disabled={!aiTabEnabled}
+        rightElement={
+          !aiTabEnabled ? (
+            <ProBadge />
+          ) : aiMode ? (
+            <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="AI operational" />
+          ) : undefined
+        }
       />
-      
+
       <SettingMenuTabItem
         isActive={activeTab === "voice"}
         onClick={() => handleTabChange("voice")}
         icon={Mic}
         label="Voice Input Engine"
+        disabled={!voiceTabEnabled}
+        rightElement={!voiceTabEnabled ? <ProBadge /> : undefined}
       />
 
       <SettingMenuTabItem

@@ -19,7 +19,8 @@ interface Template {
 
 export default function TemplatesPage() {
   const router = useRouter();
-  const [userName, setUserName] = useState<string>("User");
+  const [userName, setUserName] = useState<string | null>(null);
+  const [tier, setTier] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -38,10 +39,9 @@ export default function TemplatesPage() {
         const res = await fetch("/api/auth/session");
         if (res.ok) {
           const session = await res.json();
-          if (session?.user?.name) {
-            setUserName(session.user.name);
-          } else if (session?.user?.email) {
-            setUserName(session.user.email);
+          if (session?.user?.name || session?.user?.email) {
+            setUserName(session.user.name || session.user.email);
+            setTier(session.user.tier || "free");
           }
         }
       } catch (err) {
@@ -162,7 +162,7 @@ export default function TemplatesPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
-      <MainTopBar userName={userName} handleLogout={handleLogout} />
+      <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
       <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-10 flex flex-col gap-8">
         {/* Navigation & Title */}

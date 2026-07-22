@@ -220,6 +220,14 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
             username  TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS auth_session (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            token       TEXT NOT NULL,
+            email       TEXT NOT NULL,
+            tier        TEXT NOT NULL,
+            expires_at  TEXT NOT NULL
+        );
     ").map_err(|e| format!("[tags schema] {e}"))?;
 
     conn.execute_batch("

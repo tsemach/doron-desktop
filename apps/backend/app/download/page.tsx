@@ -13,6 +13,16 @@ export default function DownloadDashboard() {
     "https://github.com/tsemach/doron-desktop/releases/latest"
   );
   const [os, setOs] = React.useState<string>("Windows");
+  // Downloading no longer requires an account -- this page is public, so
+  // "signed in" is just one of the states it can be viewed in, not assumed.
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch("/api/auth/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((session) => setIsLoggedIn(!!(session?.user?.name || session?.user?.email)))
+      .catch(() => setIsLoggedIn(false));
+  }, []);
 
   React.useEffect(() => {
     // Detect OS on client mount
@@ -66,7 +76,7 @@ export default function DownloadDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: "/" });
   };
 
   return (
@@ -88,13 +98,15 @@ export default function DownloadDashboard() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Home
           </Link>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
+          {isLoggedIn && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          )}
         </div>
 
         {/* Branding & Status */}
@@ -113,7 +125,9 @@ export default function DownloadDashboard() {
         {/* Content */}
         <div className="border-t border-b border-slate-200/60 py-6 my-6 text-slate-600 space-y-3">
           <p className="text-sm">
-            Welcome! Your account session is active. You have authorized access to download the standalone client.
+            {isLoggedIn
+              ? "Welcome back! Download the standalone client below."
+              : "No account needed to download -- you'll sign in from inside the app."}
           </p>
           <div className="flex items-center justify-center gap-6 text-xs font-semibold text-slate-400">
             <span className="flex items-center gap-1">
