@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import MainTopBar from "@/components/main/MainTopBar";
@@ -59,6 +59,14 @@ export default function Home() {
       <main className="flex-grow w-full px-6 py-12 flex flex-col lg:flex-row gap-10 justify-between items-start">
         {/* Left Column: Hero & Product Description (2/3 width) */}
         <div className="lg:w-2/3 max-w-4xl flex flex-col justify-start space-y-6 ml-12">
+          <Link
+            href="/templates"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 w-fit"
+          >
+            <FileText className="w-4 h-4" />
+            Templates
+          </Link>
+
           {MainHelpFeatureSelected === "central-working-space" && <MainHelpCentralWorkingSpace />}
           {MainHelpFeatureSelected === "case-management-tracking" && <MainHelpCaseManagementAndTraking />}
           {MainHelpFeatureSelected === "ai-document-indexing" && <MainHelpDocumentIndexing />}

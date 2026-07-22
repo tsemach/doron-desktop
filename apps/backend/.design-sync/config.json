@@ -1,0 +1,37 @@
+{
+  "projectId": "18ae1faa-1597-4d0e-9060-66e9587562fe",
+  "pkg": "backend",
+  "globalName": "AmicusBackend",
+  "shape": "package",
+  "componentSrcMap": {
+    "AuthSessionProvider": null,
+    "Button": "../../packages/ui/src/components/button.tsx",
+    "ConfirmDialog": "components/ConfirmDialog.tsx",
+    "AuthCard": "components/auth/AuthCard.tsx",
+    "PasswordInput": "components/auth/PasswordInput.tsx",
+    "MainTopBar": "components/main/MainTopBar.tsx",
+    "MainTopBarUser": "components/main/MainTopBarUser.tsx",
+    "MainTopBarLogo": "components/main/MainTopBarLogo.tsx",
+    "MainFeatureList": "components/main/MainFeatureList.tsx",
+    "MainHelpCaseManagementAndTraking": "components/main/MainHelpCaseManagementAndTraking.tsx",
+    "MainHelpCentralWorkingSpace": "components/main/MainHelpCentralWorkingSpace.tsx",
+    "MainHelpDocumentIndexing": "components/main/MainHelpDocumentIndexing.tsx",
+    "MainHelpDocumentTagsAndNotes": "components/main/MainHelpDocumentTagsAndNotes.tsx",
+    "MainHelpEmailCorrespondencesSync": "components/main/MainHelpEmailCorrespondencesSync.tsx",
+    "MainHelpFullTextSearch": "components/main/MainHelpFullTextSearch.tsx"
+  },
+  "extraEntries": ["@workspace/ui"],
+  "storyImports": { "bundle": ["@workspace/ui"] },
+  "libOverrides": {
+    "source-kit.mjs": "components use `export default function X()` (export * drops defaults) and the stock synth entry sweeps ALL of components/**, which pulled in excluded AuthSessionProvider.tsx (imports next-auth, crashes the bundle on process.env at module scope). Fork builds the entry only from componentSrcMap's explicit pins, with a default re-export per pin.",
+    "bundle.mjs": "next/link (used by MainTopBar/MainFeatureList/etc) reads process.env.__NEXT_* flags at module scope; the stock define only covers process.env.NODE_ENV, leaving a bare `process` reference that threw ReferenceError in every preview. Fork widens the define to shim the whole `process` identifier.",
+    "previews.mjs": "same next/link process.env.__NEXT_* issue as bundle.mjs, but the per-component preview compile is a separate esbuild call with its own narrow define — MainTopBarDownload's preview (imports next/link directly) still crashed after bundle.mjs was fixed. Fork mirrors the same define additions here."
+  },
+  "srcDir": "components",
+  "overrides": {
+    "ConfirmDialog": { "cardMode": "single", "viewport": "480x360" }
+  },
+  "cssEntry": "./.ds-sync/compiled.css",
+  "tsconfig": "./tsconfig.json",
+  "readmeHeader": ".design-sync/conventions.md"
+}
