@@ -36,6 +36,8 @@ interface AuthorizedSession {
   tier: "free" | "pro";
 }
 
+type RequestValidationResult = { value: ValidatedRequest } | { error: string };
+
 export async function POST(request: Request): Promise<Response> {
   const rawBody = (await request.json().catch(() => null)) as CompleteRequestBody | null;
 
@@ -73,9 +75,7 @@ export async function POST(request: Request): Promise<Response> {
 
 // ── Request validation ──────────────────────────────────────────────────
 
-function validateRequestBody(
-  body: CompleteRequestBody | null
-): { value: ValidatedRequest } | { error: string } {
+function validateRequestBody(body: CompleteRequestBody | null): RequestValidationResult {
   if (!body) return { error: "Invalid request body" };
   const { token, prompt, system, provider, model, structured } = body;
   if (!token) return { error: "Missing token" };
