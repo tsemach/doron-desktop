@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Check, Activity } from "lucide-react";
 import { AUDIO_CAPABLE_PROVIDERS } from "@/lib/voiceCapability";
@@ -62,9 +62,20 @@ export default function SettingVoiceEngine({
   // shown. Voice has no separate "managed key" mode to switch to/from --
   // this is a plain visibility toggle, not a real settings change -- so it
   // auto-shows once a key is already saved (async-loaded), independent of
-  // whether the user has clicked it this session.
+  // whether the user has clicked it this session. That auto-open must fire
+  // only once: ORing byomOpen with "a key is saved" on every render (the
+  // previous approach) makes the field impossible to manually collapse once
+  // a key exists, since the OR re-asserts true right after the toggle sets
+  // byomOpen to false.
   const [byomOpen, setByomOpen] = useState(false);
-  const showApiKeyField = byomOpen || !!voiceCloudApiKey.trim();
+  const hasAutoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (voiceCloudApiKey.trim() && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      setByomOpen(true);
+    }
+  }, [voiceCloudApiKey]);
+  const showApiKeyField = byomOpen;
 
   function handleVoiceCloudProviderChange(provider: string) {
     setVoiceCloudProvider(provider);
@@ -72,15 +83,19 @@ export default function SettingVoiceEngine({
   }
 
   // Pings the actual configured voice-cloud provider (not the main AI
-  // Provider config) — reuses check_ai_health's existing non-local branch,
-  // which does a real call_simple ping when ai_mode != "local".
+  // Provider config) — reuses check_ai_health's existing non-local branch.
+  // Mode mirrors AI Provider's own toggle (SettingAiProvider.tsx): BYOM
+  // only when that panel is actually open, "online" (backend-proxied)
+  // otherwise -- byomOpen isn't just visual here, it's the same real
+  // mode switch AI Provider's link performs via setAiMode.
   async function handleVoiceCloudHealthCheck() {
     setCheckingCloudHealth(true);
     setHealthCheckResult(null);
+    const mode = byomOpen ? "byom" : "online";
     try {
       const response = await invoke<string>("check_ai_health", {
         config: {
-          ai_mode: "byom",
+          ai_mode: mode,
           provider: voiceCloudProvider,
           ai_model: voiceCloudModel,
           api_key_enc: voiceCloudApiKey,
@@ -91,15 +106,17 @@ export default function SettingVoiceEngine({
         message: response,
         modelName: voiceCloudModel,
         providerName: voiceCloudProvider,
-        mode: "byom",
+        mode,
       });
     } catch (err: any) {
+      const message = err.toString();
       setHealthCheckResult({
         success: false,
-        message: err.toString(),
+        message,
         modelName: voiceCloudModel,
         providerName: voiceCloudProvider,
-        mode: "byom",
+        mode,
+        quotaExceeded: message.startsWith("QUOTA_EXCEEDED:"),
       });
     } finally {
       setCheckingCloudHealth(false);
@@ -204,7 +221,7 @@ export default function SettingVoiceEngine({
         <div className="pt-1">
           <SettingByomLink
             isActive={showApiKeyField}
-            onClick={() => setByomOpen(!showApiKeyField)}
+            onClick={() => setByomOpen(!byomOpen)}
           />
 
           {showApiKeyField && (
@@ -231,7 +248,7 @@ export default function SettingVoiceEngine({
           <button
             type="button"
             onClick={handleVoiceCloudHealthCheck}
-            disabled={checkingCloudHealth || !voiceCloudApiKey.trim()}
+            disabled={checkingCloudHealth || (byomOpen && !voiceCloudApiKey.trim())}
             className="flex items-center gap-1.5 px-4 py-2 border border-border bg-background hover:bg-accent disabled:opacity-50 text-foreground text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
           >
             {checkingCloudHealth ? (
