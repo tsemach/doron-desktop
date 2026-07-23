@@ -1,4 +1,4 @@
-import { LogOut, Settings, User, FileText } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -9,6 +9,12 @@ type MainTopBarUserProps = {
   tier?: string | null;
   handleLogout: () => void;
 }
+
+const TIER_LABELS: Record<string, string> = {
+  free: "Free",
+  pro: "Pro",
+  ultra: "Ultra",
+};
 
 export default function MainTopBarUser({ userName, tier, handleLogout }: MainTopBarUserProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -31,24 +37,27 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
     return (
       <Link
         href="/login"
-        className="text-sm font-semibold text-teal-200 hover:text-white transition-colors cursor-pointer"
+        className="text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
       >
         Log in
       </Link>
     );
   }
 
+  const tierLabel = TIER_LABELS[tier ?? "free"] ?? "Free";
+  const isUpgradeable = tier !== "pro" && tier !== "ultra";
+
   return (
     <div className="flex items-center gap-3">
 
-      <span className="text-sm font-semibold text-teal-200 select-none">
-        {userName} <span className="text-teal-400">({tier === "pro" ? "PRO" : "FREE"})</span>
+      <span className="text-sm font-semibold text-foreground select-none">
+        {userName} <span className="text-muted-foreground">({tierLabel})</span>
       </span>
 
-      {tier !== "pro" && (
+      {isUpgradeable && (
         <Link
           href="/register/plan"
-          className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-teal-400 text-teal-950 hover:bg-teal-300 transition-colors cursor-pointer"
+          className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
         >
           Upgrade
         </Link>
@@ -57,25 +66,17 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
       <div className="relative w-fit" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex items-center justify-center w-9 h-9 rounded-full border border-teal-900 hover:border-teal-700 bg-teal-900/40 text-teal-200 hover:text-white transition-all cursor-pointer"
+          className="flex items-center justify-center w-9 h-9 rounded-full border border-border hover:border-foreground/30 bg-muted/60 text-foreground hover:text-foreground transition-all cursor-pointer"
         >
           <User className="w-4 h-4" />
         </button>
 
         {dropdownOpen && (
-          <div className="absolute right-[-18px] mt-2 w-28 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50">
-          <Link
-            href="/templates"
-            onClick={() => setDropdownOpen(false)}
-            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Templates
-          </Link>
+          <div className="absolute right-[-18px] mt-2 w-28 bg-popover border border-border rounded-lg shadow-lg py-1 z-50">
           <Link
             href="/profile"
             onClick={() => setDropdownOpen(false)}
-            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/60 flex items-center gap-2 cursor-pointer"
           >
             <User className="w-3.5 h-3.5" />
             Profile
@@ -85,15 +86,15 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
               setDropdownOpen(false);
               alert("Settings page coming soon!");
             }}
-            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/60 flex items-center gap-2 cursor-pointer"
           >
             <Settings className="w-3.5 h-3.5" />
             Settings
           </button>
-          <div className="border-t border-slate-100 my-1"></div>
+          <div className="border-t border-border my-1"></div>
           <button
             onClick={handleLogout}
-            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 flex items-center gap-2 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             Logout
