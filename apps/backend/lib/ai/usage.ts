@@ -64,6 +64,29 @@ export async function recordUsage(userId: string, costCents: number): Promise<vo
     });
 }
 
+/**
+ * Grants a fresh quota for the user's current billing period -- called on
+ * payment confirmation (today: the mock checkout webhook fired once at
+ * registration; later: every real recurring subscription charge), not on
+ * every AI request. Ties quota renewal to actual payment success rather
+ * than to the UTC calendar month rolling over on its own: without this, a
+ * lapsed/failed real subscription would still silently regain a full
+ * budget the moment a new month starts, since recordUsage's upsert
+ * defaults an unseen (userId, billingPeriod) pair to a fresh 0 automatically.
+ * Unlike recordUsage's increment-on-conflict, this is a hard reset to 0 --
+ * it intentionally discards whatever was already spent this period.
+ */
+export async function resetCurrentPeriodUsage(userId: string): Promise<void> {
+  const period = currentBillingPeriod();
+  await db
+    .insert(aiUsagePeriods)
+    .values({ userId, billingPeriod: period, costCents: 0 })
+    .onConflictDoUpdate({
+      target: [aiUsagePeriods.userId, aiUsagePeriods.billingPeriod],
+      set: { costCents: 0, updatedAt: new Date() },
+    });
+}
+
 export interface RecordAiRequestInput {
   userId: string;
   conversationId?: string | null;
