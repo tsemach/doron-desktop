@@ -29,7 +29,7 @@ vi.mock("./plans", () => ({
   getPlanForTier: mockGetPlanForTier,
 }));
 
-import { checkQuota, getCurrentPeriodSpendCents, recordAiRequest, recordUsage } from "./usage";
+import { checkQuota, getCurrentPeriodSpendCents, recordAiRequest, recordUsage, resetCurrentPeriodUsage } from "./usage";
 
 describe("usage service", () => {
   beforeEach(() => {
@@ -82,6 +82,16 @@ describe("usage service", () => {
       await recordUsage("user-1", 42);
       expect(mockInsertValues).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", costCents: 42 }));
       expect(mockOnConflictDoUpdate).toHaveBeenCalled();
+    });
+  });
+
+  describe("resetCurrentPeriodUsage", () => {
+    it("upserts the current period's cost to 0, not an increment", async () => {
+      await resetCurrentPeriodUsage("user-1");
+      expect(mockInsertValues).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", costCents: 0 }));
+      expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ set: expect.objectContaining({ costCents: 0 }) })
+      );
     });
   });
 

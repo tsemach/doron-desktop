@@ -8,7 +8,11 @@
 // streamText() with an arbitrary model string.
 //
 // Model ids below mirror apps/desktop/src/components/Settings/SettingAiProvider.tsx's
-// online model lists, post-normalization.
+// online model lists, plus SettingVoiceEngine.tsx's separate voice-cloud
+// model lists (VOICE_CLOUD_MODELS) -- voice's health check and
+// transcription route through this same /api/v1/ai/complete-adjacent
+// online-mode path (check_ai_health) with its own provider/model
+// selection, independent of the main AI Provider config.
 
 const GATEWAY_NAMESPACE: Record<string, string> = {
   claude: "anthropic",
@@ -20,8 +24,8 @@ const GATEWAY_NAMESPACE: Record<string, string> = {
 
 const MODELS_BY_NAMESPACE: Record<string, string[]> = {
   anthropic: ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
-  google: ["gemini-1.5-pro", "gemini-2.0-flash-exp"],
-  openai: ["gpt-4o", "o1-mini"],
+  google: ["gemini-1.5-pro", "gemini-2.0-flash-exp", "gemini-3.1-flash-lite", "gemini-3.5-flash"],
+  openai: ["gpt-4o", "o1-mini", "gpt-4o-mini", "gpt-5.6-luna", "gpt-5.6-terra"],
 };
 
 /**

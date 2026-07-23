@@ -1,4 +1,4 @@
-import { APICallError, streamText } from "ai";
+import { streamText } from "ai";
 import { eq } from "drizzle-orm";
 import { db } from "../../../../../database";
 import { desktopSessions, users } from "../../../../../database/schema";
@@ -13,6 +13,14 @@ import { checkQuota, recordAiRequest, recordUsage } from "../../../../../lib/ai/
 const STRUCTURED_INSTRUCTION =
   "IMPORTANT: Your response must be ONLY valid JSON. Do not include markdown code fences or explanatory text. Start directly with { and end with }.";
 
+// Must match ai_requests.purpose's enum in apps/backend/database/schema.ts.
+const VALID_PURPOSES = ["chat", "email_classification", "field_extraction", "doc_indexing", "query_analysis"] as const;
+type Purpose = (typeof VALID_PURPOSES)[number];
+
+function resolvePurpose(purpose: string | undefined): Purpose {
+  return (VALID_PURPOSES as readonly string[]).includes(purpose ?? "") ? (purpose as Purpose) : "chat";
+}
+
 interface CompleteRequestBody {
   token?: string;
   prompt?: string;
@@ -20,6 +28,7 @@ interface CompleteRequestBody {
   provider?: string;
   model?: string;
   structured?: boolean;
+  purpose?: string;
 }
 
 interface ValidatedRequest {
@@ -29,6 +38,7 @@ interface ValidatedRequest {
   provider: string;
   model: string;
   structured?: boolean;
+  purpose: Purpose;
 }
 
 interface AuthorizedSession {
@@ -45,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
   if ("error" in validation) {
     return Response.json({ error: validation.error }, { status: 400 });
   }
-  const { token, prompt, system, provider, model, structured } = validation.value;
+  const { token, prompt, system, provider, model, structured, purpose } = validation.value;
 
   const authorization = await authorizeRequest(token);
   if ("error" in authorization) {
@@ -70,28 +80,19 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const effectiveSystem = buildEffectiveSystem(system, structured);
-  return streamCompletion(session, gatewayModel, prompt, effectiveSystem);
+  return streamCompletion(session, gatewayModel, prompt, effectiveSystem, purpose);
 }
 
 // ── Request validation ──────────────────────────────────────────────────
 
 function validateRequestBody(body: CompleteRequestBody | null): RequestValidationResult {
-  if (!body) return { 
-    error: "Invalid request body" 
-  };
-  const { token, prompt, system, provider, model, structured } = body;
-  
-  if (!token) return { 
-    error: "Missing token" 
-  };
-  
-  if (!prompt || !provider || !model) return { 
-    error: "Missing prompt, provider, or model" 
-  };
-  
-  return { 
-    value: { token, prompt, system, provider, model, structured } 
-  };
+  if (!body) return { error: "Invalid request body" };
+  const { token, prompt, system, provider, model, structured, purpose } = body;
+
+  if (!token) return { error: "Missing token" };
+  if (!prompt || !provider || !model) return { error: "Missing prompt, provider, or model" };
+
+  return { value: { token, prompt, system, provider, model, structured, purpose: resolvePurpose(purpose) } };
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────
@@ -160,7 +161,8 @@ function streamCompletion(
   session: AuthorizedSession,
   gatewayModel: string,
   prompt: string,
-  effectiveSystem: string | undefined
+  effectiveSystem: string | undefined,
+  purpose: Purpose
 ): Response {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -169,13 +171,13 @@ function streamCompletion(
 
       try {
         const result = streamText({ model: gatewayModel, prompt, system: effectiveSystem });
-        await translateStreamToNdjson(result, state, session, gatewayModel, prompt, enqueue);
+        await translateStreamToNdjson(result, state, session, gatewayModel, prompt, purpose, enqueue);
       } catch (err) {
         // Errors that abort the stream outright (network failures before
         // any part arrives) rather than surfacing as an in-band 'error'
         // part -- result.stream's own docs: "Only errors that stop the
         // stream, such as network errors, are thrown."
-        await handleStreamError(err, session.userId, gatewayModel, prompt, state.deltaSent, enqueue);
+        await handleStreamError(err, session.userId, gatewayModel, prompt, purpose, state.deltaSent, enqueue);
       } finally {
         controller.close();
       }
@@ -191,6 +193,7 @@ async function translateStreamToNdjson(
   session: AuthorizedSession,
   gatewayModel: string,
   prompt: string,
+  purpose: Purpose,
   enqueue: (obj: unknown) => void
 ): Promise<void> {
   let responseText = "";
@@ -201,9 +204,9 @@ async function translateStreamToNdjson(
       responseText += part.text;
       enqueue({ type: "delta", text: part.text });
     } else if (part.type === "finish") {
-      await recordFinish(part.finishReason, part.totalUsage, session, gatewayModel, prompt, responseText, enqueue);
+      await recordFinish(part.finishReason, part.totalUsage, session, gatewayModel, prompt, purpose, responseText, enqueue);
     } else if (part.type === "error") {
-      await handleStreamError(part.error, session.userId, gatewayModel, prompt, state.deltaSent, enqueue);
+      await handleStreamError(part.error, session.userId, gatewayModel, prompt, purpose, state.deltaSent, enqueue);
       break; // nothing more will usefully follow an error part
     }
   }
@@ -215,6 +218,7 @@ async function recordFinish(
   session: AuthorizedSession,
   gatewayModel: string,
   prompt: string,
+  purpose: Purpose,
   responseText: string,
   enqueue: (obj: unknown) => void
 ): Promise<void> {
@@ -225,7 +229,7 @@ async function recordFinish(
   await recordUsage(session.userId, costCents);
   await recordAiRequest({
     userId: session.userId,
-    purpose: "chat",
+    purpose,
     model: gatewayModel,
     prompt,
     response: responseText,
@@ -238,24 +242,54 @@ async function recordFinish(
   enqueue({ type: "done", finishReason, usage: { inputTokens, outputTokens } });
 }
 
+interface ApiErrorLike {
+  statusCode?: number;
+  isRetryable?: boolean;
+  responseHeaders?: Record<string, string>;
+}
+
+function isApiErrorLike(error: unknown): error is ApiErrorLike {
+  return typeof error === "object" && error !== null && ("statusCode" in error || "isRetryable" in error);
+}
+
+// Static, support-friendly text per error code -- never the raw
+// provider/Gateway error string. That string can carry operational details
+// (e.g. "AI Gateway requires a valid credit card on file...") that are
+// Amicus's problem to fix, not something to show a paying end user; the
+// raw error is logged server-side instead (see console.error below).
+const GENERIC_ERROR_MESSAGES: Record<"rate_limited" | "provider_error", string> = {
+  rate_limited: "The AI service is temporarily busy. Please try again shortly.",
+  provider_error: "The AI request failed. Please try again, or contact support if this keeps happening.",
+};
+
 async function handleStreamError(
   error: unknown,
   userId: string,
   gatewayModel: string,
   prompt: string,
+  purpose: Purpose,
   partial: boolean,
   enqueue: (obj: unknown) => void
 ): Promise<void> {
-  const isApiError = APICallError.isInstance(error);
-  const statusCode = isApiError ? error.statusCode : undefined;
+  console.error("AI completion stream error:", error);
+
+  // Some AI SDK error classes (e.g. @ai-sdk/gateway's
+  // GatewayInternalServerError, thrown for a 403 "credit card required on
+  // the Gateway account" failure) aren't branded as an APICallError --
+  // APICallError.isInstance(error) is false for them -- but they do carry
+  // the same statusCode/isRetryable/responseHeaders fields as real own
+  // properties, so duck-type instead of brand-checking.
+  const apiError = isApiErrorLike(error) ? error : undefined;
+
+  const statusCode = apiError?.statusCode;
   const code = statusCode === 429 ? "rate_limited" : "provider_error";
   // Default to retryable when the error shape is unrecognized -- a
   // transient/unknown failure should offer retry, not silently assume
   // it's permanent.
-  const retryable = isApiError ? error.isRetryable : true;
-  const retryAfterHeader = isApiError ? error.responseHeaders?.["retry-after"] : undefined;
+  const retryable = apiError ? apiError.isRetryable !== false : true;
+  const retryAfterHeader = apiError?.responseHeaders?.["retry-after"];
   const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) || undefined : undefined;
-  const message = isApiError ? error.message : "The AI provider request failed.";
+  const message = GENERIC_ERROR_MESSAGES[code];
 
   enqueue({
     type: "error",
@@ -276,7 +310,7 @@ async function handleStreamError(
   // error part). The outcome is still logged for support/audit purposes.
   await recordAiRequest({
     userId,
-    purpose: "chat",
+    purpose,
     model: gatewayModel,
     prompt,
     errorCode: code,
