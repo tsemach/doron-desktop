@@ -74,11 +74,6 @@ pnpm install
    ```bash
    pnpm db:push
    ```
-6. Seed the local dev admin account (idempotent — safe to re-run):
-   ```bash
-   pnpm db:seed
-   ```
-   Credentials: `admin@admin.com` / `admin`
 
 ---
 
