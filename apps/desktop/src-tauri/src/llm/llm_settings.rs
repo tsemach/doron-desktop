@@ -255,7 +255,19 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
             Ok(format!("Connection successful! Response: '{}'", res.trim()))
         }
         Ok(Err(e)) => {
-            Err(format!("Connection failed: {e}"))
+            // BackendOnlineProvider prefixes online-mode failures with a
+            // stable code (QUOTA_EXCEEDED:/RATE_LIMITED:/PROVIDER_ERROR:,
+            // see llm_provider_backend_online.rs) that the frontend
+            // pattern-matches on (SettingAiProvider.tsx's handleHealthCheck).
+            // Wrapping it in "Connection failed: " would push that prefix
+            // off the front of the string and break the match -- only wrap
+            // BYOM/local's raw, uncoded connection errors.
+            const KNOWN_CODES: [&str; 3] = ["QUOTA_EXCEEDED:", "RATE_LIMITED:", "PROVIDER_ERROR:"];
+            if KNOWN_CODES.iter().any(|code| e.starts_with(code)) {
+                Err(e)
+            } else {
+                Err(format!("Connection failed: {e}"))
+            }
         }
         Err(_) => {
             Err("Connection timed out after 10 seconds. The model might still be loading or warming up in memory.".to_string())

@@ -5,6 +5,12 @@ use tauri::{AppHandle, Emitter};
 
 static SHOULD_STOP_INDEXING: AtomicBool = AtomicBool::new(false);
 
+// Matches query/mod.rs::USE_FTS_ONLY's precedent -- a hardcoded,
+// developer-flippable constant, not a settings-UI toggle. Default true
+// (heuristic-only) keeps indexing free of any LLM cost, including cost
+// through the backend proxy, until deliberately flipped.
+pub const USE_HEURISTIC_METADATA_ONLY: bool = true;
+
 #[tauri::command]
 pub fn stop_indexing() {
     SHOULD_STOP_INDEXING.store(true, Ordering::SeqCst);
@@ -296,15 +302,11 @@ pub async fn index_file(
     // Set up provider configuration
     let provider = crate::llm::load_active_provider(&app, api_key, Some(model), "doc_indexing")?;
 
-    let is_local = match &provider {
-        LlmProvider::Local(_) => true,
-        _ => false,
-    };
-    // Free tier falls back to extract_heuristic_metadata below, same as
-    // local mode already does -- indexing itself stays free (PRD 5.5),
-    // only the LLM-based extraction step is Pro-gated (PLAN.md Phase 3).
+    // Free tier falls back to extract_heuristic_metadata below -- indexing
+    // itself stays free (PRD 5.5), only the LLM-based extraction step is
+    // Pro-gated (PLAN.md Phase 3).
     let options = IndexOptions {
-        run_llm_metadata: !is_local && crate::auth::is_pro_tier(&app),
+        run_llm_metadata: !USE_HEURISTIC_METADATA_ONLY && crate::auth::is_pro_tier(&app),
         run_vector_embeddings: true,
     };
 
@@ -361,18 +363,14 @@ pub async fn index_folder(
     // Set up provider configuration
     let provider = crate::llm::load_active_provider(&app, api_key, Some(model), "doc_indexing")?;
 
-    let is_local = match &provider {
-        LlmProvider::Local(_) => true,
-        _ => false,
-    };
-    // Free tier falls back to extract_heuristic_metadata below, same as
-    // local mode already does -- indexing itself stays free (PRD 5.5),
-    // only the LLM-based extraction step is Pro-gated (PLAN.md Phase 3).
+    // Free tier falls back to extract_heuristic_metadata below -- indexing
+    // itself stays free (PRD 5.5), only the LLM-based extraction step is
+    // Pro-gated (PLAN.md Phase 3).
     let options = IndexOptions {
-        run_llm_metadata: !is_local && crate::auth::is_pro_tier(&app),
+        run_llm_metadata: !USE_HEURISTIC_METADATA_ONLY && crate::auth::is_pro_tier(&app),
         run_vector_embeddings: true,
     };
-    
+
     let db_path = store::db_path(&app);
     let db_conn = store::open_db_by_path(&db_path).ok();
     
