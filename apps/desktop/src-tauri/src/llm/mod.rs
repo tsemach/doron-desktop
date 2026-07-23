@@ -5,6 +5,7 @@ pub mod sidecar;
 pub mod whisper_local;
 pub mod cloud_transcribe;
 pub mod field_extraction;
+pub mod backend_stream;
 
 pub use llm_settings::*;
 pub use llm_local_mode::*;

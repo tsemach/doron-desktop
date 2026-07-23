@@ -31,10 +31,12 @@ export type QuotaCheckResult = { ok: true } | { ok: false; budgetCents: number; 
  */
 export async function checkQuota(userId: string, tier: "free" | "pro"): Promise<QuotaCheckResult> {
   const plan = await getPlanForTier(tier);
+
   if (!plan) {
     // No plan row (e.g. "free") means not entitled to cloud AI at all.
     return { ok: false, budgetCents: 0, spentCents: 0 };
   }
+  
   const spentCents = await getCurrentPeriodSpendCents(userId);
   if (spentCents >= plan.monthlyBudgetCents) {
     return { ok: false, budgetCents: plan.monthlyBudgetCents, spentCents };
@@ -59,6 +61,29 @@ export async function recordUsage(userId: string, costCents: number): Promise<vo
         costCents: sql`${aiUsagePeriods.costCents} + ${costCents}`,
         updatedAt: new Date(),
       },
+    });
+}
+
+/**
+ * Grants a fresh quota for the user's current billing period -- called on
+ * payment confirmation (today: the mock checkout webhook fired once at
+ * registration; later: every real recurring subscription charge), not on
+ * every AI request. Ties quota renewal to actual payment success rather
+ * than to the UTC calendar month rolling over on its own: without this, a
+ * lapsed/failed real subscription would still silently regain a full
+ * budget the moment a new month starts, since recordUsage's upsert
+ * defaults an unseen (userId, billingPeriod) pair to a fresh 0 automatically.
+ * Unlike recordUsage's increment-on-conflict, this is a hard reset to 0 --
+ * it intentionally discards whatever was already spent this period.
+ */
+export async function resetCurrentPeriodUsage(userId: string): Promise<void> {
+  const period = currentBillingPeriod();
+  await db
+    .insert(aiUsagePeriods)
+    .values({ userId, billingPeriod: period, costCents: 0 })
+    .onConflictDoUpdate({
+      target: [aiUsagePeriods.userId, aiUsagePeriods.billingPeriod],
+      set: { costCents: 0, updatedAt: new Date() },
     });
 }
 
