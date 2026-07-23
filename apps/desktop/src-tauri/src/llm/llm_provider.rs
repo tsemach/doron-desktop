@@ -8,12 +8,15 @@ pub mod llm_provider_entropic;
 pub mod llm_provider_mock;
 #[path = "llm_provider_local.rs"]
 pub mod llm_provider_local;
+#[path = "llm_provider_backend_online.rs"]
+pub mod llm_provider_backend_online;
 
 pub use llm_provider_gemini::GeminiProvider;
 pub use llm_provider_openai::OpenAiProvider;
 pub use llm_provider_entropic::ClaudeProvider;
 pub use llm_provider_mock::MockProvider;
 pub use llm_provider_local::LocalProvider;
+pub use llm_provider_backend_online::BackendOnlineProvider;
 
 pub enum LlmProvider {
     Claude(ClaudeProvider),
