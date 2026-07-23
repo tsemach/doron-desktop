@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, primaryKey, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, primaryKey, uuid, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 export const users = pgTable("users", {
@@ -91,5 +91,73 @@ export const documentTemplates = pgTable("document_templates", {
   language: text("language").notNull(), // 'en' or 'he'
   fileSize: integer("file_size").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Per-tier monthly AI budget, backing the online-AI quota check in
+// lib/ai/usage.ts. A DB table (not a code constant) deliberately -- the
+// budget must be adjustable without a redeploy. No row for 'free': the
+// usage service treats a missing plan as "not entitled to cloud AI", not a
+// $0 budget (see docs/ai-online-proxy).
+export const plans = pgTable("plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tier: text("tier", { enum: ["free", "pro"] }).unique().notNull(),
+  monthlyBudgetCents: integer("monthly_budget_cents").notNull(),
+  gatewayRateLimitTier: text("gateway_rate_limit_tier"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Running per-user, per-billing-period spend against a plan's budget --
+// the fast pre-request quota check. Kept as a rollup separate from the
+// ai_requests detail log below so the hot-path check never needs to SUM()
+// across every request. billingPeriod is a UTC calendar month ("2026-07"),
+// not a subscription-anniversary period -- there's no real billing engine
+// yet, so this is a deliberate simplification.
+export const aiUsagePeriods = pgTable(
+  "ai_usage_periods",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    billingPeriod: text("billing_period").notNull(),
+    costCents: integer("cost_cents").default(0).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("ai_usage_periods_user_period_idx").on(t.userId, t.billingPeriod)]
+);
+
+// One row per backend-proxied AI call (the /api/v1/ai/complete route) --
+// prompt, response, cost, and outcome, for support/billing observability
+// beyond what the AI Gateway dashboard provides. conversationId groups
+// multi-turn exchanges for a future interactive surface; today's
+// single-shot callers (indexing, classification, extraction) leave it
+// null. Retention/redaction policy for prompt/response is intentionally
+// not implemented here -- see docs/ai-online-proxy/ai_online_proxy_architecture.md §9.
+export const aiRequests = pgTable("ai_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  conversationId: uuid("conversation_id"),
+  purpose: text("purpose", {
+    enum: ["chat", "email_classification", "field_extraction", "doc_indexing", "query_analysis"],
+  }).notNull(),
+  model: text("model").notNull(),
+  // jsonb, not text -- today this holds a single string, but a future
+  // multi-turn/tool-calling surface needs it to hold a full turn array
+  // (e.g. AI SDK's ModelMessage[] shape: role + text/tool-call/tool-result
+  // blocks), which text can't represent. jsonb stores either shape as-is,
+  // with no migration needed when that day comes.
+  prompt: jsonb("prompt"),
+  response: jsonb("response"),
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  costCents: integer("cost_cents"),
+  finishReason: text("finish_reason"),
+  errorCode: text("error_code", {
+    enum: ["rate_limited", "quota_exceeded", "provider_error"],
+  }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
