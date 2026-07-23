@@ -21,8 +21,6 @@ pub struct Case {
     pub folder: Option<String>,
     pub notes: Option<String>,
     pub tags: Vec<Tag>,
-    #[serde(default)]
-    pub fields: std::collections::HashMap<String, String>,
 }
 
 #[tauri::command]
@@ -49,7 +47,6 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
             folder: row.get(6)?,
             notes: row.get(7)?,
             tags: Vec::new(),
-            fields: std::collections::HashMap::new(),
         })
     }).map_err(|e| e.to_string())?;
 
@@ -69,34 +66,7 @@ pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
             .collect();
     }
 
-    let mut all_fields = load_all_case_fields(&conn)?;
-    for case in list.iter_mut() {
-        case.fields = all_fields.remove(&case.id).unwrap_or_default();
-    }
-
     Ok(list)
-}
-
-fn load_all_case_fields(
-    conn: &rusqlite::Connection,
-) -> Result<std::collections::HashMap<i64, std::collections::HashMap<String, String>>, String> {
-    let mut stmt = conn
-        .prepare("SELECT case_id, field_name, field_value FROM case_fields")
-        .map_err(|e| e.to_string())?;
-
-    let rows = stmt
-        .query_map([], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
-        })
-        .map_err(|e| e.to_string())?;
-
-    let mut by_case: std::collections::HashMap<i64, std::collections::HashMap<String, String>> =
-        std::collections::HashMap::new();
-    for row in rows {
-        let (case_id, name, value) = row.map_err(|e| e.to_string())?;
-        by_case.entry(case_id).or_default().insert(name, value);
-    }
-    Ok(by_case)
 }
 
 #[tauri::command]
@@ -115,7 +85,7 @@ pub fn add_case(
     ).map_err(|e| format!("[insert case] {e}"))?;
     let id = conn.last_insert_rowid();
     let case_id_tag = upsert_tag_internal(&app, TagScope::Case(id), "case_id", Some(&id.to_string()), TagType::System)?;
-    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder, notes: None, tags: vec![case_id_tag], fields: std::collections::HashMap::new() })
+    Ok(Case { id, subject: Some(subject), status, name, created_at, updated_at: None, folder, notes: None, tags: vec![case_id_tag] })
 }
 
 #[tauri::command]
@@ -278,7 +248,6 @@ pub async fn create_new_case(
         folder: Some(folder),
         notes: None,
         tags: vec![case_id_tag],
-        fields: field_values,
     })
 }
 
