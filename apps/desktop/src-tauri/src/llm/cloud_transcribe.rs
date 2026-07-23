@@ -21,6 +21,9 @@ async fn transcribe_via_provider(provider: LlmProvider, audio_bytes: Vec<u8>, la
             "Voice input isn't supported for the local text-chat model. Switch your AI provider to Gemini or OpenAI, or use the local voice engine instead.".to_string(),
         ),
         LlmProvider::Mock(_) => Err("Voice input isn't supported in mock mode.".to_string()),
+        LlmProvider::BackendOnline(_) => Err(
+            "Voice input isn't supported in backend-proxied online mode yet.".to_string(),
+        ),
     }
 }
 
@@ -51,7 +54,7 @@ pub async fn transcribe_audio_cloud(
             model: model.unwrap_or_default(),
             base_url: None,
         }),
-        None => super::llm_settings::load_active_provider(&app, api_key, model),
+        None => super::llm_settings::load_active_provider(&app, api_key, model, "chat")?,
     };
     transcribe_via_provider(resolved_provider, audio_bytes, language).await
 }
@@ -59,7 +62,7 @@ pub async fn transcribe_audio_cloud(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::llm::llm_provider::{ClaudeProvider, MockProvider, LocalProvider};
+    use crate::llm::llm_provider::{BackendOnlineProvider, ClaudeProvider, MockProvider, LocalProvider};
 
     #[tokio::test]
     async fn test_claude_returns_explicit_unsupported_error() {
@@ -91,5 +94,20 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.contains("local text-chat model"));
+    }
+
+    #[tokio::test]
+    async fn test_backend_online_returns_explicit_unsupported_error() {
+        let provider = LlmProvider::BackendOnline(BackendOnlineProvider {
+            backend_url: "http://localhost:3000".to_string(),
+            session_token: "unused".to_string(),
+            provider: "claude".to_string(),
+            model: "claude-3-5-sonnet-20241022".to_string(),
+            purpose: "chat",
+        });
+        let result = transcribe_via_provider(provider, vec![1, 2, 3], None).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("backend-proxied online mode"));
     }
 }
