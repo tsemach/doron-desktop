@@ -2,6 +2,7 @@ import { Button } from "../ui/button";
 
 interface DocsManagementScanConfirmProps {
   selectedPath: string;
+  isFolder: boolean;
   reindex: boolean;
   setReindex: (val: boolean) => void;
   onCancel?: () => void;
@@ -10,6 +11,7 @@ interface DocsManagementScanConfirmProps {
 
 export default function DocsManagementScanConfirm({
   selectedPath,
+  isFolder,
   reindex,
   setReindex,
   onCancel,
@@ -21,7 +23,7 @@ export default function DocsManagementScanConfirm({
         {/* Header */}
         <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
           <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
-            Folder Selected
+            {isFolder ? "Folder Selected" : "File Selected"}
           </span>
           <h3 className="text-sm font-bold truncate text-foreground font-mono mt-1">
             {selectedPath}
