@@ -15,6 +15,14 @@ const MODEL_PRICING_CENTS_PER_MILLION: Record<string, { input: number; output: n
   "google/gemini-2.0-flash-exp": { input: 0, output: 0 },
   "openai/gpt-4o": { input: 250, output: 1000 },
   "openai/o1-mini": { input: 300, output: 1200 },
+  // Voice-cloud models (SettingVoiceEngine.tsx's VOICE_CLOUD_MODELS) -- the
+  // figures there ($ per 1M input/output) are the source these were
+  // converted from, not independently re-verified here.
+  "google/gemini-3.1-flash-lite": { input: 25, output: 150 },
+  "google/gemini-3.5-flash": { input: 150, output: 900 },
+  "openai/gpt-4o-mini": { input: 15, output: 60 },
+  "openai/gpt-5.6-luna": { input: 100, output: 600 },
+  "openai/gpt-5.6-terra": { input: 250, output: 1500 },
 };
 
 /**

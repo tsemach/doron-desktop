@@ -1,4 +1,4 @@
-import { APICallError, streamText } from "ai";
+import { streamText } from "ai";
 import { eq } from "drizzle-orm";
 import { db } from "../../../../../database";
 import { desktopSessions, users } from "../../../../../database/schema";
@@ -242,6 +242,26 @@ async function recordFinish(
   enqueue({ type: "done", finishReason, usage: { inputTokens, outputTokens } });
 }
 
+interface ApiErrorLike {
+  statusCode?: number;
+  isRetryable?: boolean;
+  responseHeaders?: Record<string, string>;
+}
+
+function isApiErrorLike(error: unknown): error is ApiErrorLike {
+  return typeof error === "object" && error !== null && ("statusCode" in error || "isRetryable" in error);
+}
+
+// Static, support-friendly text per error code -- never the raw
+// provider/Gateway error string. That string can carry operational details
+// (e.g. "AI Gateway requires a valid credit card on file...") that are
+// Amicus's problem to fix, not something to show a paying end user; the
+// raw error is logged server-side instead (see console.error below).
+const GENERIC_ERROR_MESSAGES: Record<"rate_limited" | "provider_error", string> = {
+  rate_limited: "The AI service is temporarily busy. Please try again shortly.",
+  provider_error: "The AI request failed. Please try again, or contact support if this keeps happening.",
+};
+
 async function handleStreamError(
   error: unknown,
   userId: string,
@@ -251,16 +271,25 @@ async function handleStreamError(
   partial: boolean,
   enqueue: (obj: unknown) => void
 ): Promise<void> {
-  const isApiError = APICallError.isInstance(error);
-  const statusCode = isApiError ? error.statusCode : undefined;
+  console.error("AI completion stream error:", error);
+
+  // Some AI SDK error classes (e.g. @ai-sdk/gateway's
+  // GatewayInternalServerError, thrown for a 403 "credit card required on
+  // the Gateway account" failure) aren't branded as an APICallError --
+  // APICallError.isInstance(error) is false for them -- but they do carry
+  // the same statusCode/isRetryable/responseHeaders fields as real own
+  // properties, so duck-type instead of brand-checking.
+  const apiError = isApiErrorLike(error) ? error : undefined;
+
+  const statusCode = apiError?.statusCode;
   const code = statusCode === 429 ? "rate_limited" : "provider_error";
   // Default to retryable when the error shape is unrecognized -- a
   // transient/unknown failure should offer retry, not silently assume
   // it's permanent.
-  const retryable = isApiError ? error.isRetryable : true;
-  const retryAfterHeader = isApiError ? error.responseHeaders?.["retry-after"] : undefined;
+  const retryable = apiError ? apiError.isRetryable !== false : true;
+  const retryAfterHeader = apiError?.responseHeaders?.["retry-after"];
   const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) || undefined : undefined;
-  const message = isApiError ? error.message : "The AI provider request failed.";
+  const message = GENERIC_ERROR_MESSAGES[code];
 
   enqueue({
     type: "error",
