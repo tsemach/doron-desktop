@@ -22,55 +22,34 @@ interface CompleteRequestBody {
   structured?: boolean;
 }
 
-function ndjsonLine(obj: unknown): Uint8Array {
-  return new TextEncoder().encode(JSON.stringify(obj) + "\n");
+interface ValidatedRequest {
+  token: string;
+  prompt: string;
+  system?: string;
+  provider: string;
+  model: string;
+  structured?: boolean;
 }
 
-function singleLineNdjsonResponse(obj: unknown): Response {
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(ndjsonLine(obj));
-      controller.close();
-    },
-  });
-  return new Response(stream, { status: 200, headers: { "Content-Type": "application/x-ndjson" } });
+interface AuthorizedSession {
+  userId: string;
+  tier: "free" | "pro";
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const body = (await request.json().catch(() => null)) as CompleteRequestBody | null;
-  if (!body) {
-    return Response.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const rawBody = (await request.json().catch(() => null)) as CompleteRequestBody | null;
 
-  const { token, prompt, system, provider, model, structured } = body;
-
-  if (!token) {
-    return Response.json({ error: "Missing token" }, { status: 400 });
+  const validation = validateRequestBody(rawBody);
+  if ("error" in validation) {
+    return Response.json({ error: validation.error }, { status: 400 });
   }
-  if (!prompt || !provider || !model) {
-    return Response.json({ error: "Missing prompt, provider, or model" }, { status: 400 });
-  }
+  const { token, prompt, system, provider, model, structured } = validation.value;
 
-  // Same lookup as desktop-session/route.ts (token in the JSON body, not a
-  // Bearer header -- no such convention exists anywhere in this codebase),
-  // plus the user id this route needs for quota checks/usage recording
-  // that desktop-session/route.ts doesn't select.
-  const [session] = await db
-    .select({ userId: users.id, tier: users.tier, expiresAt: desktopSessions.expiresAt })
-    .from(desktopSessions)
-    .innerJoin(users, eq(users.id, desktopSessions.userId))
-    .where(eq(desktopSessions.token, token))
-    .limit(1);
-
-  if (!session || session.expiresAt.getTime() < Date.now()) {
-    return Response.json({ error: "Session no longer valid" }, { status: 401 });
+  const authorization = await authorizeRequest(token);
+  if ("error" in authorization) {
+    return Response.json({ error: authorization.error }, { status: authorization.status });
   }
-
-  // Server-side enforcement -- never trust the desktop's own is_pro_tier
-  // gate alone; free tier must not be able to reach the Gateway at all.
-  if (session.tier !== "pro") {
-    return Response.json({ error: "Cloud AI is a Pro feature." }, { status: 403 });
-  }
+  const { session } = authorization;
 
   const gatewayModel = resolveGatewayModel(provider, model);
   if (!gatewayModel) {
@@ -85,69 +64,107 @@ export async function POST(request: Request): Promise<Response> {
     // attempted AI call (pre-flight auth/tier failures above are plain
     // JSON responses instead, since those never got as far as "an AI call
     // that was then blocked").
-    return singleLineNdjsonResponse({
-      type: "error",
-      code: "quota_exceeded",
-      message: "You've used your monthly AI allowance for this billing period.",
-      retryable: false,
-      partial: false,
-    });
+    return quotaExceededResponse();
   }
 
-  const effectiveSystem = structured
-    ? system
-      ? `${system}\n\n${STRUCTURED_INSTRUCTION}`
-      : STRUCTURED_INSTRUCTION
-    : system;
+  const effectiveSystem = buildEffectiveSystem(system, structured);
+  return streamCompletion(session, gatewayModel, prompt, effectiveSystem);
+}
 
+// ── Request validation ──────────────────────────────────────────────────
+
+function validateRequestBody(
+  body: CompleteRequestBody | null
+): { value: ValidatedRequest } | { error: string } {
+  if (!body) return { error: "Invalid request body" };
+  const { token, prompt, system, provider, model, structured } = body;
+  if (!token) return { error: "Missing token" };
+  if (!prompt || !provider || !model) return { error: "Missing prompt, provider, or model" };
+  return { value: { token, prompt, system, provider, model, structured } };
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────
+
+async function authorizeRequest(
+  token: string
+): Promise<{ session: AuthorizedSession } | { error: string; status: number }> {
+  // Same lookup as desktop-session/route.ts (token in the JSON body, not a
+  // Bearer header -- no such convention exists anywhere in this codebase),
+  // plus the user id this route needs for quota checks/usage recording
+  // that desktop-session/route.ts doesn't select.
+  const [row] = await db
+    .select({ userId: users.id, tier: users.tier, expiresAt: desktopSessions.expiresAt })
+    .from(desktopSessions)
+    .innerJoin(users, eq(users.id, desktopSessions.userId))
+    .where(eq(desktopSessions.token, token))
+    .limit(1);
+
+  if (!row || row.expiresAt.getTime() < Date.now()) {
+    return { error: "Session no longer valid", status: 401 };
+  }
+
+  // Server-side enforcement -- never trust the desktop's own is_pro_tier
+  // gate alone; free tier must not be able to reach the Gateway at all.
+  if (row.tier !== "pro") {
+    return { error: "Cloud AI is a Pro feature.", status: 403 };
+  }
+
+  return { session: { userId: row.userId, tier: row.tier } };
+}
+
+// ── NDJSON envelope helpers ──────────────────────────────────────────────
+
+function ndjsonLine(obj: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(obj) + "\n");
+}
+
+function singleLineNdjsonResponse(obj: unknown): Response {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(ndjsonLine(obj));
+      controller.close();
+    },
+  });
+  return new Response(stream, { status: 200, headers: { "Content-Type": "application/x-ndjson" } });
+}
+
+function quotaExceededResponse(): Response {
+  return singleLineNdjsonResponse({
+    type: "error",
+    code: "quota_exceeded",
+    message: "You've used your monthly AI allowance for this billing period.",
+    retryable: false,
+    partial: false,
+  });
+}
+
+function buildEffectiveSystem(system: string | undefined, structured: boolean | undefined): string | undefined {
+  if (!structured) return system;
+  return system ? `${system}\n\n${STRUCTURED_INSTRUCTION}` : STRUCTURED_INSTRUCTION;
+}
+
+// ── Streaming ────────────────────────────────────────────────────────────
+
+function streamCompletion(
+  session: AuthorizedSession,
+  gatewayModel: string,
+  prompt: string,
+  effectiveSystem: string | undefined
+): Response {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      let deltaSent = false;
-      let responseText = "";
       const enqueue = (obj: unknown) => controller.enqueue(ndjsonLine(obj));
+      const state = { deltaSent: false };
 
       try {
         const result = streamText({ model: gatewayModel, prompt, system: effectiveSystem });
-
-        for await (const part of result.stream) {
-          if (part.type === "text-delta") {
-            deltaSent = true;
-            responseText += part.text;
-            enqueue({ type: "delta", text: part.text });
-          } else if (part.type === "finish") {
-            const inputTokens = part.totalUsage.inputTokens ?? 0;
-            const outputTokens = part.totalUsage.outputTokens ?? 0;
-            const costCents = computeCostCents(gatewayModel, inputTokens, outputTokens);
-
-            await recordUsage(session.userId, costCents);
-            await recordAiRequest({
-              userId: session.userId,
-              purpose: "chat",
-              model: gatewayModel,
-              prompt,
-              response: responseText,
-              inputTokens,
-              outputTokens,
-              costCents,
-              finishReason: part.finishReason,
-            });
-
-            enqueue({
-              type: "done",
-              finishReason: part.finishReason,
-              usage: { inputTokens, outputTokens },
-            });
-          } else if (part.type === "error") {
-            await handleStreamError(part.error, session.userId, gatewayModel, prompt, deltaSent, enqueue);
-            break; // nothing more will usefully follow an error part
-          }
-        }
+        await translateStreamToNdjson(result, state, session, gatewayModel, prompt, enqueue);
       } catch (err) {
         // Errors that abort the stream outright (network failures before
         // any part arrives) rather than surfacing as an in-band 'error'
         // part -- result.stream's own docs: "Only errors that stop the
         // stream, such as network errors, are thrown."
-        await handleStreamError(err, session.userId, gatewayModel, prompt, deltaSent, enqueue);
+        await handleStreamError(err, session.userId, gatewayModel, prompt, state.deltaSent, enqueue);
       } finally {
         controller.close();
       }
@@ -155,6 +172,59 @@ export async function POST(request: Request): Promise<Response> {
   });
 
   return new Response(stream, { status: 200, headers: { "Content-Type": "application/x-ndjson" } });
+}
+
+async function translateStreamToNdjson(
+  result: ReturnType<typeof streamText>,
+  state: { deltaSent: boolean },
+  session: AuthorizedSession,
+  gatewayModel: string,
+  prompt: string,
+  enqueue: (obj: unknown) => void
+): Promise<void> {
+  let responseText = "";
+
+  for await (const part of result.stream) {
+    if (part.type === "text-delta") {
+      state.deltaSent = true;
+      responseText += part.text;
+      enqueue({ type: "delta", text: part.text });
+    } else if (part.type === "finish") {
+      await recordFinish(part.finishReason, part.totalUsage, session, gatewayModel, prompt, responseText, enqueue);
+    } else if (part.type === "error") {
+      await handleStreamError(part.error, session.userId, gatewayModel, prompt, state.deltaSent, enqueue);
+      break; // nothing more will usefully follow an error part
+    }
+  }
+}
+
+async function recordFinish(
+  finishReason: string,
+  totalUsage: { inputTokens: number | undefined; outputTokens: number | undefined },
+  session: AuthorizedSession,
+  gatewayModel: string,
+  prompt: string,
+  responseText: string,
+  enqueue: (obj: unknown) => void
+): Promise<void> {
+  const inputTokens = totalUsage.inputTokens ?? 0;
+  const outputTokens = totalUsage.outputTokens ?? 0;
+  const costCents = computeCostCents(gatewayModel, inputTokens, outputTokens);
+
+  await recordUsage(session.userId, costCents);
+  await recordAiRequest({
+    userId: session.userId,
+    purpose: "chat",
+    model: gatewayModel,
+    prompt,
+    response: responseText,
+    inputTokens,
+    outputTokens,
+    costCents,
+    finishReason,
+  });
+
+  enqueue({ type: "done", finishReason, usage: { inputTokens, outputTokens } });
 }
 
 async function handleStreamError(
