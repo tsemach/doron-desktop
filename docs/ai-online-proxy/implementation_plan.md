@@ -506,3 +506,36 @@ extend); validated by Verification item 6 below.
    `ai_requests`). Flip to `false`, re-index, confirm LLM metadata
    extraction now runs through the backend proxy (a `doc_indexing` row
    appears).
+
+## Known Gaps / Not Yet Supported
+
+**Voice recognition (cloud transcription) has no backend-proxied "online"
+path.** Only the AI Provider health check (`check_ai_health`) gained an
+`online` branch for voice's provider/model selection — and that only sends
+a text ping (`call_simple`), not real audio. Actual transcription
+(`VoiceFieldFiller.tsx` → `transcribe_audio_cloud`) always constructs a
+*direct* provider via `get_active_provider` with an explicit API key, so
+without a BYOM key set in Settings → Voice Input Engine, the mic is
+disabled everywhere it's used (Document Fields, New Case, etc.) — this is
+expected given the current implementation, not a bug. `cloud_transcribe.rs`
+already has an explicit placeholder for the online case:
+`LlmProvider::BackendOnline(_) => Err("Voice input isn't supported in
+backend-proxied online mode yet.".to_string())`.
+
+Making voice actually work without a BYOM key is real, separate follow-up
+work, not a quick fix on top of this plan's phases — deferred to its own
+PR:
+- A new backend endpoint that accepts audio bytes and proxies to a
+  provider's transcription API (no such route exists — `/api/v1/ai/complete`
+  is text-only, and the Gateway/AI SDK call shape for audio input differs
+  from `streamText`'s text/prompt shape).
+- A `transcribe()` method on `BackendOnlineProvider` (currently only has
+  `call_simple`/`call_structured`).
+- Rewiring `transcribe_audio_cloud` so an explicit `ai_mode` (mirroring
+  `check_ai_health`'s `AiConfig`) can route to `LlmProvider::BackendOnline`
+  instead of always forcing direct construction via `provider: Option<String>`.
+- Adding voice's model catalog (`SettingVoiceEngine.tsx`'s
+  `VOICE_CLOUD_MODELS`) to whatever new backend allowlist/pricing table
+  the audio endpoint uses — already needed once for `lib/ai/models.ts`'s
+  text-completion allowlist (missed in Phase 2, fixed post-merge), the same
+  gap will recur for a new audio-specific catalog if not done deliberately.
