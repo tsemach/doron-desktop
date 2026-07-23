@@ -247,4 +247,43 @@ describe("POST /api/v1/ai/complete", () => {
     // than assuming it.
     expect(mockRecordUsage).not.toHaveBeenCalled();
   });
+
+  it("never leaks the raw provider/Gateway error text to the client, but logs it server-side", async () => {
+    mockSelectLimit.mockResolvedValue([activeSession]);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Mirrors a live @ai-sdk/gateway GatewayInternalServerError: an
+    // operational detail ("AI Gateway requires a valid credit card on
+    // file...") that's Amicus's problem to fix, not something a paying
+    // end user should see. Not recognized by APICallError.isInstance(),
+    // but carries statusCode/isRetryable as real own properties, which is
+    // duck-typed for the error code/retryable flag even though the raw
+    // message itself is discarded from the client-facing response.
+    const gatewayError = Object.assign(
+      new Error("AI Gateway requires a valid credit card on file to service requests."),
+      { name: "GatewayInternalServerError", statusCode: 403, isRetryable: false }
+    );
+
+    currentMockModel = new MockLanguageModelV4({
+      doStream: async () => {
+        throw gatewayError;
+      },
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    const lines = await readAllLines(res);
+
+    expect(lines).toEqual([
+      expect.objectContaining({
+        type: "error",
+        code: "provider_error",
+        message: "The AI request failed. Please try again, or contact support if this keeps happening.",
+        retryable: false,
+        partial: false,
+      }),
+    ]);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("AI completion stream error"), gatewayError);
+
+    consoleErrorSpy.mockRestore();
+  });
 });
