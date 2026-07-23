@@ -72,7 +72,7 @@ pub async fn extract_field_value(
             model: model.unwrap_or_default(),
             base_url: None,
         }),
-        None => super::load_active_provider(&app, api_key, model),
+        None => super::load_active_provider(&app, api_key, model, "field_extraction")?,
     };
 
     // Free tier only for local-provider extraction ("ai_features"

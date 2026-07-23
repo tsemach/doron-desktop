@@ -57,7 +57,7 @@ pub async fn query_search_documents(
     let limit = limit.unwrap_or(10);
 
     // Set up provider configuration
-    let provider = crate::llm::load_active_provider(&app, api_key, model);
+    let provider = crate::llm::load_active_provider(&app, api_key, model, "query_analysis")?;
     let is_local = match &provider {
         LlmProvider::Local(_) => true,
         _ => false,
