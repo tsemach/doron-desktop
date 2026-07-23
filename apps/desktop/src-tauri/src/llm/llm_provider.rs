@@ -24,6 +24,7 @@ pub enum LlmProvider {
     OpenAi(OpenAiProvider),
     Mock(MockProvider),
     Local(LocalProvider),
+    BackendOnline(BackendOnlineProvider),
 }
 
 impl LlmProvider {
@@ -34,6 +35,7 @@ impl LlmProvider {
             Self::OpenAi(p) => p.call_simple(prompt, system, temperature).await,
             Self::Mock(p) => p.call_simple(prompt, system, temperature).await,
             Self::Local(p) => p.call_simple(prompt, system, temperature).await,
+            Self::BackendOnline(p) => p.call_simple(prompt, system, temperature).await,
         }
     }
 
@@ -44,6 +46,7 @@ impl LlmProvider {
             Self::OpenAi(p) => p.call_structured(prompt, system, temperature).await,
             Self::Mock(p) => p.call_structured(prompt, system, temperature).await,
             Self::Local(p) => p.call_structured(prompt, system, temperature).await,
+            Self::BackendOnline(p) => p.call_structured(prompt, system, temperature).await,
         }
     }
 }
@@ -55,7 +58,7 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
 }
 
-fn normalize_model_name(model: &str) -> String {
+pub(crate) fn normalize_model_name(model: &str) -> String {
     match model {
         "claude-3-5-sonnet-online" => "claude-3-5-sonnet-20241022".to_string(),
         "claude-3-5-opus-online" => "claude-3-opus-20240229".to_string(),

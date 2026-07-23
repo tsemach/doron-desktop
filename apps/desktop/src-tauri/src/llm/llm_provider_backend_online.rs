@@ -12,6 +12,12 @@ pub struct BackendOnlineProvider {
     pub session_token: String,
     pub provider: String,
     pub model: String,
+    // Threaded from load_active_provider's/llm_provider_from_app's caller
+    // (e.g. "doc_indexing", "query_analysis") into ai_requests.purpose on
+    // the backend, so observability isn't just "chat" for every call. Must
+    // match one of the enum values in the backend's ai_requests.purpose
+    // column (apps/backend/database/schema.ts).
+    pub purpose: &'static str,
 }
 
 #[derive(Serialize)]
@@ -27,6 +33,7 @@ struct CompleteRequestBody<'a> {
     model: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     structured: Option<bool>,
+    purpose: &'a str,
 }
 
 impl BackendOnlineProvider {
@@ -38,6 +45,7 @@ impl BackendOnlineProvider {
             provider: &self.provider,
             model: &self.model,
             structured: structured.then_some(true),
+            purpose: self.purpose,
         };
 
         let client = reqwest::Client::new();
