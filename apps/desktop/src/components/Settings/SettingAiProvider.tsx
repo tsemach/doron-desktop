@@ -105,12 +105,14 @@ export default function SettingAiProvider({
     } catch (err: any) {
       if (isCancelledRef.current) return;
       setHealthStatus("failed");
+      const message = err.toString();
       setHealthCheckResult({
         success: false,
-        message: err.toString(),
+        message,
         modelName: aiModel,
         providerName: aiProvider,
         mode: aiMode,
+        quotaExceeded: message.startsWith("QUOTA_EXCEEDED:"),
       });
     } finally {
       if (!isCancelledRef.current) {
