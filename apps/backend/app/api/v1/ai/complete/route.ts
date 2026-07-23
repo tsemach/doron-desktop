@@ -76,11 +76,22 @@ export async function POST(request: Request): Promise<Response> {
 // ── Request validation ──────────────────────────────────────────────────
 
 function validateRequestBody(body: CompleteRequestBody | null): RequestValidationResult {
-  if (!body) return { error: "Invalid request body" };
+  if (!body) return { 
+    error: "Invalid request body" 
+  };
   const { token, prompt, system, provider, model, structured } = body;
-  if (!token) return { error: "Missing token" };
-  if (!prompt || !provider || !model) return { error: "Missing prompt, provider, or model" };
-  return { value: { token, prompt, system, provider, model, structured } };
+  
+  if (!token) return { 
+    error: "Missing token" 
+  };
+  
+  if (!prompt || !provider || !model) return { 
+    error: "Missing prompt, provider, or model" 
+  };
+  
+  return { 
+    value: { token, prompt, system, provider, model, structured } 
+  };
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────

@@ -31,10 +31,12 @@ export type QuotaCheckResult = { ok: true } | { ok: false; budgetCents: number; 
  */
 export async function checkQuota(userId: string, tier: "free" | "pro"): Promise<QuotaCheckResult> {
   const plan = await getPlanForTier(tier);
+
   if (!plan) {
     // No plan row (e.g. "free") means not entitled to cloud AI at all.
     return { ok: false, budgetCents: 0, spentCents: 0 };
   }
+  
   const spentCents = await getCurrentPeriodSpendCents(userId);
   if (spentCents >= plan.monthlyBudgetCents) {
     return { ok: false, budgetCents: plan.monthlyBudgetCents, spentCents };
