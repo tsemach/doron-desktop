@@ -13,6 +13,14 @@ import { checkQuota, recordAiRequest, recordUsage } from "../../../../../lib/ai/
 const STRUCTURED_INSTRUCTION =
   "IMPORTANT: Your response must be ONLY valid JSON. Do not include markdown code fences or explanatory text. Start directly with { and end with }.";
 
+// Must match ai_requests.purpose's enum in apps/backend/database/schema.ts.
+const VALID_PURPOSES = ["chat", "email_classification", "field_extraction", "doc_indexing", "query_analysis"] as const;
+type Purpose = (typeof VALID_PURPOSES)[number];
+
+function resolvePurpose(purpose: string | undefined): Purpose {
+  return (VALID_PURPOSES as readonly string[]).includes(purpose ?? "") ? (purpose as Purpose) : "chat";
+}
+
 interface CompleteRequestBody {
   token?: string;
   prompt?: string;
@@ -20,6 +28,7 @@ interface CompleteRequestBody {
   provider?: string;
   model?: string;
   structured?: boolean;
+  purpose?: string;
 }
 
 interface ValidatedRequest {
@@ -29,6 +38,7 @@ interface ValidatedRequest {
   provider: string;
   model: string;
   structured?: boolean;
+  purpose: Purpose;
 }
 
 interface AuthorizedSession {
@@ -45,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
   if ("error" in validation) {
     return Response.json({ error: validation.error }, { status: 400 });
   }
-  const { token, prompt, system, provider, model, structured } = validation.value;
+  const { token, prompt, system, provider, model, structured, purpose } = validation.value;
 
   const authorization = await authorizeRequest(token);
   if ("error" in authorization) {
@@ -70,28 +80,19 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const effectiveSystem = buildEffectiveSystem(system, structured);
-  return streamCompletion(session, gatewayModel, prompt, effectiveSystem);
+  return streamCompletion(session, gatewayModel, prompt, effectiveSystem, purpose);
 }
 
 // ── Request validation ──────────────────────────────────────────────────
 
 function validateRequestBody(body: CompleteRequestBody | null): RequestValidationResult {
-  if (!body) return { 
-    error: "Invalid request body" 
-  };
-  const { token, prompt, system, provider, model, structured } = body;
-  
-  if (!token) return { 
-    error: "Missing token" 
-  };
-  
-  if (!prompt || !provider || !model) return { 
-    error: "Missing prompt, provider, or model" 
-  };
-  
-  return { 
-    value: { token, prompt, system, provider, model, structured } 
-  };
+  if (!body) return { error: "Invalid request body" };
+  const { token, prompt, system, provider, model, structured, purpose } = body;
+
+  if (!token) return { error: "Missing token" };
+  if (!prompt || !provider || !model) return { error: "Missing prompt, provider, or model" };
+
+  return { value: { token, prompt, system, provider, model, structured, purpose: resolvePurpose(purpose) } };
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────
@@ -160,7 +161,8 @@ function streamCompletion(
   session: AuthorizedSession,
   gatewayModel: string,
   prompt: string,
-  effectiveSystem: string | undefined
+  effectiveSystem: string | undefined,
+  purpose: Purpose
 ): Response {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -169,13 +171,13 @@ function streamCompletion(
 
       try {
         const result = streamText({ model: gatewayModel, prompt, system: effectiveSystem });
-        await translateStreamToNdjson(result, state, session, gatewayModel, prompt, enqueue);
+        await translateStreamToNdjson(result, state, session, gatewayModel, prompt, purpose, enqueue);
       } catch (err) {
         // Errors that abort the stream outright (network failures before
         // any part arrives) rather than surfacing as an in-band 'error'
         // part -- result.stream's own docs: "Only errors that stop the
         // stream, such as network errors, are thrown."
-        await handleStreamError(err, session.userId, gatewayModel, prompt, state.deltaSent, enqueue);
+        await handleStreamError(err, session.userId, gatewayModel, prompt, purpose, state.deltaSent, enqueue);
       } finally {
         controller.close();
       }
@@ -191,6 +193,7 @@ async function translateStreamToNdjson(
   session: AuthorizedSession,
   gatewayModel: string,
   prompt: string,
+  purpose: Purpose,
   enqueue: (obj: unknown) => void
 ): Promise<void> {
   let responseText = "";
@@ -201,9 +204,9 @@ async function translateStreamToNdjson(
       responseText += part.text;
       enqueue({ type: "delta", text: part.text });
     } else if (part.type === "finish") {
-      await recordFinish(part.finishReason, part.totalUsage, session, gatewayModel, prompt, responseText, enqueue);
+      await recordFinish(part.finishReason, part.totalUsage, session, gatewayModel, prompt, purpose, responseText, enqueue);
     } else if (part.type === "error") {
-      await handleStreamError(part.error, session.userId, gatewayModel, prompt, state.deltaSent, enqueue);
+      await handleStreamError(part.error, session.userId, gatewayModel, prompt, purpose, state.deltaSent, enqueue);
       break; // nothing more will usefully follow an error part
     }
   }
@@ -215,6 +218,7 @@ async function recordFinish(
   session: AuthorizedSession,
   gatewayModel: string,
   prompt: string,
+  purpose: Purpose,
   responseText: string,
   enqueue: (obj: unknown) => void
 ): Promise<void> {
@@ -225,7 +229,7 @@ async function recordFinish(
   await recordUsage(session.userId, costCents);
   await recordAiRequest({
     userId: session.userId,
-    purpose: "chat",
+    purpose,
     model: gatewayModel,
     prompt,
     response: responseText,
@@ -243,6 +247,7 @@ async function handleStreamError(
   userId: string,
   gatewayModel: string,
   prompt: string,
+  purpose: Purpose,
   partial: boolean,
   enqueue: (obj: unknown) => void
 ): Promise<void> {
@@ -276,7 +281,7 @@ async function handleStreamError(
   // error part). The outcome is still logged for support/audit purposes.
   await recordAiRequest({
     userId,
-    purpose: "chat",
+    purpose,
     model: gatewayModel,
     prompt,
     errorCode: code,

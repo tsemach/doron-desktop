@@ -294,7 +294,7 @@ pub async fn index_file(
     }
 
     // Set up provider configuration
-    let provider = crate::llm::load_active_provider(&app, api_key, Some(model));
+    let provider = crate::llm::load_active_provider(&app, api_key, Some(model), "doc_indexing")?;
 
     let is_local = match &provider {
         LlmProvider::Local(_) => true,
@@ -359,7 +359,7 @@ pub async fn index_folder(
     let mut failed = 0usize;
 
     // Set up provider configuration
-    let provider = crate::llm::load_active_provider(&app, api_key, Some(model));
+    let provider = crate::llm::load_active_provider(&app, api_key, Some(model), "doc_indexing")?;
 
     let is_local = match &provider {
         LlmProvider::Local(_) => true,

@@ -163,6 +163,60 @@ describe("POST /api/v1/ai/complete", () => {
     );
   });
 
+  it("threads a valid purpose through to recordAiRequest", async () => {
+    mockSelectLimit.mockResolvedValue([activeSession]);
+
+    const { simulateReadableStream } = await import("ai");
+    currentMockModel = new MockLanguageModelV4({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "stream-start", warnings: [] },
+            {
+              type: "finish",
+              finishReason: { unified: "stop", raw: "stop" },
+              usage: {
+                inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+                outputTokens: { total: 1, text: 1, reasoning: undefined },
+              },
+            },
+          ],
+        }),
+      }),
+    });
+
+    const res = await POST(makeRequest({ ...VALID_BODY, purpose: "doc_indexing" }));
+    await readAllLines(res); // drains the stream -- streamCompletion's work runs in the background otherwise
+    expect(mockRecordAiRequest).toHaveBeenCalledWith(expect.objectContaining({ purpose: "doc_indexing" }));
+  });
+
+  it("defaults an absent or unrecognized purpose to chat", async () => {
+    mockSelectLimit.mockResolvedValue([activeSession]);
+
+    const { simulateReadableStream } = await import("ai");
+    currentMockModel = new MockLanguageModelV4({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "stream-start", warnings: [] },
+            {
+              type: "finish",
+              finishReason: { unified: "stop", raw: "stop" },
+              usage: {
+                inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+                outputTokens: { total: 1, text: 1, reasoning: undefined },
+              },
+            },
+          ],
+        }),
+      }),
+    });
+
+    const res = await POST(makeRequest({ ...VALID_BODY, purpose: "not_a_real_purpose" }));
+    await readAllLines(res);
+    expect(mockRecordAiRequest).toHaveBeenCalledWith(expect.objectContaining({ purpose: "chat" }));
+  });
+
   it("terminates with a partial, retryable error on a mid-stream failure", async () => {
     mockSelectLimit.mockResolvedValue([activeSession]);
 
