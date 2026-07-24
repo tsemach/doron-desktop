@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../database";
 import { aiRequests, aiUsagePeriods } from "../../database/schema";
 import { getPlanForTier } from "./plans";
+import type { Purpose } from "./purpose";
 
 // UTC calendar month ("2026-07"), not a subscription-anniversary period --
 // there's no real subscription billing engine yet, so usage is bucketed
@@ -90,7 +91,7 @@ export async function resetCurrentPeriodUsage(userId: string): Promise<void> {
 export interface RecordAiRequestInput {
   userId: string;
   conversationId?: string | null;
-  purpose: "chat" | "email_classification" | "field_extraction" | "doc_indexing" | "query_analysis";
+  purpose: Purpose;
   model: string;
   prompt?: unknown;
   response?: unknown;
