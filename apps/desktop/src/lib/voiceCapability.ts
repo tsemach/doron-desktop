@@ -17,8 +17,15 @@ export interface VoiceCapabilityResult {
  * tooltip. The "local" voice engine never needs this check (it doesn't touch
  * any cloud provider at all). "cloud" uses its own dedicated
  * voice_cloud_provider/voice_cloud_api_key settings (independent of the main
- * AI Provider config) for both transcription and field extraction, so
- * capability just depends on whether an API key is set for that provider.
+ * AI Provider config) for both transcription and field extraction.
+ *
+ * An API key is no longer required: an empty voice_cloud_api_key now means
+ * "online" (backend-proxied, resolve_voice_provider on the Rust side --
+ * apps/desktop/src-tauri/src/llm/llm_settings.rs), same as the main AI
+ * Provider's online mode; a configured key means BYOM (direct provider
+ * call), unchanged from before. Cloud voice stays Pro-gated either way —
+ * matches transcribe_audio_cloud's server-side is_pro_tier check, which
+ * fires before provider resolution regardless of whether a key is set.
  */
 export function checkVoiceCapability(
   settings: { voice_engine?: string; voice_cloud_provider?: string; voice_cloud_api_key?: string } | null
@@ -28,20 +35,20 @@ export function checkVoiceCapability(
     return { disabled: false, reason: null };
   }
 
-  // Cloud voice is Pro-only (matches transcribe_audio_cloud's server-side
-  // gate, PLAN.md Phase 3) — local voice stays free regardless of tier.
+  // Cloud voice (online or BYOM) is Pro-only (matches transcribe_audio_cloud's
+  // server-side gate, PLAN.md Phase 3) — local voice stays free regardless
+  // of tier.
   if (!isFeatureEnabled("voice_recording")) {
     return { disabled: true, reason: "Cloud voice input is a Pro feature. Switch to the local voice engine, or upgrade to Pro." };
   }
 
   const provider = settings?.voice_cloud_provider || "";
-  const apiKey = settings?.voice_cloud_api_key || "";
-  if (AUDIO_CAPABLE_PROVIDERS.includes(provider) && apiKey.trim()) {
-    return { disabled: false, reason: null };
+  if (!AUDIO_CAPABLE_PROVIDERS.includes(provider)) {
+    return {
+      disabled: true,
+      reason: "Voice input needs Gemini or OpenAI set as the cloud provider in Settings → Voice Input Engine.",
+    };
   }
 
-  return {
-    disabled: true,
-    reason: "Voice input needs a cloud provider and API key set in Settings → Voice Input Engine → Cloud.",
-  };
+  return { disabled: false, reason: null };
 }

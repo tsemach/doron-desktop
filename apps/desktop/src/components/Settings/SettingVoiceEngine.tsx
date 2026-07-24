@@ -237,7 +237,7 @@ export default function SettingVoiceEngine({
 
               {!voiceCloudApiKey.trim() && (
                 <p className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40 rounded-lg px-3 py-2">
-                  Add an API key above to enable voice input.
+                  Add an API key above to use your own account (BYOM), or close this panel to use Amicus's managed cloud AI instead.
                 </p>
               )}
             </div>
@@ -265,41 +265,43 @@ export default function SettingVoiceEngine({
           </button>
         </div>
 
-        {voiceCloudApiKey.trim() && (
-          <div data-testid="voice-engine-cloud-test" className="space-y-2 rounded-xl border border-border bg-muted/20 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h4 className="text-xs font-bold text-foreground">Test Transcription</h4>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Record a short clip and see exactly what the model transcribes.
-                </p>
-              </div>
-              <VoiceFieldInput
-                onRecordingComplete={handleTestCloudRecording}
-                disabled={testStatus === "processing"}
-              />
-            </div>
-
-            {testStatus === "processing" && (
-              <p className="text-[11px] text-muted-foreground animate-pulse">Transcribing...</p>
-            )}
-
-            {testStatus === "done" && (
-              <div className="rounded-lg bg-background border border-border px-3 py-2 text-xs">
-                <span className="font-semibold text-foreground">Transcript:</span>{" "}
-                <span className="text-muted-foreground italic">
-                  {testTranscript ? `"${testTranscript}"` : "(empty — no speech detected)"}
-                </span>
-              </div>
-            )}
-
-            {testStatus === "error" && (
-              <p className="text-[11px] text-red-600 dark:text-red-400">
-                Failed: {testError}
+        {/* No longer gated on having a key -- transcribe_audio_cloud works
+            with an empty key too (online/backend-proxied mode, Phase 5),
+            so Test Transcription should be available for that path as well
+            as BYOM. */}
+        <div data-testid="voice-engine-cloud-test" className="space-y-2 rounded-xl border border-border bg-muted/20 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-xs font-bold text-foreground">Test Transcription</h4>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Record a short clip and see exactly what the model transcribes.
               </p>
-            )}
+            </div>
+            <VoiceFieldInput
+              onRecordingComplete={handleTestCloudRecording}
+              disabled={testStatus === "processing"}
+            />
           </div>
-        )}
+
+          {testStatus === "processing" && (
+            <p className="text-[11px] text-muted-foreground animate-pulse">Transcribing...</p>
+          )}
+
+          {testStatus === "done" && (
+            <div className="rounded-lg bg-background border border-border px-3 py-2 text-xs">
+              <span className="font-semibold text-foreground">Transcript:</span>{" "}
+              <span className="text-muted-foreground italic">
+                {testTranscript ? `"${testTranscript}"` : "(empty — no speech detected)"}
+              </span>
+            </div>
+          )}
+
+          {testStatus === "error" && (
+            <p className="text-[11px] text-red-600 dark:text-red-400">
+              Failed: {testError}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="border-t border-border/60 my-1" />
