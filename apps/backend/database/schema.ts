@@ -141,7 +141,7 @@ export const aiRequests = pgTable("ai_requests", {
     .references(() => users.id, { onDelete: "cascade" }),
   conversationId: uuid("conversation_id"),
   purpose: text("purpose", {
-    enum: ["chat", "email_classification", "field_extraction", "doc_indexing", "query_analysis"],
+    enum: ["chat", "email_classification", "field_extraction", "doc_indexing", "query_analysis", "voice_transcription"],
   }).notNull(),
   model: text("model").notNull(),
   // jsonb, not text -- today this holds a single string, but a future
