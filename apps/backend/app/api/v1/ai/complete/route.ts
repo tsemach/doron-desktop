@@ -1,9 +1,9 @@
 import { streamText } from "ai";
-import { eq } from "drizzle-orm";
-import { db } from "../../../../../database";
-import { desktopSessions, users } from "../../../../../database/schema";
+import { authorizeRequest, type AuthorizedSession } from "../../../../../lib/ai/auth";
 import { resolveGatewayModel } from "../../../../../lib/ai/models";
 import { computeCostCents } from "../../../../../lib/ai/pricing";
+import { mapProviderError } from "../../../../../lib/ai/providerError";
+import { resolvePurpose, type Purpose } from "../../../../../lib/ai/purpose";
 import { checkQuota, recordAiRequest, recordUsage } from "../../../../../lib/ai/usage";
 
 // Mirrors ClaudeProvider::call_structured's system-prompt instruction in
@@ -12,14 +12,6 @@ import { checkQuota, recordAiRequest, recordUsage } from "../../../../../lib/ai/
 // structured-output behavior.
 const STRUCTURED_INSTRUCTION =
   "IMPORTANT: Your response must be ONLY valid JSON. Do not include markdown code fences or explanatory text. Start directly with { and end with }.";
-
-// Must match ai_requests.purpose's enum in apps/backend/database/schema.ts.
-const VALID_PURPOSES = ["chat", "email_classification", "field_extraction", "doc_indexing", "query_analysis"] as const;
-type Purpose = (typeof VALID_PURPOSES)[number];
-
-function resolvePurpose(purpose: string | undefined): Purpose {
-  return (VALID_PURPOSES as readonly string[]).includes(purpose ?? "") ? (purpose as Purpose) : "chat";
-}
 
 interface CompleteRequestBody {
   token?: string;
@@ -39,11 +31,6 @@ interface ValidatedRequest {
   model: string;
   structured?: boolean;
   purpose: Purpose;
-}
-
-interface AuthorizedSession {
-  userId: string;
-  tier: "free" | "pro";
 }
 
 type RequestValidationResult = { value: ValidatedRequest } | { error: string };
@@ -93,35 +80,6 @@ function validateRequestBody(body: CompleteRequestBody | null): RequestValidatio
   if (!prompt || !provider || !model) return { error: "Missing prompt, provider, or model" };
 
   return { value: { token, prompt, system, provider, model, structured, purpose: resolvePurpose(purpose) } };
-}
-
-// ── Auth ─────────────────────────────────────────────────────────────────
-
-async function authorizeRequest(
-  token: string
-): Promise<{ session: AuthorizedSession } | { error: string; status: number }> {
-  // Same lookup as desktop-session/route.ts (token in the JSON body, not a
-  // Bearer header -- no such convention exists anywhere in this codebase),
-  // plus the user id this route needs for quota checks/usage recording
-  // that desktop-session/route.ts doesn't select.
-  const [row] = await db
-    .select({ userId: users.id, tier: users.tier, expiresAt: desktopSessions.expiresAt })
-    .from(desktopSessions)
-    .innerJoin(users, eq(users.id, desktopSessions.userId))
-    .where(eq(desktopSessions.token, token))
-    .limit(1);
-
-  if (!row || row.expiresAt.getTime() < Date.now()) {
-    return { error: "Session no longer valid", status: 401 };
-  }
-
-  // Server-side enforcement -- never trust the desktop's own is_pro_tier
-  // gate alone; free tier must not be able to reach the Gateway at all.
-  if (row.tier !== "pro") {
-    return { error: "Cloud AI is a Pro feature.", status: 403 };
-  }
-
-  return { session: { userId: row.userId, tier: row.tier } };
 }
 
 // ── NDJSON envelope helpers ──────────────────────────────────────────────
@@ -242,26 +200,6 @@ async function recordFinish(
   enqueue({ type: "done", finishReason, usage: { inputTokens, outputTokens } });
 }
 
-interface ApiErrorLike {
-  statusCode?: number;
-  isRetryable?: boolean;
-  responseHeaders?: Record<string, string>;
-}
-
-function isApiErrorLike(error: unknown): error is ApiErrorLike {
-  return typeof error === "object" && error !== null && ("statusCode" in error || "isRetryable" in error);
-}
-
-// Static, support-friendly text per error code -- never the raw
-// provider/Gateway error string. That string can carry operational details
-// (e.g. "AI Gateway requires a valid credit card on file...") that are
-// Amicus's problem to fix, not something to show a paying end user; the
-// raw error is logged server-side instead (see console.error below).
-const GENERIC_ERROR_MESSAGES: Record<"rate_limited" | "provider_error", string> = {
-  rate_limited: "The AI service is temporarily busy. Please try again shortly.",
-  provider_error: "The AI request failed. Please try again, or contact support if this keeps happening.",
-};
-
 async function handleStreamError(
   error: unknown,
   userId: string,
@@ -273,23 +211,7 @@ async function handleStreamError(
 ): Promise<void> {
   console.error("AI completion stream error:", error);
 
-  // Some AI SDK error classes (e.g. @ai-sdk/gateway's
-  // GatewayInternalServerError, thrown for a 403 "credit card required on
-  // the Gateway account" failure) aren't branded as an APICallError --
-  // APICallError.isInstance(error) is false for them -- but they do carry
-  // the same statusCode/isRetryable/responseHeaders fields as real own
-  // properties, so duck-type instead of brand-checking.
-  const apiError = isApiErrorLike(error) ? error : undefined;
-
-  const statusCode = apiError?.statusCode;
-  const code = statusCode === 429 ? "rate_limited" : "provider_error";
-  // Default to retryable when the error shape is unrecognized -- a
-  // transient/unknown failure should offer retry, not silently assume
-  // it's permanent.
-  const retryable = apiError ? apiError.isRetryable !== false : true;
-  const retryAfterHeader = apiError?.responseHeaders?.["retry-after"];
-  const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) || undefined : undefined;
-  const message = GENERIC_ERROR_MESSAGES[code];
+  const { code, message, retryable, retryAfterSeconds } = mapProviderError(error);
 
   enqueue({
     type: "error",
