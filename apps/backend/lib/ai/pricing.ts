@@ -40,3 +40,40 @@ export function computeCostCents(gatewayModel: string, inputTokens: number, outp
   const outputCost = (outputTokens / 1_000_000) * pricing.output;
   return Math.ceil(inputCost + outputCost);
 }
+
+// Whisper is billed per minute of audio, not per token -- unlike every
+// other model in this file. Author's best recollection of OpenAI's public
+// Whisper rate ($0.006/min) at time of writing, NOT verified against
+// OpenAI's live pricing page -- same caveat as the rest of this file (see
+// header comment), flagged as open in
+// docs/ai-online-proxy/voice_transcription_architecture.md §13.
+const OPENAI_WHISPER_CENTS_PER_MINUTE = 0.6;
+
+/**
+ * Computes transcription cost in cents. OpenAI (Whisper) is priced per
+ * minute of audio -- durationSeconds is what matters, inputTokens/outputTokens
+ * are ignored. Gemini transcription is a plain generateText call (see
+ * models.ts::resolveTranscriptionModel), so it's billed identically to any
+ * other Gemini request via the existing token-based computeCostCents --
+ * durationSeconds is ignored there.
+ *
+ * resolvedModel is the Gateway model id from resolveTranscriptionModel
+ * (e.g. "google/gemini-3.5-flash") -- needed for Gemini's per-model pricing
+ * lookup; unused for OpenAI, whose rate isn't model-specific.
+ */
+export function computeTranscriptionCostCents(
+  provider: string,
+  resolvedModel: string,
+  durationSeconds: number,
+  inputTokens?: number,
+  outputTokens?: number
+): number {
+  const normalized = provider.toLowerCase();
+  if (normalized === "openai") {
+    return Math.ceil((durationSeconds / 60) * OPENAI_WHISPER_CENTS_PER_MINUTE);
+  }
+  if (normalized === "gemini") {
+    return computeCostCents(resolvedModel, inputTokens ?? 0, outputTokens ?? 0);
+  }
+  throw new Error(`No transcription pricing configured for provider "${provider}"`);
+}

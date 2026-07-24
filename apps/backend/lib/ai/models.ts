@@ -38,7 +38,32 @@ const MODELS_BY_NAMESPACE: Record<string, string[]> = {
 export function resolveGatewayModel(provider: string, model: string): string | null {
   const namespace = GATEWAY_NAMESPACE[provider.toLowerCase()];
   if (!namespace) return null;
+
   const known = MODELS_BY_NAMESPACE[namespace] ?? [];
   if (!known.includes(model)) return null;
+  
   return `${namespace}/${model}`;
+}
+
+// Gateway transcription model id for OpenAI voice input. Always used
+// regardless of the model the client passed -- llm_provider_openai.rs's
+// transcribe() hardcodes "whisper-1" in its multipart form today (OpenAI's
+// chat-completion model ids like gpt-4o-mini can't do STT), so this
+// preserves that exact behavior rather than "fixing" it. See
+// docs/ai-online-proxy/voice_transcription_architecture.md §3.4.
+const OPENAI_TRANSCRIPTION_MODEL = "openai/whisper-1";
+
+/**
+ * Resolves a (provider, model) pair for voice transcription. Unlike
+ * resolveGatewayModel, OpenAI ignores the passed model entirely (see
+ * OPENAI_TRANSCRIPTION_MODEL above) -- only Gemini's selection actually
+ * matters, since Gemini transcription is a plain generateText call using
+ * whatever chat model the client picked, not a dedicated transcription
+ * model. Returns null for any other provider (reject).
+ */
+export function resolveTranscriptionModel(provider: string, model: string): string | null {
+  const normalized = provider.toLowerCase();
+  if (normalized === "openai") return OPENAI_TRANSCRIPTION_MODEL;
+  if (normalized === "gemini") return resolveGatewayModel("gemini", model);
+  return null;
 }
