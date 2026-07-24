@@ -64,7 +64,7 @@ pnpm install
 
    | Variable Name | Description | How to Obtain / Configure |
    | :--- | :--- | :--- |
-   | `DATABASE_URL` | Connection URL for local PostgreSQL database. | When running PostgreSQL locally via Docker Compose, set this to `postgresql://postgres:postgres@localhost:5432/postgres`. |
+   | `DATABASE_URL` | Connection URL for local PostgreSQL database. | When running PostgreSQL locally via Docker Compose, set this to `postgresql://postgres:postgres@localhost:5432/doron_db`. |
    | `DATABASE_NEON` | Connection URL for Neon cloud PostgreSQL instance (optional fallback). | Sign up on [Neon.tech](https://neon.tech), spin up a free serverless PostgreSQL database, and copy the database connection string. |
    | `AUTH_SECRET` | Salt key used by NextAuth to encrypt session tokens and secure cookies. | Generate a secure key by running `npx auth secret` in your terminal. |
    | `AUTH_GOOGLE_ID` <br> `AUTH_GOOGLE_SECRET` | Credentials required to enable Google OAuth login in the portal. | Create a project in [Google Cloud Console](https://console.cloud.google.com/), configure your OAuth Consent Screen, and create a **Web application** client ID. Add `http://localhost:3000/api/auth/callback/google` to the Authorized Redirect URIs. |

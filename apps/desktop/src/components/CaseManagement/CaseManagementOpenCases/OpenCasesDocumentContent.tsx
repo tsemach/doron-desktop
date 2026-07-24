@@ -1,4 +1,4 @@
-import OpenCasesFileIcon from "./OpenCasesFileIcon";
+import FileTypeIcon from "@/components/ui/FileTypeIcon";
 import { CaseFile } from "../CaseManagementTypes";
 import TagChip from "@/components/ui/TagChip";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -14,7 +14,7 @@ export default function OpenCasesDocumentContent({ doc, onOpenFile }: OpenCasesD
   return (
     <div className="flex items-center gap-3 min-w-0">
       {/* Visual file-type icon */}
-      <OpenCasesFileIcon ext={doc.ext} />
+      <FileTypeIcon ext={doc.ext} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-1 min-w-0">
           <h4

@@ -1,8 +1,9 @@
-interface OpenCasesFileIconProps {
+interface FileTypeIconProps {
   ext: string;
+  size?: "default" | "sm";
 }
 
-export default function OpenCasesFileIcon({ ext }: OpenCasesFileIconProps) {
+export default function FileTypeIcon({ ext, size = "default" }: FileTypeIconProps) {
   const normalized = ext.toLowerCase().replace(".", "");
   let bgColor = "bg-slate-100 text-slate-600 dark:bg-slate-900/30 dark:text-slate-400 border-slate-200 dark:border-slate-800";
   let symbol = "📄";
@@ -26,10 +27,18 @@ export default function OpenCasesFileIcon({ ext }: OpenCasesFileIconProps) {
     label = "TXT";
   }
 
+  const isSm = size === "sm";
+
   return (
-    <div className={`w-10 h-10 shrink-0 rounded-lg border ${bgColor} flex flex-col items-center justify-center text-[10px] font-bold shadow-xs select-none`}>
-      <span className="text-base leading-none">{symbol}</span>
-      <span className="text-[7px] uppercase mt-0.5 tracking-wider font-semibold">{label}</span>
+    <div
+      className={`shrink-0 rounded-lg border ${bgColor} flex flex-col items-center justify-center font-bold shadow-xs select-none ${
+        isSm ? "w-7 h-7 text-[8px]" : "w-10 h-10 text-[10px]"
+      }`}
+    >
+      <span className={isSm ? "text-sm leading-none" : "text-base leading-none"}>{symbol}</span>
+      <span className={`uppercase tracking-wider font-semibold ${isSm ? "text-[6px] mt-px" : "text-[7px] mt-0.5"}`}>
+        {label}
+      </span>
     </div>
   );
 }

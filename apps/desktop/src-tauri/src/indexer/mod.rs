@@ -117,7 +117,12 @@ async fn index_file_core_impl(
     // Extract text from the file
     let extracted = extractor::extract(file_path).map_err(|e| format!("extraction failed: {e}"))?;
     if extracted.text.trim().is_empty() {
-        return Err("no text extracted".to_string());
+        let msg = if ext == "pdf" {
+            "no text extracted (PDF may be scanned/image-only)"
+        } else {
+            "no text extracted"
+        };
+        return Err(msg.to_string());
     }
 
     let file_name = file_path
@@ -174,8 +179,10 @@ async fn index_file_core_impl(
         let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
         store::insert_document(&conn, &record).map_err(|e| format!("DB insertion failed: {e}"))?;
         doc_id_opt = store::get_document_id_by_path(&conn, &path_str).map_err(|e| e.to_string())?;
-    } else if doc_id_opt.is_none() {
-        // Fallback skeletal insertion so we have a document_id to map vector chunks to
+    } else {
+        // Heuristic metadata path (free tier / local mode) — also runs on reindex.
+        // Previously gated on doc_id_opt.is_none(), which skipped DB updates when
+        // force-reindexing an already-indexed document.
         let file_size_kb = std::fs::metadata(file_path).map(|m| m.len() as i64 / 1024).unwrap_or(0);
         let metadata = extractor::metadata::extract_heuristic_metadata(&extracted.text, &file_name, &ext);
         let raw_metadata = serde_json::to_string(&metadata).unwrap_or_default();
@@ -239,8 +246,8 @@ async fn index_file_core_impl(
     let status_str = match (options.run_llm_metadata, options.run_vector_embeddings && !crate::query::USE_FTS_ONLY) {
         (true, true) => "Indexed with LLM metadata and vector chunks",
         (true, false) => "Indexed with LLM metadata only",
-        (false, true) => "Indexed with vector chunks only (fallback metadata)",
-        (false, false) => "Text extracted only (no db update)",
+        (false, true) => "Indexed with heuristic metadata and vector chunks",
+        (false, false) => "Indexed with heuristic metadata",
     };
 
     Ok(format!("{status_str} for {file_name}"))

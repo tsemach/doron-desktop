@@ -160,7 +160,8 @@ export default function DocsManagementScan({
         filters: [{ name: "Documents", extensions: ["docx", "pdf", "xlsx", "xls", "txt"] }],
       });
       if (selected && typeof selected === "string") {
-        startIndexing(selected, false, false, 0, reindex);
+        setSelectedPath(selected);
+        setIsFolder(false);
       }
     } catch (err) {
       console.error("Error choosing file:", err);
@@ -179,15 +180,16 @@ export default function DocsManagementScan({
     }
   }
 
-  // --- FOLDER SELECTED STATE VIEW (Before starting scan) ---
-  if (!isProcessing && !show && !summary && selectedPath && isFolder) {
+  // --- FILE/FOLDER SELECTED STATE VIEW (Before starting scan) ---
+  if (!isProcessing && !show && !summary && selectedPath) {
     return (
       <DocsManagementScanConfirm
         selectedPath={selectedPath}
+        isFolder={isFolder}
         reindex={reindex}
         setReindex={setReindex}
         onCancel={resetState}
-        onStart={() => startIndexing(selectedPath, true, false, 0, reindex)}
+        onStart={() => startIndexing(selectedPath, isFolder, false, 0, reindex)}
       />
     );
   }
