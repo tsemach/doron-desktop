@@ -25,8 +25,31 @@ fn greet(name: &str) -> String {
 
 
 
+// Not a secret -- same public-key treatment Sentry's own Next.js wizard
+// used for the backend (hardcoded directly in sentry.server.config.ts
+// etc.), so no build-time env var plumbing is needed here either.
+const SENTRY_DSN: &str = "https://0ae7a10e970df7833aaa34800c764d0c@o4511796131397632.ingest.de.sentry.io/4511796381810768";
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Held for the lifetime of run() (effectively the whole program, since
+    // .run() below blocks until app exit) -- dropping this guard early
+    // would stop Sentry from flushing events. Enables the panic
+    // integration by default, which is the primary signal this codebase
+    // can produce: most error paths here are Result<T, String> propagated
+    // via `?`, not panics, so explicit capture_message calls at a few real
+    // failure points (see store/email/indexer) matter more than relying on
+    // panic capture alone.
+    let _sentry_guard = sentry::init((
+        SENTRY_DSN,
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            environment: Some(if cfg!(debug_assertions) { "development" } else { "production" }.into()),
+            traces_sample_rate: 0.1,
+            ..Default::default()
+        },
+    ));
+
     tauri::Builder::default()
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
