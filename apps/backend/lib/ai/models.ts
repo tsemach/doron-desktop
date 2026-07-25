@@ -41,7 +41,7 @@ export function resolveGatewayModel(provider: string, model: string): string | n
 
   const known = MODELS_BY_NAMESPACE[namespace] ?? [];
   if (!known.includes(model)) return null;
-  
+
   return `${namespace}/${model}`;
 }
 
