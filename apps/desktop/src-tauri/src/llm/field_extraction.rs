@@ -1,7 +1,7 @@
 use tauri::AppHandle;
 use serde::{Deserialize, Serialize};
 use super::clean_json;
-use super::llm_provider::{LlmProvider, ProviderConfig, get_active_provider};
+use super::llm_provider::LlmProvider;
 
 const FIELD_EXTRACTION_PROMPT: &str = r#"You are a form-filling assistant. The user spoke a short phrase describing what field to fill and its value. Given the list of available field names below, determine which field they meant and what value to fill it with.
 
@@ -50,12 +50,13 @@ fn parse_and_validate(raw: &str, available_fields: &[String]) -> Result<FieldExt
 /// names, extracts which field the user meant and what value to fill it
 /// with. Provider resolution: when `provider` is given (e.g. the dedicated
 /// voice-cloud setting, used so voice's cloud engine doesn't depend on the
-/// main AI Provider setting staying on a cloud provider), it's used
-/// directly; otherwise falls back to the normal active-provider resolution,
-/// which is engine-independent since plain text extraction works the same
-/// regardless of which LLM provider is configured (including Claude and the
-/// local text model, which don't support audio input but are perfectly fine
-/// for this text-only step).
+/// main AI Provider setting staying on a cloud provider), it's resolved via
+/// `resolve_voice_provider` -- online (backend-proxied) if `api_key` is
+/// empty, BYOM (direct) otherwise; otherwise falls back to the normal
+/// active-provider resolution, which is engine-independent since plain text
+/// extraction works the same regardless of which LLM provider is configured
+/// (including Claude and the local text model, which don't support audio
+/// input but are perfectly fine for this text-only step).
 #[tauri::command]
 pub async fn extract_field_value(
     app: AppHandle,
@@ -66,12 +67,7 @@ pub async fn extract_field_value(
     provider: Option<String>,
 ) -> Result<FieldExtractionResult, String> {
     let resolved_provider = match provider {
-        Some(provider_type) => get_active_provider(ProviderConfig {
-            provider_type,
-            api_key,
-            model: model.unwrap_or_default(),
-            base_url: None,
-        }),
+        Some(provider_type) => super::resolve_voice_provider(&app, provider_type, api_key, model, "field_extraction")?,
         None => super::load_active_provider(&app, api_key, model, "field_extraction")?,
     };
 
