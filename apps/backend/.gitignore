@@ -6,3 +6,6 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# Sentry Config File
+.env.sentry-build-plugin
