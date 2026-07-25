@@ -187,6 +187,84 @@ pub fn load_active_provider(
     Ok(super::llm_provider::get_active_provider(config))
 }
 
+/// Pure branch decision behind resolve_voice_provider, factored out so it's
+/// unit-testable without a real AppHandle -- this crate has no existing
+/// mock-AppHandle test infrastructure (confirmed: no `tauri::test` feature
+/// enabled, no fixture elsewhere in the codebase), and adding one just for
+/// this single decision would be disproportionate. An empty API key means
+/// "online" -- there's nothing for BYOM to use; a non-empty key means
+/// "BYOM". Mirrors an existing convention: SettingVoiceEngine.tsx's
+/// hasAutoOpenedRef effect already treats "key present" as the mode signal
+/// for the settings panel's visual state, this just makes it real for the
+/// transcription/extraction call path too.
+fn is_voice_byom(api_key: &str) -> bool {
+    !api_key.trim().is_empty()
+}
+
+/// Resolves voice's cloud engine (independent of the main AI Provider's
+/// `ai_mode`) to either a BackendOnline provider (online -- no
+/// voice-specific API key configured) or a direct BYOM provider (a key is
+/// set), replacing the duplicated `Some(provider_type) => get_active_provider(...)`
+/// arm both cloud_transcribe.rs::transcribe_audio_cloud and
+/// field_extraction.rs::extract_field_value used before this existed --
+/// previously neither call site could ever reach BackendOnline for voice,
+/// since they always passed an explicit provider straight to
+/// get_active_provider regardless of whether a key was set.
+///
+/// `purpose` is threaded through (not hardcoded) since the two callers use
+/// different ai_requests.purpose values: "voice_transcription" for
+/// transcription, "field_extraction" for the extraction step.
+pub fn resolve_voice_provider(
+    app: &AppHandle,
+    provider_type: String,
+    api_key: String,
+    model: Option<String>,
+    purpose: &'static str,
+) -> Result<super::llm_provider::LlmProvider, String> {
+    if is_voice_byom(&api_key) {
+        return Ok(super::llm_provider::get_active_provider(super::llm_provider::ProviderConfig {
+            provider_type,
+            api_key,
+            model: model.unwrap_or_default(),
+            base_url: None,
+        }));
+    }
+
+    let backend_url = crate::auth::get_backend_url(app)
+        .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+    let session_token = crate::auth::get_session_token(app)
+        .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+    let resolved_model = super::llm_provider::normalize_model_name(&model.unwrap_or_default());
+    Ok(super::llm_provider::LlmProvider::BackendOnline(
+        super::llm_provider::BackendOnlineProvider {
+            backend_url,
+            session_token,
+            provider: provider_type,
+            model: resolved_model,
+            purpose,
+        },
+    ))
+}
+
+#[cfg(test)]
+mod voice_provider_tests {
+    use super::is_voice_byom;
+
+    #[test]
+    fn test_empty_api_key_resolves_to_online() {
+        assert!(!is_voice_byom(""));
+    }
+
+    #[test]
+    fn test_whitespace_only_api_key_resolves_to_online() {
+        assert!(!is_voice_byom("   "));
+    }
+
+    #[test]
+    fn test_non_empty_api_key_resolves_to_byom() {
+        assert!(is_voice_byom("sk-abc123"));
+    }
+}
 
 /// Tauri command to run the connection test/health check
 #[tauri::command]
