@@ -43,6 +43,12 @@ export default function DesktopCompletePage() {
           email: data.email,
           tier: data.tier,
           expires_at: data.expiresAt,
+          // Persisted alongside the session on the desktop side (see
+          // auth/mod.rs's Session.backend_url) so internal Rust callers
+          // that only have an AppHandle can still reach the backend for
+          // online-mode AI requests, without needing this threaded through
+          // from the frontend at every call site.
+          backend_url: window.location.origin,
         });
         const url = `doron-desktop://auth?${params.toString()}`;
         setDeepLink(url);

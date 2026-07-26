@@ -11,6 +11,13 @@ pub struct Session {
     pub email: String,
     pub tier: String,
     pub expires_at: String,
+    // The backend origin this session was established against (e.g.
+    // Vite's VITE_BACKEND_URL at login time). Persisted alongside the
+    // token so background callers that only have an AppHandle (no
+    // frontend-supplied backend_url param) -- indexer, query analysis,
+    // field extraction, cloud transcribe -- can still reach the backend
+    // for online-mode AI requests. See get_backend_url below.
+    pub backend_url: String,
 }
 
 // Success and error responses from /api/v1/auth/desktop-login share no
@@ -44,7 +51,7 @@ struct DesktopSessionVerifyResponse {
 fn read_session_internal(app: &AppHandle) -> Result<Option<Session>, String> {
     let conn = store::open_db(app)?;
     let mut stmt = conn
-        .prepare("SELECT token, email, tier, expires_at FROM auth_session LIMIT 1")
+        .prepare("SELECT token, email, tier, expires_at, backend_url FROM auth_session LIMIT 1")
         .map_err(|e| e.to_string())?;
 
     let row = stmt.query_row([], |r| {
@@ -53,6 +60,7 @@ fn read_session_internal(app: &AppHandle) -> Result<Option<Session>, String> {
             email: r.get(1)?,
             tier: r.get(2)?,
             expires_at: r.get(3)?,
+            backend_url: r.get(4)?,
         })
     });
 
@@ -86,12 +94,33 @@ pub fn is_pro_tier(app: &AppHandle) -> bool {
         .unwrap_or(false)
 }
 
+/// Backend origin for the current session, for the internal (non-command)
+/// callers that only have an AppHandle and need to reach
+/// /api/v1/ai/complete -- indexer, query analysis, field extraction, cloud
+/// transcribe, all via LlmProvider::BackendOnline (see llm_settings.rs).
+/// None if signed out or the session has expired -- callers should surface
+/// that as "sign in to use Cloud AI" rather than falling back to a
+/// hardcoded URL (there is no independent Rust-side copy of the backend
+/// URL; the frontend's VITE_BACKEND_URL is the single source of truth).
+pub fn get_backend_url(app: &AppHandle) -> Option<String> {
+    read_session_internal(app).ok().flatten().map(|s| s.backend_url)
+}
+
+/// Session token for the current session, for the same internal callers as
+/// get_backend_url -- attached to the request body of
+/// /api/v1/ai/complete (token-in-body, matching the desktop-session /
+/// desktop-token routes' convention; no Bearer header exists anywhere in
+/// this codebase).
+pub fn get_session_token(app: &AppHandle) -> Option<String> {
+    read_session_internal(app).ok().flatten().map(|s| s.token)
+}
+
 pub fn save_session_internal(app: &AppHandle, session: &Session) -> Result<(), String> {
     let conn = store::open_db(app)?;
     conn.execute("DELETE FROM auth_session", []).map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO auth_session (token, email, tier, expires_at) VALUES (?1, ?2, ?3, ?4)",
-        params![session.token, session.email, session.tier, session.expires_at],
+        "INSERT INTO auth_session (token, email, tier, expires_at, backend_url) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![session.token, session.email, session.tier, session.expires_at, session.backend_url],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -111,11 +140,14 @@ pub fn complete_oauth_login(
     email: Option<String>,
     tier: Option<String>,
     expires_at: Option<String>,
+    backend_url: Option<String>,
 ) -> Result<(), String> {
-    let (Some(token), Some(email), Some(tier), Some(expires_at)) = (token, email, tier, expires_at) else {
+    let (Some(token), Some(email), Some(tier), Some(expires_at), Some(backend_url)) =
+        (token, email, tier, expires_at, backend_url)
+    else {
         return Err("OAuth deep link was missing one or more required fields".to_string());
     };
-    save_session_internal(app, &Session { token, email, tier, expires_at })
+    save_session_internal(app, &Session { token, email, tier, expires_at, backend_url })
 }
 
 fn clear_session_internal(app: &AppHandle) -> Result<(), String> {
@@ -164,6 +196,7 @@ pub async fn login_with_credentials(app: AppHandle, backend_url: String, email: 
         email: body.email.ok_or(GENERIC_ERROR)?,
         tier: body.tier.ok_or(GENERIC_ERROR)?,
         expires_at: body.expires_at.ok_or(GENERIC_ERROR)?,
+        backend_url,
     };
     save_session_internal(&app, &session)?;
     Ok(session)
@@ -215,6 +248,10 @@ pub async fn verify_session(app: AppHandle, backend_url: String) -> Result<Optio
         email: body.email.unwrap_or(local_session.email),
         tier: body.tier.unwrap_or(local_session.tier),
         expires_at: body.expires_at.unwrap_or(local_session.expires_at),
+        // Refresh to whatever backend_url this call was just made with,
+        // rather than keeping the possibly-stale cached value -- the
+        // frontend's VITE_BACKEND_URL is the single source of truth.
+        backend_url,
     };
     save_session_internal(&app, &refreshed)?;
     Ok(Some(refreshed))

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Check, Activity } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { getDefaultStore } from "jotai";
+import { aiConfigStatusAtom } from "@/store/aiStore";
 import { ProviderSelector, ModelSelector } from "./SettingAiComponents";
 import SettingAiProviderByomApiKey from "./SettingAiProviderByomApiKey";
 import SettingAiProviderByomLink from "./SettingAiProviderByomLink";
@@ -102,16 +104,32 @@ export default function SettingAiProvider({
         providerName: aiProvider,
         mode: aiMode,
       });
+      // Keep the "Active LLM Service" status bar (SettingAiProviderStatusBar,
+      // driven by aiConfigStatusAtom) in sync with a manual re-check too --
+      // it was previously only ever written by the automatic startup check
+      // (triggerGlobalHealthCheck), so re-verifying here (e.g. right after
+      // fixing a billing/credit issue) left it stuck on a stale "failed"
+      // even though this check just succeeded. Only applies when there's no
+      // unsaved edit -- otherwise this would be testing form values that
+      // aren't the actually-active saved config.
+      if (!hasChanges) {
+        getDefaultStore().set(aiConfigStatusAtom, "verified");
+      }
     } catch (err: any) {
       if (isCancelledRef.current) return;
       setHealthStatus("failed");
+      const message = err.toString();
       setHealthCheckResult({
         success: false,
-        message: err.toString(),
+        message,
         modelName: aiModel,
         providerName: aiProvider,
         mode: aiMode,
+        quotaExceeded: message.startsWith("QUOTA_EXCEEDED:"),
       });
+      if (!hasChanges) {
+        getDefaultStore().set(aiConfigStatusAtom, "failed");
+      }
     } finally {
       if (!isCancelledRef.current) {
         setCheckingHealth(false);

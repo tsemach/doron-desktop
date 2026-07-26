@@ -226,9 +226,25 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
             token       TEXT NOT NULL,
             email       TEXT NOT NULL,
             tier        TEXT NOT NULL,
-            expires_at  TEXT NOT NULL
+            expires_at  TEXT NOT NULL,
+            backend_url TEXT NOT NULL DEFAULT ''
         );
     ").map_err(|e| format!("[tags schema] {e}"))?;
+
+    // Ensure 'backend_url' column exists in 'auth_session' for pre-existing
+    // installs (base CREATE TABLE above only takes effect for fresh DBs).
+    // Lets internal callers that only have an AppHandle -- indexer, query
+    // analysis, field extraction, cloud transcribe -- reach the backend for
+    // online-mode AI requests via auth::get_backend_url, instead of needing
+    // a backend_url threaded through from the frontend at every call site.
+    let auth_session_backend_url_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('auth_session') WHERE name='backend_url'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !auth_session_backend_url_exists {
+        let _ = conn.execute("ALTER TABLE auth_session ADD COLUMN backend_url TEXT NOT NULL DEFAULT '';", []);
+    }
 
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS email_configurations (

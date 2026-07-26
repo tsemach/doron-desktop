@@ -108,12 +108,43 @@ pub fn get_ai_settings_internal(app: &AppHandle) -> Option<AiConfig> {
     }).ok()
 }
 
+/// `purpose` is threaded through to `ai_requests.purpose` (only meaningful
+/// for the online-mode branch below, which is the only path that actually
+/// talks to the backend) -- callers pass a literal describing what they're
+/// using the provider for ("doc_indexing", "query_analysis", etc.), so
+/// backend-side observability isn't just "chat" for every call.
 pub fn load_active_provider(
     app: &AppHandle,
     api_key_fallback: String,
     model_fallback: Option<String>,
-) -> super::llm_provider::LlmProvider {
-    let config = match get_ai_settings_internal(app) {
+    purpose: &'static str,
+) -> Result<super::llm_provider::LlmProvider, String> {
+    let existing_config = get_ai_settings_internal(app);
+
+    // Checked before the generic fallback below -- "online" now proxies
+    // through the backend instead of resolving a direct-provider
+    // ProviderConfig. "byom" and an unset config fall through to the
+    // generic branch completely unchanged.
+    if let Some(config) = &existing_config {
+        if config.ai_mode == "online" {
+            let backend_url = crate::auth::get_backend_url(app)
+                .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+            let session_token = crate::auth::get_session_token(app)
+                .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+            let model = super::llm_provider::normalize_model_name(&config.ai_model);
+            return Ok(super::llm_provider::LlmProvider::BackendOnline(
+                super::llm_provider::BackendOnlineProvider {
+                    backend_url,
+                    session_token,
+                    provider: config.provider.clone(),
+                    model,
+                    purpose,
+                },
+            ));
+        }
+    }
+
+    let config = match existing_config {
         Some(config) if config.ai_mode == "local" => {
             super::llm_provider::ProviderConfig {
                 provider_type: "local".to_string(),
@@ -153,9 +184,87 @@ pub fn load_active_provider(
         }
     };
 
-    super::llm_provider::get_active_provider(config)
+    Ok(super::llm_provider::get_active_provider(config))
 }
 
+/// Pure branch decision behind resolve_voice_provider, factored out so it's
+/// unit-testable without a real AppHandle -- this crate has no existing
+/// mock-AppHandle test infrastructure (confirmed: no `tauri::test` feature
+/// enabled, no fixture elsewhere in the codebase), and adding one just for
+/// this single decision would be disproportionate. An empty API key means
+/// "online" -- there's nothing for BYOM to use; a non-empty key means
+/// "BYOM". Mirrors an existing convention: SettingVoiceEngine.tsx's
+/// hasAutoOpenedRef effect already treats "key present" as the mode signal
+/// for the settings panel's visual state, this just makes it real for the
+/// transcription/extraction call path too.
+fn is_voice_byom(api_key: &str) -> bool {
+    !api_key.trim().is_empty()
+}
+
+/// Resolves voice's cloud engine (independent of the main AI Provider's
+/// `ai_mode`) to either a BackendOnline provider (online -- no
+/// voice-specific API key configured) or a direct BYOM provider (a key is
+/// set), replacing the duplicated `Some(provider_type) => get_active_provider(...)`
+/// arm both cloud_transcribe.rs::transcribe_audio_cloud and
+/// field_extraction.rs::extract_field_value used before this existed --
+/// previously neither call site could ever reach BackendOnline for voice,
+/// since they always passed an explicit provider straight to
+/// get_active_provider regardless of whether a key was set.
+///
+/// `purpose` is threaded through (not hardcoded) since the two callers use
+/// different ai_requests.purpose values: "voice_transcription" for
+/// transcription, "field_extraction" for the extraction step.
+pub fn resolve_voice_provider(
+    app: &AppHandle,
+    provider_type: String,
+    api_key: String,
+    model: Option<String>,
+    purpose: &'static str,
+) -> Result<super::llm_provider::LlmProvider, String> {
+    if is_voice_byom(&api_key) {
+        return Ok(super::llm_provider::get_active_provider(super::llm_provider::ProviderConfig {
+            provider_type,
+            api_key,
+            model: model.unwrap_or_default(),
+            base_url: None,
+        }));
+    }
+
+    let backend_url = crate::auth::get_backend_url(app)
+        .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+    let session_token = crate::auth::get_session_token(app)
+        .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+    let resolved_model = super::llm_provider::normalize_model_name(&model.unwrap_or_default());
+    Ok(super::llm_provider::LlmProvider::BackendOnline(
+        super::llm_provider::BackendOnlineProvider {
+            backend_url,
+            session_token,
+            provider: provider_type,
+            model: resolved_model,
+            purpose,
+        },
+    ))
+}
+
+#[cfg(test)]
+mod voice_provider_tests {
+    use super::is_voice_byom;
+
+    #[test]
+    fn test_empty_api_key_resolves_to_online() {
+        assert!(!is_voice_byom(""));
+    }
+
+    #[test]
+    fn test_whitespace_only_api_key_resolves_to_online() {
+        assert!(!is_voice_byom("   "));
+    }
+
+    #[test]
+    fn test_non_empty_api_key_resolves_to_byom() {
+        assert!(is_voice_byom("sk-abc123"));
+    }
+}
 
 /// Tauri command to run the connection test/health check
 #[tauri::command]
@@ -188,15 +297,35 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
         return Err("Cloud AI is a Pro feature.".to_string());
     }
 
-    // For BYOM/online, perform a real network/service call!
-    let provider = crate::llm::llm_provider::get_active_provider(
-        crate::llm::llm_provider::ProviderConfig {
-            provider_type: config.provider.clone(),
-            api_key: config.api_key_enc.clone(),
-            model: config.ai_model.clone(),
-            base_url: None,
-        }
-    );
+    // For online, route through the backend proxy like any other online-mode
+    // call -- otherwise this health check would keep validating the old
+    // direct-provider path even after it's no longer what's actually used.
+    // For BYOM, perform a real network/service call directly against the provider.
+    let provider = if config.ai_mode == "online" {
+        let backend_url = crate::auth::get_backend_url(&app)
+            .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+        let session_token = crate::auth::get_session_token(&app)
+            .ok_or_else(|| "Sign in to use Cloud AI.".to_string())?;
+        let model = crate::llm::llm_provider::normalize_model_name(&config.ai_model);
+        crate::llm::llm_provider::LlmProvider::BackendOnline(
+            crate::llm::llm_provider::BackendOnlineProvider {
+                backend_url,
+                session_token,
+                provider: config.provider.clone(),
+                model,
+                purpose: "chat",
+            },
+        )
+    } else {
+        crate::llm::llm_provider::get_active_provider(
+            crate::llm::llm_provider::ProviderConfig {
+                provider_type: config.provider.clone(),
+                api_key: config.api_key_enc.clone(),
+                model: config.ai_model.clone(),
+                base_url: None,
+            }
+        )
+    };
 
     let check_future = provider.call_simple("Perform a brief system check. Reply with exactly the word 'OK'.", None, None);
     match tokio::time::timeout(std::time::Duration::from_secs(10), check_future).await {
@@ -204,7 +333,19 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
             Ok(format!("Connection successful! Response: '{}'", res.trim()))
         }
         Ok(Err(e)) => {
-            Err(format!("Connection failed: {e}"))
+            // BackendOnlineProvider prefixes online-mode failures with a
+            // stable code (QUOTA_EXCEEDED:/RATE_LIMITED:/PROVIDER_ERROR:,
+            // see llm_provider_backend_online.rs) that the frontend
+            // pattern-matches on (SettingAiProvider.tsx's handleHealthCheck).
+            // Wrapping it in "Connection failed: " would push that prefix
+            // off the front of the string and break the match -- only wrap
+            // BYOM/local's raw, uncoded connection errors.
+            const KNOWN_CODES: [&str; 3] = ["QUOTA_EXCEEDED:", "RATE_LIMITED:", "PROVIDER_ERROR:"];
+            if KNOWN_CODES.iter().any(|code| e.starts_with(code)) {
+                Err(e)
+            } else {
+                Err(format!("Connection failed: {e}"))
+            }
         }
         Err(_) => {
             Err("Connection timed out after 10 seconds. The model might still be loading or warming up in memory.".to_string())

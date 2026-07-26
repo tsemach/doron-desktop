@@ -1,4 +1,8 @@
-import { X, CheckCircle2, AlertTriangle, Cpu, Globe, Key } from "lucide-react";
+import { X, CheckCircle2, AlertTriangle, Cpu, Globe, Key, Sparkles } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
+// Same VITE_BACKEND_URL convention as AppHome.tsx's handleUpgrade().
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
 interface HealthCheckResultData {
   success: boolean;
@@ -6,6 +10,7 @@ interface HealthCheckResultData {
   modelName: string;
   providerName: string;
   mode: string;
+  quotaExceeded?: boolean;
 }
 
 interface SettingAiHealthCheckResultProps {
@@ -24,6 +29,10 @@ export default function SettingAiHealthCheckResult({ result, onClose }: SettingA
         return "Bring Your Own Model (BYOM)";
     }
   };
+
+  async function handleUpgrade() {
+    await openUrl(`${BACKEND_URL}/register/plan?platform=desktop`);
+  }
 
   return (
     <div className="space-y-4 animate-fade-in relative">
@@ -58,8 +67,20 @@ export default function SettingAiHealthCheckResult({ result, onClose }: SettingA
             {result.success ? "Connection Verified" : "Verification Failed"}
           </p>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            {result.message}
+            {result.quotaExceeded
+              ? "You've used your monthly AI allowance for this billing period."
+              : result.message}
           </p>
+          {result.quotaExceeded && (
+            <button
+              type="button"
+              onClick={handleUpgrade}
+              className="flex items-center gap-1.5 mt-1 px-3 py-1.5 bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+            >
+              <Sparkles className="size-3.5" />
+              Upgrade to Pro
+            </button>
+          )}
         </div>
       </div>
 

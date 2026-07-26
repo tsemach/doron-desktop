@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tauri::AppHandle;
-use super::llm_provider::{LlmProvider, ProviderConfig, get_active_provider};
+use super::llm_provider::LlmProvider;
 
 /// Only Gemini and OpenAI support audio input — Claude, the local text
 /// model, and mock all return an explicit "unsupported" error rather than
@@ -21,14 +21,21 @@ async fn transcribe_via_provider(provider: LlmProvider, audio_bytes: Vec<u8>, la
             "Voice input isn't supported for the local text-chat model. Switch your AI provider to Gemini or OpenAI, or use the local voice engine instead.".to_string(),
         ),
         LlmProvider::Mock(_) => Err("Voice input isn't supported in mock mode.".to_string()),
+        // Every voice caller (VoiceFieldFiller.tsx, SettingVoiceEngine.tsx's
+        // Test Transcription widget) always guarantees WAV, converting via
+        // blobToWav16kMono before calling -- same hardcoded "audio/wav"
+        // the Gemini direct-path arm above already uses, so there's no new
+        // mime-type parameter to thread through for this arm either.
+        LlmProvider::BackendOnline(p) => p.transcribe(audio_bytes, "audio/wav", language.as_deref()).await,
     }
 }
 
 /// Transcribes audio via a cloud AI provider. When `provider` is given
 /// (e.g. from the dedicated voice-cloud setting, independent of the main
-/// AI Provider config), it's used directly — otherwise falls back to
-/// resolving the provider the same way other commands do
-/// (`load_active_provider`, also used by `query_search_documents`).
+/// AI Provider config), it's resolved via `resolve_voice_provider` -- online
+/// (backend-proxied) if `api_key` is empty, BYOM (direct) otherwise --
+/// otherwise falls back to resolving the provider the same way other
+/// commands do (`load_active_provider`, also used by `query_search_documents`).
 #[tauri::command]
 pub async fn transcribe_audio_cloud(
     app: AppHandle,
@@ -45,13 +52,8 @@ pub async fn transcribe_audio_cloud(
         return Err("Voice transcription (cloud) is a Pro feature.".to_string());
     }
     let resolved_provider = match provider {
-        Some(provider_type) => get_active_provider(ProviderConfig {
-            provider_type,
-            api_key,
-            model: model.unwrap_or_default(),
-            base_url: None,
-        }),
-        None => super::llm_settings::load_active_provider(&app, api_key, model),
+        Some(provider_type) => super::llm_settings::resolve_voice_provider(&app, provider_type, api_key, model, "voice_transcription")?,
+        None => super::llm_settings::load_active_provider(&app, api_key, model, "chat")?,
     };
     transcribe_via_provider(resolved_provider, audio_bytes, language).await
 }
@@ -59,7 +61,7 @@ pub async fn transcribe_audio_cloud(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::llm::llm_provider::{ClaudeProvider, MockProvider, LocalProvider};
+    use crate::llm::llm_provider::{BackendOnlineProvider, ClaudeProvider, MockProvider, LocalProvider};
 
     #[tokio::test]
     async fn test_claude_returns_explicit_unsupported_error() {
@@ -91,5 +93,27 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.contains("local text-chat model"));
+    }
+
+    #[tokio::test]
+    async fn test_backend_online_dispatches_to_transcribe_instead_of_erroring_out() {
+        // No mock HTTP layer exists in this crate (see resolve_voice_provider's
+        // own doc comment) -- backend_url points at a port nothing listens
+        // on, so this proves the placeholder Err(...) arm is gone and the
+        // BackendOnline case now really attempts a network call, without
+        // needing a live backend. It fails, but with a connection error,
+        // not "isn't supported".
+        let provider = LlmProvider::BackendOnline(BackendOnlineProvider {
+            backend_url: "http://127.0.0.1:1".to_string(),
+            session_token: "unused".to_string(),
+            provider: "gemini".to_string(),
+            model: "gemini-3.5-flash".to_string(),
+            purpose: "voice_transcription",
+        });
+        let result = transcribe_via_provider(provider, vec![1, 2, 3], None).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(!err.contains("isn't supported"), "expected a real dispatch attempt, got: {err}");
+        assert!(err.starts_with("PROVIDER_ERROR:"), "expected a PROVIDER_ERROR: prefix from a failed connection, got: {err}");
     }
 }

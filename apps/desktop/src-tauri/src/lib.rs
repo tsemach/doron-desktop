@@ -93,8 +93,14 @@ pub fn run() {
                     let param = |key: &str| {
                         url.query_pairs().find(|(k, _)| k == key).map(|(_, v)| v.to_string())
                     };
-                    let (token, email, tier, expires_at) = (param("token"), param("email"), param("tier"), param("expires_at"));
-                    if let Err(e) = crate::auth::complete_oauth_login(&handle_deep_link, token, email, tier, expires_at) {
+                    let (token, email, tier, expires_at, backend_url) = (
+                        param("token"),
+                        param("email"),
+                        param("tier"),
+                        param("expires_at"),
+                        param("backend_url"),
+                    );
+                    if let Err(e) = crate::auth::complete_oauth_login(&handle_deep_link, token, email, tier, expires_at, backend_url) {
                         eprintln!("[Rust Backend] OAuth deep-link session save failed: {e}");
                     }
                 }

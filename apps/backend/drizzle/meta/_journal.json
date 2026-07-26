@@ -15,6 +15,13 @@
       "when": 1784584968229,
       "tag": "0001_puzzling_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784794390010,
+      "tag": "0002_even_wendigo",
+      "breakpoints": true
     }
   ]
 }

@@ -86,6 +86,29 @@ fn build_match_request(
 
 fn llm_provider_from_app(app: &AppHandle) -> Option<LlmProvider> {
     let config = crate::llm::get_ai_settings_internal(app)?;
+
+    // Checked before the generic byom/local branch below, same as
+    // check_ai_health -- otherwise email classification would keep
+    // silently using the old direct-provider path even after online mode
+    // is proxied. Missing backend_url/session_token (signed out) is
+    // treated the same as "not configured" (None), matching this
+    // function's existing all-paths-optional contract rather than
+    // introducing a Result here.
+    if config.ai_mode == "online" {
+        let backend_url = crate::auth::get_backend_url(app)?;
+        let session_token = crate::auth::get_session_token(app)?;
+        let model = crate::llm::llm_provider::normalize_model_name(&config.ai_model);
+        return Some(LlmProvider::BackendOnline(
+            crate::llm::llm_provider::BackendOnlineProvider {
+                backend_url,
+                session_token,
+                provider: config.provider.clone(),
+                model,
+                purpose: "email_classification",
+            },
+        ));
+    }
+
     let use_llm = if config.ai_mode == "byom" {
         !config.api_key_enc.is_empty()
     } else {
