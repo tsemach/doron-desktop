@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@sentry/react": "^10.68.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
@@ -22,6 +23,7 @@
     "jotai": "^2.20.1",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.8.0",
+    "posthog-js": "^1.407.2",
     "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -1,10 +1,12 @@
-import { generateText, transcribe } from "ai";
+import { gateway, generateText, transcribe } from "ai";
+import { withTracing } from "@posthog/ai";
 import { authorizeRequest, type AuthorizedSession } from "../../../../../lib/ai/auth";
 import { resolveTranscriptionModel } from "../../../../../lib/ai/models";
 import { computeTranscriptionCostCents } from "../../../../../lib/ai/pricing";
 import { mapProviderError } from "../../../../../lib/ai/providerError";
 import { resolvePurpose, type Purpose } from "../../../../../lib/ai/purpose";
 import { checkQuota, recordAiRequest, recordUsage } from "../../../../../lib/ai/usage";
+import { getPostHogClient } from "../../../../../lib/posthog/server";
 
 interface TranscribeRequestBody {
   token?: string;
@@ -71,6 +73,11 @@ export async function POST(request: Request): Promise<Response> {
     const audio = Buffer.from(audioBase64, "base64");
 
     if (provider.toLowerCase() === "openai") {
+      // Not traceable via withTracing -- @posthog/ai's Vercel wrapper only
+      // supports LanguageModel (generateText/streamText), not the distinct
+      // TranscriptionModel type transcribe() uses. Known gap, documented
+      // in docs/observability/observability-plan.md rather than worked
+      // around here.
       const result = await transcribe({ model: resolvedModel, audio });
       return await recordSuccessAndRespond({
         session,
@@ -88,8 +95,19 @@ export async function POST(request: Request): Promise<Response> {
     // §3.4. Instruction text mirrors llm_provider_gemini.rs::transcribe()
     // exactly, so switching between BYOM/direct and online mode produces
     // the same transcript behavior.
+    // See complete/route.ts's identical cast for why this is safe --
+    // @posthog/ai@8.4.0's types lag this project's LanguageModelV4.
+    const tracedModel = withTracing(
+      gateway(resolvedModel) as unknown as Parameters<typeof withTracing>[0],
+      getPostHogClient(),
+      {
+        posthogDistinctId: session.userId,
+        posthogPrivacyMode: false,
+        posthogProperties: { purpose },
+      }
+    );
     const result = await generateText({
-      model: resolvedModel,
+      model: tracedModel,
       messages: [
         {
           role: "user",
