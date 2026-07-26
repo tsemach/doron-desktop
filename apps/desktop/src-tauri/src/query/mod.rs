@@ -1,5 +1,6 @@
 mod types;
 mod helpers;
+mod filters;
 mod queries;
 pub mod llm;
 
@@ -10,7 +11,6 @@ pub use queries::query_smart_execute;
 use tauri::AppHandle;
 use crate::store;
 use crate::llm::llm_provider::LlmProvider;
-
 use std::path::Path;
 
 pub const USE_FTS_ONLY: bool = true;
@@ -54,33 +54,23 @@ pub async fn query_search_documents(
     tags: Option<Vec<TagFilter>>,
     notes_contains: Option<String>,
 ) -> Result<Vec<DocumentRow>, String> {
-    let limit = limit.unwrap_or(10);
-
-    // Set up provider configuration
-    let provider = crate::llm::load_active_provider(&app, api_key, model, "query_analysis")?;
-    let is_local = match &provider {
-        LlmProvider::Local(_) => true,
-        _ => false,
-    };
-    // Free tier falls back to the already-existing non-LLM paths --
-    // analyze_query_heuristically and raw (non-reranked) local_results --
-    // rather than being blocked outright (PLAN.md Phase 3).
-    let is_pro = crate::auth::is_pro_tier(&app);
-    let options = SearchOptions {
-        use_llm_query_analysis: !is_local && is_pro,
-        use_llm_rerank: !is_local && is_pro,
-    };
-
-    let db_path = store::db_path(&app);
-    query_search_documents_core(
-        &db_path,
-        &provider,
-        &query,
+    let request = crate::search::SearchRequest {
+        scope: crate::search::SearchScope::Documents,
+        query,
         limit,
-        &options,
-        tags.as_deref(),
-        notes_contains.as_deref(),
-    ).await
+        filters: crate::search::SearchFilters {
+            tags,
+            notes_contains,
+        },
+    };
+    let response = crate::search::document::DocumentSearchEngine::execute(
+        &app,
+        request,
+        api_key,
+        model,
+    )
+    .await?;
+    Ok(response.results)
 }
 
 #[cfg(test)]
