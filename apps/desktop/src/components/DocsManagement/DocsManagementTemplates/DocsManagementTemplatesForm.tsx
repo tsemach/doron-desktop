@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { TemplateRow } from "./DocsManagementTemplates.types";
 import { Button } from "../../ui/button";
+import FileTypeIcon from "@/components/ui/FileTypeIcon";
 import { useRowFields } from "@/hooks/useRowFields";
 
 interface DocsManagementTemplatesFormProps {
@@ -153,9 +154,7 @@ export default function DocsManagementTemplatesForm({
                 <span className="text-xs text-muted-foreground truncate font-mono">
                   {selectedTemplate.file_name}
                 </span>
-                <span className="shrink-0 text-[10px] font-mono bg-muted border rounded-full px-2 py-0.5 text-muted-foreground uppercase">
-                  {selectedTemplate.file_ext}
-                </span>
+                <FileTypeIcon ext={selectedTemplate.file_ext} size="sm" />
               </div>
             </>
           ) : (
@@ -163,9 +162,7 @@ export default function DocsManagementTemplatesForm({
               <h3 className="text-sm font-bold text-foreground truncate">
                 {selectedTemplate.file_name}
               </h3>
-              <span className="shrink-0 text-[10px] font-mono bg-muted border rounded-full px-2 py-0.5 text-muted-foreground uppercase">
-                {selectedTemplate.file_ext}
-              </span>
+              <FileTypeIcon ext={selectedTemplate.file_ext} size="sm" />
             </div>
           )}
           <p className="text-[11px] text-muted-foreground truncate font-mono">

@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_opener::OpenerExt;
 
 pub mod local_add;
 pub mod download;
@@ -384,7 +385,7 @@ pub async fn process_template_internal(
 
     if open_editor {
         emit_progress(&app, "processing", "opening template editor...");
-        if let Err(e) = open_path(marked_path_str.clone()) {
+        if let Err(e) = open_path_impl(&app, &marked_path_str) {
             eprintln!("Failed to open template file: {e}");
         }
     }
@@ -690,132 +691,80 @@ pub async fn fill_document_placeholders(
 }
 
 #[tauri::command]
-pub fn open_path(path: String) -> Result<(), String> {
+pub fn open_path(app: AppHandle, path: String) -> Result<(), String> {
     println!("[open_path] Attempting to open path: {}", path);
+    open_path_impl(&app, &path)
+}
 
+fn open_path_impl(app: &AppHandle, path: &str) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
-        let is_wsl = std::path::Path::new("/proc/sys/fs/binfmt_misc/WSInterop").exists()
-            || std::path::Path::new("/proc/sys/fs/binfmt_misc/WSLInterop").exists()
-            || std::env::var("WSL_DISTRO_NAME").is_ok();
-        println!("[open_path] target_os = linux, is_wsl = {}", is_wsl);
+        if try_open_via_wsl(path).is_ok() {
+            return Ok(());
+        }
+    }
 
-        if is_wsl {
-            println!("[open_path] Detected WSL. Trying wslpath + powershell...");
-            match std::process::Command::new("wslpath")
-                .args(&["-w", &path])
-                .output()
-            {
-                Ok(output) if output.status.success() => {
-                    let win_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    println!("[open_path] Resolved Windows path: {}", win_path);
-                    if !win_path.is_empty() {
-                        match std::process::Command::new("powershell.exe")
-                            .args(&["-NoProfile", "-Command", &format!("Start-Process '{}'", win_path)])
-                            .output()
-                        {
-                            Ok(ps_out) => {
-                                if ps_out.status.success() {
-                                    println!("[open_path] Successfully opened via powershell Start-Process");
-                                    return Ok(());
-                                } else {
-                                    let err_msg = String::from_utf8_lossy(&ps_out.stderr).trim().to_string();
-                                    eprintln!("[open_path] powershell exit code failed. Stderr: {}", err_msg);
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("[open_path] Failed to spawn powershell.exe: {}", e);
-                            }
-                        }
-                    } else {
-                        eprintln!("[open_path] Resolved Windows path is empty");
-                    }
-                }
-                Ok(output) => {
-                    let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                    eprintln!("[open_path] wslpath failed. Stderr: {}", err_msg);
-                }
-                Err(e) => {
-                    eprintln!("[open_path] Failed to spawn wslpath: {}", e);
-                }
-            }
+    app.opener()
+        .open_path(path, None::<&str>)
+        .map_err(|e| format!("Failed to open file: {e}"))
+}
 
-            println!("[open_path] Falling back to wslview...");
-            match std::process::Command::new("wslview")
-                .arg(&path)
-                .output()
-            {
-                Ok(output) => {
-                    if output.status.success() {
-                        println!("[open_path] Successfully opened via wslview");
+/// WSL needs to delegate to Windows handlers; all other platforms use the opener plugin.
+#[cfg(target_os = "linux")]
+fn try_open_via_wsl(path: &str) -> Result<(), String> {
+    let is_wsl = std::path::Path::new("/proc/sys/fs/binfmt_misc/WSInterop").exists()
+        || std::path::Path::new("/proc/sys/fs/binfmt_misc/WSLInterop").exists()
+        || std::env::var("WSL_DISTRO_NAME").is_ok();
+    if !is_wsl {
+        return Err("not WSL".to_string());
+    }
+
+    println!("[open_path] Detected WSL. Trying wslpath + powershell...");
+    match std::process::Command::new("wslpath")
+        .args(["-w", path])
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let win_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !win_path.is_empty() {
+                match std::process::Command::new("powershell.exe")
+                    .args([
+                        "-NoProfile",
+                        "-Command",
+                        &format!("Start-Process '{}'", win_path),
+                    ])
+                    .output()
+                {
+                    Ok(ps_out) if ps_out.status.success() => {
+                        println!("[open_path] Successfully opened via powershell Start-Process");
                         return Ok(());
-                    } else {
-                        let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                        eprintln!("[open_path] wslview failed. Stderr: {}", err_msg);
                     }
-                }
-                Err(e) => {
-                    eprintln!("[open_path] Failed to spawn wslview: {}", e);
-                }
-            }
-        }
-
-        println!("[open_path] Trying xdg-open...");
-        match std::process::Command::new("xdg-open")
-            .arg(&path)
-            .output()
-        {
-            Ok(output) => {
-                if output.status.success() {
-                    println!("[open_path] Successfully opened via xdg-open");
-                    return Ok(());
-                } else {
-                    let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                    eprintln!("[open_path] xdg-open failed. Stderr: {}", err_msg);
+                    Ok(ps_out) => {
+                        let err_msg = String::from_utf8_lossy(&ps_out.stderr).trim().to_string();
+                        eprintln!("[open_path] powershell failed. Stderr: {err_msg}");
+                    }
+                    Err(e) => eprintln!("[open_path] Failed to spawn powershell.exe: {e}"),
                 }
             }
-            Err(e) => {
-                eprintln!("[open_path] Failed to spawn xdg-open: {}", e);
-            }
         }
-
-        Err("Failed to open file via powershell, wslview, or xdg-open".to_string())
+        Ok(output) => {
+            let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            eprintln!("[open_path] wslpath failed. Stderr: {err_msg}");
+        }
+        Err(e) => eprintln!("[open_path] Failed to spawn wslpath: {e}"),
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        println!("[open_path] target_os = windows. Trying cmd start...");
-        let status = std::process::Command::new("cmd")
-            .args(&["/C", "start", "", &path])
-            .status();
-        if let Ok(s) = status {
-            if s.success() {
-                println!("[open_path] Successfully opened via cmd start");
-                return Ok(());
-            }
+    println!("[open_path] Falling back to wslview...");
+    match std::process::Command::new("wslview").arg(path).output() {
+        Ok(output) if output.status.success() => {
+            println!("[open_path] Successfully opened via wslview");
+            Ok(())
         }
-        Err("Failed to open file via cmd.exe".to_string())
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        println!("[open_path] target_os = macos. Trying open command...");
-        let status = std::process::Command::new("open")
-            .arg(&path)
-            .status();
-        if let Ok(s) = status {
-            if s.success() {
-                println!("[open_path] Successfully opened via open command");
-                return Ok(());
-            }
+        Ok(output) => {
+            let err_msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            Err(format!("wslview failed: {err_msg}"))
         }
-        Err("Failed to open file via open".to_string())
-    }
-
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    {
-        eprintln!("[open_path] Unsupported OS");
-        Err("Unsupported operating system".to_string())
+        Err(e) => Err(format!("Failed to spawn wslview: {e}")),
     }
 }
 

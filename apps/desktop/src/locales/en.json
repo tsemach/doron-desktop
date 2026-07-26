@@ -59,6 +59,8 @@
   "converting_preview": "Converting and loading preview...",
   "preview_unavailable": "Preview Unavailable",
   "open_external_app": "Open in External App",
+  "pdf_preview_title": "PDF Document",
+  "pdf_preview_desc": "PDF files open in your default PDF viewer. Use the button below to view this document.",
   "case_detail": "Case Detail",
   "back_to_open_cases": "Back to Open Cases",
   "details_view_right_empty": "Details View Right Side",

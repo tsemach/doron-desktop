@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import FileTypeIcon from "@/components/ui/FileTypeIcon";
 import { useLanguage } from "../../../context/LanguageContext";
 
 import { CaseFile } from "../CaseManagementTypes";
@@ -9,6 +10,7 @@ interface OpenCasesDocumentPreviewProps {
   previewError: string | null;
   previewHtml: string | null;
   previewText: string | null;
+  previewMode: "html" | "text" | "pdf" | null;
   onOpenFile: (filePath: string) => void;
 }
 
@@ -18,6 +20,7 @@ export default function OpenCasesDocumentPreview({
   previewError,
   previewHtml,
   previewText,
+  previewMode,
   onOpenFile,
 }: OpenCasesDocumentPreviewProps) {
   const { t } = useLanguage();
@@ -53,6 +56,39 @@ export default function OpenCasesDocumentPreview({
       <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground py-12">
         <div className="animate-spin text-3xl font-bold mb-2">⟳</div>
         <p className="text-sm">{t("converting_preview")}</p>
+      </div>
+    );
+  }
+
+  if (previewMode === "pdf") {
+    return (
+      <div className="flex-grow flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+        <FileTypeIcon ext="pdf" />
+        <p className="text-sm font-semibold text-foreground mt-4">{t("pdf_preview_title")}</p>
+        <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px]">
+          {t("pdf_preview_desc")}
+        </p>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => onOpenFile(selectedDocument.path)}
+          className="mt-5 gap-1.5"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
+            <path d="M15 3h6v6" />
+            <path d="M10 14 21 3" />
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          </svg>
+          {t("open_external_app")}
+        </Button>
       </div>
     );
   }
