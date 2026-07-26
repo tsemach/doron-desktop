@@ -3,6 +3,32 @@ use std::path::Path;
 use tauri_app_lib::{extractor, store};
 
 #[test]
+fn test_extract_pdf() {
+    let pdf_path = Path::new("tests/docs/sample-search.pdf");
+    assert!(pdf_path.exists(), "test PDF not found: {:?}", pdf_path);
+
+    let extracted = extractor::extract(pdf_path).expect("PDF extraction should succeed");
+
+    assert!(!extracted.text.is_empty(), "extracted text should not be empty");
+    assert_eq!(extracted.page_count, Some(1));
+    assert!(
+        extracted.text.contains("Hello PDF search test"),
+        "expected searchable English text, got: {:?}",
+        extracted.text
+    );
+    assert!(
+        extracted.text.contains("contract agreement"),
+        "expected second line of fixture text, got: {:?}",
+        extracted.text
+    );
+
+    println!("\n=== PDF extraction result ===");
+    println!("characters : {}", extracted.text.len());
+    println!("page_count : {:?}", extracted.page_count);
+    println!("text:\n{}", extracted.text);
+}
+
+#[test]
 fn test_extract_docx_and_store() {
     let doc_path = Path::new("tests/docs/tiviat-nezikin.docx");
     assert!(doc_path.exists(), "test document not found: {:?}", doc_path);

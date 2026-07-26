@@ -59,6 +59,8 @@
   "converting_preview": "ממיר וטוען תצוגה מקדימה...",
   "preview_unavailable": "תצוגה מקדימה אינה זמינה",
   "open_external_app": "פתח באפליקציה חיצונית",
+  "pdf_preview_title": "מסמך PDF",
+  "pdf_preview_desc": "קבצי PDF נפתחים בנגן ה-PDF המוגדר כברירת מחדל. לחץ על הכפתור למטה כדי לצפות במסמך.",
   "case_detail": "פרטי תיק",
   "back_to_open_cases": "חזרה לתיקים פתוחים",
   "details_view_right_empty": "צד ימין של תצוגת פרטים",

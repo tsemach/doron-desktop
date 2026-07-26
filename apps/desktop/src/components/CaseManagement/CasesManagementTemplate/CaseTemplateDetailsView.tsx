@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import FileTypeIcon from "@/components/ui/FileTypeIcon";
 import { CaseTemplate, DocTemplate } from "../CaseManagementTypes";
 import CaseTemplateDeleteWarningModal from "./CaseTemplateDeleteWarningModal";
 
@@ -264,9 +265,7 @@ export default function CaseTemplateDetailsView({
                         </span>
                       )}
                       <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-1">
-                        <span className="uppercase text-[8px] bg-muted px-1.5 py-0.2 rounded border">
-                          {getDocExt(id)}
-                        </span>
+                        <FileTypeIcon ext={getDocExt(id)} size="sm" />
                         <span>{getDocFieldCount(id)} fields found</span>
                       </span>
                     </div>

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import FileTypeIcon from "@/components/ui/FileTypeIcon";
 import { TemplateRow } from "./DocsManagementTemplates.types";
 
 interface DocsManagementTemplatesListItemProps {
@@ -75,13 +76,7 @@ export default function DocsManagementTemplatesListItem({
               <line x1="10" y1="14" x2="21" y2="3" />
             </svg>
           </button>
-          <button
-            onClick={handleOpenDoc}
-            className="shrink-0 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-muted hover:bg-muted-foreground/10 text-muted-foreground hover:text-foreground border border-border/40 cursor-pointer transition-colors"
-            title="Open in default application (e.g. Word, PDF viewer)"
-          >
-            {template.file_ext}
-          </button>
+          <FileTypeIcon ext={template.file_ext} size="sm" />
         </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
