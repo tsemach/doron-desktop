@@ -1,10 +1,12 @@
-import { streamText } from "ai";
+import { gateway, streamText } from "ai";
+import { withTracing } from "@posthog/ai";
 import { authorizeRequest, type AuthorizedSession } from "../../../../../lib/ai/auth";
 import { resolveGatewayModel } from "../../../../../lib/ai/models";
 import { computeCostCents } from "../../../../../lib/ai/pricing";
 import { mapProviderError } from "../../../../../lib/ai/providerError";
 import { resolvePurpose, type Purpose } from "../../../../../lib/ai/purpose";
 import { checkQuota, recordAiRequest, recordUsage } from "../../../../../lib/ai/usage";
+import { getPostHogClient } from "../../../../../lib/posthog/server";
 
 // Mirrors ClaudeProvider::call_structured's system-prompt instruction in
 // llm_provider_entropic.rs, so switching between BYOM/local (still
@@ -128,7 +130,31 @@ function streamCompletion(
       const state = { deltaSent: false };
 
       try {
-        const result = streamText({ model: gatewayModel, prompt, system: effectiveSystem });
+        // withTracing wraps an actual AI SDK model object, not the bare
+        // "namespace/model" string gatewayModel is -- gateway(gatewayModel)
+        // resolves it into one first. posthogPrivacyMode: false is
+        // explicit (it's also the default) -- full prompt/completion
+        // capture is a deliberate choice here, not an oversight, see
+        // docs/observability/observability-plan.md.
+        const tracedModel = withTracing(
+          // @posthog/ai@8.4.0's types only declare LanguageModelV2 | V3;
+          // this project's AI SDK produces LanguageModelV4. Verified safe
+          // at runtime (not just assumed): the wrapper only calls
+          // doGenerate/doStream via Object.create (stable across V2-V4)
+          // and branches on specificationVersion just for a cosmetic
+          // $ai_framework_version tag + usage-shape normalization -- worst
+          // case is a mislabeled token count on PostHog's side, not a
+          // functional break. Billing/quota here parses result.usage
+          // directly (recordFinish below), independent of this wrapper.
+          gateway(gatewayModel) as unknown as Parameters<typeof withTracing>[0],
+          getPostHogClient(),
+          {
+            posthogDistinctId: session.userId,
+            posthogPrivacyMode: false,
+            posthogProperties: { purpose },
+          }
+        );
+        const result = streamText({ model: tracedModel, prompt, system: effectiveSystem });
         await translateStreamToNdjson(result, state, session, gatewayModel, prompt, purpose, enqueue);
       } catch (err) {
         // Errors that abort the stream outright (network failures before
