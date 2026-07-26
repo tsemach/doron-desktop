@@ -87,6 +87,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
           VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST }}
         with:
           projectPath: "./apps/desktop"
           tagName: ${{ steps.vars.outputs.tag }}
