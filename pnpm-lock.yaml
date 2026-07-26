@@ -150,6 +150,9 @@ importers:
       mammoth:
         specifier: ^1.8.0
         version: 1.12.0
+      posthog-js:
+        specifier: ^1.407.2
+        version: 1.407.2(preact-render-to-string@6.5.11)
       radix-ui:
         specifier: ^1.4.3
         version: 1.5.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -8264,6 +8267,20 @@ snapshots:
     transitivePeerDependencies:
       - preact-render-to-string
 
+  posthog-js@1.407.2(preact-render-to-string@6.5.11):
+    dependencies:
+      '@posthog/browser-common': 0.2.1
+      '@posthog/core': 1.45.1
+      '@posthog/types': 1.398.0
+      core-js: 3.49.0
+      dompurify: 3.4.12
+      fflate: 0.4.9
+      preact: 10.29.7(preact-render-to-string@6.5.11)
+      query-selector-shadow-dom: 1.0.1
+      web-vitals: 5.3.0
+    transitivePeerDependencies:
+      - preact-render-to-string
+
   posthog-node@5.46.1:
     dependencies:
       '@posthog/core': 1.45.1
@@ -8274,11 +8291,20 @@ snapshots:
     dependencies:
       preact: 10.24.3
 
+  preact-render-to-string@6.5.11(preact@10.29.7):
+    dependencies:
+      preact: 10.29.7(preact-render-to-string@6.5.11)
+    optional: true
+
   preact@10.24.3: {}
 
   preact@10.29.7(preact-render-to-string@6.5.11(preact@10.24.3)):
     optionalDependencies:
       preact-render-to-string: 6.5.11(preact@10.24.3)
+
+  preact@10.29.7(preact-render-to-string@6.5.11):
+    optionalDependencies:
+      preact-render-to-string: 6.5.11(preact@10.29.7)
 
   pretty-ms@9.3.0:
     dependencies:
