@@ -1,14 +1,43 @@
 import NextAuth from "next-auth";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Credentials from "next-auth/providers/credentials";
+import { eq } from "drizzle-orm";
+import { db } from "./database";
+import { adminUsers, accounts, sessions, verificationTokens } from "./database/schema";
 import authConfig from "./auth.config";
 import { verifyAdminCredentials } from "./lib/verifyAdminCredentials";
 
-// No DrizzleAdapter -- that's only needed for OAuth account linking /
-// DB-persisted sessions, neither of which this credentials-only, JWT-strategy
-// admin app uses (see apps/backend/auth.ts for the OAuth+adapter version).
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: DrizzleAdapter(db, {
+    usersTable: adminUsers,
+    accountsTable: accounts,
+    sessionsTable: sessions,
+    verificationTokensTable: verificationTokens,
+  }),
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    // Unlike apps/backend, OAuth here must never be able to create a new
+    // admin account. Google/Facebook only prove the person owns that email
+    // address -- they say nothing about whether that person should have
+    // back-office access. The adapter would otherwise happily auto-create
+    // an admin_users row for any Google/Facebook login; reject anything
+    // that isn't already a pre-provisioned row (credentials sign-in already
+    // enforces this implicitly, since verifyAdminCredentials only matches
+    // existing rows).
+    async signIn({ user, account }) {
+      if (account?.provider === "credentials") {
+        return true;
+      }
+      if (!user.email) {
+        return false;
+      }
+      const [existing] = await db.select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.email, user.email)).limit(1);
+      return !!existing;
+    },
+  },
   providers: [
+    ...authConfig.providers,
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },

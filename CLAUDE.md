@@ -126,12 +126,13 @@ Next.js 15 App Router app (`app/`) for the web portal:
 - `pnpm --filter backend db:generate` / `db:push` (Drizzle) manage schema migrations
 
 ### Office (`apps/office/`)
-Next.js 15 App Router admin back-office for Amicus staff/ops — not the customer-facing portal, does not share users or sessions with `apps/backend`:
-- **`auth.ts` / `auth.config.ts`** — NextAuth v5 setup, credentials-only (no Google/Facebook OAuth)
-- **`database/schema.ts`** — Drizzle ORM `admin_users` table, separate from `apps/backend`'s `users` table
+Next.js 15 App Router admin back-office for Amicus staff/ops — not the customer-facing portal, does not share users, sessions, or a database with `apps/backend`:
+- **`auth.ts` / `auth.config.ts`** — NextAuth v5 setup: credentials + Google/Facebook OAuth, but OAuth sign-in is gated in `auth.ts`'s `signIn` callback to only emails that already have an `admin_users` row — it can never auto-create a new admin
+- **`database/schema.ts`** — Drizzle ORM `admin_users`/`admin_accounts`/`admin_sessions`/`admin_verification_tokens` tables, in their own dedicated Postgres database (`ascurix-office`) — a separate database from `apps/backend`'s, not just a separate table, though it runs on the same local Postgres server
 - **`app/login/page.tsx`** — Login page, built from shared `AuthCard`/`PasswordInput`/`formStyles` components in `packages/ui`
-- **`middleware.ts`** — Protects essentially the entire app except `/login`
-- Reuses `apps/backend`'s local Postgres instance/`DATABASE_URL` (same docker-compose Postgres) but writes to a distinct table with no shared session
+- **`app/register/page.tsx`** — Admin-creates-admin form (`POST /api/v1/admin/register`); only reachable while already signed in, no public self-service signup
+- **`components/UserMenu.tsx`** — Top-right user icon/dropdown (home page) with "Add admin" and "Log out"
+- **`middleware.ts`** — Protects essentially the entire app except `/login`; note it doesn't cover `/api/*`, so `app/api/v1/admin/register/route.ts` checks the session itself
 
 ### Releases & auto-update
 Desktop releases are built and signed via GitHub Actions: bump `version` in `apps/desktop/src-tauri/tauri.conf.json`, push, then tag `vX.Y.Z` — CI builds the signed Windows NSIS installer and `latest.json`, uploaded as a draft GitHub Release that the updater plugin polls.

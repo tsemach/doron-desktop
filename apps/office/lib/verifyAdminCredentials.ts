@@ -13,7 +13,7 @@ export async function verifyAdminCredentials(
 ): Promise<{ user: typeof adminUsers.$inferSelect } | { error: string }> {
   const [user] = await db.select().from(adminUsers).where(eq(adminUsers.email, email)).limit(1);
 
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+  if (!user || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
     return { error: GENERIC_ERROR };
   }
 

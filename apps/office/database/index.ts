@@ -2,9 +2,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
 
-// Reuses the same Postgres instance as apps/backend (same DATABASE_URL,
-// e.g. the shared local docker-compose Postgres) -- but only the
-// `admin_users` table, never apps/backend's `users`/`sessions`/etc.
+// A dedicated database ("ascurix-office"), separate from apps/backend's
+// (same local Postgres server, different DATABASE_URL) -- no table here is
+// ever shared with apps/backend's `users`/`sessions`/etc.
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
