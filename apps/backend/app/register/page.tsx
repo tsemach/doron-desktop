@@ -3,16 +3,13 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Button } from "@workspace/ui";
-import AuthCard from "../../components/auth/AuthCard";
-import PasswordInput from "../../components/auth/PasswordInput";
-import { errorClass, inputClass, labelClass } from "../../components/auth/formStyles";
+import { AuthCard, Button, PasswordInput, errorClass, inputClass, labelClass } from "@workspace/ui";
 import { isValidEmail, isValidFullName, isValidPasswordLength } from "../../lib/validation";
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const platform = searchParams.get("platform"); // "desktop" when opened from the Amicus desktop app
+  const platform = searchParams.get("platform"); // "desktop" when opened from the Ascurix desktop app
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -86,7 +83,7 @@ function RegisterForm() {
   }
 
   return (
-    <AuthCard title="Create your Amicus account" subtitle="Set up your account, then choose a plan.">
+    <AuthCard title="Create your Ascurix account" subtitle="Set up your account, then choose a plan.">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error && <div className={errorClass}>{error}</div>}
 
@@ -94,6 +91,8 @@ function RegisterForm() {
           <label className={labelClass}>Email address</label>
           <input
             type="email"
+            name="email"
+            autoComplete="username"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -106,6 +105,8 @@ function RegisterForm() {
           <label className={labelClass}>Full name</label>
           <input
             type="text"
+            name="name"
+            autoComplete="name"
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -116,12 +117,24 @@ function RegisterForm() {
 
         <div>
           <label className={labelClass}>Password</label>
-          <PasswordInput value={password} onChange={setPassword} placeholder="••••••••" autoComplete="new-password" />
+          <PasswordInput
+            value={password}
+            onChange={setPassword}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            name="new-password"
+          />
         </div>
 
         <div>
           <label className={labelClass}>Confirm password</label>
-          <PasswordInput value={confirmPassword} onChange={setConfirmPassword} placeholder="••••••••" autoComplete="new-password" />
+          <PasswordInput
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            name="confirm-password"
+          />
         </div>
 
         <Button type="submit" disabled={loading} className="mt-2 w-full">

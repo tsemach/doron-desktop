@@ -72,7 +72,7 @@ export default function Login() {
   }
 
   return (
-    <AuthCard title="Sign in to Amicus" backTo="/">
+    <AuthCard title="Sign in to Ascurix" backTo="/">
       {waitingForOAuth ? (
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-sm text-muted-foreground">

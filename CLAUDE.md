@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Amicus (the repo, directory, app identifier, and build artifacts still use the pre-rename name `doron-desktop` — see `.claude/rules/project-naming.md`) is a legal/case management platform, structured as a `pnpm` + Turborepo monorepo with two apps:
+Ascurix (the repo, directory, app identifier, and build artifacts still use the pre-rename name `doron-desktop` — see `.claude/rules/project-naming.md`) is a legal/case management platform, structured as a `pnpm` + Turborepo monorepo with three apps:
 
 - **`apps/desktop/`** — Tauri v2 desktop client: React + TypeScript frontend (Vite, Tailwind v4, shadcn/ui) with a Rust backend. This is where almost all product logic lives (document indexing/search, case management, templates, email ingestion, local/cloud LLM providers).
 - **`apps/backend/`** — Next.js 15 web portal: auth (NextAuth v5 + Drizzle/Postgres), user login/signup, and installer download redirects for the desktop app's auto-updater.
+- **`apps/office/`** — Next.js 15 admin back-office for Ascurix staff/ops; independent NextAuth v5 (credentials-only) and `admin_users` table, not the customer-facing portal and does not share users/sessions with `apps/backend`.
 - **`packages/ui/`** — Shared UI components/config consumed by the workspaces (`@workspace/ui`).
 
 The desktop app's frontend is bundled by Vite and served from `apps/desktop/dist` in production. The Rust side exposes commands via `#[tauri::command]` that the frontend calls with `invoke()` from `@tauri-apps/api/core`.
@@ -27,6 +28,9 @@ pnpm desktop:dev
 
 # Backend only: Next.js dev server on :3000
 pnpm backend:dev
+
+# Office only: Next.js dev server on :3001
+pnpm office:dev
 
 # Build everything / lint everything
 pnpm build
@@ -120,6 +124,15 @@ Next.js 15 App Router app (`app/`) for the web portal:
 - **`app/api/download/`** — Serves/redirects desktop installer assets for the auto-updater
 - **`middleware.ts`** — Route protection
 - `pnpm --filter backend db:generate` / `db:push` (Drizzle) manage schema migrations
+
+### Office (`apps/office/`)
+Next.js 15 App Router admin back-office for Ascurix staff/ops — not the customer-facing portal, does not share users, sessions, or a database with `apps/backend`:
+- **`auth.ts` / `auth.config.ts`** — NextAuth v5 setup: credentials + Google/Facebook OAuth, but OAuth sign-in is gated in `auth.ts`'s `signIn` callback to only emails that already have an `admin_users` row — it can never auto-create a new admin
+- **`database/schema.ts`** — Drizzle ORM `admin_users`/`admin_accounts`/`admin_sessions`/`admin_verification_tokens` tables, in their own dedicated Postgres database (`ascurix-office`) — a separate database from `apps/backend`'s, not just a separate table, though it runs on the same local Postgres server
+- **`app/login/page.tsx`** — Login page, built from shared `AuthCard`/`PasswordInput`/`formStyles` components in `packages/ui`
+- **`app/register/page.tsx`** — Admin-creates-admin form (`POST /api/v1/admin/register`); only reachable while already signed in, no public self-service signup
+- **`components/UserMenu.tsx`** — Top-right user icon/dropdown (home page) with "Add admin" and "Log out"
+- **`middleware.ts`** — Protects essentially the entire app except `/login`; note it doesn't cover `/api/*`, so `app/api/v1/admin/register/route.ts` checks the session itself
 
 ### Releases & auto-update
 Desktop releases are built and signed via GitHub Actions: bump `version` in `apps/desktop/src-tauri/tauri.conf.json`, push, then tag `vX.Y.Z` — CI builds the signed Windows NSIS installer and `latest.json`, uploaded as a draft GitHub Release that the updater plugin polls.

@@ -12,9 +12,7 @@ Sentry.init({
   tracesSampleRate: 1,
 
   dataCollection: {
-    // To disable sending user data and HTTP bodies, uncomment the lines below. For more info visit:
-    // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#dataCollection
-    // userInfo: false,
-    // httpBodies: [],
+    // Same fix as sentry.server.config.ts -- see its comment for why.
+    httpBodies: [],
   },
 });

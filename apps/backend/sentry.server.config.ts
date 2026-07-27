@@ -11,9 +11,12 @@ Sentry.init({
   tracesSampleRate: 1,
 
   dataCollection: {
-    // To disable sending user data and HTTP bodies, uncomment the lines below. For more info visit:
+    // httpBodies disabled: Sentry's instrumentation reads the request body
+    // for error/breadcrumb capture, which drains the stream -- any route
+    // handler that then calls request.json() itself (e.g.
+    // api/v1/auth/desktop-session) gets an empty body and throws
+    // "Unexpected end of JSON input". See:
     // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#dataCollection
-    // userInfo: false,
-    // httpBodies: [],
+    httpBodies: [],
   },
 });

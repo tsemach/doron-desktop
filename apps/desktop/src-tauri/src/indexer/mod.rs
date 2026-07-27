@@ -131,10 +131,7 @@ async fn index_file_core_impl(
         .unwrap_or("unknown")
         .to_string();
 
-    let mut doc_id_opt = {
-        let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
-        store::get_document_id_by_path(&conn, &path_str).map_err(|e| e.to_string())?
-    };
+    let doc_id_opt;
 
     // Track 1: LLM Metadata extraction
     if options.run_llm_metadata {

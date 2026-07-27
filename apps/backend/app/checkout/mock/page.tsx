@@ -2,9 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@workspace/ui";
-import AuthCard from "../../../components/auth/AuthCard";
-import { errorClass } from "../../../components/auth/formStyles";
+import { AuthCard, Button, errorClass } from "@workspace/ui";
 
 // Stands in for a real hosted checkout page (Paddle, once credentials exist).
 // "Confirming" here posts directly to our own webhook route with the shape a
@@ -49,7 +47,7 @@ function MockCheckoutForm() {
 
       <div className="rounded-lg border border-border bg-background p-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-sm font-medium text-foreground">Amicus Pro</span>
+          <span className="text-sm font-medium text-foreground">Ascurix Pro</span>
           <span className="text-lg font-bold text-foreground">$49<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
         </div>
       </div>

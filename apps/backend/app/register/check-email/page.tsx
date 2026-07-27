@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import AuthCard from "../../../components/auth/AuthCard";
+import { AuthCard } from "@workspace/ui";
 
 function CheckEmailContent() {
   const searchParams = useSearchParams();

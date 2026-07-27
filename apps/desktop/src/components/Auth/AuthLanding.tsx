@@ -16,7 +16,7 @@ export default function AuthLanding() {
   }
 
   return (
-    <AuthCard title="Welcome to Amicus" subtitle="Create an account or sign in to continue.">
+    <AuthCard title="Welcome to Ascurix" subtitle="Create an account or sign in to continue.">
       <div className="flex flex-col gap-3">
         <button
           type="button"

@@ -13,11 +13,10 @@ export default auth((req) => {
 
   // The site is a public portal by default (marketing/home, registration,
   // downloads) -- login is only required for specific functions, not to
-  // browse the site. /templates is the internal document-template admin
-  // tool; /checkout is the paid-plan flow; /profile is the user's own
-  // account/subscription page.
+  // browse the site. /checkout is the paid-plan flow; /profile is the
+  // user's own account/subscription page. (The document-template admin
+  // tool that used to live at /templates has moved to apps/office.)
   const requiresAuth =
-    nextUrl.pathname.startsWith("/templates") ||
     nextUrl.pathname.startsWith("/checkout") ||
     nextUrl.pathname.startsWith("/profile");
 

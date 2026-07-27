@@ -21,8 +21,8 @@ export class ResendEmailProvider implements EmailProvider {
     const { error } = await this.client.emails.send({
       from: FROM_ADDRESS,
       to: email,
-      subject: "Verify your Amicus account",
-      html: `<p>Click the link below to verify your email and finish setting up your Amicus account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 24 hours.</p>`,
+      subject: "Verify your Ascurix account",
+      html: `<p>Click the link below to verify your email and finish setting up your Ascurix account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 24 hours.</p>`,
     });
 
     if (error) {

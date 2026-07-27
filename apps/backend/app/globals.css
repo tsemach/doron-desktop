@@ -2,6 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Tailwind's automatic content scanning only walks this app's own
+   directory -- it never reaches packages/ui/src (a sibling package, only
+   linked in via node_modules), so utility classes used only inside shared
+   components like AuthCard/PasswordInput would otherwise never be
+   generated. */
+@source "../../../packages/ui/src";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Same design-token setup as apps/desktop/src/styles/globals.css, so the web
@@ -42,6 +49,7 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --font-display: var(--font-fraunces);
 }
 
 :root {

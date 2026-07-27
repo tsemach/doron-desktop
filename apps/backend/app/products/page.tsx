@@ -28,23 +28,23 @@ export default function ProductsPage() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
+    <div className="dark min-h-screen flex flex-col bg-slate-950 text-slate-50 font-sans">
       <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
       <main className="flex-grow w-full flex flex-col items-center justify-center px-6 py-24 text-center">
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 mb-3">
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-3">
           Products
         </h1>
-        <p className="text-slate-600 text-base max-w-lg mb-8">
+        <p className="text-slate-400 text-base max-w-lg mb-8">
           Our full product lineup page is coming soon.
         </p>
         <Link
           href="/"
-          className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+          className="text-sm font-semibold text-slate-300 hover:text-white"
         >
           Back to home
         </Link>

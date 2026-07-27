@@ -71,7 +71,7 @@ export default function DownloadDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (

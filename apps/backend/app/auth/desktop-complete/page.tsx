@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import AuthCard from "../../../components/auth/AuthCard";
-import { errorClass } from "../../../components/auth/formStyles";
+import { AuthCard, errorClass } from "@workspace/ui";
 
 // Landing point for the OAuth branch of desktop *login* (0.9) — reached via
 // signIn(provider, { callbackUrl: "/auth/desktop-complete" }) from either
@@ -63,7 +62,7 @@ export default function DesktopCompletePage() {
   }, [status, session, router]);
 
   return (
-    <AuthCard title="Signing you in" subtitle="Completing your Amicus desktop login.">
+    <AuthCard title="Signing you in" subtitle="Completing your Ascurix desktop login.">
       {error ? (
         <div className={errorClass}>{error}</div>
       ) : (

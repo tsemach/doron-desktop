@@ -12,7 +12,7 @@ out to need correction once checked — see §3).
 ## 1. Summary
 
 Since AMI-67, the desktop's main AI Provider ("online" `ai_mode`) proxies
-through `apps/backend`'s `/api/v1/ai/complete` route — Amicus holds the only
+through `apps/backend`'s `/api/v1/ai/complete` route — Ascurix holds the only
 provider credentials for chat/indexing/query/email-classification calls.
 **Voice input was explicitly left out of that migration.** Today, cloud voice
 transcription (`transcribe_audio_cloud`) always constructs a *direct*

@@ -237,7 +237,7 @@ export default function SettingVoiceEngine({
 
               {!voiceCloudApiKey.trim() && (
                 <p className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40 rounded-lg px-3 py-2">
-                  Add an API key above to use your own account (BYOM), or close this panel to use Amicus's managed cloud AI instead.
+                  Add an API key above to use your own account (BYOM), or close this panel to use Ascurix's managed cloud AI instead.
                 </p>
               )}
             </div>
