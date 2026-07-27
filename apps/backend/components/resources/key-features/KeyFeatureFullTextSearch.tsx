@@ -12,7 +12,7 @@ export default function KeyFeatureFullTextSearch() {
           Intelligent Retrieval
         </div>
 
-        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
+        <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">
           Smart Full-Text Search
         </h2>
         

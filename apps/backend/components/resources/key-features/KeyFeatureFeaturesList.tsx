@@ -51,11 +51,11 @@ export default function KeyFeatureFeaturesList({ activeFeatureId, onFeatureSelec
         {features.map((feature, i) => {
           const isActive = feature.id === activeFeatureId;
           return (
-            <div 
-              key={i} 
+            <div
+              key={i}
               className={`flex gap-3 items-start p-3 rounded-lg transition-all duration-200 cursor-pointer border ${
-                isActive 
-                  ? "bg-blue-50/50 border-blue-200/60 shadow-xs translate-x-1" 
+                isActive
+                  ? "bg-blue-50/50 border-blue-200/60 shadow-xs translate-x-1"
                   : "bg-transparent border-transparent hover:bg-slate-50 hover:translate-x-0.5"
               }`}
               onClick={() => handleFeatureSelect(i)}

@@ -27,7 +27,7 @@ export default function KeyFeatureDocumentIndexing() {
           AI Feature Suite
         </div>
 
-        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
+        <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">
           AI Document Indexing
         </h2>
         
