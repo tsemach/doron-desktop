@@ -128,14 +128,6 @@ export default function KeyFeatureCentralWorkingSpace() {
             alt={screenshots[activeScreenshot].alt}
             className="w-full h-full object-cover opacity-95 group-hover:opacity-100 transition-opacity duration-300"
           />
-          <div className="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-md px-4 py-2.5 rounded-lg border border-slate-800 shadow-lg transition-transform duration-200 flex items-center justify-between">
-            <p className="text-xs font-semibold text-white">
-              {screenshots[activeScreenshot].alt}
-            </p>
-            <span className="text-[10px] text-slate-400 bg-slate-850 px-2 py-0.5 rounded border border-slate-800">
-              {activeScreenshot + 1} / {screenshots.length}
-            </span>
-          </div>
         </div>
 
         {/* Carousel Controls */}

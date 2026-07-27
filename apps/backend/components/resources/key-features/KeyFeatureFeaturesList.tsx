@@ -43,8 +43,8 @@ export default function KeyFeatureFeaturesList({ activeFeatureId, onFeatureSelec
   };
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm space-y-4">
-      <h3 className="text-xs font-bold text-slate-400 border-b border-slate-100 pb-2 uppercase tracking-wider">
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold text-slate-400 border-b border-slate-100 pb-2 uppercase tracking-wider">
         Key Features
       </h3>
       <div className="flex flex-col gap-2">

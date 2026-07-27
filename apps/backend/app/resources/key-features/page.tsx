@@ -51,14 +51,18 @@ export default function KeyFeaturesPage() {
       <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
       {/* Main Content Area - Split Layout with Desktop App Styling */}
-      <main className="flex-grow w-full px-6 py-12 flex flex-col lg:flex-row gap-10 justify-between items-start">
-        {/* Left Column: Features List (1/3 width) */}
-        <div className="lg:w-1/3 flex flex-col justify-start lg:pt-12 gap-6" id="features-section">
+      <main className="flex-grow w-full px-6 pt-4 pb-12 flex flex-col lg:flex-row gap-8 items-stretch">
+        {/* Left Column: Features List (1/5 width), separated from the main
+            view by a vertical divider instead of its own card border */}
+        <div
+          className="lg:w-1/5 flex flex-col justify-start gap-6 lg:border-r lg:border-slate-200 lg:pr-8"
+          id="features-section"
+        >
           <KeyFeatureFeaturesList activeFeatureId={featureSelected} onFeatureSelect={onFeatureSelect} />
         </div>
 
-        {/* Right Column: Feature Content (2/3 width) */}
-        <div className="lg:w-2/3 max-w-4xl flex flex-col justify-start space-y-6">
+        {/* Right Column: Feature Content (4/5 width) */}
+        <div className="lg:w-4/5 max-w-4xl flex flex-col justify-start space-y-6">
           {featureSelected === "central-working-space" && <KeyFeatureCentralWorkingSpace />}
           {featureSelected === "case-management-tracking" && <KeyFeatureCaseManagementAndTraking />}
           {featureSelected === "ai-document-indexing" && <KeyFeatureDocumentIndexing />}

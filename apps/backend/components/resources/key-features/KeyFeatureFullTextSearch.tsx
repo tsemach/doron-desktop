@@ -62,11 +62,6 @@ export default function KeyFeatureFullTextSearch() {
             alt="Smart Search Engine (FTS5 Results)"
             className="w-full h-full object-cover opacity-95 group-hover:opacity-100 transition-opacity duration-300"
           />
-          <div className="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-md px-4 py-2.5 rounded-lg border border-slate-800 shadow-lg">
-            <p className="text-xs font-semibold text-white">
-              Instant search results with match snippet highlighting and file locations
-            </p>
-          </div>
         </div>
       </div>
     </div>
