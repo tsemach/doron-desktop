@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -7,6 +7,8 @@ import CaseStatusBadge from "../ui/CaseStatusBadge";
 import FileTypeIcon from "../ui/FileTypeIcon";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
 import type { CaseStatus, Tag } from "../CaseManagement/CaseManagementTypes";
+import { useSearch } from "../../hooks/useSearch";
+import { searchDocuments, type TagFilter } from "../../lib/search";
 
 const DOC_TYPES = [
   "contract",
@@ -21,11 +23,6 @@ const DOC_TYPES = [
   "manual",
   "other",
 ];
-
-type TagFilter = {
-  name: string;
-  value?: string;
-};
 
 type SearchTarget = "documents" | "cases" | "both";
 
@@ -54,23 +51,6 @@ function searchCases(allCases: CaseSearchEntry[], filters: TagFilter[], notesCon
     })
     .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
 }
-
-type DocumentRow = {
-  id: number;
-  file_path: string;
-  file_name: string;
-  title: string | null;
-  summary: string | null;
-  doc_type: string | null;
-  doc_date: string | null;
-  language: string | null;
-  keywords: string[];
-  topics: string[];
-  entities: string[];
-  authors: string[];
-  page_count: number | null;
-  confidence: number | null;
-};
 
 function buildQuery(text: string, docType: string, dateFrom: string, dateTo: string): string {
   const parts: string[] = [];
@@ -113,28 +93,60 @@ export default function DocsManagementSearch() {
   const [newTagFilterValue, setNewTagFilterValue] = useState("");
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [searchTarget, setSearchTarget] = useState<SearchTarget>("documents");
-  const [results, setResults] = useState<DocumentRow[] | null>(null);
   const [caseResults, setCaseResults] = useState<CaseSearchEntry[] | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [cases, setCases] = useState<CaseSearchEntry[]>([]);
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
   const hasStructuredFilters = tagFilters.length > 0 || !!notesContains.trim();
-  // Only the free-text/natural-language box is an AI-driven search — tag,
-  // notes, doc type, and date filters are deterministic SQL, so they
-  // shouldn't be blocked by a missing API key.
-  const needsApiKey = !!text.trim();
   const [aiConfig, setAiConfig] = useState<any>(null);
+  // Only free-text search is AI-driven; structured filters are deterministic SQL.
+  // While aiConfig is still loading, fail closed on missing localStorage key so
+  // debounced auto-search cannot fire before settings resolve.
+  const needsApiKey = !!text.trim() && (aiConfig === null || aiConfig.ai_mode === "byom");
+  const showWarning = aiConfig
+    ? aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc
+    : !apiKey;
+  const shouldClearSearch = !queryString.trim() && !hasStructuredFilters;
+
+  const documentSearchRequest = useMemo(
+    () => ({
+      query: queryString,
+      apiKey,
+      limit: 20,
+      tags: tagFilters.length > 0 ? tagFilters : undefined,
+      notesContains: notesContains.trim() || undefined,
+    }),
+    [queryString, apiKey, tagFilters, notesContains],
+  );
+
+  const documentsSearchEnabled =
+    searchTarget !== "cases" &&
+    (!!queryString.trim() || hasStructuredFilters) &&
+    !(needsApiKey && showWarning);
+
+  const {
+    results: documentSearchResponse,
+    hasSearched: hasDocumentSearch,
+    isSearching,
+    error,
+    search: runDocumentSearch,
+  } = useSearch({
+    searchFn: searchDocuments,
+    request: documentSearchRequest,
+    getQueryText: (req) => req.query,
+    enabled: documentsSearchEnabled,
+    shouldClear: shouldClearSearch,
+  });
+
+  const results = searchTarget !== "cases" ? (documentSearchResponse?.results ?? null) : null;
+  const showResultsPanel = (searchTarget !== "cases" && hasDocumentSearch) || caseResults !== null;
 
   useEffect(() => {
     loadCases();
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
     invoke<string[]>("list_all_tag_names", { tagType: "user" }).then(setAvailableTagNames).catch(() => { });
   }, []);
-
-  const showWarning = aiConfig ? (aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc) : !apiKey;
 
   async function loadCases() {
     try {
@@ -151,6 +163,14 @@ export default function DocsManagementSearch() {
       console.error("Failed to load cases in search:", err);
     }
   }
+
+  useEffect(() => {
+    if (searchTarget !== "documents" && hasStructuredFilters) {
+      setCaseResults(searchCases(cases, tagFilters, notesContains));
+    } else {
+      setCaseResults(null);
+    }
+  }, [searchTarget, hasStructuredFilters, cases, tagFilters, notesContains]);
 
   function findCaseForFile(filePath: string) {
     if (!filePath) return null;
@@ -177,34 +197,7 @@ export default function DocsManagementSearch() {
 
   async function handleSearch() {
     if ((!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning)) return;
-    setIsSearching(true);
-    setError(null);
-    try {
-      if (searchTarget !== "cases") {
-        const rows = await invoke<DocumentRow[]>("query_search_documents", {
-          query: queryString,
-          apiKey,
-          limit: 20,
-          tags: tagFilters.length > 0 ? tagFilters : undefined,
-          notesContains: notesContains.trim() || undefined,
-        });
-        setResults(rows);
-      } else {
-        setResults(null);
-      }
-
-      // Case matching is advance-search-driven only (tags/notes) — free
-      // text, doc type, and date filters stay document-specific.
-      if (searchTarget !== "documents" && hasStructuredFilters) {
-        setCaseResults(searchCases(cases, tagFilters, notesContains));
-      } else {
-        setCaseResults(null);
-      }
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setIsSearching(false);
-    }
+    runDocumentSearch();
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -271,10 +264,10 @@ export default function DocsManagementSearch() {
           <div className="absolute right-2 flex items-center gap-1.5">
             <Button
               onClick={handleSearch}
-              disabled={(!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning) || isSearching}
+              disabled={(!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning) || (isSearching && !hasDocumentSearch)}
               size="sm"
             >
-              {isSearching ? "Searching..." : "Search"}
+              {isSearching && !hasDocumentSearch ? "Searching..." : "Search"}
             </Button>
           </div>
         </div>
@@ -471,7 +464,7 @@ export default function DocsManagementSearch() {
       )}
 
       {/* Search Results */}
-      {(results !== null || caseResults !== null) ? (
+      {showResultsPanel ? (
         <div className="space-y-6">
           {/* Case Results */}
           {caseResults !== null && (
@@ -505,18 +498,18 @@ export default function DocsManagementSearch() {
           )}
 
           {/* Document Results */}
-          {results !== null && (
+          {searchTarget !== "cases" && hasDocumentSearch && (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
-                  {results.length === 0
+                  {results === null || results.length === 0
                     ? "No matching documents found."
                     : `Showing ${results.length} relevant document${results.length !== 1 ? "s" : ""}`}
                 </span>
               </div>
 
               <div className="space-y-3">
-                {results.map((doc) => {
+                {(results ?? []).map((doc) => {
               const fileExtension = doc.file_name.split(".").pop() || "";
               const matchedCase = findCaseForFile(doc.file_path);
               return (

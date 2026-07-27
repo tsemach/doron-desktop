@@ -60,7 +60,6 @@ fn test_query_by_fts_basic() {
         "[\"medical\", \"patient\", \"therapy\"]",
     );
 
-    // Query for rental keywords
     let keywords = vec!["rental".to_string(), "lease".to_string()];
     let results = query_by_fts(&conn, Some(&keywords), None, 5);
 
@@ -92,19 +91,65 @@ fn test_query_by_fts_and_or_fallback() {
         "[\"rainy\", \"days\", \"cloudy\"]",
     );
 
-    // 1. AND match: keywords "skies" and "sunny" are both in doc1, but only "skies" is in doc2.
-    // The query should use the AND expression first and only return doc1.
     let keywords_and = vec!["skies".to_string(), "sunny".to_string()];
     let results_and = query_by_fts(&conn, Some(&keywords_and), None, 5);
     assert!(results_and.contains_key(&doc_id_1), "Should match doc1");
     assert!(!results_and.contains_key(&doc_id_2), "Should not match doc2 (AND failed for doc2)");
 
-    // 2. OR fallback: keywords "sunny" and "cloudy" are in different documents.
-    // AND will return empty, falling back to OR which returns both documents.
     let keywords_or = vec!["sunny".to_string(), "cloudy".to_string()];
     let results_or = query_by_fts(&conn, Some(&keywords_or), None, 5);
     assert!(results_or.contains_key(&doc_id_1), "Should match doc1 (fallback OR)");
     assert!(results_or.contains_key(&doc_id_2), "Should match doc2 (fallback OR)");
+
+    let _ = std::fs::remove_file(db_path);
+}
+
+#[test]
+fn test_query_by_fts_prefix_match() {
+    let db_path = Path::new("tests/query/query_fts_prefix_test.db");
+    let conn = setup_test_db(db_path);
+
+    let doc_id = insert_test_doc(
+        &conn,
+        "rental.txt",
+        "Rental Contract",
+        "This is a rental lease agreement for an apartment.",
+        "[\"rental\", \"lease\"]",
+    );
+
+    let keywords = vec!["rent".to_string()];
+    let results = query_by_fts(&conn, Some(&keywords), None, 5);
+
+    assert!(results.contains_key(&doc_id), "Prefix match should find rental doc");
+
+    let _ = std::fs::remove_file(db_path);
+}
+
+#[test]
+fn test_query_by_fts_typo_match() {
+    let db_path = Path::new("tests/query/query_fts_typo_test.db");
+    let conn = setup_test_db(db_path);
+
+    let doc_id = insert_test_doc(
+        &conn,
+        "contract.txt",
+        "Service Contract",
+        "A standard service contract between parties.",
+        "[\"contract\", \"service\"]",
+    );
+
+    insert_test_doc(
+        &conn,
+        "unrelated.txt",
+        "Weather Report",
+        "Sunny skies with no legal terms.",
+        "[\"weather\", \"sunny\"]",
+    );
+
+    let keywords = vec!["contrct".to_string()];
+    let results = query_by_fts(&conn, Some(&keywords), None, 5);
+
+    assert!(results.contains_key(&doc_id), "Typo match should find contract doc via LIKE pool");
 
     let _ = std::fs::remove_file(db_path);
 }
@@ -130,7 +175,6 @@ fn test_query_by_fts_filtering() {
         "[\"alpha\", \"beta\"]",
     );
 
-    // Query for "Alpha" but filter for only doc_id_2
     let keywords = vec!["Alpha".to_string()];
     let mut filters = HashSet::new();
     filters.insert(doc_id_2);
@@ -147,11 +191,9 @@ fn test_query_by_fts_empty_or_none() {
     let db_path = Path::new("tests/query/query_fts_empty_test.db");
     let conn = setup_test_db(db_path);
 
-    // Querying with None keywords
     let results_none = query_by_fts(&conn, None, None, 5);
     assert!(results_none.is_empty(), "Results with None keywords should be empty");
 
-    // Querying with empty keywords list
     let empty_keywords = vec![];
     let results_empty = query_by_fts(&conn, Some(&empty_keywords), None, 5);
     assert!(results_empty.is_empty(), "Results with empty keywords list should be empty");

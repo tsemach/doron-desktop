@@ -17,6 +17,8 @@ pub mod clipboard;
 pub mod power;
 pub mod tags;
 pub mod user_settings;
+pub mod search;
+pub mod fuzzy;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -145,6 +147,7 @@ pub fn run() {
             indexer::get_active_indexing_sessions,
             indexer::delete_indexing_session,
             query::query_search_documents,
+            search::search,
             doc_template::local_add::process_template,
             doc_template::download::download_and_process_template,
             doc_template::list_templates,

@@ -1,98 +1,10 @@
 use std::collections::{HashMap, HashSet};
+
 use rusqlite::Connection;
-use super::types::{QueryAnalysis, DocumentRow, TagFilter};
-use super::helpers::{fts_term, row_to_doc, has_embeddings};
 
-/// Formulate and run a dynamic SQL query to get document IDs passing hard filters
-/// (date range, tag filters, and notes-contains). Tags/notes are looked up via
-/// `documents.file_path`, which is how `tags`/`document_annotations` scope to a
-/// document (there's no case FK on `documents`).
-fn get_filtered_document_ids(
-    conn: &Connection,
-    date_from: Option<&str>,
-    date_to: Option<&str>,
-    tags: Option<&[TagFilter]>,
-    notes_contains: Option<&str>,
-) -> Option<HashSet<i64>> {
-    let mut clauses = Vec::new();
-    let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-
-    if let Some(df) = date_from {
-        if !df.trim().is_empty() {
-            clauses.push(format!("doc_date >= ?{}", params.len() + 1));
-            params.push(Box::new(df.to_string()));
-        }
-    }
-
-    if let Some(dt) = date_to {
-        if !dt.trim().is_empty() {
-            clauses.push(format!("doc_date <= ?{}", params.len() + 1));
-            params.push(Box::new(dt.to_string()));
-        }
-    }
-
-    // Each selected tag must be present (intersected via AND) — a document
-    // needs ALL selected tags, not just one of them.
-    for tag in tags.into_iter().flatten() {
-        let name = tag.name.trim();
-        if name.is_empty() {
-            continue;
-        }
-        // tags.scope_value is always stored slash-normalized for document scope
-        // (see TagScope::Document), while documents.file_path keeps native
-        // separators — normalize the same way here or the match silently misses
-        // on Windows.
-        match tag.value.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
-            Some(value) => {
-                clauses.push(format!(
-                    "REPLACE(file_path, '\\', '/') IN (SELECT scope_value FROM tags WHERE scope_type = 'document' AND name = ?{} AND value = ?{})",
-                    params.len() + 1,
-                    params.len() + 2
-                ));
-                params.push(Box::new(name.to_string()));
-                params.push(Box::new(value.to_string()));
-            }
-            None => {
-                clauses.push(format!(
-                    "REPLACE(file_path, '\\', '/') IN (SELECT scope_value FROM tags WHERE scope_type = 'document' AND name = ?{})",
-                    params.len() + 1
-                ));
-                params.push(Box::new(name.to_string()));
-            }
-        }
-    }
-
-    if let Some(notes) = notes_contains.map(str::trim).filter(|n| !n.is_empty()) {
-        clauses.push(format!(
-            "file_path IN (SELECT file_path FROM document_annotations WHERE notes LIKE ?{})",
-            params.len() + 1
-        ));
-        params.push(Box::new(format!("%{}%", notes)));
-    }
-
-    if clauses.is_empty() {
-        return None;
-    }
-
-    let sql = format!("SELECT id FROM documents WHERE {}", clauses.join(" AND "));
-    let mut stmt = match conn.prepare(&sql) {
-        Ok(s) => s,
-        Err(_) => return Some(HashSet::new()),
-    };
-    
-    let p_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|v| v.as_ref()).collect();
-    let rows = stmt
-        .query_map(p_ref.as_slice(), |row| row.get::<_, i64>(0))
-        .ok();
-
-    let mut set = HashSet::new();
-    if let Some(rows) = rows {
-        for r in rows.flatten() {
-            set.insert(r);
-        }
-    }
-    Some(set)
-}
+use super::filters::filtered_document_ids;
+use super::helpers::{has_embeddings, row_to_doc};
+use super::types::{DocumentRow, QueryAnalysis, TagFilter};
 
 fn parse_distribution(val_opt: &Option<String>) -> HashMap<String, f64> {
     let mut dist = HashMap::new();
@@ -150,79 +62,22 @@ fn compute_type_overlap(query_dist: &HashMap<String, f64>, doc_dist: &HashMap<St
     score
 }
 
-/// Retrieve documents matching the FTS query and filter them by ID set
-fn query_by_fts_with_filter(
-    conn: &Connection,
-    match_expr: &str,
-    filter_ids: Option<&HashSet<i64>>,
-    limit: usize,
-) -> Vec<(i64, f32)> {
-    let sql = "
-        SELECT d.id, fts.rank
-        FROM documents d
-        JOIN documents_fts fts ON d.id = fts.rowid
-        WHERE documents_fts MATCH ?1
-        ORDER BY rank
-    ";
-    let mut stmt = match conn.prepare(sql) {
-        Ok(s) => s,
-        Err(_) => return vec![],
-    };
-
-    let rows = match stmt.query_map(rusqlite::params![match_expr], |row| {
-        let id: i64 = row.get(0)?;
-        let rank: f64 = row.get(1)?;
-        Ok((id, rank))
-    }) {
-        Ok(r) => r,
-        Err(_) => return vec![],
-    };
-
-    let mut results = Vec::new();
-    for row in rows.flatten() {
-        let (id, rank) = row;
-        if let Some(set) = filter_ids {
-            if !set.contains(&id) {
-                continue;
-            }
-        }
-        // sqlite fts rank lower is better (0.0 is perfect match). Convert to positive score.
-        let score = (100.0 - rank) as f32;
-        results.push((id, score));
-    }
-    results.truncate(limit);
-    results
-}
-
-/// Query the FTS database and collect scores into a HashMap
+/// Back-compat alias for eval tests and external callers.
 pub fn query_by_fts(
     conn: &Connection,
     keywords: Option<&Vec<String>>,
     filter_ids: Option<&HashSet<i64>>,
     limit: usize,
 ) -> HashMap<i64, f32> {
-    let mut fts_scores = HashMap::new();
-    if let Some(keywords) = keywords {
-        if !keywords.is_empty() {
-            let and_expr = keywords.iter().map(|k| fts_term(k)).collect::<Vec<_>>().join(" ");
-            let matches = query_by_fts_with_filter(conn, &and_expr, filter_ids, limit * 2);
-
-            let matches = if matches.is_empty() {
-                let or_expr = keywords.iter().map(|k| fts_term(k)).collect::<Vec<_>>().join(" OR ");
-                query_by_fts_with_filter(conn, &or_expr, filter_ids, limit * 2)
-            } else {
-                matches
-            };
-
-            for (id, score) in matches {
-                fts_scores.insert(id, score);
-            }
-        }
-    }
-    fts_scores
+    crate::fuzzy::search(
+        conn,
+        keywords.map(|k| k.as_slice()),
+        filter_ids,
+        limit,
+    )
 }
 
-/// Generate query embedding and calculate cosine similarity over all stored chunks
+/// Generate query embedding and calculate cosine similarity over all stored chunks.
 pub fn query_by_vector(
     conn: &Connection,
     query_text: &str,
@@ -274,7 +129,7 @@ pub fn query_by_vector(
     results
 }
 
-/// Core smart query dispatcher executing both text/FTS search and vector search
+/// Orchestrates structured filters, fuzzy retrieval, vector search, and ranking.
 pub fn query_smart_execute(
     conn: &Connection,
     analysis: &QueryAnalysis,
@@ -283,12 +138,11 @@ pub fn query_smart_execute(
     notes_contains: Option<&str>,
     limit: usize,
 ) -> Vec<DocumentRow> {
-    // 1. Resolve structured filters (dates, tags, notes)
     let date_range_from = analysis.date_range.as_ref().and_then(|r| r.from.as_deref());
     let date_range_to = analysis.date_range.as_ref().and_then(|r| r.to.as_deref());
     let has_explicit_filter = tags.is_some_and(|t| !t.is_empty())
         || notes_contains.is_some_and(|s| !s.trim().is_empty());
-    let mut filter_ids = get_filtered_document_ids(
+    let mut filter_ids = filtered_document_ids(
         conn,
         date_range_from,
         date_range_to,
@@ -296,20 +150,15 @@ pub fn query_smart_execute(
         notes_contains,
     );
 
-    // Resilient Fallback: If only soft (AI-guessed) date filters matched 0
-    // documents, fallback to searching everything instead of returning empty
-    // results immediately. Explicit tag/notes filters are user picks, not
-    // guesses — 0 matches there should mean 0 results, not a silent broadening.
     if let Some(ref set) = filter_ids {
         if set.is_empty() && !has_explicit_filter {
             filter_ids = None;
         }
     }
 
-    // 2. Fetch FTS matches
-    let fts_scores = query_by_fts(conn, analysis.keywords.as_ref(), filter_ids.as_ref(), limit);
+    let keywords = analysis.keywords.as_deref();
+    let retrieval_scores = crate::fuzzy::search(conn, keywords, filter_ids.as_ref(), limit);
 
-    // 3. Fetch Vector Similarity matches (bypassed if FTS-only is active)
     let mut vec_scores = HashMap::new();
     if !super::USE_FTS_ONLY {
         let vec_matches = query_by_vector(conn, query_text, filter_ids.as_ref(), limit * 3);
@@ -318,8 +167,11 @@ pub fn query_smart_execute(
         }
     }
 
-    // 4. Merge results using a strict semantic relevance check
-    let all_ids: HashSet<i64> = fts_scores.keys().copied().chain(vec_scores.keys().copied()).collect();
+    let all_ids: HashSet<i64> = retrieval_scores
+        .keys()
+        .copied()
+        .chain(vec_scores.keys().copied())
+        .collect();
     let has_embs = has_embeddings(conn);
 
     let final_ids = if all_ids.is_empty() {
@@ -329,34 +181,41 @@ pub fn query_smart_execute(
             vec![]
         }
     } else {
+        let candidate_ids: Vec<i64> = all_ids.iter().copied().collect();
+        let doc_fields = crate::fuzzy::fetch_doc_fields_batch(conn, &candidate_ids);
         let mut combined_scores = HashMap::new();
         let query_type_dist = parse_query_distribution(&analysis.doc_types);
 
         for id in all_ids {
             let vec_score = vec_scores.get(&id).copied().unwrap_or(0.0);
-            let fts_score = fts_scores.get(&id).copied().unwrap_or(0.0);
+            let retrieval_score = retrieval_scores.get(&id).copied().unwrap_or(0.0);
 
-            // Fetch document metadata to extract its doc_type distribution
-            let doc_type_val = {
-                let stmt = conn.prepare("SELECT doc_type FROM documents WHERE id = ?1").ok();
-                stmt.and_then(|mut s| s.query_row(rusqlite::params![id], |r| r.get::<_, Option<String>>(0)).ok()).flatten()
-            };
-            let doc_type_dist = parse_distribution(&doc_type_val);
+            let doc_type_dist = doc_fields
+                .get(&id)
+                .map(|fields| parse_distribution(&fields.doc_type))
+                .unwrap_or_default();
             let type_score = compute_type_overlap(&query_type_dist, &doc_type_dist);
 
-            // Stricter Relevance Verification:
+            let fuzzy_score = keywords
+                .filter(|k| !k.is_empty())
+                .and_then(|k| {
+                    doc_fields
+                        .get(&id)
+                        .map(|fields| crate::fuzzy::score_keywords(k, &fields.searchable))
+                })
+                .unwrap_or(0.0);
+
             let is_relevant = if has_embs && !super::USE_FTS_ONLY {
-                vec_score >= 0.75 || (fts_score > 0.0 && vec_score >= 0.68)
+                vec_score >= 0.75 || (retrieval_score > 0.0 && vec_score >= 0.68)
             } else {
-                fts_score > 0.0
+                retrieval_score > 0.0 || crate::fuzzy::is_relevant(fuzzy_score)
             };
 
             if is_relevant {
-                // Combine scores:
                 let combined = if super::USE_FTS_ONLY {
-                    fts_score + (type_score as f32 * 0.20)
+                    retrieval_score + (fuzzy_score * 0.35) + (type_score as f32 * 0.20)
                 } else {
-                    vec_score + (fts_score / 200.0) + (type_score as f32 * 0.20)
+                    vec_score + (retrieval_score / 200.0) + (fuzzy_score * 0.15) + (type_score as f32 * 0.20)
                 };
                 combined_scores.insert(id, combined);
             }
@@ -369,10 +228,8 @@ pub fn query_smart_execute(
             sb.partial_cmp(sa).unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        // Relative Score Thresholding:
         if !ids.is_empty() {
             let top_score = combined_scores.get(&ids[0]).copied().unwrap_or(0.0);
-            // Retain documents scoring within 0.15 of the best match
             ids.retain(|id| {
                 let score = combined_scores.get(id).copied().unwrap_or(0.0);
                 score >= top_score - 0.15
@@ -386,7 +243,6 @@ pub fn query_smart_execute(
         return vec![];
     }
 
-    // 5. Fetch full document details preserving order
     let placeholders = final_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
         "SELECT id, file_path, file_name, title, summary, doc_type,
@@ -401,15 +257,22 @@ pub fn query_smart_execute(
         Err(_) => return vec![],
     };
 
-    let params: Vec<Box<dyn rusqlite::ToSql>> = final_ids.iter().map(|&id| Box::new(id) as Box<dyn rusqlite::ToSql>).collect();
+    let params: Vec<Box<dyn rusqlite::ToSql>> = final_ids
+        .iter()
+        .map(|&id| Box::new(id) as Box<dyn rusqlite::ToSql>)
+        .collect();
     let p_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|v| v.as_ref()).collect();
 
     let mut docs_map = match stmt.query_map(p_ref.as_slice(), row_to_doc) {
-        Ok(rows) => rows.filter_map(|r| r.ok()).map(|d| (d.id, d)).collect::<HashMap<_, _>>(),
+        Ok(rows) => rows
+            .filter_map(|r| r.ok())
+            .map(|d| (d.id, d))
+            .collect::<HashMap<_, _>>(),
         Err(_) => return vec![],
     };
 
-    final_ids.into_iter()
+    final_ids
+        .into_iter()
         .filter_map(|id| docs_map.remove(&id))
         .take(limit)
         .collect()
