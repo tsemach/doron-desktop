@@ -2,8 +2,7 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@workspace/ui";
-import AuthCard from "../../../components/auth/AuthCard";
+import { AuthCard, Button } from "@workspace/ui";
 
 function CompleteContent() {
   const router = useRouter();

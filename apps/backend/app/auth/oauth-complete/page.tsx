@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import AuthCard from "../../../components/auth/AuthCard";
+import { AuthCard } from "@workspace/ui";
 
 // Landing point for plain-web Google/Facebook sign-in, from either the
 // register or login page's social buttons -- OAuth doesn't distinguish

@@ -3,9 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Button } from "@workspace/ui";
-import AuthCard from "../../../components/auth/AuthCard";
-import { errorClass } from "../../../components/auth/formStyles";
+import { AuthCard, Button, errorClass } from "@workspace/ui";
 
 function PlanForm() {
   const router = useRouter();

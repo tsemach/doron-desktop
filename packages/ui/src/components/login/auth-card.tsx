@@ -10,7 +10,7 @@ interface AuthCardProps {
 // the app's actual background/card/border tokens (apps/backend/app/globals.css),
 // replacing the previous bespoke "Doron Client Portal" gradient design so the
 // web portal looks like the same product as the desktop app, not a separate one.
-export default function AuthCard({ title, subtitle, children }: AuthCardProps) {
+export function AuthCard({ title, subtitle, children }: AuthCardProps) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-sm">

@@ -11,6 +11,7 @@
     "desktop:build": "pnpm --filter desktop build",
     "desktop:release": "pnpm --filter desktop tauri build",
     "backend:dev": "pnpm --filter backend dev",
+    "office:dev": "pnpm --filter office dev",
     "release:bump": "node scripts/bump-version.js"
   },
   "devDependencies": {

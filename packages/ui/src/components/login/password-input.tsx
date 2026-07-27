@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { inputClass } from "./formStyles";
+import { inputClass } from "../../lib/auth-form-styles";
 
 interface PasswordInputProps {
   value: string;
@@ -12,7 +12,7 @@ interface PasswordInputProps {
   name?: string;
 }
 
-export default function PasswordInput({ value, onChange, placeholder, autoComplete, name }: PasswordInputProps) {
+export function PasswordInput({ value, onChange, placeholder, autoComplete, name }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
   return (

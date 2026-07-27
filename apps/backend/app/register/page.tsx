@@ -3,10 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Button } from "@workspace/ui";
-import AuthCard from "../../components/auth/AuthCard";
-import PasswordInput from "../../components/auth/PasswordInput";
-import { errorClass, inputClass, labelClass } from "../../components/auth/formStyles";
+import { AuthCard, Button, PasswordInput, errorClass, inputClass, labelClass } from "@workspace/ui";
 import { isValidEmail, isValidFullName, isValidPasswordLength } from "../../lib/validation";
 
 function RegisterForm() {
