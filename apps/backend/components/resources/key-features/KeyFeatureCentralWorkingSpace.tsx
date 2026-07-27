@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Layout, Compass, Shield, ChevronLeft, ChevronRight, Lock, FileCheck } from "lucide-react";
 
-export default function MainHelpCentralWorkingSpace() {
+export default function KeyFeatureCentralWorkingSpace() {
   // Screenshot Carousel State
   const [activeScreenshot, setActiveScreenshot] = useState(0);
 

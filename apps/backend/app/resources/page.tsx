@@ -1,19 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import Link from "next/link";
 import MainTopBar from "@/components/main/MainTopBar";
 
-// The feature-list/content that used to live here moved to
-// /resources/key-features (see app/resources/key-features/page.tsx) --
-// this keeps the shell as the default landing page.
-export default function Home() {
+export default function ShowMeHowPage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [tier, setTier] = useState<string | null>(null);
-
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
-  };
 
   useEffect(() => {
     async function fetchSession() {
@@ -33,12 +27,27 @@ export default function Home() {
     fetchSession();
   }, []);
 
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/login" });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
       <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
       <main className="flex-grow w-full flex flex-col items-center justify-center px-6 py-24 text-center">
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">Amicus</h1>
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 mb-3">
+          Show Me How
+        </h1>
+        <p className="text-slate-600 text-base max-w-lg mb-8">
+          A guided walkthrough of Amicus is coming soon.
+        </p>
+        <Link
+          href="/"
+          className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+        >
+          Back to home
+        </Link>
       </main>
     </div>
   );

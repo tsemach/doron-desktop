@@ -1,9 +1,9 @@
-type MainFreatureListProps = {
+type KeyFeatureFeaturesListProps = {
   activeFeatureId: string;
   onFeatureSelect: (featureTitle: string, featureId: string) => void;
 }
 
-export default function MainFeatureList({ activeFeatureId, onFeatureSelect }: MainFreatureListProps) {
+export default function KeyFeatureFeaturesList({ activeFeatureId, onFeatureSelect }: KeyFeatureFeaturesListProps) {
   const features = [
     {
       id: "central-working-space",

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import MainTopBarUser from "./MainTopBarUser";
 import MainTopBarLogo from "./MainTopBarLogo";
+import MainTopBarResourcesDropdown from "./MainTopBarResourcesDropdown";
 
 type Props = {
   userName: string | null;
@@ -14,7 +15,6 @@ const NAV_LINKS = [
   { label: "Products", href: "/products" },
   { label: "Download", href: "/download" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Resources", href: "/resources" },
 ];
 
 export default function MainTopBar({ userName, tier, handleLogout }: Props) {
@@ -32,6 +32,7 @@ export default function MainTopBar({ userName, tier, handleLogout }: Props) {
               {label}
             </Link>
           ))}
+          <MainTopBarResourcesDropdown />
         </nav>
       </div>
       <MainTopBarUser userName={userName} tier={tier} handleLogout={handleLogout} />
