@@ -23,7 +23,7 @@ export default function Home() {
   const [MainHelpFeatureSelected, setMainHelpFeatureSelected] = useState<string>("central-working-space");
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   // Fetch current session info on mount

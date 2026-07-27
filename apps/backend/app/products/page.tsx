@@ -28,7 +28,7 @@ export default function ProductsPage() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (

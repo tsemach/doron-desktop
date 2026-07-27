@@ -94,6 +94,8 @@ function RegisterForm() {
           <label className={labelClass}>Email address</label>
           <input
             type="email"
+            name="email"
+            autoComplete="username"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -106,6 +108,8 @@ function RegisterForm() {
           <label className={labelClass}>Full name</label>
           <input
             type="text"
+            name="name"
+            autoComplete="name"
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -116,12 +120,24 @@ function RegisterForm() {
 
         <div>
           <label className={labelClass}>Password</label>
-          <PasswordInput value={password} onChange={setPassword} placeholder="••••••••" autoComplete="new-password" />
+          <PasswordInput
+            value={password}
+            onChange={setPassword}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            name="new-password"
+          />
         </div>
 
         <div>
           <label className={labelClass}>Confirm password</label>
-          <PasswordInput value={confirmPassword} onChange={setConfirmPassword} placeholder="••••••••" autoComplete="new-password" />
+          <PasswordInput
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            name="confirm-password"
+          />
         </div>
 
         <Button type="submit" disabled={loading} className="mt-2 w-full">

@@ -40,7 +40,7 @@ export default function ProfilePage() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   async function handleUpgrade() {

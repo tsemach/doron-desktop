@@ -28,7 +28,7 @@ export default function PricingPage() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (

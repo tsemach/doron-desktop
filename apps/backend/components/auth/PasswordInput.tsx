@@ -9,9 +9,10 @@ interface PasswordInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   autoComplete?: string;
+  name?: string;
 }
 
-export default function PasswordInput({ value, onChange, placeholder, autoComplete }: PasswordInputProps) {
+export default function PasswordInput({ value, onChange, placeholder, autoComplete, name }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -25,6 +26,7 @@ export default function PasswordInput({ value, onChange, placeholder, autoComple
         className={`${inputClass} pr-9`}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        name={name}
       />
       <button
         type="button"

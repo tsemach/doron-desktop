@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@workspace/ui";
 import AuthCard from "../../components/auth/AuthCard";
@@ -10,7 +10,6 @@ import { errorClass, inputClass, labelClass } from "../../components/auth/formSt
 import { isValidEmail } from "../../lib/validation";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const platform = searchParams.get("platform"); // "desktop" when opened from the Amicus desktop app
   const autoProvider = searchParams.get("provider") as "google" | "facebook" | null;
@@ -54,12 +53,18 @@ function LoginForm() {
       // link) continues on to plan selection, same as it would have before
       // email verification broke the register -> plan continuity into two
       // separate visits. A normal returning login never carries this param.
-      if (justVerified) {
-        router.push(platform === "desktop" ? "/register/plan?platform=desktop" : "/register/plan");
-      } else {
-        router.push("/");
-      }
-      router.refresh();
+      //
+      // A hard navigation (not router.push) is required here: Chrome's
+      // password-save prompt keys off the login <form>'s submit being
+      // followed by a real document navigation. signIn() with redirect:
+      // false posts via fetch and router.push only does a client-side route
+      // change, so Chrome never sees a strong "login succeeded" signal and
+      // silently skips the save-password offer.
+      window.location.href = justVerified
+        ? platform === "desktop"
+          ? "/register/plan?platform=desktop"
+          : "/register/plan"
+        : "/";
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
       setLoading(false);
@@ -94,6 +99,8 @@ function LoginForm() {
               <label className={labelClass}>Email address</label>
               <input
                 type="email"
+                name="email"
+                autoComplete="username"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -104,7 +111,13 @@ function LoginForm() {
 
             <div>
               <label className={labelClass}>Password</label>
-              <PasswordInput value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" />
+              <PasswordInput
+                value={password}
+                onChange={setPassword}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                name="password"
+              />
             </div>
 
             <Button type="submit" disabled={loading} className="mt-2 w-full">

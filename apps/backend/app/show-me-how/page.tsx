@@ -28,7 +28,7 @@ export default function ShowMeHowPage() {
   }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (
