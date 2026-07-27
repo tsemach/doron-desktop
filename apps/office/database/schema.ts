@@ -74,3 +74,17 @@ export const verificationTokens = pgTable(
     },
   ]
 );
+
+// Copied from apps/backend/database/schema.ts (not shared -- apps/backend's
+// copy of this table/feature will be deleted once this one fully replaces
+// it, but not yet), so this is its own independent registry, not the same
+// rows as apps/backend's `document_templates`.
+export const documentTemplates = pgTable("document_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fileName: text("file_name").notNull(),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  language: text("language").notNull(), // 'en' or 'he'
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

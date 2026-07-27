@@ -211,6 +211,9 @@ importers:
       '@auth/drizzle-adapter':
         specifier: ^1.11.2
         version: 1.11.2
+      '@vercel/blob':
+        specifier: ^2.6.1
+        version: 2.6.1
       '@workspace/ui':
         specifier: workspace:*
         version: link:../../packages/ui
