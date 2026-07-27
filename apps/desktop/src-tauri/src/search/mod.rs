@@ -3,6 +3,8 @@ mod engine;
 pub mod document;
 
 pub use types::{SearchFilters, SearchRequest, SearchResponse, SearchScope};
+pub use document::DocumentSearchEngine;
+pub use engine::SearchEngine;
 
 use tauri::AppHandle;
 
@@ -15,7 +17,7 @@ pub async fn search(
 ) -> Result<SearchResponse, String> {
     match request.scope {
         SearchScope::Documents => {
-            document::DocumentSearchEngine::execute(&app, request, api_key, model).await
+            DocumentSearchEngine::search(&app, request, api_key, model).await
         }
     }
 }

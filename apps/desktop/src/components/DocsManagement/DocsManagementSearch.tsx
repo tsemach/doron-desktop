@@ -100,8 +100,13 @@ export default function DocsManagementSearch() {
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
   const hasStructuredFilters = tagFilters.length > 0 || !!notesContains.trim();
   const [aiConfig, setAiConfig] = useState<any>(null);
-  const needsApiKey = !!text.trim() && aiConfig !== null && aiConfig.ai_mode === "byom";
-  const showWarning = aiConfig !== null && aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc;
+  // Only free-text search is AI-driven; structured filters are deterministic SQL.
+  // While aiConfig is still loading, fail closed on missing localStorage key so
+  // debounced auto-search cannot fire before settings resolve.
+  const needsApiKey = !!text.trim() && (aiConfig === null || aiConfig.ai_mode === "byom");
+  const showWarning = aiConfig
+    ? aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc
+    : !apiKey;
   const shouldClearSearch = !queryString.trim() && !hasStructuredFilters;
 
   const documentSearchRequest = useMemo(

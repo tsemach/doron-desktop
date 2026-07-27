@@ -181,6 +181,8 @@ pub fn query_smart_execute(
             vec![]
         }
     } else {
+        let candidate_ids: Vec<i64> = all_ids.iter().copied().collect();
+        let doc_fields = crate::fuzzy::fetch_doc_fields_batch(conn, &candidate_ids);
         let mut combined_scores = HashMap::new();
         let query_type_dist = parse_query_distribution(&analysis.doc_types);
 
@@ -188,20 +190,19 @@ pub fn query_smart_execute(
             let vec_score = vec_scores.get(&id).copied().unwrap_or(0.0);
             let retrieval_score = retrieval_scores.get(&id).copied().unwrap_or(0.0);
 
-            let doc_type_val = {
-                let stmt = conn.prepare("SELECT doc_type FROM documents WHERE id = ?1").ok();
-                stmt.and_then(|mut s| {
-                    s.query_row(rusqlite::params![id], |r| r.get::<_, Option<String>>(0))
-                        .ok()
-                })
-                .flatten()
-            };
-            let doc_type_dist = parse_distribution(&doc_type_val);
+            let doc_type_dist = doc_fields
+                .get(&id)
+                .map(|fields| parse_distribution(&fields.doc_type))
+                .unwrap_or_default();
             let type_score = compute_type_overlap(&query_type_dist, &doc_type_dist);
 
             let fuzzy_score = keywords
                 .filter(|k| !k.is_empty())
-                .map(|k| crate::fuzzy::score_document(conn, id, k))
+                .and_then(|k| {
+                    doc_fields
+                        .get(&id)
+                        .map(|fields| crate::fuzzy::score_keywords(k, &fields.searchable))
+                })
                 .unwrap_or(0.0);
 
             let is_relevant = if has_embs && !super::USE_FTS_ONLY {

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useDebouncedValue } from "./useDebouncedValue";
+
 type UseSearchOptions<TReq, TResult> = {
   searchFn: (request: TReq) => Promise<TResult>;
   request: TReq;
@@ -32,7 +34,7 @@ export function useSearch<TReq, TResult>({
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debouncedRequest, setDebouncedRequest] = useState(request);
+  const debouncedRequest = useDebouncedValue(request, debounceMs);
   const requestIdRef = useRef(0);
   const hasResultsRef = useRef(false);
 
@@ -57,11 +59,6 @@ export function useSearch<TReq, TResult>({
       reset();
     }
   }, [shouldClear, reset]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedRequest(request), debounceMs);
-    return () => window.clearTimeout(timer);
-  }, [request, debounceMs]);
 
   const runSearch = useCallback(
     async (activeRequest: TReq) => {

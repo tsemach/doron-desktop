@@ -63,13 +63,10 @@ pub async fn query_search_documents(
             notes_contains,
         },
     };
-    let response = crate::search::document::DocumentSearchEngine::execute(
-        &app,
-        request,
-        api_key,
-        model,
-    )
-    .await?;
+    let response = {
+        use crate::search::SearchEngine;
+        crate::search::DocumentSearchEngine::search(&app, request, api_key, model).await?
+    };
     Ok(response.results)
 }
 
