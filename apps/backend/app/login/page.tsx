@@ -8,7 +8,7 @@ import { isValidEmail } from "../../lib/validation";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const platform = searchParams.get("platform"); // "desktop" when opened from the Amicus desktop app
+  const platform = searchParams.get("platform"); // "desktop" when opened from the Ascurix desktop app
   const autoProvider = searchParams.get("provider") as "google" | "facebook" | null;
   const justVerified = searchParams.get("justVerified") === "1";
 
@@ -84,7 +84,7 @@ function LoginForm() {
   }
 
   return (
-    <AuthCard title="Sign in to Amicus">
+    <AuthCard title="Sign in to Ascurix">
       {platform === "desktop" && autoProvider ? (
         <p className="text-center text-sm text-muted-foreground">Opening {autoProvider}…</p>
       ) : (

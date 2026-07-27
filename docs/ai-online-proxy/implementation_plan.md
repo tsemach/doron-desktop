@@ -7,7 +7,7 @@ calls Anthropic/Gemini/OpenAI directly using either a bundled key or the
 user's own key. This is moving behind the backend: all `"online"` mode
 requests will be proxied through `apps/backend` via Vercel AI SDK + AI
 Gateway, streaming back to the desktop over a custom NDJSON envelope, so
-Amicus holds the only provider credentials and can enforce per-customer cost
+Ascurix holds the only provider credentials and can enforce per-customer cost
 controls. `byom` and `local` modes are explicitly untouched.
 
 The full architecture, protocol, and design rationale were worked out over

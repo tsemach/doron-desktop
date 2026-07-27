@@ -1,8 +1,8 @@
 import { pgTable, text, integer, timestamp, primaryKey, uuid } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
-// Amicus staff/ops accounts for the back office -- deliberately a separate
-// table from apps/backend's `users` (Amicus customers). Credentials accounts
+// Ascurix staff/ops accounts for the back office -- deliberately a separate
+// table from apps/backend's `users` (Ascurix customers). Credentials accounts
 // are provisioned directly (see scripts/seed-admin.mjs), not self-registered.
 // OAuth (Google/Facebook) sign-in is also allowed, but gated in auth.ts's
 // signIn callback to only emails that already have a row here -- unlike

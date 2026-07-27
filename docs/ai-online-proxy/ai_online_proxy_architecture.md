@@ -23,7 +23,7 @@ sidecar) is also unaffected.
 
 **Goals**
 - Move "online" mode's provider credentials out of the desktop client entirely
-  — Amicus holds the only API keys, via one AI Gateway credential.
+  — Ascurix holds the only API keys, via one AI Gateway credential.
 - Support streaming responses end-to-end (provider → Gateway → backend →
   desktop) so the UI can render tokens as they arrive and avoid request
   timeouts on long generations.
@@ -300,13 +300,13 @@ customer ask, what did the model say, what did it cost" for support/billing
 disputes without needing Gateway dashboard access — and it's the detail log
 `ai_usage_periods` (§5.3, §7) is derived from.
 
-**Confirmed required — Amicus is a legal case-management platform**, and
+**Confirmed required — Ascurix is a legal case-management platform**, and
 `ai_requests` will contain the actual content of documents, queries, and
 emails routed through cloud AI, not just metadata. That's a materially
 different exposure than storing token counts: it may include privileged or
-confidential client material, and Amicus (as vendor) would be able to read
+confidential client material, and Ascurix (as vendor) would be able to read
 it. The specific policy below is a **starting proposal for this design doc,
-not a legal decision** — it should be reviewed by whoever owns Amicus's
+not a legal decision** — it should be reviewed by whoever owns Ascurix's
 customer contracts/DPAs before implementation, not treated as final because
 an engineering doc proposed it.
 
@@ -327,7 +327,7 @@ Proposed default:
   honored, rather than retention period being the only lever.
 - **Encrypt `prompt`/`response` at rest**, beyond whatever disk-level
   encryption the Postgres host (Neon) already provides by default — a
-  column-level or application-level encryption key Amicus controls, so a
+  column-level or application-level encryption key Ascurix controls, so a
   database backup/snapshot leak doesn't expose plaintext case content on its
   own.
 - **Audit access to stored content**, not just store it — reading a
@@ -451,7 +451,7 @@ questions:
   required** (§9 has a proposed default: bounded retention + purge job,
   per-customer content-logging opt-out, encryption at rest for
   `prompt`/`response`, access auditing, cascade-on-deletion). The proposal
-  itself still needs sign-off from whoever owns Amicus's customer
+  itself still needs sign-off from whoever owns Ascurix's customer
   contracts/DPAs before the implementation plan treats it as final — an
   engineering design doc isn't the right place for that decision to
   originate from.

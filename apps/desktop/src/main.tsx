@@ -10,7 +10,7 @@ initObservability();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Sentry.ErrorBoundary fallback={<p>Something went wrong. Please restart Amicus.</p>}>
+    <Sentry.ErrorBoundary fallback={<p>Something went wrong. Please restart Ascurix.</p>}>
       <MemoryRouter>
         <App />
       </MemoryRouter>

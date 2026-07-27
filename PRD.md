@@ -1,9 +1,9 @@
-# Amicus — Product Requirements Document
+# Ascurix — Product Requirements Document
 
 Status: Draft v1 — 2026-07-20
 Owner: Tsemach Mizrachi
 
-Naming note: the product is **Amicus**. "Doron Desktop" was the working name before the rename and still names the physical repo, local directory, app identifier (`com.tsemach.doron-desktop`), and the `doron-desktop://` deep-link scheme referenced below — those stay as-is until manually migrated.
+Naming note: the product is **Ascurix** (formerly Amicus). "Doron Desktop" was the working name before the rename and still names the physical repo, local directory, app identifier (`com.tsemach.doron-desktop`), and the `doron-desktop://` deep-link scheme referenced below — those stay as-is until manually migrated.
 
 ## 1. Mission
 

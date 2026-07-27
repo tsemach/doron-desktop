@@ -153,7 +153,7 @@ export default function TemplatesPage() {
               Document Templates Manager
             </h1>
             <p className="text-sm text-slate-500">
-              Upload and manage document templates for the Amicus desktop app library.
+              Upload and manage document templates for the Ascurix desktop app library.
             </p>
           </div>
         </div>

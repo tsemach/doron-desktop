@@ -14,22 +14,22 @@ function CompleteContent() {
   // launches it if not. A custom-scheme navigation doesn't take the browser
   // tab away on its own, so this page then sends itself back to the portal
   // home instead of sitting on "You're all set" forever.
-  function handleOpenAmicus() {
+  function handleOpenAscurix() {
     window.location.href = "doron-desktop://login";
     setTimeout(() => router.push("/"), 300);
   }
 
   return (
-    <AuthCard title="You're all set" subtitle="Your Amicus account is ready.">
+    <AuthCard title="You're all set" subtitle="Your Ascurix account is ready.">
       <p className="text-center text-sm text-muted-foreground">
         {isDesktop
-          ? "Return to the Amicus desktop app and log in with your new account."
-          : "You can now sign in from the Amicus desktop app."}
+          ? "Return to the Ascurix desktop app and log in with your new account."
+          : "You can now sign in from the Ascurix desktop app."}
       </p>
 
       {isDesktop && (
-        <Button type="button" onClick={handleOpenAmicus} className="mt-6 w-full">
-          Open Amicus
+        <Button type="button" onClick={handleOpenAscurix} className="mt-6 w-full">
+          Open Ascurix
         </Button>
       )}
     </AuthCard>

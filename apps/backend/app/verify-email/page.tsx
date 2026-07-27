@@ -52,7 +52,7 @@ function VerifyEmailContent() {
         <div className="text-center">
           <p className="text-sm text-foreground">Your email is verified.</p>
           <a href={loginUrl} className="mt-4 inline-block font-medium text-foreground underline">
-            {isDesktop ? "Return to the Amicus app to sign in" : "Continue to sign in"}
+            {isDesktop ? "Return to the Ascurix app to sign in" : "Continue to sign in"}
           </a>
         </div>
       )}

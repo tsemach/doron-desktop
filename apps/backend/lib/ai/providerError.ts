@@ -11,7 +11,7 @@ function isApiErrorLike(error: unknown): error is ApiErrorLike {
 // Static, support-friendly text per error code -- never the raw
 // provider/Gateway error string. That string can carry operational details
 // (e.g. "AI Gateway requires a valid credit card on file...") that are
-// Amicus's problem to fix, not something to show a paying end user; the
+// Ascurix's problem to fix, not something to show a paying end user; the
 // raw error is logged server-side by the caller instead.
 const GENERIC_ERROR_MESSAGES: Record<"rate_limited" | "provider_error", string> = {
   rate_limited: "The AI service is temporarily busy. Please try again shortly.",

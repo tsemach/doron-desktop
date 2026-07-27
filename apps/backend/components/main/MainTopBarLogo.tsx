@@ -9,7 +9,7 @@ export default function MainTopBarLogo() {
       <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-semibold">
         A
       </span>
-      <span>Amicus</span>
+      <span>Ascurix</span>
     </Link>
   )
 }

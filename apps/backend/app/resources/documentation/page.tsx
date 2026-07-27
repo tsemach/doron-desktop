@@ -40,7 +40,7 @@ export default function DocumentationPage() {
           Documentation
         </h1>
         <p className="text-slate-600 text-base max-w-lg mb-8">
-          Amicus documentation is coming soon.
+          Ascurix documentation is coming soon.
         </p>
         <Link href="/" className="text-sm font-semibold text-slate-700 hover:text-slate-900">
           Back to home

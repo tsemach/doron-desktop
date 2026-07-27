@@ -169,7 +169,7 @@ export default function ProfilePage() {
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">
-                    {isPro ? "Amicus Pro" : "Amicus Free"}
+                    {isPro ? "Ascurix Pro" : "Ascurix Free"}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {isPro

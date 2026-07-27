@@ -254,7 +254,7 @@ describe("POST /api/v1/ai/complete", () => {
 
     // Mirrors a live @ai-sdk/gateway GatewayInternalServerError: an
     // operational detail ("AI Gateway requires a valid credit card on
-    // file...") that's Amicus's problem to fix, not something a paying
+    // file...") that's Ascurix's problem to fix, not something a paying
     // end user should see. Not recognized by APICallError.isInstance(),
     // but carries statusCode/isRetryable as real own properties, which is
     // duck-typed for the error code/retryable flag even though the raw

@@ -62,7 +62,7 @@ export default function DesktopCompletePage() {
   }, [status, session, router]);
 
   return (
-    <AuthCard title="Signing you in" subtitle="Completing your Amicus desktop login.">
+    <AuthCard title="Signing you in" subtitle="Completing your Ascurix desktop login.">
       {error ? (
         <div className={errorClass}>{error}</div>
       ) : (

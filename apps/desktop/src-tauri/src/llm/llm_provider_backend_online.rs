@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::llm::backend_stream::{LineBuffer, StreamEvent};
 
 /// Calls the backend's /api/v1/ai/complete route instead of a provider
-/// directly -- the desktop's "online" AI mode, now proxied so Amicus holds
+/// directly -- the desktop's "online" AI mode, now proxied so Ascurix holds
 /// the only provider credentials (see docs/ai-online-proxy). `byom`/`local`
 /// are untouched and keep calling providers directly via the sibling
 /// provider structs in this module.

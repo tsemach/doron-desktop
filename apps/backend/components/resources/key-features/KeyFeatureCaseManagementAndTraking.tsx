@@ -17,7 +17,7 @@ export default function KeyFeatureCaseManagementAndTraking() {
         </h2>
         
         <p className="text-slate-600 text-base sm:text-lg max-w-4xl leading-relaxed">
-          Streamline the lifecycle of your client matters. Amicus Desktop lets you organize folders, files, and correspondences under specific case files, making sure you always have contextual information at your fingertips.
+          Streamline the lifecycle of your client matters. Ascurix Desktop lets you organize folders, files, and correspondences under specific case files, making sure you always have contextual information at your fingertips.
         </p>
 
         {/* Feature Cards Grid */}

@@ -32,7 +32,7 @@ export default function KeyFeatureDocumentIndexing() {
         </h2>
         
         <p className="text-slate-600 text-base sm:text-lg max-w-4xl leading-relaxed">
-          Amicus Desktop uses cutting-edge LLMs (such as Anthropic Claude) to analyze your documentation. Instead of manually reviewing files to extract key terms or dates, the system processes them in the background to automatically build a structured profile.
+          Ascurix Desktop uses cutting-edge LLMs (such as Anthropic Claude) to analyze your documentation. Instead of manually reviewing files to extract key terms or dates, the system processes them in the background to automatically build a structured profile.
         </p>
 
         {/* Feature Cards Grid */}

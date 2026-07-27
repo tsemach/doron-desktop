@@ -32,7 +32,7 @@ export default function KeyFeatureEmailCorrespondencesSync() {
         </h2>
         
         <p className="text-slate-600 text-base sm:text-lg max-w-4xl leading-relaxed">
-          Amicus Desktop eliminates the chore of manual correspondence filing. By connecting your active mail client to the workspace, you can automatically ingest incoming legal queries and lock attachments to their corresponding files.
+          Ascurix Desktop eliminates the chore of manual correspondence filing. By connecting your active mail client to the workspace, you can automatically ingest incoming legal queries and lock attachments to their corresponding files.
         </p>
 
         {/* Feature Cards Grid */}

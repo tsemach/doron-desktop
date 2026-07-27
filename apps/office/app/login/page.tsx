@@ -47,7 +47,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthCard title="Amicus Back Office">
+    <AuthCard title="Ascurix Back Office">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error && <div className={errorClass}>{error}</div>}
 
@@ -61,7 +61,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className={inputClass}
-            placeholder="you@amicus.com"
+            placeholder="you@ascurix.com"
           />
         </div>
 

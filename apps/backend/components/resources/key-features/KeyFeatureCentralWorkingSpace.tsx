@@ -43,7 +43,7 @@ export default function KeyFeatureCentralWorkingSpace() {
         </h2>
         
         <p className="text-slate-600 text-base sm:text-lg max-w-4xl leading-relaxed">
-          At the core of <strong>Amicus Desktop</strong> is a unified, highly optimized environment designed to bring all your legal and business operations into a single point of control. By eliminating scattered windows and fragmented apps, it enables seamless multitasking with zero friction.
+          At the core of <strong>Ascurix Desktop</strong> is a unified, highly optimized environment designed to bring all your legal and business operations into a single point of control. By eliminating scattered windows and fragmented apps, it enables seamless multitasking with zero friction.
         </p>
 
         {/* Feature Cards Grid */}

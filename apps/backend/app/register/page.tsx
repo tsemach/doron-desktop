@@ -9,7 +9,7 @@ import { isValidEmail, isValidFullName, isValidPasswordLength } from "../../lib/
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const platform = searchParams.get("platform"); // "desktop" when opened from the Amicus desktop app
+  const platform = searchParams.get("platform"); // "desktop" when opened from the Ascurix desktop app
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -83,7 +83,7 @@ function RegisterForm() {
   }
 
   return (
-    <AuthCard title="Create your Amicus account" subtitle="Set up your account, then choose a plan.">
+    <AuthCard title="Create your Ascurix account" subtitle="Set up your account, then choose a plan.">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error && <div className={errorClass}>{error}</div>}
 

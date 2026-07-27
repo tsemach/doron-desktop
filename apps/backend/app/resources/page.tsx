@@ -40,7 +40,7 @@ export default function ShowMeHowPage() {
           Show Me How
         </h1>
         <p className="text-slate-600 text-base max-w-lg mb-8">
-          A guided walkthrough of Amicus is coming soon.
+          A guided walkthrough of Ascurix is coming soon.
         </p>
         <Link
           href="/"
