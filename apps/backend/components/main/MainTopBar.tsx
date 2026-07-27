@@ -14,7 +14,7 @@ const NAV_LINKS = [
   { label: "Products", href: "/products" },
   { label: "Download", href: "/download" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Show me how", href: "/show-me-how" },
+  { label: "Resources", href: "/resources" },
 ];
 
 export default function MainTopBar({ userName, tier, handleLogout }: Props) {

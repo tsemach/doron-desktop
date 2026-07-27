@@ -37,14 +37,6 @@ export default function MainHelpCentralWorkingSpace() {
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="space-y-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-150 text-blue-700 text-xs font-semibold w-fit backdrop-blur-xs">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
-          </span>
-          Secure Desktop Client
-        </div>
-
         {/* Title styling matching desktop welcome headers */}
         <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
           Central Working Space
