@@ -58,7 +58,7 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
 }
 
-pub(crate) fn normalize_model_name(model: &str) -> String {
+pub fn normalize_model_name(model: &str) -> String {
     match model {
         "claude-3-5-sonnet-online" => "claude-3-5-sonnet-20241022".to_string(),
         "claude-3-5-opus-online" => "claude-3-opus-20240229".to_string(),
