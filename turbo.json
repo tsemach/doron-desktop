@@ -7,6 +7,8 @@
     "AUTH_FACEBOOK_ID",
     "AUTH_FACEBOOK_SECRET",
     "DATABASE_URL",
+    "OFFICE_DATABASE_URL",
+    "BACKEND_DATABASE_URL",
     "AUTH_SECRET"
   ],
   "tasks": {

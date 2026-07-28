@@ -32,9 +32,9 @@ loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), "..", ".env.local"));
 const DEV_ADMIN_EMAIL = "admin@ascurix.com";
 const DEV_ADMIN_NAME = "Admin";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.OFFICE_DATABASE_URL;
 if (!connectionString) {
-  console.error("DATABASE_URL is not set. Run from apps/office with .env.local configured.");
+  console.error("OFFICE_DATABASE_URL is not set. Run from apps/office with .env.local configured.");
   process.exit(1);
 }
 
