@@ -159,7 +159,6 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
                 let _ = crate::indexer::index_file(
                     app_clone,
                     dest_path_str,
-                    String::new(),
                     Some("claude-3-5-sonnet-20241022".to_string()),
                     Some(false),
                 ).await;

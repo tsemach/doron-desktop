@@ -1,17 +1,17 @@
 import { useNavigate } from "react-router-dom";
-import { useLanguage } from "../../context/LanguageContext";
-import { Button } from "../ui/button";
-import { ProgressItem } from "./DocsManagementScan";
+import { useLanguage } from "../../../context/LanguageContext";
+import { Button } from "../../ui/button";
+import type { ProgressItem } from "./types";
 
-interface DocsManagementScanFooterProps {
+interface ScanFooterProps {
   items: ProgressItem[];
   resetState?: () => void;
 }
 
-export default function DocsManagementScanFooter({
+export default function ScanFooter({
   items,
   resetState,
-}: DocsManagementScanFooterProps) {
+}: ScanFooterProps) {
   const navigate = useNavigate();
   const { t } = useLanguage();
 

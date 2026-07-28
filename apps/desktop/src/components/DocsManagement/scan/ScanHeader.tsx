@@ -1,4 +1,4 @@
-export default function DocsManagementScanHeader() {
+export default function ScanHeader() {
   return (
     <div className="text-center space-y-2">
       <h2 className="text-xl font-bold tracking-tight text-foreground">

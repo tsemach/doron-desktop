@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
-import { ProgressItem, ProgressStatus } from "./DocsManagementScan";
+
+import type { ProgressItem, ProgressStatus } from "./types";
 
 function StatusIcon({ status }: { status: ProgressStatus }) {
   if (status === "processing") {
@@ -10,19 +11,19 @@ function StatusIcon({ status }: { status: ProgressStatus }) {
   return <span className="text-muted-foreground">─</span>;
 }
 
-interface DocsManagementScanProcessingLogProps {
+interface ScanProcessingLogProps {
   items: ProgressItem[];
   isProcessing: boolean;
   error: string | null;
   currentItem: ProgressItem | undefined;
 }
 
-export default function DocsManagementScanProcessingLog({
+export default function ScanProcessingLog({
   items,
   isProcessing,
   error,
   currentItem,
-}: DocsManagementScanProcessingLogProps) {
+}: ScanProcessingLogProps) {
   const outputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

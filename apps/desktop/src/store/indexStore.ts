@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import { type ProgressItem, type IndexSummary } from "../components/DocsManagement/DocsManagementScan";
+import { type ProgressItem, type IndexSummary } from "../components/DocsManagement/scan/types";
 
 export const showOutputAtom = atom<boolean>(false);
 export const isProcessingAtom = atom<boolean>(false);

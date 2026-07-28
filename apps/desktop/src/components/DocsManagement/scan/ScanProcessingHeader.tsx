@@ -1,12 +1,12 @@
-interface DocsManagementScanProcessingHeaderProps {
+interface ScanProcessingHeaderProps {
   isFolder: boolean;
   selectedPath: string;
 }
 
-export default function DocsManagementScanProcessingHeader({
+export default function ScanProcessingHeader({
   isFolder,
   selectedPath,
-}: DocsManagementScanProcessingHeaderProps) {
+}: ScanProcessingHeaderProps) {
   return (
     <div className="space-y-1 min-w-0 justify-self-start">
       <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">

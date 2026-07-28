@@ -1,6 +1,6 @@
-import { Button } from "../ui/button";
+import { Button } from "../../ui/button";
 
-interface DocsManagementScanConfirmProps {
+interface ScanConfirmProps {
   selectedPath: string;
   isFolder: boolean;
   reindex: boolean;
@@ -9,18 +9,17 @@ interface DocsManagementScanConfirmProps {
   onStart: () => void;
 }
 
-export default function DocsManagementScanConfirm({
+export default function ScanConfirm({
   selectedPath,
   isFolder,
   reindex,
   setReindex,
   onCancel,
   onStart,
-}: DocsManagementScanConfirmProps) {
+}: ScanConfirmProps) {
   return (
     <div className="max-w-xl mx-auto py-8 animate-fade-in-down space-y-6">
       <div className="rounded-xl border border-border bg-card shadow-md overflow-hidden">
-        {/* Header */}
         <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
           <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
             {isFolder ? "Folder Selected" : "File Selected"}
@@ -31,7 +30,6 @@ export default function DocsManagementScanConfirm({
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Reindex Option checkbox */}
           <div className="flex items-center">
             <label className="inline-flex items-center gap-2.5 px-4 py-3 rounded-lg border border-border bg-card shadow-xs cursor-pointer select-none hover:bg-muted/30 transition-colors w-full">
               <input
@@ -46,7 +44,6 @@ export default function DocsManagementScanConfirm({
             </label>
           </div>
 
-          {/* Buttons */}
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button
               variant="outline"

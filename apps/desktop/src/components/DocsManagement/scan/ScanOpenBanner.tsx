@@ -1,14 +1,14 @@
-import { Button } from "../ui/button";
+import { Button } from "../../ui/button";
 
-interface DocsManagementScanOpenBannerProps {
+interface ScanOpenBannerProps {
   isFolder: boolean;
   onOpen: () => void;
 }
 
-export default function DocsManagementScanOpenBanner({
+export default function ScanOpenBanner({
   isFolder,
   onOpen,
-}: DocsManagementScanOpenBannerProps) {
+}: ScanOpenBannerProps) {
   const content = (
     <div className={`flex items-center justify-between text-xs animate-fade-in px-1 ${isFolder ? "col-start-1" : ""}`}>
       <div className="flex items-center gap-2 text-blue-600 font-medium">

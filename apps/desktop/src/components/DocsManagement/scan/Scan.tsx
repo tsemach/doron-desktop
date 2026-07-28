@@ -1,40 +1,15 @@
-import { useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import DocsManagementScanHeader from "./DocsManagementScanHeader";
-import DocsManagementScanMenu from "./DocsManagementScanMenu";
-import DocsManagementScanConfirm from "./DocsManagementScanConfirm";
-import DocsManagementScanProcessing from "./DocsManagementScanProcessing";
 
-export type ProgressStatus = "processing" | "ok" | "skipped" | "failed";
+import { pickIndexableDocumentFile, pickIndexableDocumentFolder } from "@/lib/indexing";
+import { fetchLatestActiveIndexingSession, useActiveIndexingSession } from "./activeSession";
+import ScanConfirm from "./ScanConfirm";
+import ScanHeader from "./ScanHeader";
+import ScanMenu from "./ScanMenu";
+import ScanProcessing from "./ScanProcessing";
+import type { IndexSummary, ProgressItem } from "./types";
 
-export type ProgressItem = {
-  file_name: string;
-  status: ProgressStatus;
-  message: string;
-  current: number;
-  total: number;
-};
-
-export type IndexSummary = {
-  indexed: number;
-  skipped: number;
-  failed: number;
-};
-
-
-
-export interface IndexingSession {
-  path: string;
-  is_folder: boolean;
-  reindex: boolean;
-  start_index: number;
-  total_files: number;
-  status: string;
-  updated_at: string;
-}
-
-type Props = {
+type ScanProps = {
   show: boolean;
   isFolder: boolean;
   isProcessing: boolean;
@@ -50,7 +25,7 @@ type Props = {
   setShowOutput: (show: boolean) => void;
 };
 
-export default function DocsManagementScan({
+export default function Scan({
   show,
   isFolder,
   isProcessing,
@@ -64,49 +39,37 @@ export default function DocsManagementScan({
   setSelectedPath,
   setIsFolder,
   setShowOutput,
-}: Props) {
+}: ScanProps) {
   const [reindex, setReindex] = useState(false);
-  const [activeSession, setActiveSession] = useState<IndexingSession | null>(null);
+  const { activeSession, setActiveSession } = useActiveIndexingSession(isProcessing);
 
-  useEffect(() => {
-    // When entering the Scan & Index page, default to showing the cards/main selection view
-    setShowOutput(false);
-  }, [setShowOutput]);
+  const isConfirmView =
+    !isProcessing && !summary && !!selectedPath && items.length === 0 && !show;
 
-  useEffect(() => {
-    async function checkActiveSession() {
-      try {
-        const sessions = await invoke<IndexingSession[]>("get_active_indexing_sessions");
-        const active = sessions.filter((s) => s.total_files === 0 || s.start_index < s.total_files);
-        if (active.length > 0) {
-          active.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-          setActiveSession(active[0]);
-        } else {
-          setActiveSession(null);
-        }
-      } catch (err) {
-        console.error("Failed to check active indexing sessions in scan view:", err);
-      }
-    }
-    checkActiveSession();
-  }, [isProcessing]);
+  const showResultsView =
+    isProcessing ||
+    !!summary ||
+    show ||
+    (items.length > 0 && !!selectedPath && !isConfirmView);
+
+  const matchingSession = activeSession?.path === selectedPath ? activeSession : null;
+  const resumeInfo = matchingSession
+    ? { startIndex: matchingSession.start_index, reindex: matchingSession.reindex }
+    : null;
 
   function handleOpenActiveSession() {
     if (!activeSession) return;
-    
+
     setSelectedPath(activeSession.path);
     setIsFolder(activeSession.is_folder);
     setShowOutput(true);
   }
 
   const actualItemsCount = items.filter((i) => i.file_name !== "").length;
-
   const currentCount = actualItemsCount;
-
   const totalCount = isProcessing && currentItem
     ? currentItem.total
     : (items[0]?.total || actualItemsCount);
-
   const progressPercent = totalCount > 0
     ? Math.round((currentCount / totalCount) * 100)
     : 0;
@@ -121,33 +84,22 @@ export default function DocsManagementScan({
 
   async function executeCancelIndexing() {
     try {
-      // 1. Immediately clear the local state to unlock the UI instantly
       setActiveSession(null);
-      
-      // 2. Stop active indexing thread
+
       if (isProcessing) {
         await invoke("stop_indexing");
       }
-      
-      // 3. Delete the session from the database
+
       if (selectedPath) {
         await invoke("delete_indexing_session", { path: selectedPath });
       }
-      
-      // 4. Reset all Jotai indexing atoms
+
       if (resetState) {
         resetState();
       }
 
-      // 5. Perform a final query to ensure the UI is fully in sync with the database
-      const sessions = await invoke<IndexingSession[]>("get_active_indexing_sessions");
-      const active = sessions.filter((s) => s.total_files === 0 || s.start_index < s.total_files);
-      if (active.length > 0) {
-        active.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-        setActiveSession(active[0]);
-      } else {
-        setActiveSession(null);
-      }
+      const latestSession = await fetchLatestActiveIndexingSession();
+      setActiveSession(latestSession);
     } catch (err) {
       console.error("Error cancelling indexing:", err);
     }
@@ -155,11 +107,8 @@ export default function DocsManagementScan({
 
   async function handleSelectFile() {
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: "Documents", extensions: ["docx", "pdf", "xlsx", "xls", "txt"] }],
-      });
-      if (selected && typeof selected === "string") {
+      const selected = await pickIndexableDocumentFile();
+      if (selected) {
         setSelectedPath(selected);
         setIsFolder(false);
       }
@@ -170,8 +119,8 @@ export default function DocsManagementScan({
 
   async function handleSelectFolder() {
     try {
-      const selected = await open({ directory: true });
-      if (selected && typeof selected === "string") {
+      const selected = await pickIndexableDocumentFolder();
+      if (selected) {
         setSelectedPath(selected);
         setIsFolder(true);
       }
@@ -180,10 +129,9 @@ export default function DocsManagementScan({
     }
   }
 
-  // --- FILE/FOLDER SELECTED STATE VIEW (Before starting scan) ---
-  if (!isProcessing && !show && !summary && selectedPath) {
+  if (isConfirmView) {
     return (
-      <DocsManagementScanConfirm
+      <ScanConfirm
         selectedPath={selectedPath}
         isFolder={isFolder}
         reindex={reindex}
@@ -194,16 +142,15 @@ export default function DocsManagementScan({
     );
   }
 
-  // --- IDLE STATE VIEW ---
-  if (!show && !summary) {
+  if (!showResultsView) {
     const isDisabled = !!activeSession || isProcessing;
     const isFolderActive = activeSession ? activeSession.is_folder : false;
 
     return (
       <div className="max-w-4xl mx-auto space-y-8 py-4 animate-fade-in-down">
-        <DocsManagementScanHeader />
+        <ScanHeader />
 
-        <DocsManagementScanMenu
+        <ScanMenu
           isDisabled={isDisabled}
           isFolderActive={isFolderActive}
           activeSession={activeSession}
@@ -215,9 +162,8 @@ export default function DocsManagementScan({
     );
   }
 
-  // --- PROCESSING / STATUS STATE VIEW ---
   return (
-    <DocsManagementScanProcessing
+    <ScanProcessing
       isFolder={isFolder}
       selectedPath={selectedPath}
       isProcessing={isProcessing}
@@ -231,6 +177,7 @@ export default function DocsManagementScan({
       progressPercent={progressPercent}
       currentItem={currentItem}
       error={error}
+      resumeInfo={resumeInfo}
       resetState={resetState}
     />
   );

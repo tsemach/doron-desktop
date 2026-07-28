@@ -56,12 +56,104 @@ struct IndexProgress {
     message: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct IndexSummary {
     pub indexed: usize,
     pub skipped: usize,
     pub failed: usize,
 }
+
+#[derive(Serialize, Clone)]
+pub struct IndexingFinished {
+    pub path: String,
+    pub is_folder: bool,
+    pub summary: Option<IndexSummary>,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct IndexingStarted {
+    path: String,
+    is_folder: bool,
+}
+
+fn emit_indexing_started(app: &AppHandle, path: &str, is_folder: bool) {
+    let _ = app.emit(
+        "indexing-started",
+        IndexingStarted {
+            path: path.to_string(),
+            is_folder,
+        },
+    );
+}
+
+fn emit_indexing_finished(app: &AppHandle, path: &str, is_folder: bool, result: &Result<IndexSummary, String>) {
+    let (summary, error) = match result {
+        Ok(summary) => (Some(summary.clone()), None),
+        Err(message) => (None, Some(message.clone())),
+    };
+    let _ = app.emit(
+        "indexing-finished",
+        IndexingFinished {
+            path: path.to_string(),
+            is_folder,
+            summary,
+            error,
+        },
+    );
+}
+
+pub fn pick_latest_active_session(sessions: &[store::IndexingSession]) -> Option<store::IndexingSession> {
+    let mut active: Vec<_> = sessions
+        .iter()
+        .filter(|session| session.total_files == 0 || session.start_index < session.total_files)
+        .cloned()
+        .collect();
+    if active.is_empty() {
+        return None;
+    }
+    active.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    active.into_iter().next()
+}
+
+pub async fn resume_interrupted_indexing(app: AppHandle) {
+    let db_path = store::db_path(&app);
+    let conn = match store::open_db_by_path(&db_path) {
+        Ok(conn) => conn,
+        Err(err) => {
+            eprintln!("[indexer] Failed to open DB for resume check: {err}");
+            return;
+        }
+    };
+
+    let sessions = match store::get_active_indexing_sessions(&conn) {
+        Ok(sessions) => sessions,
+        Err(err) => {
+            eprintln!("[indexer] Failed to load active indexing sessions: {err}");
+            return;
+        }
+    };
+
+    let Some(session) = pick_latest_active_session(&sessions) else {
+        return;
+    };
+
+    println!("[indexer] Resuming interrupted indexing session: {session:?}");
+
+    if session.is_folder {
+        let _ = index_folder(
+            app,
+            session.path,
+            None,
+            Some(session.reindex),
+            Some(session.start_index),
+        )
+        .await;
+    } else {
+        let _ = index_file(app, session.path, None, Some(session.reindex)).await;
+    }
+}
+
 
 pub struct IndexOptions {
     pub run_llm_metadata: bool,
@@ -254,7 +346,18 @@ async fn index_file_core_impl(
 pub async fn index_file(
     app: AppHandle,
     file_path: String,
-    api_key: String,
+    model: Option<String>,
+    reindex: Option<bool>,
+) -> Result<IndexSummary, String> {
+    emit_indexing_started(&app, &file_path, false);
+    let result = index_file_inner(app.clone(), file_path.clone(), model, reindex).await;
+    emit_indexing_finished(&app, &file_path, false, &result);
+    result
+}
+
+async fn index_file_inner(
+    app: AppHandle,
+    file_path: String,
     model: Option<String>,
     reindex: Option<bool>,
 ) -> Result<IndexSummary, String> {
@@ -304,7 +407,7 @@ pub async fn index_file(
     }
 
     // Set up provider configuration
-    let provider = crate::llm::load_active_provider(&app, api_key, Some(model), "doc_indexing")?;
+    let provider = crate::llm::load_active_provider(&app, String::new(), Some(model), "doc_indexing")?;
 
     // Free tier falls back to extract_heuristic_metadata below -- indexing
     // itself stays free (PRD 5.5), only the LLM-based extraction step is
@@ -331,7 +434,19 @@ pub async fn index_file(
 pub async fn index_folder(
     app: AppHandle,
     folder_path: String,
-    api_key: String,
+    model: Option<String>,
+    reindex: Option<bool>,
+    start_index: Option<usize>,
+) -> Result<IndexSummary, String> {
+    emit_indexing_started(&app, &folder_path, true);
+    let result = index_folder_inner(app.clone(), folder_path.clone(), model, reindex, start_index).await;
+    emit_indexing_finished(&app, &folder_path, true, &result);
+    result
+}
+
+async fn index_folder_inner(
+    app: AppHandle,
+    folder_path: String,
     model: Option<String>,
     reindex: Option<bool>,
     start_index: Option<usize>,
@@ -365,7 +480,7 @@ pub async fn index_folder(
     let mut failed = 0usize;
 
     // Set up provider configuration
-    let provider = crate::llm::load_active_provider(&app, api_key, Some(model), "doc_indexing")?;
+    let provider = crate::llm::load_active_provider(&app, String::new(), Some(model), "doc_indexing")?;
 
     // Free tier falls back to extract_heuristic_metadata below -- indexing
     // itself stays free (PRD 5.5), only the LLM-based extraction step is

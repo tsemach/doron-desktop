@@ -1,7 +1,12 @@
-import { Button } from "../ui/button";
-import { ProgressItem, IndexSummary } from "./DocsManagementScan";
+import { Button } from "../../ui/button";
+import type { IndexSummary } from "./types";
 
-interface DocsManagementScanProcessingActionsProps {
+export type ScanResumeInfo = {
+  startIndex: number;
+  reindex: boolean;
+};
+
+interface ScanProcessingActionsProps {
   isProcessing: boolean;
   handleStopIndexing: () => void;
   onShowCancelConfirm: () => void;
@@ -9,11 +14,11 @@ interface DocsManagementScanProcessingActionsProps {
   selectedPath: string;
   isFolder: boolean;
   startIndexing: (path: string, isFolder: boolean, isContinue?: boolean, startIndex?: number, reindex?: boolean) => void;
-  items: ProgressItem[];
+  resumeInfo: ScanResumeInfo | null;
   resetState?: () => void;
 }
 
-export default function DocsManagementScanProcessingActions({
+export default function ScanProcessingActions({
   isProcessing,
   handleStopIndexing,
   onShowCancelConfirm,
@@ -21,9 +26,9 @@ export default function DocsManagementScanProcessingActions({
   selectedPath,
   isFolder,
   startIndexing,
-  items,
+  resumeInfo,
   resetState,
-}: DocsManagementScanProcessingActionsProps) {
+}: ScanProcessingActionsProps) {
   return (
     <div className="flex items-center gap-2 justify-self-end">
       {isProcessing ? (
@@ -58,7 +63,17 @@ export default function DocsManagementScanProcessingActions({
           <Button
             size="sm"
             className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-750 text-white"
-            onClick={() => startIndexing(selectedPath, isFolder, true, items.filter((i) => i.file_name !== "").length)}
+            disabled={!resumeInfo}
+            onClick={() => {
+              if (!resumeInfo) return;
+              startIndexing(
+                selectedPath,
+                isFolder,
+                true,
+                resumeInfo.startIndex,
+                resumeInfo.reindex,
+              );
+            }}
           >
             Continue
           </Button>

@@ -78,6 +78,11 @@ pub fn run() {
                     }
                 }
             });
+            // Resume interrupted indexing sessions after startup
+            let handle_indexing = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::indexer::resume_interrupted_indexing(handle_indexing).await;
+            });
             // OAuth login hand-off (0.9): the backend redirects the system browser to
             // doron-desktop://auth?token=... once a desktop-originated Google/Facebook
             // login completes. Persist that token as the local session the same way

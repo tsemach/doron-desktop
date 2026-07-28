@@ -1,14 +1,14 @@
-interface DocsManagementScanFolderProps {
+interface ScanFolderProps {
   isDisabled: boolean;
   isFolderActive: boolean;
   onSelectFolder: () => void;
 }
 
-export default function DocsManagementScanFolder({
+export default function ScanFolder({
   isDisabled,
   isFolderActive,
   onSelectFolder,
-}: DocsManagementScanFolderProps) {
+}: ScanFolderProps) {
   return (
     <div
       onClick={(isDisabled && isFolderActive) ? undefined : onSelectFolder}
