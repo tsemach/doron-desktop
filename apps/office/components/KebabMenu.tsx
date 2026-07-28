@@ -4,20 +4,23 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 
-interface UserRowMenuProps {
+interface KebabMenuProps {
   onEdit: () => void;
   onDelete: () => void;
+  editLabel?: string;
+  deleteLabel?: string;
 }
 
 const MENU_WIDTH = 160; // matches w-40
 
 // Rendered via a portal into document.body, positioned from the trigger
-// button's actual screen coordinates -- the table this lives in has
+// button's actual screen coordinates -- tables that use this have
 // overflow-x-auto (for horizontal scrolling on narrow screens), and setting
 // only overflow-x implicitly clips overflow-y too (per the CSS overflow
 // spec), which was cutting the dropdown down to nothing when it was just a
-// normal absolutely-positioned child.
-export default function UserRowMenu({ onEdit, onDelete }: UserRowMenuProps) {
+// normal absolutely-positioned child. Shared between the Users and Admins
+// pages -- both are plain "list with edit/delete per row" tables.
+export default function KebabMenu({ onEdit, onDelete, editLabel = "Edit", deleteLabel = "Delete" }: KebabMenuProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -78,7 +81,7 @@ export default function UserRowMenu({ onEdit, onDelete }: UserRowMenuProps) {
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <Pencil className="size-4" />
-              Edit user
+              {editLabel}
             </button>
             <button
               onClick={() => {
@@ -88,7 +91,7 @@ export default function UserRowMenu({ onEdit, onDelete }: UserRowMenuProps) {
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
             >
               <Trash2 className="size-4" />
-              Delete user
+              {deleteLabel}
             </button>
           </div>,
           document.body

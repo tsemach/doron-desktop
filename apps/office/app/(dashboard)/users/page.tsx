@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Users as UsersIcon, Loader2 } from "lucide-react";
 import EditUserModal from "../../../components/users/EditUserModal";
 import DeleteUserModal from "../../../components/users/DeleteUserModal";
-import UserRowMenu from "../../../components/users/UserRowMenu";
+import KebabMenu from "../../../components/KebabMenu";
 import type { BackendUser } from "../../../components/users/types";
 
 // Styling mirrors app/(dashboard)/templates/page.tsx's table/card look, but
@@ -86,7 +86,12 @@ export default function UsersPage() {
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <UserRowMenu onEdit={() => setEditingUser(user)} onDelete={() => setDeletingUser(user)} />
+                      <KebabMenu
+                        editLabel="Edit user"
+                        deleteLabel="Delete user"
+                        onEdit={() => setEditingUser(user)}
+                        onDelete={() => setDeletingUser(user)}
+                      />
                     </td>
                   </tr>
                 ))}
