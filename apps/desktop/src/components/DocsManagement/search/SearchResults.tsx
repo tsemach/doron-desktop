@@ -36,6 +36,226 @@ function ConfidenceBadge({ value }: { value: number | null }) {
   );
 }
 
+function SearchError({ label, message }: { label: string; message: string }) {
+  return (
+    <div className="doc-search__error">
+      <span className="doc-search__error-label">{label}: </span>
+      {message}
+    </div>
+  );
+}
+
+function CaseResultItem({
+  caseRow,
+  onSelect,
+}: {
+  caseRow: CaseSearchRow;
+  onSelect: (id: number) => void;
+}) {
+  return (
+    <div onClick={() => onSelect(caseRow.id)} className="doc-search__case-card">
+      <div className="doc-search__case-content">
+        <div className="doc-search__case-title">{caseRow.subject || "Untitled Case"}</div>
+        {caseRow.folder && <div className="doc-search__case-folder">{caseRow.folder}</div>}
+      </div>
+      <CaseStatusBadge status={caseRow.status as CaseStatus} className="doc-search__case-badge" />
+    </div>
+  );
+}
+
+function CaseResultsSection({
+  results,
+  isSearching,
+  onSelectCase,
+}: {
+  results: CaseSearchRow[];
+  isSearching: boolean;
+  onSelectCase: (id: number) => void;
+}) {
+  const countLabel = isSearching
+    ? "Searching cases..."
+    : results.length === 0
+      ? "No matching cases found."
+      : `Showing ${results.length} matching case${results.length !== 1 ? "s" : ""}`;
+
+  return (
+    <div className="doc-search__results-section">
+      <div className="doc-search__results-count">
+        <span>{countLabel}</span>
+      </div>
+
+      <div className="doc-search__case-list">
+        {results.map((caseRow) => (
+          <CaseResultItem key={caseRow.id} caseRow={caseRow} onSelect={onSelectCase} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DocumentMetaChips({ doc }: { doc: DocumentRow }) {
+  return (
+    <div className="doc-search__tag-cloud">
+      {doc.keywords.slice(0, 5).map((k) => (
+        <span key={k} className="doc-search__meta-chip doc-search__meta-chip--keyword">
+          #{k}
+        </span>
+      ))}
+
+      {doc.topics.slice(0, 3).map((t) => (
+        <span key={t} className="doc-search__meta-chip doc-search__meta-chip--topic">
+          🔮 {t}
+        </span>
+      ))}
+
+      {doc.entities.slice(0, 3).map((e) => (
+        <span key={e} className="doc-search__meta-chip doc-search__meta-chip--entity">
+          💼 {e}
+        </span>
+      ))}
+
+      {doc.authors.slice(0, 2).map((a) => (
+        <span key={a} className="doc-search__meta-chip doc-search__meta-chip--author">
+          👤 {a}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DocumentResultItem({
+  doc,
+  matchedCase,
+  onOpenFile,
+  onSelectCase,
+}: {
+  doc: DocumentRow;
+  matchedCase?: CaseLink;
+  onOpenFile: (path: string) => void;
+  onSelectCase: (id: string | number) => void;
+}) {
+  const fileExtension = doc.file_name.split(".").pop() || "";
+
+  return (
+    <div className="doc-search__doc-card">
+      <FileTypeIcon ext={fileExtension} />
+
+      <div className="doc-search__doc-body">
+        <div className="doc-search__doc-header">
+          <div className="doc-search__doc-meta">
+            <span
+              onClick={() => onOpenFile(doc.file_path)}
+              className="doc-search__doc-name"
+              title="Click to open file"
+            >
+              {doc.file_name}
+            </span>
+            {doc.doc_type && <span className="doc-search__doc-type-badge">{doc.doc_type}</span>}
+            {doc.language && <span className="doc-search__doc-lang-badge">{doc.language}</span>}
+            {matchedCase && (
+              <button
+                onClick={() => onSelectCase(matchedCase.id)}
+                className="doc-search__case-link"
+                title={`Jump to case: ${matchedCase.subject}`}
+              >
+                <ExternalLinkIcon size={10} className="doc-search__case-link-icon" />
+                <span>Go to Case</span>
+              </button>
+            )}
+          </div>
+          <div className="doc-search__doc-aside">
+            {doc.doc_date && <span className="doc-search__doc-date">{doc.doc_date}</span>}
+            <ConfidenceBadge value={doc.confidence} />
+          </div>
+        </div>
+
+        <p
+          onClick={() => onOpenFile(doc.file_path)}
+          className="doc-search__doc-path"
+          title={doc.file_path}
+        >
+          {doc.file_path}
+        </p>
+
+        {doc.title && <h4 className="doc-search__doc-title">{doc.title}</h4>}
+        {doc.summary && <p className="doc-search__doc-summary">{doc.summary}</p>}
+        <DocumentMetaChips doc={doc} />
+      </div>
+    </div>
+  );
+}
+
+function DocumentResultsSection({
+  results,
+  caseLinks,
+  onOpenFile,
+  onSelectCase,
+}: {
+  results: DocumentRow[] | null;
+  caseLinks: Map<string, CaseLink>;
+  onOpenFile: (path: string) => void;
+  onSelectCase: (id: string | number) => void;
+}) {
+  const countLabel =
+    results === null || results.length === 0
+      ? "No matching documents found."
+      : `Showing ${results.length} relevant document${results.length !== 1 ? "s" : ""}`;
+
+  return (
+    <div className="doc-search__results-section">
+      <div className="doc-search__results-count">
+        <span>{countLabel}</span>
+      </div>
+
+      <div className="doc-search__doc-list">
+        {(results ?? []).map((doc) => (
+          <DocumentResultItem
+            key={doc.id}
+            doc={doc}
+            matchedCase={caseLinks.get(doc.file_path)}
+            onOpenFile={onOpenFile}
+            onSelectCase={onSelectCase}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SearchIdleState({
+  onSuggestionClick,
+}: {
+  onSuggestionClick: (suggestion: string) => void;
+}) {
+  return (
+    <div className="doc-search__idle animate-fade-in-up">
+      <div className="doc-search__idle-icon-wrap">
+        <SearchIcon size={26} className="doc-search__idle-icon" />
+      </div>
+      <div className="doc-search__idle-copy">
+        <h3 className="doc-search__idle-title">Ready to Search</h3>
+        <p className="doc-search__idle-description">
+          Enter semantic descriptions or keywords to look through your synced knowledge bases.
+        </p>
+      </div>
+
+      <div className="doc-search__suggestions">
+        <span className="doc-search__suggestions-label">Popular Searches</span>
+        {POPULAR_SEARCHES.map((suggest) => (
+          <button
+            key={suggest}
+            type="button"
+            onClick={() => onSuggestionClick(suggest)}
+            className="doc-search__suggestion-btn"
+          >
+            "{suggest}"
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type SearchResultsProps = {
   showResultsPanel: boolean;
   showCaseResults: boolean;
@@ -72,191 +292,36 @@ export default function SearchResults({
     }
   }
 
+  function handleSelectCase(id: string | number) {
+    navigate(`/case-management/cases/${id}`);
+  }
+
   return (
     <>
-      {documentError && (
-        <div className="doc-search__error">
-          <span className="doc-search__error-label">Search Error: </span>
-          {documentError}
-        </div>
-      )}
-
-      {caseError && (
-        <div className="doc-search__error">
-          <span className="doc-search__error-label">Case Search Error: </span>
-          {caseError}
-        </div>
-      )}
+      {documentError && <SearchError label="Search Error" message={documentError} />}
+      {caseError && <SearchError label="Case Search Error" message={caseError} />}
 
       {showResultsPanel ? (
         <div className="doc-search__results">
           {showCaseResults && (
-            <div className="doc-search__results-section">
-              <div className="doc-search__results-count">
-                <span>
-                  {caseIsSearching
-                    ? "Searching cases..."
-                    : caseResults.length === 0
-                      ? "No matching cases found."
-                      : `Showing ${caseResults.length} matching case${caseResults.length !== 1 ? "s" : ""}`}
-                </span>
-              </div>
-
-              <div className="doc-search__case-list">
-                {caseResults.map((c) => (
-                  <div
-                    key={c.id}
-                    onClick={() => navigate(`/case-management/cases/${c.id}`)}
-                    className="doc-search__case-card"
-                  >
-                    <div className="doc-search__case-content">
-                      <div className="doc-search__case-title">{c.subject || "Untitled Case"}</div>
-                      {c.folder && <div className="doc-search__case-folder">{c.folder}</div>}
-                    </div>
-                    <CaseStatusBadge status={c.status as CaseStatus} className="doc-search__case-badge" />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CaseResultsSection
+              results={caseResults}
+              isSearching={caseIsSearching}
+              onSelectCase={handleSelectCase}
+            />
           )}
 
           {showDocumentResults && (
-            <div className="doc-search__results-section">
-              <div className="doc-search__results-count">
-                <span>
-                  {documentResults === null || documentResults.length === 0
-                    ? "No matching documents found."
-                    : `Showing ${documentResults.length} relevant document${documentResults.length !== 1 ? "s" : ""}`}
-                </span>
-              </div>
-
-              <div className="doc-search__doc-list">
-                {(documentResults ?? []).map((doc) => {
-                  const fileExtension = doc.file_name.split(".").pop() || "";
-                  const matchedCase = caseLinks.get(doc.file_path);
-
-                  return (
-                    <div key={doc.id} className="doc-search__doc-card">
-                      <FileTypeIcon ext={fileExtension} />
-
-                      <div className="doc-search__doc-body">
-                        <div className="doc-search__doc-header">
-                          <div className="doc-search__doc-meta">
-                            <span
-                              onClick={() => handleOpenFile(doc.file_path)}
-                              className="doc-search__doc-name"
-                              title="Click to open file"
-                            >
-                              {doc.file_name}
-                            </span>
-                            {doc.doc_type && (
-                              <span className="doc-search__doc-type-badge">{doc.doc_type}</span>
-                            )}
-                            {doc.language && (
-                              <span className="doc-search__doc-lang-badge">{doc.language}</span>
-                            )}
-                            {matchedCase && (
-                              <button
-                                onClick={() => navigate(`/case-management/cases/${matchedCase.id}`)}
-                                className="doc-search__case-link"
-                                title={`Jump to case: ${matchedCase.subject}`}
-                              >
-                                <ExternalLinkIcon size={10} className="doc-search__case-link-icon" />
-                                <span>Go to Case</span>
-                              </button>
-                            )}
-                          </div>
-                          <div className="doc-search__doc-aside">
-                            {doc.doc_date && (
-                              <span className="doc-search__doc-date">{doc.doc_date}</span>
-                            )}
-                            <ConfidenceBadge value={doc.confidence} />
-                          </div>
-                        </div>
-
-                        <p
-                          onClick={() => handleOpenFile(doc.file_path)}
-                          className="doc-search__doc-path"
-                          title={doc.file_path}
-                        >
-                          {doc.file_path}
-                        </p>
-
-                        {doc.title && <h4 className="doc-search__doc-title">{doc.title}</h4>}
-
-                        {doc.summary && <p className="doc-search__doc-summary">{doc.summary}</p>}
-
-                        <div className="doc-search__tag-cloud">
-                          {doc.keywords.slice(0, 5).map((k) => (
-                            <span
-                              key={k}
-                              className="doc-search__meta-chip doc-search__meta-chip--keyword"
-                            >
-                              #{k}
-                            </span>
-                          ))}
-
-                          {doc.topics.slice(0, 3).map((t) => (
-                            <span
-                              key={t}
-                              className="doc-search__meta-chip doc-search__meta-chip--topic"
-                            >
-                              🔮 {t}
-                            </span>
-                          ))}
-
-                          {doc.entities.slice(0, 3).map((e) => (
-                            <span
-                              key={e}
-                              className="doc-search__meta-chip doc-search__meta-chip--entity"
-                            >
-                              💼 {e}
-                            </span>
-                          ))}
-
-                          {doc.authors.slice(0, 2).map((a) => (
-                            <span
-                              key={a}
-                              className="doc-search__meta-chip doc-search__meta-chip--author"
-                            >
-                              👤 {a}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <DocumentResultsSection
+              results={documentResults}
+              caseLinks={caseLinks}
+              onOpenFile={handleOpenFile}
+              onSelectCase={handleSelectCase}
+            />
           )}
         </div>
       ) : (
-        <div className="doc-search__idle animate-fade-in-up">
-          <div className="doc-search__idle-icon-wrap">
-            <SearchIcon size={26} className="doc-search__idle-icon" />
-          </div>
-          <div className="doc-search__idle-copy">
-            <h3 className="doc-search__idle-title">Ready to Search</h3>
-            <p className="doc-search__idle-description">
-              Enter semantic descriptions or keywords to look through your synced knowledge bases.
-            </p>
-          </div>
-
-          <div className="doc-search__suggestions">
-            <span className="doc-search__suggestions-label">Popular Searches</span>
-            {POPULAR_SEARCHES.map((suggest) => (
-              <button
-                key={suggest}
-                type="button"
-                onClick={() => onSuggestionClick(suggest)}
-                className="doc-search__suggestion-btn"
-              >
-                "{suggest}"
-              </button>
-            ))}
-          </div>
-        </div>
+        <SearchIdleState onSuggestionClick={onSuggestionClick} />
       )}
 
       {openFileError && (
