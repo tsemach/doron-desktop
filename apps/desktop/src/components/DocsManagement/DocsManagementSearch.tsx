@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -6,51 +6,11 @@ import { Button } from "../ui/button";
 import CaseStatusBadge from "../ui/CaseStatusBadge";
 import FileTypeIcon from "../ui/FileTypeIcon";
 import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
-import type { CaseStatus, Tag } from "../CaseManagement/CaseManagementTypes";
+import type { CaseStatus } from "../CaseManagement/CaseManagementTypes";
+import { useCaseLinksForPaths, useCaseSearch } from "../../hooks/case";
 import { useSearch } from "../../hooks/useSearch";
-import { searchDocuments, type TagFilter } from "../../lib/search";
-
-const DOC_TYPES = [
-  "contract",
-  "report",
-  "invoice",
-  "memo",
-  "specification",
-  "presentation",
-  "spreadsheet",
-  "letter",
-  "policy",
-  "manual",
-  "other",
-];
-
-type SearchTarget = "documents" | "cases" | "both";
-
-type CaseSearchEntry = {
-  id: string;
-  folder: string;
-  subject: string;
-  status: CaseStatus;
-  tags: Tag[];
-  notes: string | null;
-};
-
-// Open cases surface first, then anything still needing attention, closed last.
-const STATUS_PRIORITY: Record<CaseStatus, number> = { open: 0, waiting: 1, followup: 2, closed: 3 };
-
-function searchCases(allCases: CaseSearchEntry[], filters: TagFilter[], notesContains: string): CaseSearchEntry[] {
-  const needle = notesContains.trim().toLowerCase();
-  return allCases
-    .filter((c) => {
-      const tagsMatch = filters.every((f) =>
-        c.tags.some((tg) => tg.name === f.name && (!f.value || tg.value === f.value))
-      );
-      if (!tagsMatch) return false;
-      if (needle && !(c.notes && c.notes.toLowerCase().includes(needle))) return false;
-      return true;
-    })
-    .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
-}
+import { searchDocuments } from "../../lib/search";
+import type { DocumentSearchAdvancedFilters } from "./DocsManagementSearch.types";
 
 function buildQuery(text: string, docType: string, dateFrom: string, dateTo: string): string {
   const parts: string[] = [];
@@ -80,21 +40,22 @@ function ConfidenceBadge({ value }: { value: number | null }) {
   );
 }
 
-export default function DocsManagementSearch() {
+type DocsManagementSearchProps = {
+  advancedFilters: DocumentSearchAdvancedFilters;
+  showAdvancedSearch: boolean;
+  onToggleAdvancedSearch: () => void;
+  advancedSearch: ReactNode;
+};
+
+export default function DocsManagementSearch({
+  advancedFilters,
+  showAdvancedSearch,
+  onToggleAdvancedSearch,
+  advancedSearch,
+}: DocsManagementSearchProps) {
   const navigate = useNavigate();
   const [text, setText] = useState("");
-  const [docType, setDocType] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [tagFilters, setTagFilters] = useState<TagFilter[]>([]);
-  const [notesContains, setNotesContains] = useState("");
-  const [availableTagNames, setAvailableTagNames] = useState<string[]>([]);
-  const [newTagFilterName, setNewTagFilterName] = useState("");
-  const [newTagFilterValue, setNewTagFilterValue] = useState("");
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
-  const [searchTarget, setSearchTarget] = useState<SearchTarget>("documents");
-  const [caseResults, setCaseResults] = useState<CaseSearchEntry[] | null>(null);
-  const [cases, setCases] = useState<CaseSearchEntry[]>([]);
+  const { docType, dateFrom, dateTo, tagFilters, notesContains, searchTarget } = advancedFilters;
 
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
@@ -140,51 +101,23 @@ export default function DocsManagementSearch() {
   });
 
   const results = searchTarget !== "cases" ? (documentSearchResponse?.results ?? null) : null;
-  const showResultsPanel = (searchTarget !== "cases" && hasDocumentSearch) || caseResults !== null;
+  const filePaths = useMemo(() => (results ?? []).map((doc) => doc.file_path), [results]);
+  const { links: caseLinks } = useCaseLinksForPaths(filePaths, { isSearching });
+
+  const caseSearchFilters = useMemo(
+    () => ({ tags: tagFilters, notesContains }),
+    [tagFilters, notesContains],
+  );
+  const caseSearchEnabled = searchTarget !== "documents" && hasStructuredFilters;
+  const caseSearch = useCaseSearch(caseSearchFilters, { enabled: caseSearchEnabled });
+
+  const showResultsPanel =
+    (searchTarget !== "cases" && hasDocumentSearch) ||
+    (caseSearchEnabled && caseSearch.hasSearched);
 
   useEffect(() => {
-    loadCases();
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
-    invoke<string[]>("list_all_tag_names", { tagType: "user" }).then(setAvailableTagNames).catch(() => { });
   }, []);
-
-  async function loadCases() {
-    try {
-      const res = await invoke<any[]>("list_cases");
-      setCases(res.map(c => ({
-        id: String(c.id),
-        folder: c.folder,
-        subject: c.subject,
-        status: c.status,
-        tags: c.tags ?? [],
-        notes: c.notes ?? null,
-      })));
-    } catch (err) {
-      console.error("Failed to load cases in search:", err);
-    }
-  }
-
-  useEffect(() => {
-    if (searchTarget !== "documents" && hasStructuredFilters) {
-      setCaseResults(searchCases(cases, tagFilters, notesContains));
-    } else {
-      setCaseResults(null);
-    }
-  }, [searchTarget, hasStructuredFilters, cases, tagFilters, notesContains]);
-
-  function findCaseForFile(filePath: string) {
-    if (!filePath) return null;
-    const normalizedFilePath = filePath.replace(/\\/g, "/");
-    const matchedCases = cases.filter(c => {
-      if (!c.folder) return false;
-      const normalizedFolder = c.folder.replace(/\\/g, "/");
-      return normalizedFilePath === normalizedFolder || normalizedFilePath.startsWith(normalizedFolder + "/");
-    });
-    if (matchedCases.length === 1) {
-      return matchedCases[0];
-    }
-    return null;
-  }
 
   async function handleOpenFile(path: string) {
     try {
@@ -202,35 +135,6 @@ export default function DocsManagementSearch() {
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") handleSearch();
-  }
-
-  function handleClearAdvancedSearch() {
-    setDocType("");
-    setDateFrom("");
-    setDateTo("");
-    setTagFilters([]);
-    setNotesContains("");
-    setNewTagFilterName("");
-    setNewTagFilterValue("");
-  }
-
-  function handleAddTagFilter(name: string, value?: string) {
-    const trimmedName = name.trim().toLowerCase();
-    if (!trimmedName || tagFilters.some((f) => f.name === trimmedName)) return;
-    setTagFilters([...tagFilters, { name: trimmedName, value: value?.trim() || undefined }]);
-    setNewTagFilterName("");
-    setNewTagFilterValue("");
-  }
-
-  function handleRemoveTagFilter(name: string) {
-    setTagFilters(tagFilters.filter((f) => f.name !== name));
-  }
-
-  function handleTagFilterKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      handleAddTagFilter(newTagFilterName, newTagFilterValue);
-    }
   }
 
   return (
@@ -273,7 +177,7 @@ export default function DocsManagementSearch() {
 
         <button
           type="button"
-          onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+          onClick={onToggleAdvancedSearch}
           className="doc-search__advanced-toggle"
         >
           Advance search
@@ -291,151 +195,7 @@ export default function DocsManagementSearch() {
           </svg>
         </button>
 
-        {showAdvancedSearch && (
-          <div className="doc-search__advanced animate-fade-in-down">
-            <div className="doc-search__field-row">
-              <label className="doc-search__label">Search in:</label>
-              <div className="doc-search__target-group">
-                {(["documents", "cases", "both"] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setSearchTarget(opt)}
-                    className={[
-                      "doc-search__target-btn",
-                      opt !== "documents" ? "doc-search__target-btn--bordered" : "",
-                      searchTarget === opt ? "doc-search__target-btn--active" : "",
-                    ].filter(Boolean).join(" ")}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="doc-search__tags-row">
-              <label className="doc-search__label doc-search__label--tags">Tags:</label>
-              <div className="doc-search__tags-field">
-                <div className="doc-search__tags-input-wrap">
-                  {tagFilters.map((f) => (
-                    <span
-                      key={f.name}
-                      className="doc-search__tag-chip"
-                    >
-                      #{f.value ? `${f.name}: ${f.value}` : f.name}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTagFilter(f.name)}
-                        className="doc-search__tag-remove"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    type="text"
-                    list="doc-search-tag-suggestions"
-                    placeholder={tagFilters.length === 0 ? "e.g. important..." : ""}
-                    value={newTagFilterName}
-                    onChange={(e) => setNewTagFilterName(e.target.value)}
-                    onKeyDown={handleTagFilterKeyDown}
-                    className="doc-search__tag-text-input"
-                  />
-                  <datalist id="doc-search-tag-suggestions">
-                    {availableTagNames
-                      .filter((n) => !tagFilters.some((f) => f.name === n))
-                      .map((n) => (
-                        <option key={n} value={n} />
-                      ))}
-                  </datalist>
-                </div>
-
-                {newTagFilterName.trim() && (
-                  <div className="doc-search__tag-value-row animate-in slide-in-from-top-1 duration-150">
-                    <input
-                      type="text"
-                      placeholder="Optional value..."
-                      value={newTagFilterValue}
-                      onChange={(e) => setNewTagFilterValue(e.target.value)}
-                      onKeyDown={handleTagFilterKeyDown}
-                      className="doc-search__text-input"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="doc-search__add-btn"
-                      onClick={() => handleAddTagFilter(newTagFilterName, newTagFilterValue)}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="doc-search__field-row">
-              <label className="doc-search__label">Notes contain:</label>
-              <input
-                type="text"
-                value={notesContains}
-                onChange={(e) => setNotesContains(e.target.value)}
-                placeholder="e.g. sign-off"
-                className="doc-search__text-input doc-search__text-input--notes"
-              />
-            </div>
-
-            <div className="doc-search__filters-row">
-              <div className="doc-search__field-row">
-                <label className="doc-search__label">Doc Type:</label>
-                <select
-                  value={docType}
-                  onChange={(e) => setDocType(e.target.value)}
-                  className="doc-search__select"
-                >
-                  <option value="">Any</option>
-                  {DOC_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="doc-search__field-row">
-                <label className="doc-search__label">From:</label>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="doc-search__date-input"
-                />
-              </div>
-
-              <div className="doc-search__field-row">
-                <label className="doc-search__label">To:</label>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="doc-search__date-input"
-                />
-              </div>
-            </div>
-
-            {(hasStructuredFilters || docType || dateFrom || dateTo) && (
-              <button
-                type="button"
-                onClick={handleClearAdvancedSearch}
-                className="doc-search__clear-btn"
-              >
-                Clear Advance Search
-              </button>
-            )}
-          </div>
-        )}
+        {advancedSearch}
       </div>
 
       {error && (
@@ -451,20 +211,29 @@ export default function DocsManagementSearch() {
         </div>
       )}
 
+      {caseSearch.error && (
+        <div className="doc-search__error">
+          <span className="doc-search__error-label">Case Search Error: </span>
+          {caseSearch.error}
+        </div>
+      )}
+
       {showResultsPanel ? (
         <div className="doc-search__results">
-          {caseResults !== null && (
+          {caseSearchEnabled && caseSearch.hasSearched && (
             <div className="doc-search__results-section">
               <div className="doc-search__results-count">
                 <span>
-                  {caseResults.length === 0
-                    ? "No matching cases found."
-                    : `Showing ${caseResults.length} matching case${caseResults.length !== 1 ? "s" : ""}`}
+                  {caseSearch.isSearching
+                    ? "Searching cases..."
+                    : caseSearch.cases.length === 0
+                      ? "No matching cases found."
+                      : `Showing ${caseSearch.cases.length} matching case${caseSearch.cases.length !== 1 ? "s" : ""}`}
                 </span>
               </div>
 
               <div className="doc-search__case-list">
-                {caseResults.map((c) => (
+                {caseSearch.cases.map((c) => (
                   <div
                     key={c.id}
                     onClick={() => navigate(`/case-management/cases/${c.id}`)}
@@ -476,7 +245,7 @@ export default function DocsManagementSearch() {
                         <div className="doc-search__case-folder">{c.folder}</div>
                       )}
                     </div>
-                    <CaseStatusBadge status={c.status} className="doc-search__case-badge" />
+                    <CaseStatusBadge status={c.status as CaseStatus} className="doc-search__case-badge" />
                   </div>
                 ))}
               </div>
@@ -496,7 +265,7 @@ export default function DocsManagementSearch() {
               <div className="doc-search__doc-list">
                 {(results ?? []).map((doc) => {
               const fileExtension = doc.file_name.split(".").pop() || "";
-              const matchedCase = findCaseForFile(doc.file_path);
+              const matchedCase = caseLinks.get(doc.file_path);
               return (
                 <div
                   key={doc.id}

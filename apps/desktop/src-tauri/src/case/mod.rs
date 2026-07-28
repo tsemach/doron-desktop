@@ -8,7 +8,10 @@ use crate::store;
 use crate::tags::{list_all_tags_for_scope_type, list_tags_for_document_fuzzy, upsert_tag_internal, Tag, TagScope, TagType};
 
 pub mod annotations;
+pub mod lookup;
+
 pub use annotations::*;
+pub use lookup::*;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Case {

@@ -5,7 +5,7 @@ import CheckApiKey from "../ui/check-api-key";
 import DocsManagementHeader from "./DocsManagementHeader";
 import DocsManagementScan from "./DocsManagementScan";
 import DocsManagementTemplates from "./DocsManagementTemplates/DocsManagementTemplates";
-import DocsManagementSearch from "./DocsManagementSearch";
+import DocsManagementSearchPage from "./DocsManagementSearchPage";
 import { useAtom } from "jotai";
 import { aiConfigAtom } from "../../store/aiStore";
 import { dbPathAtom } from "../../store/indexStore";
@@ -58,8 +58,8 @@ export default function DocsManagement() {
         {aiConfig ? (aiConfig.aiMode === "byom" && !aiConfig.apiKey && <CheckApiKey apiKey="" />) : (!apiKey && <CheckApiKey apiKey="" />)}
 
         <Routes>
-          <Route path="/" element={<DocsManagementSearch />} />
-          <Route path="search" element={<DocsManagementSearch />} />
+          <Route path="/" element={<DocsManagementSearchPage />} />
+          <Route path="search" element={<DocsManagementSearchPage />} />
           <Route
             path="scan"
             element={
