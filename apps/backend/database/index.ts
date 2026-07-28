@@ -1,16 +1,6 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import * as schema from "./schema";
+import { createDb } from "@workspace/backend-orm";
 
-// Retrieve the database connection URL from environment variables
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  console.warn("WARNING: DATABASE_URL is not set in environment variables");
-}
-
-const pool = new Pool({
-  connectionString,
-});
-
-export const db = drizzle(pool, { schema });
+// Connection/schema now live in @workspace/backend-orm (shared with
+// apps/office, which points the same schema at its own BACKEND_DATABASE_URL
+// connection instead). DATABASE_URL here is unchanged.
+export const db = createDb(process.env.DATABASE_URL!);

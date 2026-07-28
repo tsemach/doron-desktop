@@ -47,7 +47,7 @@ export default function RegisterPage() {
       if (!res.ok) {
         throw new Error(data.error || "Failed to create admin account");
       }
-      window.location.href = "/login";
+      window.location.href = "/admins";
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
       setLoading(false);

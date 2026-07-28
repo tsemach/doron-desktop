@@ -41,9 +41,6 @@ export default function UserMenu({ name, email }: UserMenuProps) {
         {open && (
           <div className="absolute right-0 z-10 mt-2 w-56 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
             {email && <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">{email}</div>}
-            <a href="/register" className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent">
-              Add admin
-            </a>
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: "/login" })}
