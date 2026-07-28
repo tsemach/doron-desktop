@@ -46,6 +46,7 @@ export function useIndexing() {
   const [summary, setSummary] = useAtom(summaryAtom);
   const [error, setError] = useAtom(errorAtom);
 
+  // TODO: Remove localStorage API key — LLM config should be resolved on the backend only.
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
 
   const resetState = () => {

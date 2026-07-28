@@ -29,6 +29,7 @@ export default function DocsManagement() {
     setShowOutput,
   } = useIndexing();
 
+  // TODO: Remove localStorage API key — LLM config should be resolved on the backend only.
   const apiKey = localStorage.getItem("gemini_api_key") ?? "";
 
   useEffect(() => {

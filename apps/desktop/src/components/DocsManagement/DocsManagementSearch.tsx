@@ -1,16 +1,19 @@
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 
+import { ChevronDownIcon, ExternalLinkIcon, SearchIcon } from "@/assets/icons";
 import { Button } from "../ui/button";
 import CaseStatusBadge from "../ui/CaseStatusBadge";
 import FileTypeIcon from "../ui/FileTypeIcon";
-import { API_KEY_STORAGE_KEY } from "../Settings/Settings";
 import type { CaseStatus } from "../CaseManagement/CaseManagementTypes";
 import { useCaseLinksForPaths, useCaseSearch } from "../../hooks/case";
 import { useSearch } from "../../hooks/useSearch";
 import { searchDocuments } from "../../lib/search";
-import type { DocumentSearchAdvancedFilters } from "./DocsManagementSearch.types";
+import {
+  resolveDocumentSearchScope,
+  type DocumentSearchAdvancedFilters,
+} from "./DocsManagementSearch.types";
 
 function buildQuery(text: string, docType: string, dateFrom: string, dateTo: string): string {
   const parts: string[] = [];
@@ -57,34 +60,27 @@ export default function DocsManagementSearch({
   const [text, setText] = useState("");
   const { docType, dateFrom, dateTo, tagFilters, notesContains, searchTarget } = advancedFilters;
 
-  const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
+  const searchScope = useMemo(
+    () => resolveDocumentSearchScope(searchTarget),
+    [searchTarget],
+  );
+
   const queryString = buildQuery(text, docType, dateFrom, dateTo);
   const hasStructuredFilters = tagFilters.length > 0 || !!notesContains.trim();
-  const [aiConfig, setAiConfig] = useState<any>(null);
-  // Only free-text search is AI-driven; structured filters are deterministic SQL.
-  // While aiConfig is still loading, fail closed on missing localStorage key so
-  // debounced auto-search cannot fire before settings resolve.
-  const needsApiKey = !!text.trim() && (aiConfig === null || aiConfig.ai_mode === "byom");
-  const showWarning = aiConfig
-    ? aiConfig.ai_mode === "byom" && !aiConfig.api_key_enc
-    : !apiKey;
-  const shouldClearSearch = !queryString.trim() && !hasStructuredFilters;
+  const hasQuery = !!queryString.trim() || hasStructuredFilters;
+  const shouldClearSearch = !hasQuery;
 
   const documentSearchRequest = useMemo(
     () => ({
       query: queryString,
-      apiKey,
       limit: 20,
       tags: tagFilters.length > 0 ? tagFilters : undefined,
       notesContains: notesContains.trim() || undefined,
     }),
-    [queryString, apiKey, tagFilters, notesContains],
+    [queryString, tagFilters, notesContains],
   );
 
-  const documentsSearchEnabled =
-    searchTarget !== "cases" &&
-    (!!queryString.trim() || hasStructuredFilters) &&
-    !(needsApiKey && showWarning);
+  const documentsSearchEnabled = searchScope.includesDocuments && hasQuery;
 
   const {
     results: documentSearchResponse,
@@ -100,24 +96,20 @@ export default function DocsManagementSearch({
     shouldClear: shouldClearSearch,
   });
 
-  const results = searchTarget !== "cases" ? (documentSearchResponse?.results ?? null) : null;
-  const filePaths = useMemo(() => (results ?? []).map((doc) => doc.file_path), [results]);
+  const showDocumentResults = searchScope.includesDocuments && hasDocumentSearch;
+  const documentResults = showDocumentResults ? (documentSearchResponse?.results ?? null) : null;
+  const filePaths = useMemo(() => (documentResults ?? []).map((doc) => doc.file_path), [documentResults]);
   const { links: caseLinks } = useCaseLinksForPaths(filePaths, { isSearching });
 
   const caseSearchFilters = useMemo(
     () => ({ tags: tagFilters, notesContains }),
     [tagFilters, notesContains],
   );
-  const caseSearchEnabled = searchTarget !== "documents" && hasStructuredFilters;
+  const caseSearchEnabled = searchScope.includesCases && hasStructuredFilters;
   const caseSearch = useCaseSearch(caseSearchFilters, { enabled: caseSearchEnabled });
 
-  const showResultsPanel =
-    (searchTarget !== "cases" && hasDocumentSearch) ||
-    (caseSearchEnabled && caseSearch.hasSearched);
-
-  useEffect(() => {
-    invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
-  }, []);
+  const showCaseResults = searchScope.includesCases && caseSearch.hasSearched;
+  const showResultsPanel = showDocumentResults || showCaseResults;
 
   async function handleOpenFile(path: string) {
     try {
@@ -129,7 +121,7 @@ export default function DocsManagementSearch({
   }
 
   async function handleSearch() {
-    if ((!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning)) return;
+    if (!hasQuery) return;
     runDocumentSearch();
   }
 
@@ -141,21 +133,7 @@ export default function DocsManagementSearch({
     <div className="doc-search animate-fade-in">
       <div className="doc-search__panel">
         <div className="doc-search__input-row">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="doc-search__input-icon"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
+          <SearchIcon size={18} className="doc-search__input-icon" />
           <input
             type="text"
             value={text}
@@ -167,7 +145,7 @@ export default function DocsManagementSearch({
           <div className="doc-search__input-actions">
             <Button
               onClick={handleSearch}
-              disabled={(!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning) || (isSearching && !hasDocumentSearch)}
+              disabled={!hasQuery || (isSearching && !hasDocumentSearch)}
               size="sm"
             >
               {isSearching && !hasDocumentSearch ? "Searching..." : "Search"}
@@ -181,18 +159,10 @@ export default function DocsManagementSearch({
           className="doc-search__advanced-toggle"
         >
           Advance search
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+          <ChevronDownIcon
+            size={12}
             className={`doc-search__advanced-toggle-icon${showAdvancedSearch ? " doc-search__advanced-toggle-icon--open" : ""}`}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          />
         </button>
 
         {advancedSearch}
@@ -205,12 +175,6 @@ export default function DocsManagementSearch({
         </div>
       )}
 
-      {showWarning && (
-        <div className="doc-search__warning">
-          No API key is configured. Please navigate to the settings page to connect your AI credentials.
-        </div>
-      )}
-
       {caseSearch.error && (
         <div className="doc-search__error">
           <span className="doc-search__error-label">Case Search Error: </span>
@@ -220,7 +184,7 @@ export default function DocsManagementSearch({
 
       {showResultsPanel ? (
         <div className="doc-search__results">
-          {caseSearchEnabled && caseSearch.hasSearched && (
+          {showCaseResults && (
             <div className="doc-search__results-section">
               <div className="doc-search__results-count">
                 <span>
@@ -252,18 +216,18 @@ export default function DocsManagementSearch({
             </div>
           )}
 
-          {searchTarget !== "cases" && hasDocumentSearch && (
+          {showDocumentResults && (
             <div className="doc-search__results-section">
               <div className="doc-search__results-count">
                 <span>
-                  {results === null || results.length === 0
+                  {documentResults === null || documentResults.length === 0
                     ? "No matching documents found."
-                    : `Showing ${results.length} relevant document${results.length !== 1 ? "s" : ""}`}
+                    : `Showing ${documentResults.length} relevant document${documentResults.length !== 1 ? "s" : ""}`}
                 </span>
               </div>
 
               <div className="doc-search__doc-list">
-                {(results ?? []).map((doc) => {
+                {(documentResults ?? []).map((doc) => {
               const fileExtension = doc.file_name.split(".").pop() || "";
               const matchedCase = caseLinks.get(doc.file_path);
               return (
@@ -299,11 +263,7 @@ export default function DocsManagementSearch({
                             className="doc-search__case-link"
                             title={`Jump to case: ${matchedCase.subject}`}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="doc-search__case-link-icon">
-                              <path d="M15 3h6v6" />
-                              <path d="M10 14 21 3" />
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                            </svg>
+                            <ExternalLinkIcon size={10} className="doc-search__case-link-icon" />
                             <span>Go to Case</span>
                           </button>
                         )}
@@ -384,20 +344,7 @@ export default function DocsManagementSearch({
       ) : (
         <div className="doc-search__idle animate-fade-in-up">
           <div className="doc-search__idle-icon-wrap">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="26"
-              height="26"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
+            <SearchIcon size={26} className="doc-search__idle-icon" />
           </div>
           <div className="doc-search__idle-copy">
             <h3 className="doc-search__idle-title">Ready to Search</h3>

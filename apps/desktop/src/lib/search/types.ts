@@ -28,7 +28,6 @@ export type SearchResponse = {
 
 export type DocumentSearchRequest = {
   query: string;
-  apiKey: string;
   limit?: number;
   tags?: TagFilter[];
   notesContains?: string;

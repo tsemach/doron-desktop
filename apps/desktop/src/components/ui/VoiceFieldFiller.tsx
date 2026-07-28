@@ -81,6 +81,7 @@ export default function VoiceFieldFiller({ availableFields, onFieldExtracted }: 
           modelName: aiSettings?.voice_model || "whisper multilingual (small)",
           language: null,
         });
+        // TODO: Remove localStorage API key fallback — LLM config should be resolved on the backend only.
         const fallbackApiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
         extractionApiKey = aiSettings?.api_key_enc || fallbackApiKey;
       } else {

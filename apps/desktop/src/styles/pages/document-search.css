@@ -324,6 +324,10 @@
   @apply w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground mx-auto;
 }
 
+.doc-search__idle-icon svg {
+  stroke-width: 1.5;
+}
+
 .doc-search__idle-copy {
   @apply space-y-1;
 }

@@ -275,6 +275,7 @@ export default function Settings() {
     setIsSaving(true);
     setSaved(false);
 
+    // TODO: Remove localStorage API key — LLM config should be resolved on the backend only.
     localStorage.setItem(API_KEY_STORAGE_KEY, providerApiKey.trim());
     setLanguage(tempLang);
 

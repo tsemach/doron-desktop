@@ -60,6 +60,7 @@ export async function triggerGlobalHealthCheck() {
     }
 
     // 3. Run real health check
+    // TODO: Remove localStorage API key fallback — LLM config should be resolved on the backend only.
     const fallbackApiKey = localStorage.getItem("claude_api_key") || "";
     const response = await invoke<string>("check_ai_health", {
       config: {

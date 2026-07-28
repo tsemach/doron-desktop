@@ -48,7 +48,7 @@ pub async fn query_search_documents_core(
 pub async fn query_search_documents(
     app: AppHandle,
     query: String,
-    api_key: String,
+    _api_key: String, // TODO: remove — LLM config is backend-only
     limit: Option<usize>,
     model: Option<String>,
     tags: Option<Vec<TagFilter>>,
@@ -65,7 +65,7 @@ pub async fn query_search_documents(
     };
     let response = {
         use crate::search::SearchEngine;
-        crate::search::DocumentSearchEngine::search(&app, request, api_key, model).await?
+        crate::search::DocumentSearchEngine::search(&app, request, model).await?
     };
     Ok(response.results)
 }
