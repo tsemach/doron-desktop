@@ -50,8 +50,10 @@ export async function POST(request: Request) {
       .limit(1);
 
     if (existingUser) {
+      // Deliberately generic -- a distinct "already exists" message lets an
+      // attacker enumerate registered emails by probing signup.
       return NextResponse.json(
-        { error: "An account with this email address already exists" },
+        { error: "User or password is incorrect" },
         { status: 400 }
       );
     }
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
     // If sending the verification email fails (e.g. the configured Resend
     // domain isn't verified yet), roll back the user row we just created --
     // otherwise it's stuck forever: unverified (so login stays blocked) and
-    // unretriable (a second signup attempt hits "account already exists"),
+    // unretriable (a second signup attempt hits the generic "incorrect" error),
     // with no way out except manual DB cleanup.
     try {
       const origin = new URL(request.url).origin;
