@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { inputClass } from "../../lib/auth-form-styles";
+import { inputClass, LOGIN_PASSWORD_LENGTH } from "../../lib/auth-form";
 
 interface PasswordInputProps {
   value: string;
@@ -20,7 +20,7 @@ export function PasswordInput({ value, onChange, placeholder, autoComplete, name
       <input
         type={visible ? "text" : "password"}
         required
-        maxLength={16}
+        maxLength={LOGIN_PASSWORD_LENGTH}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`${inputClass} pr-9`}
