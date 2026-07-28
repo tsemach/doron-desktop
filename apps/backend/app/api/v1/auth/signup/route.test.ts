@@ -100,7 +100,7 @@ describe("POST /api/v1/auth/signup", () => {
 
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toMatch(/already exists/i);
+    expect(data.error).toMatch(/incorrect/i);
     expect(mockInsertReturning).not.toHaveBeenCalled();
   });
 
@@ -132,7 +132,7 @@ describe("POST /api/v1/auth/signup", () => {
     expect(data.error).toMatch(/verification email failed to send/i);
     expect(data.error).toMatch(/try registering again/i);
     // The user row must actually be deleted -- otherwise a retry would hit
-    // "account already exists" with no way to recover except manual cleanup.
+    // the generic "incorrect" error with no way to recover except manual cleanup.
     expect(mockDeleteWhere).toHaveBeenCalled();
   });
 });
