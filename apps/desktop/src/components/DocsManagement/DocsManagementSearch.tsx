@@ -62,20 +62,20 @@ function buildQuery(text: string, docType: string, dateFrom: string, dateTo: str
   return parts.join(", ");
 }
 
+function confidenceLevel(pct: number): "high" | "medium" | "low" {
+  if (pct >= 85) return "high";
+  if (pct >= 70) return "medium";
+  return "low";
+}
+
 function ConfidenceBadge({ value }: { value: number | null }) {
   if (value === null) return null;
   const pct = Math.round(value * 100);
-  let color = "bg-red-50 border-red-200 text-red-700";
-  if (pct >= 85) {
-    color = "bg-green-50 border-green-200 text-green-700";
-  } else if (pct >= 70) {
-    color = "bg-yellow-50 border-yellow-200 text-yellow-700";
-  }
 
   return (
-    <div className={`flex items-center gap-1 border rounded-full px-2 py-0.5 text-[10px] font-semibold ${color}`}>
+    <div className={`doc-search__confidence doc-search__confidence--${confidenceLevel(pct)}`}>
       <span>Match:</span>
-      <span className="font-mono">{pct}%</span>
+      <span className="doc-search__confidence-value">{pct}%</span>
     </div>
   );
 }
@@ -234,10 +234,9 @@ export default function DocsManagementSearch() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 py-2 animate-fade-in">
-      {/* Enterprise Search Box */}
-      <div className="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
-        <div className="relative flex items-center">
+    <div className="doc-search animate-fade-in">
+      <div className="doc-search__panel">
+        <div className="doc-search__input-row">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="18"
@@ -248,7 +247,7 @@ export default function DocsManagementSearch() {
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="absolute left-3.5 text-muted-foreground"
+            className="doc-search__input-icon"
           >
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
@@ -259,9 +258,9 @@ export default function DocsManagementSearch() {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search documents using natural language (Hebrew / English)..."
-            className="w-full rounded-lg border border-input bg-background pl-11 pr-24 py-3 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring"
+            className="doc-search__input"
           />
-          <div className="absolute right-2 flex items-center gap-1.5">
+          <div className="doc-search__input-actions">
             <Button
               onClick={handleSearch}
               disabled={(!queryString.trim() && !hasStructuredFilters) || (needsApiKey && showWarning) || (isSearching && !hasDocumentSearch)}
@@ -272,11 +271,10 @@ export default function DocsManagementSearch() {
           </div>
         </div>
 
-        {/* Advance search link — opens the combined tag/notes/doc-type/date panel below */}
         <button
           type="button"
           onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-          className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+          className="doc-search__advanced-toggle"
         >
           Advance search
           <svg
@@ -287,31 +285,27 @@ export default function DocsManagementSearch() {
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            className={`transition-transform duration-200 ${showAdvancedSearch ? "rotate-180" : ""}`}
+            className={`doc-search__advanced-toggle-icon${showAdvancedSearch ? " doc-search__advanced-toggle-icon--open" : ""}`}
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
 
-        {/* Collapsible Advance Search (tags + notes) */}
         {showAdvancedSearch && (
-          <div className="pt-3 border-t border-border/50 space-y-3 text-xs animate-fade-in-down">
-            {/* Search target */}
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground shrink-0">Search in:</label>
-              <div className="inline-flex rounded-md border border-input overflow-hidden">
+          <div className="doc-search__advanced animate-fade-in-down">
+            <div className="doc-search__field-row">
+              <label className="doc-search__label">Search in:</label>
+              <div className="doc-search__target-group">
                 {(["documents", "cases", "both"] as const).map((opt) => (
                   <button
                     key={opt}
                     type="button"
                     onClick={() => setSearchTarget(opt)}
-                    className={`px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors ${
-                      opt !== "documents" ? "border-l border-input" : ""
-                    } ${
-                      searchTarget === opt
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={[
+                      "doc-search__target-btn",
+                      opt !== "documents" ? "doc-search__target-btn--bordered" : "",
+                      searchTarget === opt ? "doc-search__target-btn--active" : "",
+                    ].filter(Boolean).join(" ")}
                   >
                     {opt}
                   </button>
@@ -319,21 +313,20 @@ export default function DocsManagementSearch() {
               </div>
             </div>
 
-            {/* Tag filters */}
-            <div className="flex flex-wrap items-start gap-2">
-              <label className="font-semibold text-muted-foreground pt-1.5 shrink-0">Tags:</label>
-              <div className="flex-1 min-w-[220px] space-y-1.5">
-                <div className="flex flex-wrap items-center gap-1.5 min-h-[28px] px-2 py-1 border border-input rounded-md bg-background/50 focus-within:ring-1 focus-within:ring-ring transition-all">
+            <div className="doc-search__tags-row">
+              <label className="doc-search__label doc-search__label--tags">Tags:</label>
+              <div className="doc-search__tags-field">
+                <div className="doc-search__tags-input-wrap">
                   {tagFilters.map((f) => (
                     <span
                       key={f.name}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/5 text-primary/80 text-[10px] font-medium lowercase select-none"
+                      className="doc-search__tag-chip"
                     >
                       #{f.value ? `${f.name}: ${f.value}` : f.name}
                       <button
                         type="button"
                         onClick={() => handleRemoveTagFilter(f.name)}
-                        className="hover:bg-primary/20 text-primary/75 hover:text-primary rounded-full p-0.5 leading-none transition-colors"
+                        className="doc-search__tag-remove"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                           <line x1="18" y1="6" x2="6" y2="18" />
@@ -349,7 +342,7 @@ export default function DocsManagementSearch() {
                     value={newTagFilterName}
                     onChange={(e) => setNewTagFilterName(e.target.value)}
                     onKeyDown={handleTagFilterKeyDown}
-                    className="flex-1 bg-transparent text-xs focus:outline-none border-none p-0.5 min-w-[100px]"
+                    className="doc-search__tag-text-input"
                   />
                   <datalist id="doc-search-tag-suggestions">
                     {availableTagNames
@@ -361,19 +354,19 @@ export default function DocsManagementSearch() {
                 </div>
 
                 {newTagFilterName.trim() && (
-                  <div className="flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
+                  <div className="doc-search__tag-value-row animate-in slide-in-from-top-1 duration-150">
                     <input
                       type="text"
                       placeholder="Optional value..."
                       value={newTagFilterValue}
                       onChange={(e) => setNewTagFilterValue(e.target.value)}
                       onKeyDown={handleTagFilterKeyDown}
-                      className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="doc-search__text-input"
                     />
                     <Button
                       type="button"
                       size="sm"
-                      className="h-6 text-xs"
+                      className="doc-search__add-btn"
                       onClick={() => handleAddTagFilter(newTagFilterName, newTagFilterValue)}
                     >
                       Add
@@ -383,26 +376,24 @@ export default function DocsManagementSearch() {
               </div>
             </div>
 
-            {/* Notes filter */}
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-muted-foreground shrink-0">Notes contain:</label>
+            <div className="doc-search__field-row">
+              <label className="doc-search__label">Notes contain:</label>
               <input
                 type="text"
                 value={notesContains}
                 onChange={(e) => setNotesContains(e.target.value)}
                 placeholder="e.g. sign-off"
-                className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                className="doc-search__text-input doc-search__text-input--notes"
               />
             </div>
 
-            {/* Doc type / date range — merged into Advance Search */}
-            <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="font-semibold text-muted-foreground">Doc Type:</label>
+            <div className="doc-search__filters-row">
+              <div className="doc-search__field-row">
+                <label className="doc-search__label">Doc Type:</label>
                 <select
                   value={docType}
                   onChange={(e) => setDocType(e.target.value)}
-                  className="rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="doc-search__select"
                 >
                   <option value="">Any</option>
                   {DOC_TYPES.map((t) => (
@@ -413,33 +404,32 @@ export default function DocsManagementSearch() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <label className="font-semibold text-muted-foreground">From:</label>
+              <div className="doc-search__field-row">
+                <label className="doc-search__label">From:</label>
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="doc-search__date-input"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <label className="font-semibold text-muted-foreground">To:</label>
+              <div className="doc-search__field-row">
+                <label className="doc-search__label">To:</label>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="doc-search__date-input"
                 />
               </div>
-
             </div>
 
             {(hasStructuredFilters || docType || dateFrom || dateTo) && (
               <button
                 type="button"
                 onClick={handleClearAdvancedSearch}
-                className="text-red-500 font-semibold hover:underline"
+                className="doc-search__clear-btn"
               >
                 Clear Advance Search
               </button>
@@ -448,28 +438,24 @@ export default function DocsManagementSearch() {
         )}
       </div>
 
-      {/* Error Output */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
-          <span className="font-bold">Search Error: </span>
+        <div className="doc-search__error">
+          <span className="doc-search__error-label">Search Error: </span>
           {error}
         </div>
       )}
 
-      {/* No API key hint */}
       {showWarning && (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-800">
+        <div className="doc-search__warning">
           No API key is configured. Please navigate to the settings page to connect your AI credentials.
         </div>
       )}
 
-      {/* Search Results */}
       {showResultsPanel ? (
-        <div className="space-y-6">
-          {/* Case Results */}
+        <div className="doc-search__results">
           {caseResults !== null && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="doc-search__results-section">
+              <div className="doc-search__results-count">
                 <span>
                   {caseResults.length === 0
                     ? "No matching cases found."
@@ -477,30 +463,29 @@ export default function DocsManagementSearch() {
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="doc-search__case-list">
                 {caseResults.map((c) => (
                   <div
                     key={c.id}
                     onClick={() => navigate(`/case-management/cases/${c.id}`)}
-                    className="rounded-xl border border-border bg-card p-3.5 hover:shadow-xs transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer hover:border-border-hover"
+                    className="doc-search__case-card"
                   >
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-foreground truncate">{c.subject || "Untitled Case"}</div>
+                    <div className="doc-search__case-content">
+                      <div className="doc-search__case-title">{c.subject || "Untitled Case"}</div>
                       {c.folder && (
-                        <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5">{c.folder}</div>
+                        <div className="doc-search__case-folder">{c.folder}</div>
                       )}
                     </div>
-                    <CaseStatusBadge status={c.status} className="shrink-0" />
+                    <CaseStatusBadge status={c.status} className="doc-search__case-badge" />
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Document Results */}
           {searchTarget !== "cases" && hasDocumentSearch && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="doc-search__results-section">
+              <div className="doc-search__results-count">
                 <span>
                   {results === null || results.length === 0
                     ? "No matching documents found."
@@ -508,47 +493,44 @@ export default function DocsManagementSearch() {
                 </span>
               </div>
 
-              <div className="space-y-3">
+              <div className="doc-search__doc-list">
                 {(results ?? []).map((doc) => {
               const fileExtension = doc.file_name.split(".").pop() || "";
               const matchedCase = findCaseForFile(doc.file_path);
               return (
                 <div
                   key={doc.id}
-                  className="rounded-xl border border-border bg-card p-4 hover:shadow-xs transition-all duration-200 flex items-start gap-4 hover:border-border-hover"
+                  className="doc-search__doc-card"
                 >
-                  {/* File Type Icon */}
                   <FileTypeIcon ext={fileExtension} />
 
-                  {/* Document details */}
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {/* Header: Name, Doc Type, Lang, Confidence */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <div className="doc-search__doc-body">
+                    <div className="doc-search__doc-header">
+                      <div className="doc-search__doc-meta">
                         <span
                           onClick={() => handleOpenFile(doc.file_path)}
-                          className="font-mono text-xs font-bold truncate cursor-pointer text-primary hover:underline hover:text-primary/80"
+                          className="doc-search__doc-name"
                           title="Click to open file"
                         >
                           {doc.file_name}
                         </span>
                         {doc.doc_type && (
-                          <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border">
+                          <span className="doc-search__doc-type-badge">
                             {doc.doc_type}
                           </span>
                         )}
                         {doc.language && (
-                          <span className="text-[9px] uppercase px-1.5 py-0.5 rounded border border-border/80 text-muted-foreground">
+                          <span className="doc-search__doc-lang-badge">
                             {doc.language}
                           </span>
                         )}
                         {matchedCase && (
                           <button
                             onClick={() => navigate(`/case-management/cases/${matchedCase.id}`)}
-                            className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all cursor-pointer"
+                            className="doc-search__case-link"
                             title={`Jump to case: ${matchedCase.subject}`}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="doc-search__case-link-icon">
                               <path d="M15 3h6v6" />
                               <path d="M10 14 21 3" />
                               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -557,74 +539,66 @@ export default function DocsManagementSearch() {
                           </button>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="doc-search__doc-aside">
                         {doc.doc_date && (
-                          <span className="text-[10px] text-muted-foreground">{doc.doc_date}</span>
+                          <span className="doc-search__doc-date">{doc.doc_date}</span>
                         )}
                         <ConfidenceBadge value={doc.confidence} />
                       </div>
                     </div>
 
-                    {/* Full path */}
                     <p
                       onClick={() => handleOpenFile(doc.file_path)}
-                      className="text-[10px] text-muted-foreground truncate font-mono cursor-pointer hover:underline hover:text-foreground"
+                      className="doc-search__doc-path"
                       title={doc.file_path}
                     >
                       {doc.file_path}
                     </p>
 
-                    {/* AI Extracted Title */}
                     {doc.title && (
-                      <h4 className="text-xs font-bold text-foreground leading-snug">
+                      <h4 className="doc-search__doc-title">
                         {doc.title}
                       </h4>
                     )}
 
-                    {/* AI Extracted Summary */}
                     {doc.summary && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed bg-muted/20 p-2.5 rounded-lg border border-border/30">
+                      <p className="doc-search__doc-summary">
                         {doc.summary}
                       </p>
                     )}
 
-                    {/* Metadata Tag Cloud */}
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {/* Keywords */}
+                    <div className="doc-search__tag-cloud">
                       {doc.keywords.slice(0, 5).map((k) => (
                         <span
                           key={k}
-                          className="text-[10px] bg-muted/65 border border-border/40 text-foreground/80 rounded-md px-2 py-0.5"
+                          className="doc-search__meta-chip doc-search__meta-chip--keyword"
                         >
                           #{k}
                         </span>
                       ))}
 
-                      {/* Topics */}
                       {doc.topics.slice(0, 3).map((t) => (
                         <span
                           key={t}
-                          className="text-[10px] bg-indigo-50/50 border border-indigo-100 text-indigo-700 rounded-md px-2 py-0.5"
+                          className="doc-search__meta-chip doc-search__meta-chip--topic"
                         >
                           🔮 {t}
                         </span>
                       ))}
 
-                      {/* Entities */}
                       {doc.entities.slice(0, 3).map((e) => (
                         <span
                           key={e}
-                          className="text-[10px] bg-emerald-50/50 border border-emerald-100 text-emerald-700 rounded-md px-2 py-0.5"
+                          className="doc-search__meta-chip doc-search__meta-chip--entity"
                         >
                           💼 {e}
                         </span>
                       ))}
 
-                      {/* Authors */}
                       {doc.authors.slice(0, 2).map((a) => (
                         <span
                           key={a}
-                          className="text-[10px] bg-amber-50/50 border border-amber-100 text-amber-700 rounded-md px-2 py-0.5"
+                          className="doc-search__meta-chip doc-search__meta-chip--author"
                         >
                           👤 {a}
                         </span>
@@ -639,9 +613,8 @@ export default function DocsManagementSearch() {
           )}
         </div>
       ) : (
-        /* Search Landing/Idle State suggestions */
-        <div className="text-center py-16 space-y-4 animate-fade-in-up">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground mx-auto">
+        <div className="doc-search__idle animate-fade-in-up">
+          <div className="doc-search__idle-icon-wrap">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="26"
@@ -657,15 +630,15 @@ export default function DocsManagementSearch() {
               <path d="m21 21-4.3-4.3" />
             </svg>
           </div>
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-foreground">Ready to Search</h3>
-            <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+          <div className="doc-search__idle-copy">
+            <h3 className="doc-search__idle-title">Ready to Search</h3>
+            <p className="doc-search__idle-description">
               Enter semantic descriptions or keywords to look through your synced knowledge bases.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-2 max-w-md mx-auto pt-2">
-            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider block w-full mb-1">
+          <div className="doc-search__suggestions">
+            <span className="doc-search__suggestions-label">
               Popular Searches
             </span>
             {[
@@ -680,7 +653,7 @@ export default function DocsManagementSearch() {
                   setText(suggest);
                   setTimeout(handleSearch, 50);
                 }}
-                className="px-2.5 py-1 text-[11px] font-semibold border rounded-full bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-150"
+                className="doc-search__suggestion-btn"
               >
                 "{suggest}"
               </button>
