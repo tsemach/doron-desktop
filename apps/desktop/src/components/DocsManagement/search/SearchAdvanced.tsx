@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-import { Button } from "../ui/button";
 import type { TagFilter } from "@/lib/search";
 
-import type { DocumentSearchAdvancedFilters, DocumentSearchTarget } from "./DocsManagementSearch.types";
+import { Button } from "../../ui/button";
+import type { DocumentSearchAdvancedFilters, DocumentSearchTarget } from "./types";
 
 const DOC_TYPES = [
   "contract",
@@ -20,15 +20,15 @@ const DOC_TYPES = [
   "other",
 ];
 
-type DocsManagementSearchAdvancedProps = {
+type SearchAdvancedProps = {
   filters: DocumentSearchAdvancedFilters;
   onChange: (filters: DocumentSearchAdvancedFilters) => void;
 };
 
-export default function DocsManagementSearchAdvanced({
+export default function SearchAdvanced({
   filters,
   onChange,
-}: DocsManagementSearchAdvancedProps) {
+}: SearchAdvancedProps) {
   const [availableTagNames, setAvailableTagNames] = useState<string[]>([]);
   const [newTagFilterName, setNewTagFilterName] = useState("");
   const [newTagFilterValue, setNewTagFilterValue] = useState("");
