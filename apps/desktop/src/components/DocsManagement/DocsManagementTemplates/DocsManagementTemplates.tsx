@@ -34,6 +34,7 @@ export default function DocsManagementTemplates() {
   const [pendingImport, setPendingImport] = useState<{ filePath: string; fileName: string } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // TODO: Remove localStorage API key — LLM config should be resolved on the backend only.
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
   const unlistenRef = useRef<UnlistenFn | null>(null);
 

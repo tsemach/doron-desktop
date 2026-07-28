@@ -13,6 +13,5 @@ export async function searchDocuments(request: DocumentSearchRequest): Promise<S
         notesContains: request.notesContains,
       },
     },
-    apiKey: request.apiKey,
   });
 }

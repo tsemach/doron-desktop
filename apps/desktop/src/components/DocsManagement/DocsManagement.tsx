@@ -5,7 +5,7 @@ import CheckApiKey from "../ui/check-api-key";
 import DocsManagementHeader from "./DocsManagementHeader";
 import DocsManagementScan from "./DocsManagementScan";
 import DocsManagementTemplates from "./DocsManagementTemplates/DocsManagementTemplates";
-import DocsManagementSearch from "./DocsManagementSearch";
+import { SmartSearch } from "./search";
 import { useAtom } from "jotai";
 import { aiConfigAtom } from "../../store/aiStore";
 import { dbPathAtom } from "../../store/indexStore";
@@ -29,6 +29,7 @@ export default function DocsManagement() {
     setShowOutput,
   } = useIndexing();
 
+  // TODO: Remove localStorage API key — LLM config should be resolved on the backend only.
   const apiKey = localStorage.getItem("gemini_api_key") ?? "";
 
   useEffect(() => {
@@ -58,8 +59,8 @@ export default function DocsManagement() {
         {aiConfig ? (aiConfig.aiMode === "byom" && !aiConfig.apiKey && <CheckApiKey apiKey="" />) : (!apiKey && <CheckApiKey apiKey="" />)}
 
         <Routes>
-          <Route path="/" element={<DocsManagementSearch />} />
-          <Route path="search" element={<DocsManagementSearch />} />
+          <Route path="/" element={<SmartSearch />} />
+          <Route path="search" element={<SmartSearch />} />
           <Route
             path="scan"
             element={

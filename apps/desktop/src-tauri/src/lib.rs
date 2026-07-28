@@ -165,6 +165,8 @@ pub fn run() {
             case_template::delete_case_template,
             // case
             case::list_cases,
+            case::resolve_cases_for_paths,
+            case::search_cases,
             case::add_case,
             case::create_new_case,
             case::delete_case,

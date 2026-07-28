@@ -9,7 +9,6 @@ pub trait SearchEngine {
     fn search(
         app: &AppHandle,
         request: SearchRequest,
-        api_key: String,
         model: Option<String>,
     ) -> impl Future<Output = Result<SearchResponse, String>> + Send;
 }

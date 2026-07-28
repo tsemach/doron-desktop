@@ -12,12 +12,9 @@ use tauri::AppHandle;
 pub async fn search(
     app: AppHandle,
     request: SearchRequest,
-    api_key: String,
     model: Option<String>,
 ) -> Result<SearchResponse, String> {
     match request.scope {
-        SearchScope::Documents => {
-            DocumentSearchEngine::search(&app, request, api_key, model).await
-        }
+        SearchScope::Documents => DocumentSearchEngine::search(&app, request, model).await,
     }
 }
