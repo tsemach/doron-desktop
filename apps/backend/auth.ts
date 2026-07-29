@@ -31,6 +31,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const [row] = await db.select({ tier: users.tier }).from(users).where(eq(users.id, session.user.id)).limit(1);
         if (row) {
           (session.user as { tier?: string }).tier = row.tier;
+        } else {
+          session.user.id = "";
         }
       }
       return session;

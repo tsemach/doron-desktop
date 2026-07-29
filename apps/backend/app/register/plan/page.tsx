@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { AuthCard, Button, errorClass } from "@workspace/ui";
 
 function PlanForm() {
@@ -15,11 +15,29 @@ function PlanForm() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // Not signed in (e.g. direct navigation without registering first) — send back to register.
-    if (status === "unauthenticated") {
-      router.replace(platform === "desktop" ? "/register?platform=desktop" : "/register");
-    }
+    if (status !== "unauthenticated") return;
+    // /login is a strict superset here -- it has its own "Don't have an
+    // account? Create one" link straight to /register (see
+    // app/login/page.tsx), so someone who's never registered can still get
+    // there in one click, while someone who has an account (e.g.
+    // desktop's "Upgrade to Pro", or a plain expired browser session) can
+    // actually sign back in instead of being funneled into registration.
+    router.replace(platform === "desktop" ? "/login?platform=desktop" : "/login");
   }, [status, platform, router]);
+
+  // A 401 here means the session looked valid to useSession() (it still has
+  // the cached user info, e.g. email in the subtitle above) but the server
+  // rejected it -- e.g. the underlying user row was deleted after the JWT
+  // was issued (see auth.ts's session callback). The JWT cookie itself is
+  // still validly signed and unexpired though, so a plain router.push here
+  // gets silently bounced right back by middleware.ts -- its isLoggedIn
+  // check runs on the edge-safe authConfig (no DB access), which still
+  // considers this cookie "logged in". signOut() actually clears the
+  // cookie client-side first, so middleware no longer redirects `/login`
+  // away, then lands on the real login page.
+  async function redirectToLogin() {
+    await signOut({ callbackUrl: platform === "desktop" ? "/login?platform=desktop" : "/login" });
+  }
 
   async function selectFree() {
     setError("");
@@ -30,6 +48,10 @@ function PlanForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tier: "free" }),
       });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to select plan");
@@ -50,6 +72,10 @@ function PlanForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ platform }),
       });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Failed to start checkout");

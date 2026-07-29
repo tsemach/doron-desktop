@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Loader2 } from "lucide-react";
 import { LanguageProvider } from "./context/LanguageContext";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
@@ -65,12 +66,25 @@ function App() {
     };
   }, []);
 
-  const gated = AUTH_REQUIRED && sessionStatus === "ready" && !session;
+  // True only during the one-time initial session check (see authStore.ts's
+  // refreshSession) -- neither AppMain nor AppLogin renders during that
+  // window, so we never guess wrong and flash the other screen before the
+  // real answer comes back.
+  const checkingSession = AUTH_REQUIRED && sessionStatus !== "ready";
+  const gated = AUTH_REQUIRED && !session;
 
   return (
     <LanguageProvider>
       <UpdateBanner />
-      {gated ? <AppLogin /> : <AppMain />}
+      {checkingSession ? (
+        <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : gated ? (
+        <AppLogin />
+      ) : (
+        <AppMain />
+      )}
     </LanguageProvider>
   );
 }
