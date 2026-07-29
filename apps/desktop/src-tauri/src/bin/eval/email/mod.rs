@@ -1,9 +1,13 @@
 mod dataset;
 
+pub mod corpus;
+pub mod corpus_stats;
+pub mod docx_writer;
 pub mod examples;
 pub mod generate;
-pub mod run;
 pub mod list;
+pub mod rng;
+pub mod run;
 pub mod show;
 
 use clap::{Args, Subcommand};
@@ -19,8 +23,11 @@ pub enum EmailCommands {
     /// Show help examples of email evaluation commands
     Examples(examples::ExamplesArgs),
 
-    /// Generate synthetic email data or classification examples
+    /// Generate a synthetic email→case corpus with ground-truth labels
     Generate(generate::GenerateArgs),
+
+    /// Report composition and integrity of a generated corpus
+    CorpusStats(corpus_stats::CorpusStatsArgs),
 
     /// Run the email classification evaluation pipeline
     Run(run::RunArgs),

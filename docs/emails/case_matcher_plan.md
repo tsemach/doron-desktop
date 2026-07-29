@@ -250,7 +250,7 @@ attachment count, emails per case, how many cases have zero emails, adversarial 
   case number. A generator that leaks case numbers into conveyancing cases would mask exactly the
   failure P0 found.
 - Every `expected.case_id` refers to a case in `cases.json`; every attachment path exists.
-- Generated `.docx`/`.pdf` are readable by `crate::extractor::extract` (assert in a unit test — a
+- Generated `.docx` round-trips through `crate::extractor::extract` (assert in a unit test — a
   corpus of unparseable documents would silently zero out Tier B later).
 
 ### Notes

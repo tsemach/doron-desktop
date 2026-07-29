@@ -774,7 +774,7 @@ email_eval_corpus/
 ├── cases/
 │   ├── case_001/                       ← becomes cases.folder
 │   │   ├── כתב_תביעה.docx
-│   │   ├── פרוטוקול_דיון.pdf
+│   │   ├── פרוטוקול_דיון.docx
 │   │   └── חוזה.txt
 │   └── ...
 ├── attachments/                        ← files referenced by email fixtures
