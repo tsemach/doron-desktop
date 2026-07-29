@@ -1,4 +1,4 @@
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickIndexableDocumentFile, pickIndexableDocumentFolder } from "@/lib/indexing";
 
 type Props = {
   show: boolean;
@@ -8,19 +8,16 @@ type Props = {
 
 export default function DocsManagementPicker({ show, onClose, onSelect }: Props) {
   async function handleSelectFile() {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: "Documents", extensions: ["docx", "pdf", "xlsx", "xls", "txt"] }],
-    });
-    if (selected && typeof selected === "string") {
+    const selected = await pickIndexableDocumentFile();
+    if (selected) {
       onSelect(selected, false);
     }
     onClose();
   }
 
   async function handleSelectFolder() {
-    const selected = await open({ directory: true });
-    if (selected && typeof selected === "string") {
+    const selected = await pickIndexableDocumentFolder();
+    if (selected) {
       onSelect(selected, true);
     }
     onClose();

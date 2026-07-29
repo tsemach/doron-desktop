@@ -1,28 +1,28 @@
-import DocsManagementScanFolder from "./DocsManagementScanFolder";
-import DocsManagementScanDocument from "./DocsManagementScanDocument";
+import ScanFolder from "./ScanFolder";
+import ScanDocument from "./ScanDocument";
 
-interface DocsManagementScanCardsProps {
+interface ScanCardsProps {
   isDisabled: boolean;
   isFolderActive: boolean;
   onSelectFolder: () => void;
   onSelectFile: () => void;
 }
 
-export default function DocsManagementScanCards({
+export default function ScanCards({
   isDisabled,
   isFolderActive,
   onSelectFolder,
   onSelectFile,
-}: DocsManagementScanCardsProps) {
+}: ScanCardsProps) {
   return (
     <>
-      <DocsManagementScanFolder
+      <ScanFolder
         isDisabled={isDisabled}
         isFolderActive={isFolderActive}
         onSelectFolder={onSelectFolder}
       />
 
-      <DocsManagementScanDocument
+      <ScanDocument
         isDisabled={isDisabled}
         isFolderActive={isFolderActive}
         onSelectFile={onSelectFile}

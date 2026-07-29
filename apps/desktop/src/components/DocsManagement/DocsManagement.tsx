@@ -3,8 +3,8 @@ import { Routes, Route } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import CheckApiKey from "../ui/check-api-key";
 import DocsManagementHeader from "./DocsManagementHeader";
-import DocsManagementScan from "./DocsManagementScan";
 import DocsManagementTemplates from "./DocsManagementTemplates/DocsManagementTemplates";
+import { Scan } from "./scan";
 import { SmartSearch } from "./search";
 import { useAtom } from "jotai";
 import { aiConfigAtom } from "../../store/aiStore";
@@ -29,9 +29,6 @@ export default function DocsManagement() {
     setShowOutput,
   } = useIndexing();
 
-  // TODO: Remove localStorage API key — LLM config should be resolved on the backend only.
-  const apiKey = localStorage.getItem("gemini_api_key") ?? "";
-
   useEffect(() => {
     invoke<string>("get_db_path").then(setDbPath).catch(() => { });
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
@@ -45,7 +42,7 @@ export default function DocsManagement() {
         dbPath={dbPath}
         isProcessing={isProcessing}
         scanCount={
-          isFolder && showOutput
+          isFolder && (isProcessing || showOutput || items.length > 0)
             ? {
                 current: items.filter((i) => i.file_name !== "").length,
                 total: currentItem?.total || items[0]?.total || 0,
@@ -56,7 +53,7 @@ export default function DocsManagement() {
       />
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {aiConfig ? (aiConfig.aiMode === "byom" && !aiConfig.apiKey && <CheckApiKey apiKey="" />) : (!apiKey && <CheckApiKey apiKey="" />)}
+        {aiConfig?.aiMode === "byom" && !aiConfig.apiKey && <CheckApiKey apiKey="" />}
 
         <Routes>
           <Route path="/" element={<SmartSearch />} />
@@ -64,7 +61,7 @@ export default function DocsManagement() {
           <Route
             path="scan"
             element={
-              <DocsManagementScan
+              <Scan
                 show={showOutput}
                 isFolder={isFolder}
                 isProcessing={isProcessing}

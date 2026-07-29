@@ -1,8 +1,8 @@
-import DocsManagementScanCards from "./DocsManagementScanCards";
-import DocsManagementScanOpenBanner from "./DocsManagementScanOpenBanner";
-import { IndexingSession } from "./DocsManagementScan";
+import ScanCards from "./ScanCards";
+import ScanOpenBanner from "./ScanOpenBanner";
+import type { IndexingSession } from "./types";
 
-interface DocsManagementScanMenuProps {
+interface ScanMenuProps {
   isDisabled: boolean;
   isFolderActive: boolean;
   activeSession: IndexingSession | null;
@@ -11,33 +11,32 @@ interface DocsManagementScanMenuProps {
   onOpenActiveSession: () => void;
 }
 
-export default function DocsManagementScanMenu({
+export default function ScanMenu({
   isDisabled,
   isFolderActive,
   activeSession,
   onSelectFolder,
   onSelectFile,
   onOpenActiveSession,
-}: DocsManagementScanMenuProps) {
+}: ScanMenuProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-      <DocsManagementScanCards
+      <ScanCards
         isDisabled={isDisabled}
         isFolderActive={isFolderActive}
         onSelectFolder={onSelectFolder}
         onSelectFile={onSelectFile}
       />
 
-      {/* Row 2: Status Banners */}
       {activeSession && isFolderActive && (
-        <DocsManagementScanOpenBanner
+        <ScanOpenBanner
           isFolder={true}
           onOpen={onOpenActiveSession}
         />
       )}
 
       {activeSession && !isFolderActive && (
-        <DocsManagementScanOpenBanner
+        <ScanOpenBanner
           isFolder={false}
           onOpen={onOpenActiveSession}
         />

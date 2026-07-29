@@ -1,10 +1,10 @@
-interface DocsManagementScanProcessingProgressProps {
+interface ScanProcessingProgressProps {
   progressPercent: number;
 }
 
-export default function DocsManagementScanProcessingProgress({
+export default function ScanProcessingProgress({
   progressPercent,
-}: DocsManagementScanProcessingProgressProps) {
+}: ScanProcessingProgressProps) {
   return (
     <div className="px-6 pt-4 space-y-1.5">
       <div className="flex items-center justify-between text-xs font-medium">

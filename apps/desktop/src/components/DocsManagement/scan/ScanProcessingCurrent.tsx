@@ -1,12 +1,12 @@
-import { ProgressItem } from "./DocsManagementScan";
+import type { ProgressItem } from "./types";
 
-interface DocsManagementScanProcessingProgressProps {
+interface ScanProcessingCurrentProps {
   currentItem: ProgressItem | undefined;
 }
 
-export default function DocsManagementScanProcessingCurrent({
+export default function ScanProcessingCurrent({
   currentItem,
-}: DocsManagementScanProcessingProgressProps) {
+}: ScanProcessingCurrentProps) {
   return (
     <div className="flex items-center gap-3 mx-6 mt-4 p-3 rounded-lg border border-blue-100 bg-blue-50/40 font-mono text-xs text-blue-900 min-h-[58px]">
       <span className="inline-block animate-spin text-blue-500 w-4 shrink-0 text-center text-sm font-bold">

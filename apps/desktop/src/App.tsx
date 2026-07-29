@@ -5,8 +5,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LanguageProvider } from "./context/LanguageContext";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
+import { initIndexingBridge } from "./hooks/indexingBridge";
 import { useAtomValue } from "jotai";
-import DocsManagementScanBackgroundIndexer from "./components/DocsManagement/DocsManagementScanBackgroundIndexer";
 import { refreshSession, sessionAtom, sessionStatusAtom } from "./store/authStore";
 import AppMain from "./components/App/AppMain";
 import AppLogin from "./components/App/AppLogin";
@@ -20,6 +20,12 @@ function App() {
   const session = useAtomValue(sessionAtom);
   const sessionStatus = useAtomValue(sessionStatusAtom);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    initIndexingBridge().catch((err) => {
+      console.error("[App] Failed to initialize indexing bridge:", err);
+    });
+  }, []);
 
   useEffect(() => {
     triggerGlobalHealthCheck().catch((err) => {
@@ -64,7 +70,6 @@ function App() {
   return (
     <LanguageProvider>
       <UpdateBanner />
-      <DocsManagementScanBackgroundIndexer />
       {gated ? <AppLogin /> : <AppMain />}
     </LanguageProvider>
   );
