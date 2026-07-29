@@ -37,6 +37,12 @@ pub struct GenerateArgs {
     #[arg(long, default_value = "0.25")]
     pub unrelated_ratio: f64,
 
+    /// Of the not-case-related share, the fraction that are business-like decoys
+    /// rather than obvious spam. Decoys survive the transactional filter and are what
+    /// actually measure the matcher's false-positive rate.
+    #[arg(long, default_value = "0.4")]
+    pub decoy_share: f64,
+
     /// Content language: he | en | mixed
     #[arg(long, default_value = "mixed")]
     pub lang: String,
@@ -163,6 +169,7 @@ pub async fn execute(args: GenerateArgs) -> Result<(), String> {
         with_attachments: args.with_attachments,
         seed: args.seed,
         unrelated_ratio: args.unrelated_ratio,
+        decoy_share: args.decoy_share,
         lang: parse_lang(&args.lang)?,
         practice_mix: parse_practice_mix(&args.practice_mix)?,
     };

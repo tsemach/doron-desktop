@@ -45,8 +45,13 @@ pub enum Difficulty {
     Hard,
     /// Reply referencing a prior message on the case.
     Thread,
-    /// Not case related at all.
+    /// Not case related at all — marketing, OTP, billing.
     Unrelated,
+    /// Business-like mail belonging to no existing case, sometimes carrying a
+    /// near-miss identifier. Unlike `Unrelated`, these survive the transactional
+    /// filter and actually reach the matcher, so they are what measures real
+    /// false-positive risk.
+    Decoy,
     /// Names a party shared by two cases — must land in Review, never AutoLink.
     Adversarial,
 }
@@ -59,15 +64,17 @@ impl Difficulty {
             Difficulty::Hard => "hard",
             Difficulty::Thread => "thread",
             Difficulty::Unrelated => "unrelated",
+            Difficulty::Decoy => "decoy",
             Difficulty::Adversarial => "adversarial",
         }
     }
-    pub const ALL: [Difficulty; 6] = [
+    pub const ALL: [Difficulty; 7] = [
         Difficulty::Easy,
         Difficulty::Medium,
         Difficulty::Hard,
         Difficulty::Thread,
         Difficulty::Unrelated,
+        Difficulty::Decoy,
         Difficulty::Adversarial,
     ];
 }
@@ -183,6 +190,8 @@ pub struct CorpusConfig {
     pub with_attachments: bool,
     pub seed: u64,
     pub unrelated_ratio: f64,
+    /// Share of the not-case-related budget spent on `decoy` rather than obvious spam.
+    pub decoy_share: f64,
     pub lang: Lang,
     /// (litigation, conveyancing) relative weights.
     pub practice_mix: (u32, u32),
@@ -195,6 +204,7 @@ pub struct CorpusManifest {
     pub cases: usize,
     pub emails: usize,
     pub unrelated_ratio: f64,
+    pub decoy_share: f64,
     pub practice_mix: String,
     pub lang: String,
 }
@@ -217,6 +227,9 @@ pub fn build(config: &CorpusConfig) -> Result<Corpus, String> {
     if !(0.0..=0.9).contains(&config.unrelated_ratio) {
         return Err("--unrelated-ratio must be between 0.0 and 0.9".to_string());
     }
+    if !(0.0..=1.0).contains(&config.decoy_share) {
+        return Err("--decoy-share must be between 0.0 and 1.0".to_string());
+    }
     if config.practice_mix.0 + config.practice_mix.1 == 0 {
         return Err("--practice-mix must not be 0/0".to_string());
     }
@@ -232,6 +245,7 @@ pub fn build(config: &CorpusConfig) -> Result<Corpus, String> {
             cases: cases.len(),
             emails: emails.len(),
             unrelated_ratio: config.unrelated_ratio,
+            decoy_share: config.decoy_share,
             practice_mix: format!("{}/{}", config.practice_mix.0, config.practice_mix.1),
             lang: match config.lang {
                 Lang::He => "he".to_string(),
@@ -252,6 +266,7 @@ pub(crate) fn test_config() -> CorpusConfig {
         with_attachments: true,
         seed: 42,
         unrelated_ratio: 0.25,
+        decoy_share: 0.4,
         lang: Lang::Mixed,
         practice_mix: (50, 50),
     }
@@ -277,6 +292,10 @@ mod tests {
 
         let mut c = test_config();
         c.practice_mix = (0, 0);
+        assert!(build(&c).is_err());
+
+        let mut c = test_config();
+        c.decoy_share = 2.0;
         assert!(build(&c).is_err());
     }
 

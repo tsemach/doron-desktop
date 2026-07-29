@@ -206,3 +206,29 @@ mod tests {
         }
     }
 }
+
+/// Openers for the `decoy` slice — business-like mail that belongs to no existing case.
+/// Deliberately free of the spam blocklist's vocabulary so these reach the matcher,
+/// unlike the `unrelated` slice which the transactional filter mostly removes first.
+pub const DECOY_OPENERS: &[&str] = &[
+    "פנייה חדשה",
+    "בקשה לייעוץ",
+    "שאלה בנושא",
+    "התייעצות בעניין",
+    "בירור לגבי",
+    "פנייה בעקבות המלצה",
+];
+
+pub const DECOY_CLOSINGS: &[&str] = &[
+    "אשמח לחזרה בהקדם.",
+    "נא לעדכן האם ניתן לקבוע פגישה.",
+    "תודה מראש על הטיפול.",
+    "אודה לתשובתכם.",
+];
+
+pub const DECOY_CONTEXTS: &[&str] = &[
+    "קיבלתי את פרטיכם מקולגה",
+    "מדובר בעניין חדש שטרם טופל אצלכם",
+    "פניתי בעבר למשרד אחר ולא התקדמנו",
+    "אני בתחילת הליך ומברר אפשרויות",
+];

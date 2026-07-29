@@ -382,9 +382,117 @@ fn build_unrelated(rng: &mut Rng, id: &str, index: usize) -> EmailFixture {
     }
 }
 
-fn plan(total: usize, unrelated_ratio: f64) -> Vec<Difficulty> {
-    let unrelated = (total as f64 * unrelated_ratio).round() as usize;
-    let remainder = total.saturating_sub(unrelated);
+
+/// Every land-registry `gush/helka` pair and case number in use, so a decoy's
+/// near-miss identifier can be checked not to collide with a real case.
+fn taken_identifiers(cases: &[CorpusCase]) -> (Vec<(String, String)>, Vec<String>) {
+    let mut plots = Vec::new();
+    let mut numbers = Vec::new();
+    for c in cases {
+        if let Some(lr) = &c.planted.land_registry {
+            let parts: Vec<&str> = lr.split('/').collect();
+            plots.push((parts[0].to_string(), parts[1].to_string()));
+        }
+        if let Some(cn) = &c.planted.case_number {
+            numbers.push(cn.clone());
+        }
+    }
+    (plots, numbers)
+}
+
+/// Business-like mail that belongs to no case. This is what actually measures
+/// false-positive risk: the `unrelated` slice is mostly removed by the transactional
+/// filter before the matcher runs, and what survives shares no vocabulary with any
+/// case, so it scores zero for free. Decoys use real legal vocabulary, a plausible
+/// sender, and sometimes an identifier that is one digit or one parcel away from a
+/// real one — which is what the ambiguity guard and partial land-registry rules exist
+/// to reject.
+fn build_decoy(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> EmailFixture {
+    let borrowed = &ctx.cases[rng.below(ctx.cases.len())];
+    let (plots, numbers) = taken_identifiers(ctx.cases);
+    let mut signals = ExpectedSignals::default();
+
+    // A sender the corpus has never associated with any case.
+    let sender = format!("inquiry{}@{}", rng.range(1000, 9999), rng.choose(NEUTRAL_DOMAINS));
+    signals.emails.push(sender.clone());
+
+    let mut near_miss = None;
+    if rng.chance(0.45) {
+        if let Some(lr) = &borrowed.planted.land_registry {
+            // Same block, a parcel nobody owns — a partial match that must not link.
+            let gush = lr.split('/').next().unwrap_or("0").to_string();
+            for _ in 0..64 {
+                let helka = rng.range(1, 300).to_string();
+                if !plots.iter().any(|(g, h)| g == &gush && h == &helka) {
+                    let composite = format!("{gush}/{helka}");
+                    signals.land_registry.push(composite.clone());
+                    near_miss = Some(format!("גוש {gush} חלקה {helka}"));
+                    break;
+                }
+            }
+        } else if let Some(cn) = &borrowed.planted.case_number {
+            // A case number one digit off from a real one.
+            let (num, year) = cn.split_once('/').unwrap_or(("1000", "24"));
+            for _ in 0..64 {
+                let candidate = format!("{}/{year}", rng.range(1000, 99_999));
+                if candidate != *cn && !numbers.contains(&candidate) {
+                    signals.case_numbers.push(candidate.clone());
+                    near_miss = Some(format!("תיק {candidate}"));
+                    break;
+                }
+            }
+            let _ = num;
+        }
+    }
+
+    let vocab: Vec<String> = rng
+        .sample(&borrowed.planted.vocabulary, 2)
+        .into_iter()
+        .cloned()
+        .collect();
+    let opener = rng.choose(DECOY_OPENERS);
+    let context = rng.choose(DECOY_CONTEXTS);
+    let closing = rng.choose(DECOY_CLOSINGS);
+
+    let subject = format!("{opener} — {}", vocab.first().cloned().unwrap_or_default());
+    let mut body = format!("שלום רב,\n\n{context}. אני פונה בנוגע ל{}.\n", vocab.join(" ול"));
+    if let Some(nm) = &near_miss {
+        body.push_str(&format!("מדובר ב{nm}.\n"));
+    }
+    body.push_str(&format!("\n{closing}"));
+
+    EmailFixture {
+        id: id.to_string(),
+        message_id: message_id(id),
+        sender,
+        sender_name: None,
+        subject,
+        body_text: body,
+        received_at: received_at(index),
+        in_reply_to: None,
+        references: vec![],
+        attachments: vec![],
+        expected: Expected {
+            case_id: None,
+            practice: None,
+            difficulty: Difficulty::Decoy,
+            signal: if near_miss.is_some() {
+                "decoy_near_miss".to_string()
+            } else {
+                "decoy_vocabulary".to_string()
+            },
+            band: Band::Ignore,
+            competing_case_id: None,
+            signals,
+        },
+    }
+}
+
+fn plan(total: usize, unrelated_ratio: f64, decoy_share: f64) -> Vec<Difficulty> {
+    let not_related = (total as f64 * unrelated_ratio).round() as usize;
+    let decoy = (not_related as f64 * decoy_share).round() as usize;
+    let unrelated = not_related.saturating_sub(decoy);
+    let remainder = total.saturating_sub(not_related);
 
     let mut plan = Vec::with_capacity(total);
     let push = |d: Difficulty, share: usize, plan: &mut Vec<Difficulty>| {
@@ -400,6 +508,9 @@ fn plan(total: usize, unrelated_ratio: f64) -> Vec<Difficulty> {
     push(Difficulty::Adversarial, ADVERSARIAL, &mut plan);
     for _ in 0..unrelated {
         plan.push(Difficulty::Unrelated);
+    }
+    for _ in 0..decoy {
+        plan.push(Difficulty::Decoy);
     }
     // Integer division can leave a shortfall; top up with the largest slice.
     while plan.len() < total {
@@ -417,7 +528,7 @@ pub fn build_emails(
     let ctx = Ctx { config, cases };
     // Thread replies need a parent, so the plan is ordered (not shuffled) and thread
     // fixtures come after the easy/medium ones that seed each case's history.
-    let plan = plan(config.emails, config.unrelated_ratio);
+    let plan = plan(config.emails, config.unrelated_ratio, config.decoy_share);
 
     let mut prior: BTreeMap<i64, Vec<String>> = BTreeMap::new();
     let mut out: Vec<EmailFixture> = Vec::with_capacity(config.emails);
@@ -431,6 +542,7 @@ pub fn build_emails(
             Difficulty::Thread => build_thread(rng, &ctx, &id, index, &prior),
             Difficulty::Adversarial => build_adversarial(rng, &ctx, &id, index),
             Difficulty::Unrelated => Some(build_unrelated(rng, &id, index)),
+            Difficulty::Decoy => Some(build_decoy(rng, &ctx, &id, index)),
         };
 
         // Thread/adversarial can legitimately be unbuildable (no parent yet, no shared
@@ -554,7 +666,127 @@ mod tests {
     #[test]
     fn difficulty_plan_sums_to_total() {
         for total in [10, 37, 60, 200] {
-            assert_eq!(plan(total, 0.25).len(), total);
+            assert_eq!(plan(total, 0.25, 0.4).len(), total);
+        }
+    }
+
+    #[test]
+    fn decoys_belong_to_no_case_and_are_ignorable() {
+        let (_, emails) = corpus();
+        let decoys: Vec<_> = emails
+            .iter()
+            .filter(|e| e.expected.difficulty == Difficulty::Decoy)
+            .collect();
+        assert!(!decoys.is_empty(), "no decoy fixtures generated");
+        for e in decoys {
+            assert!(e.expected.case_id.is_none(), "decoy {} claims a case", e.id);
+            assert_eq!(e.expected.band, Band::Ignore);
+        }
+    }
+
+    /// The whole point of a decoy is that it reaches the matcher. `is_transactional_or_spam`
+    /// runs first in the real pipeline, so a decoy whose subject trips the blocklist would
+    /// be filtered out and measure nothing.
+    #[test]
+    fn decoy_subjects_survive_the_transactional_filter() {
+        let (_, emails) = corpus();
+        for e in emails
+            .iter()
+            .filter(|e| e.expected.difficulty == Difficulty::Decoy)
+        {
+            let subject = e.subject.to_lowercase();
+            for keyword in tauri_app_lib::email::BLOCKED_SUBJECT_KEYWORDS {
+                assert!(
+                    !subject.contains(&keyword.to_lowercase()),
+                    "decoy {} subject {:?} trips the spam blocklist on {keyword:?}",
+                    e.id,
+                    e.subject
+                );
+            }
+        }
+    }
+
+    /// A near-miss identifier must be genuinely near-miss: extractable, but belonging to
+    /// no real case. If it collided, the fixture would be unfair rather than adversarial.
+    #[test]
+    fn decoy_near_miss_identifiers_match_no_real_case() {
+        let (cases, emails) = corpus();
+        let real_plots: Vec<(String, String)> = cases
+            .iter()
+            .filter_map(|c| c.planted.land_registry.as_ref())
+            .map(|lr| {
+                let p: Vec<&str> = lr.split('/').collect();
+                (p[0].to_string(), p[1].to_string())
+            })
+            .collect();
+        let real_numbers: Vec<&String> = cases
+            .iter()
+            .filter_map(|c| c.planted.case_number.as_ref())
+            .collect();
+
+        let mut near_miss_seen = 0;
+        for e in emails
+            .iter()
+            .filter(|e| e.expected.signal == "decoy_near_miss")
+        {
+            near_miss_seen += 1;
+            for lr in &e.expected.signals.land_registry {
+                let p: Vec<&str> = lr.split('/').collect();
+                let pair = (p[0].to_string(), p[1].to_string());
+                assert!(
+                    !real_plots.contains(&pair),
+                    "decoy {} near-miss plot {lr} belongs to a real case",
+                    e.id
+                );
+            }
+            for cn in &e.expected.signals.case_numbers {
+                assert!(
+                    !real_numbers.contains(&cn),
+                    "decoy {} near-miss case number {cn} belongs to a real case",
+                    e.id
+                );
+            }
+        }
+        assert!(near_miss_seen > 0, "no near-miss decoys generated");
+    }
+
+    /// Decoys must share vocabulary with some case's documents — that overlap is what
+    /// makes them a real test of Tier B rather than a free zero.
+    #[test]
+    fn decoys_share_vocabulary_with_the_case_corpus() {
+        let (cases, emails) = corpus();
+        let all_vocab: Vec<&String> = cases
+            .iter()
+            .flat_map(|c| &c.planted.vocabulary)
+            .collect();
+        for e in emails
+            .iter()
+            .filter(|e| e.expected.difficulty == Difficulty::Decoy)
+        {
+            let text = format!("{} {}", e.subject, e.body_text);
+            assert!(
+                all_vocab.iter().any(|v| text.contains(v.as_str())),
+                "decoy {} shares no vocabulary with any case",
+                e.id
+            );
+        }
+    }
+
+    /// A decoy sender must be unknown to every case, or Tier A's sender signal would
+    /// legitimately fire and the fixture would be testing the wrong thing.
+    #[test]
+    fn decoy_senders_are_not_known_to_any_case() {
+        let (cases, emails) = corpus();
+        let known: Vec<&String> = cases.iter().flat_map(|c| &c.planted.emails).collect();
+        for e in emails
+            .iter()
+            .filter(|e| e.expected.difficulty == Difficulty::Decoy)
+        {
+            assert!(
+                !known.contains(&&e.sender),
+                "decoy {} uses a sender a case already knows",
+                e.id
+            );
         }
     }
 }

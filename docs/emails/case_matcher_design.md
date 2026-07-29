@@ -763,6 +763,7 @@ pub struct GenerateArgs {
     #[arg(long)] pub with_attachments: bool,
     #[arg(long, default_value = "42")] pub seed: u64,
     #[arg(long, default_value = "0.25")] pub unrelated_ratio: f64,
+    #[arg(long, default_value = "0.4")]  pub decoy_share: f64,
     #[arg(long, default_value = "he")] pub lang: String,  // he|en|mixed
 }
 ```
@@ -813,11 +814,23 @@ report 100% and prove nothing:
 | `medium` | 25% | no case number; known sender + shared vocabulary with case documents |
 | `hard` | 25% | party names only, with deliberate spelling variants; vocabulary drift from case docs |
 | `thread` | 10% | reply referencing a prior confirmed email |
-| `unrelated` | 25%* | marketing, OTP, personal — `expected.case_id: null` |
+| `unrelated` | 15%* | marketing, OTP, billing — `expected.case_id: null` |
+| `decoy` | 10%* | business-like mail belonging to no case — see below |
 | `adversarial` | — | near-miss: mentions a party shared by **two** cases → expected band `Review`, not `AutoLink` |
 
-*`unrelated_ratio` controls the last group. The adversarial slice is what exercises the ambiguity
-guard and is the main defense against a matcher that looks good on paper and mislinks in practice.
+*`--unrelated-ratio` sizes the not-case-related budget; `--decoy-share` splits it between obvious
+spam and decoys.
+
+**Why the decoy slice exists.** `is_transactional_or_spam` runs *before* the matcher
+(`emails_orchestrate.rs:146`). Measured against the real 52-keyword blocklist, roughly two thirds of
+obvious spam never reaches the matcher at all, and what survives shares no vocabulary with any case,
+so it scores zero for free — a false-positive metric built only on spam is close to a free pass.
+Decoys are business-like: a plausible sender unknown to every case, genuine legal vocabulary drawn
+from the case topics, and in ~45% of them a **near-miss identifier** — the same `גוש` with a parcel
+nobody owns, or a case number one digit off. Those are what Tier B can wrongly link, and what the
+partial land-registry rule (§5.5 A4) and the ambiguity guard exist to reject. Together with the
+adversarial slice they are the main defense against a matcher that looks good on paper and mislinks
+in practice.
 
 Hebrew and English variants are generated per `--lang`, since the whole point of the normalizer is
 Hebrew handling.
