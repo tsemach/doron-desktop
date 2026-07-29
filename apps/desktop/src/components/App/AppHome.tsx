@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { User, Settings, Sparkles } from "lucide-react";
+import { User, Settings, Sparkles, LogOut } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "../../store/indexStore";
+import { clearSession } from "../../store/authStore";
 import { useSubscriptionTier } from "../../lib/featureGating";
 import PlanBadge from "../ui/PlanBadge";
 import KebabMenu from "../ui/KebabMenu";
@@ -53,6 +54,12 @@ export default function AppHome() {
     await openUrl(`${BACKEND_URL}/register/plan?platform=desktop`);
   }
 
+  async function handleLogout() {
+    // Clears the local session (App.tsx's `gated` check then swaps straight
+    // to AppLogin -- no manual navigation needed here).
+    await clearSession();
+  }
+
   function handleSaveName(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = nameInput.trim();
@@ -80,6 +87,12 @@ export default function AppHome() {
               icon: <Sparkles className="size-4" />,
               onClick: handleUpgrade,
               hidden: tier === "pro",
+            },
+            {
+              label: t("log_out"),
+              icon: <LogOut className="size-4" />,
+              onClick: handleLogout,
+              variant: "destructive",
             },
           ]}
         />
