@@ -150,6 +150,28 @@ pub async fn execute(args: IndexArgs) -> Result<(), String> {
         );
     }
 
+    // Cross-check the fixture set against the profile actually built: a fixture pointing
+    // at a case that was not inserted means the corpus is internally inconsistent, and
+    // every later phase would score against a moving target.
+    let referenced: std::collections::BTreeSet<i64> = profile
+        .emails
+        .iter()
+        .filter_map(|e| e.expected.case_id)
+        .collect();
+    let dangling: Vec<i64> = referenced
+        .iter()
+        .filter(|id| !profile.cases.iter().any(|c| c.id == **id))
+        .copied()
+        .collect();
+    let unreferenced = case_total - referenced.len().min(case_total);
+
+    println!("\nFixture coverage");
+    println!("  cases referenced by ≥1 fixture   {}/{case_total}", referenced.len());
+    println!("  cases with no fixture            {unreferenced}");
+    if !dangling.is_empty() {
+        println!("  fixtures pointing at missing cases: {dangling:?}");
+    }
+
     let missing = cases_without_decisive_identifier(conn, &profile.cases);
     println!(
         "\nCases with NO decisive identifier: {}   ← Tier A can never match these",
@@ -161,6 +183,12 @@ pub async fn execute(args: IndexArgs) -> Result<(), String> {
 
     // P2 exit criteria, enforced rather than eyeballed.
     let mut problems = Vec::new();
+    if !dangling.is_empty() {
+        problems.push(format!(
+            "{} fixture(s) reference a case absent from the profile: {dangling:?}",
+            dangling.len()
+        ));
+    }
     let covered = case_total - missing.len();
     if pct(covered, case_total) < 90.0 {
         problems.push(format!(
