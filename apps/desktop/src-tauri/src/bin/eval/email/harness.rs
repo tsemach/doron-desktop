@@ -84,6 +84,49 @@ async fn index_documents(db_path: &Path, root: &Path, cases: &[CorpusCase]) -> R
     Ok(indexed)
 }
 
+
+/// Seed `case_emails` with the parents of thread replies.
+///
+/// A thread fixture models "a reply arrives to a message that was already confirmed to a
+/// case", so the parent must exist as a linked email. Without this, Tier A's thread
+/// signal has nothing to resolve against and every thread fixture silently fails for a
+/// harness reason rather than a matcher one.
+fn seed_thread_parents(
+    conn: &Connection,
+    emails: &[EmailFixture],
+) -> Result<usize, String> {
+    let referenced: std::collections::HashSet<String> = emails
+        .iter()
+        .flat_map(|e| e.in_reply_to.iter().cloned().chain(e.references.iter().cloned()))
+        .collect();
+    if referenced.is_empty() {
+        return Ok(0);
+    }
+
+    let mut seeded = 0;
+    for parent in emails.iter().filter(|e| referenced.contains(&e.message_id)) {
+        let Some(case_id) = parent.expected.case_id else {
+            continue;
+        };
+        conn.execute(
+            "INSERT OR IGNORE INTO case_emails
+                (case_id, message_id, sender, recipient, subject, body_text, direction, received_at)
+             VALUES (?1, ?2, ?3, '', ?4, ?5, 'incoming', ?6)",
+            params![
+                case_id,
+                parent.message_id,
+                parent.sender,
+                parent.subject,
+                parent.body_text,
+                parent.received_at
+            ],
+        )
+        .map_err(|e| format!("[seed thread parent {}] {e}", parent.id))?;
+        seeded += 1;
+    }
+    Ok(seeded)
+}
+
 pub struct BuildOptions {
     /// Delete any existing scratch database first.
     pub fresh: bool,
@@ -113,6 +156,7 @@ pub async fn build_profile(
     // Schema is created inline by open_db_by_path — no separate migration step.
     let conn = store::open_db_by_path(&db_path)?;
     insert_cases(&conn, &root, &cases)?;
+    seed_thread_parents(&conn, &emails)?;
     drop(conn);
 
     let indexed = index_documents(&db_path, &root, &cases).await?;

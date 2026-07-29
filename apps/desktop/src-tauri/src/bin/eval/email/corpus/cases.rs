@@ -167,6 +167,13 @@ fn conveyancing_fields(
         name: "עורך דין:1".to_string(),
         value: lawyer.clone(),
     });
+    // The address must be stored as case data, not only remembered in `planted`:
+    // otherwise fixtures send from an address the case index has never seen and the
+    // sender signal can never fire.
+    fields.push(CaseField {
+        name: "עורך דין:מייל:1".to_string(),
+        value: lawyer_email.clone(),
+    });
     planted.emails.push(lawyer_email);
     fields
 }
@@ -215,6 +222,10 @@ fn litigation_fields(
     fields.push(CaseField {
         name: "עורך דין:1".to_string(),
         value: lawyer,
+    });
+    fields.push(CaseField {
+        name: "עורך דין:מייל:1".to_string(),
+        value: lawyer_email.clone(),
     });
     planted.emails.push(lawyer_email);
     fields
@@ -300,7 +311,7 @@ pub fn build_cases(rng: &mut Rng, config: &CorpusConfig) -> Vec<CorpusCase> {
         };
 
         let client_email = contact_email(rng, &party_a, false);
-        planted.emails.push(client_email);
+        planted.emails.push(client_email.clone());
 
         let id = (i + 1) as i64;
         let subject = if conveyancing {
@@ -308,6 +319,12 @@ pub fn build_cases(rng: &mut Rng, config: &CorpusConfig) -> Vec<CorpusCase> {
         } else {
             format!("{subject_base}: {party_a} נ' {party_b}")
         };
+
+        let mut fields = fields;
+        fields.push(CaseField {
+            name: "מאת:מייל:1".to_string(),
+            value: client_email,
+        });
 
         let mut case = CorpusCase {
             id,

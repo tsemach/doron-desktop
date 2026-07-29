@@ -42,11 +42,14 @@ pub struct PreparedEmail {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PipelineStopStage {
     IgnoredSpam,
+    /// Deterministic matcher produced a match (the default path — no LLM involved).
     DeterministicCaseMatch,
+    /// Deterministic matcher found nothing.
+    NoCaseMatch,
+    /// Reachable only in `LlmAssisted` mode.
     LlmSkippedNoProvider,
     LlmIgnoredNotForReview,
     AfterLlmCaseMatch,
-    NoCaseMatch,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,6 +97,18 @@ fn build_match_request(
         classification: classification.cloned(),
         phase,
     }
+}
+
+
+/// Whether the pipeline should consult the LLM at all.
+///
+/// Defaults to false: the deterministic matcher is the shipping path. The LLM
+/// classification code stays compiled and callable, but nothing reaches it unless the
+/// stored config explicitly selects `LlmAssisted` (design §5.9).
+fn uses_llm(app: &AppHandle) -> bool {
+    crate::store::open_db(app)
+        .map(|conn| crate::email::case_matcher::MatcherConfig::load(&conn).uses_llm())
+        .unwrap_or(false)
 }
 
 fn llm_provider_from_app(app: &AppHandle) -> Option<LlmProvider> {
@@ -183,16 +198,25 @@ pub async fn run_email_pipeline(
     );
     let early_match = case_api.match_email(app, &early_request)?;
 
-    if early_match.is_matched() {
+
+    // 3. In the default deterministic mode the matcher has already had everything it
+    // needs — signals from subject, full body and attachments — so there is nothing for
+    // an LLM to add and it is never called. The LLM path below is reachable only when
+    // the pipeline mode is explicitly set to LlmAssisted.
+    if !uses_llm(app) {
+        let stop_stage = if early_match.is_matched() {
+            PipelineStopStage::DeterministicCaseMatch
+        } else {
+            PipelineStopStage::NoCaseMatch
+        };
         return Ok(EmailPipelineResult {
             deterministic,
             classification: None,
             case_match: early_match,
-            stop_stage: PipelineStopStage::DeterministicCaseMatch,
+            stop_stage,
         });
     }
 
-    // 3. LLM classification + extraction
     let classification = match llm_provider_from_app(app) {
         Some(provider) => {
             classify_email_llm(

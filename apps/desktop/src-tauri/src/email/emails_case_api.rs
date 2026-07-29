@@ -1,12 +1,12 @@
 //! Case-management matching API boundary.
 //!
-//! Implement [`CaseManagementApi`] and register it via [`resolve_case_api`] when the
-//! case-linking algorithm lands. Until then ingestion uses [`StubCaseManagementApi`].
+//! [`LocalCaseMatcherApi`] is the registered implementation: a thin wrapper that opens
+//! the database and delegates to [`crate::email::case_matcher::CaseMatcher`], whose core
+//! takes a `&Connection` rather than an `AppHandle` so it can be driven headless by the
+//! eval harness.
 //!
-//! Expected behaviour per phase:
-//! - [`CaseMatchPhase::AfterDeterministic`] — match on regex/header signals only
-//!   (case numbers, IDs, phones, party names). A hit should skip the LLM pass.
-//! - [`CaseMatchPhase::AfterLlm`] — match on merged deterministic + LLM `search_terms`.
+//! [`StubCaseManagementApi`] is retained for tests that need a matcher that always
+//! declines.
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -101,14 +101,32 @@ impl CaseManagementApi for StubCaseManagementApi {
     }
 }
 
-/// Shared stub used until a real `CaseManagementApi` is registered.
+/// Shared stub, kept for tests.
 pub fn default_case_api() -> &'static StubCaseManagementApi {
     static API: StubCaseManagementApi = StubCaseManagementApi;
     &API
 }
 
-/// Single injection point for ingestion / orchestration. Swap the body when the real
-/// case-linking client is ready (e.g. read from `AppHandle` state).
+/// The deterministic matcher, running entirely locally.
+pub struct LocalCaseMatcherApi;
+
+impl CaseManagementApi for LocalCaseMatcherApi {
+    fn match_email(
+        &self,
+        app: &AppHandle,
+        request: &CaseMatchRequest,
+    ) -> Result<CaseMatchResult, String> {
+        use crate::email::case_matcher::{CaseMatcher, MatcherConfig};
+
+        let conn = crate::store::open_db(app)?;
+        let config = MatcherConfig::load(&conn);
+        let outcome = CaseMatcher::new(config).match_email_core(&conn, request)?;
+        Ok(outcome.into_case_match_result())
+    }
+}
+
+/// Single injection point for ingestion / orchestration.
 pub fn resolve_case_api(_app: &AppHandle) -> &dyn CaseManagementApi {
-    default_case_api()
+    static API: LocalCaseMatcherApi = LocalCaseMatcherApi;
+    &API
 }
