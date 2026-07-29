@@ -18,9 +18,18 @@ export const sessionStatusAtom = atom<"idle" | "loading" | "ready">("idle");
 // online (falling back to the cached session if unreachable), so a deleted
 // user or a tier change takes effect without waiting for the session's full
 // local TTL to expire -- see auth::verify_session in the Rust backend.
+//
+// sessionStatusAtom only ever flips "idle" -> "loading" -> "ready" once, on
+// the very first check. Later calls (e.g. the window-focus listener in
+// App.tsx) re-verify and update sessionAtom in the background without
+// touching status -- App.tsx's gate is keyed off status, and flipping it
+// back to "loading" on every focus regain briefly rendered AppMain before
+// snapping back to AppLogin (or vice versa), a visible flicker.
 export async function refreshSession() {
   const store = getDefaultStore();
-  store.set(sessionStatusAtom, "loading");
+  const isFirstCheck = store.get(sessionStatusAtom) === "idle";
+
+  if (isFirstCheck) store.set(sessionStatusAtom, "loading");
   try {
     const session = await invoke<Session | null>("verify_session", { backendUrl: BACKEND_URL });
     const isExpired = session ? new Date(session.expires_at).getTime() < Date.now() : false;
@@ -29,7 +38,7 @@ export async function refreshSession() {
     console.error("[authStore] Failed to load session:", err);
     store.set(sessionAtom, null);
   } finally {
-    store.set(sessionStatusAtom, "ready");
+    if (isFirstCheck) store.set(sessionStatusAtom, "ready");
   }
 }
 
