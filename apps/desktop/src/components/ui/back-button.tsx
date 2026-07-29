@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./button";
+import { useLanguage } from "../../context/LanguageContext";
 
 export type BackButtonProps = {
   className?: string;
@@ -10,6 +11,7 @@ export type BackButtonProps = {
 
 export default function BackButton({ className, navigateTo, iconOnly }: BackButtonProps) {
   const navigate = useNavigate();
+  const { t, dir } = useLanguage();
 
   const handleClick = () => {
     if (typeof navigateTo === "string") {
@@ -36,7 +38,7 @@ export default function BackButton({ className, navigateTo, iconOnly }: BackButt
   return (
     <div className={`flex items-center gap-1 justify-start ${className || ""}`}>
       <Button variant="ghost" onClick={handleClick} className="flex items-center gap-1">
-        ← Back
+        {dir === "rtl" ? "→" : "←"} {t("back_to_main")}
       </Button>
     </div>
   );
