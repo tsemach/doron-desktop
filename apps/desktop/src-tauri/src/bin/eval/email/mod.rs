@@ -5,6 +5,7 @@ pub mod corpus_stats;
 pub mod docx_writer;
 pub mod harness;
 pub mod index_cmd;
+pub mod signals_cmd;
 pub mod examples;
 pub mod generate;
 pub mod list;
@@ -33,6 +34,9 @@ pub enum EmailCommands {
 
     /// Build the matcher indexes from a corpus and report their health
     Index(index_cmd::IndexArgs),
+
+    /// Score signal extraction (and attachment reading) against the corpus ground truth
+    Signals(signals_cmd::SignalsArgs),
 
     /// Run the email classification evaluation pipeline
     Run(run::RunArgs),

@@ -1,4 +1,5 @@
 pub mod case_matcher;
+mod emails_attachments;
 mod normalize;
 mod types;
 mod emails_settings;
@@ -15,6 +16,7 @@ mod emails_alerts;
 // Re-exported so the case-side identifier miner can run the *same* extraction over
 // case fields that the pipeline runs over email text — one regex set, both sides.
 pub use emails_classify_deterministic::extract_email_signals;
+pub use emails_attachments::*;
 pub use normalize::*;
 pub use types::*;
 pub use emails_settings::*;

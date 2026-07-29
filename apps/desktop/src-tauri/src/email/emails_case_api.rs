@@ -27,6 +27,18 @@ pub struct CaseMatchRequest {
     pub sender: String,
     pub subject: String,
     pub snippet: String,
+    /// Full body and extracted attachment text — Tier B scores content against these,
+    /// and Tier A needs identifiers that appear beyond the snippet cutoff.
+    #[serde(default)]
+    pub body_text: String,
+    #[serde(default)]
+    pub attachment_text: String,
+    /// RFC 5322 threading headers. A reply to a message already linked to a case is the
+    /// most precise signal available (design §5.5 A0).
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    #[serde(default)]
+    pub references: Vec<String>,
     pub search_terms: Vec<String>,
     pub deterministic: EmailExtractedSignals,
     pub classification: Option<EmailClassification>,

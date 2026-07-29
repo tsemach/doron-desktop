@@ -110,7 +110,6 @@ pub fn reassign_documents_for_case(conn: &Connection, case_id: i64) -> Result<us
     let Some(prefix) = folder.as_deref().and_then(folder_prefix) else {
         return Ok(0);
     };
-    let folders = load_case_folders(conn)?;
 
     let candidates: Vec<i64> = {
         let mut stmt = conn

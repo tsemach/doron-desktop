@@ -17,6 +17,9 @@ pub struct EmailExtractedSignals {
     pub phone_numbers: Vec<String>,
     pub national_ids: Vec<String>,
     pub company_ids: Vec<String>,
+    /// Canonical land-registry keys, `gush/helka[/tat]` (design §5.2).
+    pub land_registry: Vec<String>,
+    pub deeds: Vec<String>,
     pub dates: Vec<String>,
     pub party_names: Vec<String>,
 }
@@ -34,6 +37,10 @@ struct EmailPatterns {
     company_id_hp: Regex,
     company_id_hz: Regex,
     company_id_en: Regex,
+    gush: Regex,
+    helka: Regex,
+    tat_helka: Regex,
+    deed: Regex,
     party_he: Regex,
     party_he_nged: Regex,
     party_en: Regex,
@@ -76,6 +83,13 @@ fn patterns() -> &'static EmailPatterns {
             r"(?i)(?:company(?:\s+reg(?:istration)?)?|reg(?:istration)?|tax\s+id|vat|ein)(?:\s+no\.?|#|:)?\s*(\d{8,9})",
         )
         .unwrap(),
+        // Land-registry components. Written apart, reordered, or comma-separated, so
+        // each is matched independently and assembled afterwards by proximity.
+        gush: Regex::new(r"(?i)גוש(?:\s+ספר)?\s*[:.#]?\s*(\d{1,5})").unwrap(),
+        // `תת חלקה` must be tried before `חלקה`, since it contains it.
+        tat_helka: Regex::new(r"(?i)תת[-\s]*חלקה\s*[:.#]?\s*(\d{1,4})").unwrap(),
+        helka: Regex::new(r"(?i)חלקה(?:\s+דף)?\s*[:.#]?\s*(\d{1,4})").unwrap(),
+        deed: Regex::new(r"(?i)שטר(?:\s+(?:מספר|מס\.?))?\s*[:.#]?\s*(\d{2,6})").unwrap(),
         party_he: Regex::new(
             r#"([א-ת][א-ת\s"'׳״\-]{1,30}?)\s+נ['׳]\s+([א-ת][א-ת\s"'׳״\-]{1,30})"#,
         )
@@ -89,6 +103,93 @@ fn patterns() -> &'static EmailPatterns {
         )
         .unwrap(),
     })
+}
+
+
+/// Proximity window for pairing land-registry components, in bytes. Hebrew is ~2
+/// bytes/char, so this is roughly 80 characters — wide enough for
+/// "גוש 972, חלקה 11, תת חלקה 33" written with labels and separators, narrow enough
+/// that two unrelated plots in the same paragraph do not cross-pair.
+const PLOT_WINDOW_BYTES: usize = 160;
+
+#[derive(Debug, Clone)]
+struct Located {
+    start: usize,
+    end: usize,
+    value: String,
+}
+
+fn locate(re: &Regex, text: &str) -> Vec<Located> {
+    re.captures_iter(text)
+        .filter_map(|c| {
+            let whole = c.get(0)?;
+            Some(Located {
+                start: whole.start(),
+                end: whole.end(),
+                value: c.get(1)?.as_str().to_string(),
+            })
+        })
+        .collect()
+}
+
+fn overlaps(item: &Located, others: &[Located]) -> bool {
+    others.iter().any(|o| item.start < o.end && o.start < item.end)
+}
+
+/// Distance between two spans, 0 when they touch or overlap.
+fn gap(a: &Located, b: &Located) -> usize {
+    if a.end <= b.start {
+        b.start - a.end
+    } else if b.end <= a.start {
+        a.start - b.end
+    } else {
+        0
+    }
+}
+
+fn nearest<'a>(anchor: &Located, candidates: &'a [Located]) -> Option<&'a Located> {
+    candidates
+        .iter()
+        .filter(|c| gap(anchor, c) <= PLOT_WINDOW_BYTES)
+        .min_by_key(|c| gap(anchor, c))
+}
+
+/// Assemble `gush/helka[/tat]` keys and deed numbers from free text.
+///
+/// Components are extracted separately because an email writes them in any order and
+/// with arbitrary separators; they are then paired by proximity. A `גוש` with no nearby
+/// `חלקה` yields nothing — a block spans many properties and cannot identify a matter
+/// (design §5.5 A2/A4).
+fn extract_land_registry(text: &str, p: &EmailPatterns) -> (Vec<String>, Vec<String>) {
+    let tats = locate(&p.tat_helka, text);
+    // `חלקה` also matches inside `תת חלקה`, so drop those overlaps.
+    let helkas: Vec<Located> = locate(&p.helka, text)
+        .into_iter()
+        .filter(|h| !overlaps(h, &tats))
+        .collect();
+    let gushes = locate(&p.gush, text);
+
+    let mut keys: Vec<String> = Vec::new();
+    for gush in &gushes {
+        let Some(helka) = nearest(gush, &helkas) else {
+            continue;
+        };
+        let tat = nearest(helka, &tats);
+        if let Some(key) = crate::email::land_registry_key(
+            &gush.value,
+            &helka.value,
+            tat.map(|t| t.value.as_str()),
+        ) {
+            push_unique(&mut keys, &key);
+        }
+    }
+
+    let mut deeds: Vec<String> = Vec::new();
+    for d in locate(&p.deed, text) {
+        push_unique(&mut deeds, &d.value);
+    }
+
+    (keys, deeds)
 }
 
 pub fn extract_email_signals(sender: &str, subject: &str, snippet: &str) -> EmailExtractedSignals {
@@ -108,6 +209,9 @@ pub fn extract_email_signals(sender: &str, subject: &str, snippet: &str) -> Emai
     signals.phone_numbers = extract_phones(&combined, p);
     signals.national_ids = extract_national_ids(&combined, p);
     signals.company_ids = extract_company_ids(&combined, p);
+    let (land_registry, deeds) = extract_land_registry(&combined, p);
+    signals.land_registry = land_registry;
+    signals.deeds = deeds;
     signals.dates = extract_dates(&combined);
     signals.party_names = extract_party_names(&combined, p);
 
@@ -287,6 +391,12 @@ impl EmailExtractedSignals {
         for v in &self.case_numbers {
             push_unique(&mut out, v);
         }
+        for v in &self.land_registry {
+            push_unique(&mut out, v);
+        }
+        for v in &self.deeds {
+            push_unique(&mut out, v);
+        }
         for v in &self.party_names {
             push_unique(&mut out, v);
         }
@@ -452,5 +562,88 @@ mod tests {
             .party_names
             .iter()
             .any(|p| p.contains("Smith") && p.contains("Jones")));
+    }
+}
+
+#[cfg(test)]
+mod land_registry_tests {
+    use super::*;
+
+    fn signals(text: &str) -> EmailExtractedSignals {
+        extract_email_signals("", "", text)
+    }
+
+    #[test]
+    fn extracts_full_composite() {
+        let s = signals("בעניין גוש 972 חלקה 11 תת חלקה 33");
+        assert_eq!(s.land_registry, vec!["972/11/33"]);
+    }
+
+    #[test]
+    fn extracts_partial_without_sub_parcel() {
+        let s = signals("העברת זכויות בגוש 972 חלקה 11");
+        assert_eq!(s.land_registry, vec!["972/11"]);
+    }
+
+    /// The components are written in any order and with any separator, so all of these
+    /// must normalize to the same key the case index stores.
+    #[test]
+    fn tolerates_separators_and_labels() {
+        for text in [
+            "גוש 972, חלקה 11, תת חלקה 33",
+            "גוש ספר: 972 חלקה דף: 11 תת חלקה: 33",
+            "גוש 972 - חלקה 11 - תת-חלקה 33",
+            "גוש #972 חלקה #11 תת חלקה #33",
+        ] {
+            assert_eq!(signals(text).land_registry, vec!["972/11/33"], "input {text:?}");
+        }
+    }
+
+    #[test]
+    fn gush_alone_yields_nothing() {
+        assert!(signals("הנכס נמצא בגוש 972").land_registry.is_empty());
+    }
+
+    #[test]
+    fn sub_parcel_is_not_mistaken_for_the_parcel() {
+        // `חלקה` also matches inside `תת חלקה`; without the overlap filter this would
+        // produce 972/33 instead of 972/11/33.
+        let s = signals("גוש 972 חלקה 11 תת חלקה 33");
+        assert_eq!(s.land_registry, vec!["972/11/33"]);
+        assert!(!s.land_registry.iter().any(|k| k == "972/33"));
+    }
+
+    #[test]
+    fn two_distant_plots_do_not_cross_pair() {
+        let filler = "מלל ".repeat(60); // well past the proximity window
+        let text = format!("גוש 100 חלקה 5{filler}גוש 200 חלקה 9");
+        let keys = signals(&text).land_registry;
+        assert!(keys.contains(&"100/5".to_string()), "got {keys:?}");
+        assert!(keys.contains(&"200/9".to_string()), "got {keys:?}");
+        assert!(!keys.contains(&"100/9".to_string()), "components crossed: {keys:?}");
+    }
+
+    #[test]
+    fn extracts_deed_numbers() {
+        assert_eq!(signals("מצורף שטר 4471").deeds, vec!["4471"]);
+        assert_eq!(signals("שטר מספר 4471").deeds, vec!["4471"]);
+        assert_eq!(signals("שטר מס. 4471").deeds, vec!["4471"]);
+    }
+
+    #[test]
+    fn land_registry_ranks_above_party_names_in_search_terms() {
+        let s = signals("גוש 972 חלקה 11 בעניין כהן נ' לוי");
+        let terms = s.to_search_terms();
+        let lr = terms.iter().position(|t| t == "972/11").unwrap();
+        let party = terms.iter().position(|t| t.contains("כהן")).unwrap();
+        assert!(lr < party, "land registry must outrank party names: {terms:?}");
+    }
+
+    #[test]
+    fn litigation_text_is_unaffected() {
+        let s = signals("עדכון בתיק 12345/23");
+        assert_eq!(s.case_numbers, vec!["12345/23"]);
+        assert!(s.land_registry.is_empty());
+        assert!(s.deeds.is_empty());
     }
 }

@@ -242,7 +242,11 @@ fn build_hard(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> EmailFixture 
     let sender = format!("private{}@{}", rng.range(10, 999), rng.choose(NEUTRAL_DOMAINS));
 
     let mut signals = ExpectedSignals::default();
-    signals.party_names.push(variant.clone());
+    // NOT recorded as an expected `party_names` signal: the deterministic extractor
+    // matches adversarial *pairs* ("X נ' Y"), never a standalone name in prose — that
+    // needs NER and would flag every capitalised word pair. The variant reaches the
+    // matcher through `sender_name` instead, which is what Tier C fuzzy-matches against
+    // the case's party identifiers.
     signals.emails.push(sender.clone());
 
     EmailFixture {
@@ -326,7 +330,8 @@ fn build_adversarial(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> Option
 
     let sender = format!("info{}@{}", rng.range(10, 999), rng.choose(NEUTRAL_DOMAINS));
     let mut signals = ExpectedSignals::default();
-    signals.party_names.push(shared.clone());
+    // Same as `hard`: the shared party arrives via sender_name, not as an extracted
+    // party_names signal.
     signals.emails.push(sender.clone());
 
     Some(EmailFixture {

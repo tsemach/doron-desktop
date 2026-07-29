@@ -89,6 +89,24 @@ async fn ingest_single_email(
         .map(|h| h.get_value())
         .unwrap_or_else(|| "No Subject".to_string());
 
+    let header = |name: &str| {
+        parsed_mail
+            .headers
+            .iter()
+            .find(|h| h.get_key().to_lowercase() == name)
+            .map(|h| h.get_value())
+    };
+
+    // RFC 5322 threading: a reply to a message already linked to a case is the single
+    // most precise matching signal, and both headers were previously discarded.
+    let in_reply_to = header("in-reply-to").map(|v| v.trim().to_string());
+    let references: Vec<String> = header("references")
+        .unwrap_or_default()
+        .split_whitespace()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
     let date_str = parsed_mail
         .headers
         .iter()
@@ -151,6 +169,21 @@ async fn ingest_single_email(
     let attachments_json =
         serde_json::to_string(&staged_attachments).unwrap_or_else(|_| "[]".to_string());
 
+    // Read text out of the staged files so identifiers inside an attached deed or claim
+    // reach the matcher. Read-only: staging and import are untouched.
+    let attachment_texts = super::emails_attachments::extract_attachment_texts(
+        &attachments_json,
+        &super::emails_attachments::AttachmentLimits::default(),
+    );
+    let attachment_text = super::emails_attachments::combined_text(&attachment_texts);
+    for skipped in attachment_texts.iter().filter(|t| !t.extracted) {
+        println!(
+            "[Email] attachment '{}' not read: {}",
+            skipped.name,
+            skipped.skip_reason.as_deref().unwrap_or("unknown")
+        );
+    }
+
     // ── Classification pipeline (deterministic → case API → LLM → case API → alert) ──
     let prepared = PreparedEmail {
         message_id: message_id.to_string(),
@@ -160,6 +193,9 @@ async fn ingest_single_email(
         body_text: text_body.clone(),
         received_at: date_str.clone(),
         attachments_json: attachments_json.clone(),
+        attachment_text,
+        in_reply_to,
+        references,
     };
 
     let pipeline_result = run_email_pipeline(app, &prepared, resolve_case_api(app)).await?;
