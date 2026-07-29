@@ -167,6 +167,17 @@ async fn run_matcher(args: &RunArgs) -> Result<(), String> {
             summary.mislinks
         ));
     }
+    // Auto-linking an email that two cases legitimately compete for defeats the
+    // ambiguity guard, and is as unrecoverable for the user as a mislink.
+    if summary.ambiguity_failures > 0 {
+        for failure in summary.failures.iter().filter(|f| f.contains("AMBIGUITY")) {
+            eprintln!("  {failure}");
+        }
+        return Err(format!(
+            "{} ambiguous email(s) were auto-linked despite a competing case.",
+            summary.ambiguity_failures
+        ));
+    }
     if summary.false_positives > 0 {
         eprintln!(
             "\nWarning: {} email(s) belonging to no case were linked anyway.",

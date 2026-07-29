@@ -13,6 +13,9 @@ use super::corpus::{Difficulty, EmailFixture, Practice};
 pub struct Prediction {
     pub fixture_id: String,
     pub expected_case: Option<i64>,
+    /// Adversarial fixtures only: the second case that legitimately competes for this
+    /// email. Linking to *either* is ambiguity, not error.
+    pub competing_case: Option<i64>,
     pub predicted_case: Option<i64>,
     pub confidence: f64,
     pub band: MatchBand,
@@ -24,14 +27,51 @@ pub struct Prediction {
 }
 
 impl Prediction {
-    fn correct(&self) -> bool {
-        self.expected_case.is_some() && self.predicted_case == self.expected_case
+    /// Cases it is legitimate to surface for this email.
+    ///
+    /// For an adversarial fixture the expected id is one of a competing *pair*, chosen
+    /// arbitrarily by the generator. Requiring that exact id would score identical
+    /// behaviour as correct or as a mislink depending on a coin flip — and would fail the
+    /// gate for something the design actually wants (ambiguity → Review).
+    fn acceptable(&self) -> Vec<i64> {
+        self.expected_case
+            .into_iter()
+            .chain(self.competing_case)
+            .collect()
     }
-    /// Linked to a case that is not the expected one. The metric that gates the phase.
+
+    fn is_adversarial(&self) -> bool {
+        self.competing_case.is_some()
+    }
+
+    fn correct(&self) -> bool {
+        match (self.expected_case, self.predicted_case) {
+            (Some(_), Some(predicted)) if self.is_adversarial() => {
+                // Success is *recognising the ambiguity*: surface one of the pair without
+                // linking automatically. Confidently picking one is a failure, not a win.
+                self.acceptable().contains(&predicted) && self.band != MatchBand::AutoLink
+            }
+            (Some(want), Some(predicted)) => predicted == want,
+            _ => false,
+        }
+    }
+
+    /// Linked to a case that is not a legitimate candidate. The metric that gates the phase.
     fn mislinked(&self) -> bool {
-        self.predicted_case.is_some()
-            && self.expected_case.is_some()
-            && self.predicted_case != self.expected_case
+        match self.predicted_case {
+            Some(predicted) if self.expected_case.is_some() => {
+                !self.acceptable().contains(&predicted)
+            }
+            _ => false,
+        }
+    }
+
+    /// An ambiguous email that was linked automatically anyway — the ambiguity guard
+    /// failing to do its job. Gated alongside mislinks.
+    fn ambiguity_failure(&self) -> bool {
+        self.is_adversarial()
+            && self.predicted_case.is_some()
+            && self.band == MatchBand::AutoLink
     }
     /// Surfaced a case for an email that belongs to none.
     fn false_positive(&self) -> bool {
@@ -66,6 +106,7 @@ pub struct Summary {
     pub f1: f64,
     pub mrr: f64,
     pub mislinks: usize,
+    pub ambiguity_failures: usize,
     pub false_positives: usize,
     pub missed: usize,
     pub auto_links: usize,
@@ -79,6 +120,7 @@ pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summa
     let total = predictions.len();
     let mut correct = 0;
     let mut mislinks = 0;
+    let mut ambiguity_failures = 0;
     let mut false_positives = 0;
     let mut missed = 0;
     let mut auto_links = 0;
@@ -141,6 +183,13 @@ pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summa
                 p.confidence
             ));
         }
+        if p.ambiguity_failure() {
+            ambiguity_failures += 1;
+            failures.push(format!(
+                "[{}] AMBIGUITY: auto-linked case {:?} despite a competing case {:?}",
+                p.fixture_id, p.predicted_case, p.competing_case
+            ));
+        }
         if p.missed() {
             missed += 1;
         }
@@ -187,6 +236,7 @@ pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summa
             reciprocal_sum / linkable as f64
         },
         mislinks,
+        ambiguity_failures,
         false_positives,
         missed,
         auto_links,
@@ -216,6 +266,10 @@ pub fn print_report(summary: &Summary, case_count: usize) {
             summary.mislinks as f64 / summary.total as f64 * 100.0
         },
         summary.mislinks
+    );
+    println!(
+        "ambiguity fails   {}   ← auto-linked despite a competing case",
+        summary.ambiguity_failures
     );
     println!("false positives   {}", summary.false_positives);
     println!("missed            {}", summary.missed);
@@ -266,6 +320,7 @@ mod tests {
         Prediction {
             fixture_id: id.into(),
             expected_case: expected,
+            competing_case: None,
             predicted_case: predicted,
             confidence: 0.9,
             band: MatchBand::Review,
@@ -307,6 +362,46 @@ mod tests {
     #[test]
     fn missing_a_linkable_email_is_recorded_but_is_not_a_mislink() {
         let p = pred("d", Some(1), None, Difficulty::Hard);
+        assert!(p.missed());
+        assert!(!p.mislinked());
+    }
+
+    fn adversarial(predicted: Option<i64>, band: MatchBand) -> Prediction {
+        Prediction {
+            competing_case: Some(2),
+            band,
+            ..pred("adv", Some(1), predicted, Difficulty::Adversarial)
+        }
+    }
+
+    /// Either case of the competing pair is a legitimate surface, so which one the
+    /// generator happened to record must not decide correct-vs-mislink.
+    #[test]
+    fn adversarial_accepts_either_competing_case() {
+        assert!(adversarial(Some(1), MatchBand::Review).correct());
+        assert!(adversarial(Some(2), MatchBand::Review).correct());
+        assert!(!adversarial(Some(1), MatchBand::Review).mislinked());
+        assert!(!adversarial(Some(2), MatchBand::Review).mislinked());
+    }
+
+    #[test]
+    fn adversarial_auto_link_is_a_failure_not_a_win() {
+        let p = adversarial(Some(1), MatchBand::AutoLink);
+        assert!(!p.correct(), "linking confidently defeats the ambiguity guard");
+        assert!(p.ambiguity_failure());
+    }
+
+    #[test]
+    fn adversarial_linking_a_third_case_is_still_a_mislink() {
+        let p = adversarial(Some(99), MatchBand::Review);
+        assert!(p.mislinked());
+        assert!(!p.correct());
+    }
+
+    #[test]
+    fn adversarial_no_match_is_a_miss_not_a_pass() {
+        let p = adversarial(None, MatchBand::Ignore);
+        assert!(!p.correct(), "finding nothing is not the same as recognising ambiguity");
         assert!(p.missed());
         assert!(!p.mislinked());
     }

@@ -104,6 +104,7 @@ pub async fn run(
         predictions.push(Prediction {
             fixture_id: fixture.id.clone(),
             expected_case: fixture.expected.case_id,
+            competing_case: fixture.expected.competing_case_id,
             predicted_case,
             confidence,
             band: outcome.band,
