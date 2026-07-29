@@ -1,3 +1,5 @@
+pub mod matcher_schema;
+
 use chrono::Utc;
 use rusqlite::{Connection, OpenFlags, params};
 use serde::Serialize;
@@ -121,6 +123,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
     }
 
     init_documents_schema(&conn).map_err(|e| format!("[documents schema] {e}"))?;
+    matcher_schema::init_matcher_schema(&conn)
+        .map_err(|e| format!("[case matcher schema] {e}"))?;
     init_templates_schema(&conn).map_err(|e| format!("[templates schema] {e}"))?;
     crate::documents::versioning::init_version_schema(&conn).map_err(|e| format!("[versioning schema] {e}"))?;
 
