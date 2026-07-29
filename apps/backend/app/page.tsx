@@ -101,7 +101,7 @@ export default function Home() {
 
   return (
     <div className="dark min-h-screen flex flex-col bg-slate-950 text-slate-50 font-sans">
-      <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
+      <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} logoVariant="dark" />
 
       <main className="flex-grow w-full">
         {/* Hero */}
