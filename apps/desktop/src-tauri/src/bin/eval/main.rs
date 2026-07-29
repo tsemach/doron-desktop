@@ -41,6 +41,7 @@ async fn main() {
             email::EmailCommands::Examples(args) => email::examples::execute(args).await,
             email::EmailCommands::Generate(args) => email::generate::execute(args).await,
             email::EmailCommands::CorpusStats(args) => email::corpus_stats::execute(args).await,
+            email::EmailCommands::Index(args) => email::index_cmd::execute(args).await,
             email::EmailCommands::Run(args) => email::run::execute(args).await,
             email::EmailCommands::List(args) => email::list::execute(args).await,
             email::EmailCommands::Show(args) => email::show::execute(args).await,

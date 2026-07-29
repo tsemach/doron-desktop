@@ -11,6 +11,18 @@ static SHOULD_STOP_INDEXING: AtomicBool = AtomicBool::new(false);
 // through the backend proxy, until deliberately flipped.
 pub const USE_HEURISTIC_METADATA_ONLY: bool = true;
 
+
+/// Link a freshly indexed document to the case whose folder contains it.
+///
+/// Best-effort: failing to derive a case must not fail indexing. `None` is the normal
+/// outcome for scan-and-index over folders that are not case folders.
+fn assign_case_for_indexed_document(conn: &rusqlite::Connection, doc_id: Option<i64>) {
+    let Some(id) = doc_id else { return };
+    if let Err(e) = crate::case::documents_link::assign_document_case(conn, id) {
+        eprintln!("[case matcher] could not assign case for document {id}: {e}");
+    }
+}
+
 #[tauri::command]
 pub fn stop_indexing() {
     SHOULD_STOP_INDEXING.store(true, Ordering::SeqCst);
@@ -268,6 +280,7 @@ async fn index_file_core_impl(
         let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
         store::insert_document(&conn, &record).map_err(|e| format!("DB insertion failed: {e}"))?;
         doc_id_opt = store::get_document_id_by_path(&conn, &path_str).map_err(|e| e.to_string())?;
+        assign_case_for_indexed_document(&conn, doc_id_opt);
     } else {
         // Heuristic metadata path (free tier / local mode) — also runs on reindex.
         // Previously gated on doc_id_opt.is_none(), which skipped DB updates when
@@ -306,6 +319,7 @@ async fn index_file_core_impl(
         let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
         store::insert_document(&conn, &record).map_err(|e| format!("DB fallback insertion failed: {e}"))?;
         doc_id_opt = store::get_document_id_by_path(&conn, &path_str).map_err(|e| e.to_string())?;
+        assign_case_for_indexed_document(&conn, doc_id_opt);
     }
 
     let doc_id = doc_id_opt.ok_or_else(|| "Failed to retrieve document ID".to_string())?;

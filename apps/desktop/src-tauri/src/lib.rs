@@ -63,6 +63,13 @@ pub fn run() {
             tauri::async_runtime::spawn(async {
                 let _ = crate::embeddings::get_embedding_model();
             });
+            // Build the case-matcher indexes once on an existing profile. Off the
+            // DB-open path because it rescans every document; retries next launch on
+            // failure since the marker is only set on success.
+            let handle_backfill = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::case::matcher_backfill::run_backfill_on_startup(&handle_backfill);
+            });
             // Start background email polling worker
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

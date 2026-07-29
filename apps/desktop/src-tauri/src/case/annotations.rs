@@ -47,6 +47,8 @@ pub fn set_case_annotations(
         params![case_id, notes, updated_at],
     ).map_err(|e| format!("[set_case_annotations] {e}"))?;
 
+    super::refresh_case_matcher_indexes(&conn, case_id);
+
     Ok(CaseAnnotations {
         case_id,
         notes,

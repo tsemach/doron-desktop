@@ -199,6 +199,17 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
         ]
     ).map_err(|e| format!("Failed to insert case email: {e}"))?;
 
+    // Teach the matcher from this confirmation: the sender now belongs to this case and
+    // the message id anchors future replies. Best-effort — never fail a confirmation.
+    if let Err(e) = crate::case::identifiers::learn_from_confirmed_email(
+        &conn,
+        case_id,
+        &alert.sender,
+        &alert.message_id,
+    ) {
+        eprintln!("[case matcher] could not learn from confirmed email: {e}");
+    }
+
     // 5. Clean up pending alert & staged directory
     conn.execute("DELETE FROM pending_email_alerts WHERE id = ?1", params![alert_id]).map_err(|e| e.to_string())?;
     

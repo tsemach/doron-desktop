@@ -123,8 +123,6 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
     }
 
     init_documents_schema(&conn).map_err(|e| format!("[documents schema] {e}"))?;
-    matcher_schema::init_matcher_schema(&conn)
-        .map_err(|e| format!("[case matcher schema] {e}"))?;
     init_templates_schema(&conn).map_err(|e| format!("[templates schema] {e}"))?;
     crate::documents::versioning::init_version_schema(&conn).map_err(|e| format!("[versioning schema] {e}"))?;
 
@@ -443,6 +441,11 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
             }
         }
     }
+
+    // Last: the matcher schema adds a column to `documents` and references `cases`,
+    // `case_emails` and `pending_email_alerts`, all of which are created above.
+    matcher_schema::init_matcher_schema(&conn)
+        .map_err(|e| format!("[case matcher schema] {e}"))?;
 
     Ok(conn)
 }

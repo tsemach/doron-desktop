@@ -1,3 +1,4 @@
+pub mod case_matcher;
 mod normalize;
 mod types;
 mod emails_settings;
