@@ -16,6 +16,12 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 // account and fails safely either way.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Same lazy-useState-from-localStorage pattern as AppHome.tsx's "user_name" --
+// remembers the email of the last successful login, not the password (no
+// secure OS credential store wired up here, so we deliberately don't persist
+// that).
+const LAST_LOGIN_EMAIL_KEY = "last_login_email";
+
 // 0.6 — password login (0.7) is a direct Tauri command call, no browser.
 // Google/Facebook (0.9) open the system browser and come back via the
 // doron-desktop:// deep link — this screen re-checks the local session on
@@ -24,7 +30,7 @@ export default function Login() {
   const navigate = useNavigate();
   const session = useAtomValue(sessionAtom);
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem(LAST_LOGIN_EMAIL_KEY) || "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,6 +64,7 @@ export default function Login() {
     setLoading(true);
     try {
       await invoke("login_with_credentials", { backendUrl: BACKEND_URL, email, password });
+      localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email);
       await refreshSession();
     } catch (err: any) {
       setError(typeof err === "string" ? err : "Invalid email or password");
@@ -110,7 +117,12 @@ export default function Login() {
                 <input
                   type={showPassword ? "text" : "password"}
                   required
-                  maxLength={16}
+                  // 48, not 16 -- matches LOGIN_PASSWORD_LENGTH in packages/ui's
+                  // shared auth-form.ts (backend/office's login password field).
+                  // The old 16 silently truncated longer passwords on
+                  // type/paste before they ever reached state, causing every
+                  // password-hash comparison over 16 chars to fail.
+                  maxLength={48}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 pr-9 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
