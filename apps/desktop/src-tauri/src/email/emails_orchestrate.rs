@@ -29,6 +29,14 @@ pub struct PreparedEmail {
     pub body_text: String,
     pub received_at: String,
     pub attachments_json: String,
+    /// Text pulled out of staged attachments (design §5.1). Empty when there are none
+    /// or none were readable.
+    #[serde(default)]
+    pub attachment_text: String,
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    #[serde(default)]
+    pub references: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,6 +85,10 @@ fn build_match_request(
         sender: email.sender.clone(),
         subject: email.subject.clone(),
         snippet: email.snippet.clone(),
+        body_text: email.body_text.clone(),
+        attachment_text: email.attachment_text.clone(),
+        in_reply_to: email.in_reply_to.clone(),
+        references: email.references.clone(),
         search_terms,
         deterministic: deterministic.clone(),
         classification: classification.cloned(),
@@ -152,8 +164,15 @@ pub async fn run_email_pipeline(
         });
     }
 
-    // 1. Deterministic classification / extraction
-    let deterministic = extract_email_signals(&email.sender, &email.subject, &email.snippet);
+    // 1. Deterministic classification / extraction.
+    // Over the full body and attachment text, not the 500-char snippet: an identifier in
+    // paragraph three or inside an attached deed was previously invisible.
+    let body = if email.attachment_text.is_empty() {
+        email.body_text.clone()
+    } else {
+        format!("{}\n{}", email.body_text, email.attachment_text)
+    };
+    let deterministic = extract_email_signals(&email.sender, &email.subject, &body);
 
     // 2. First case-management match — exit early when confidently connected
     let early_request = build_match_request(
@@ -255,8 +274,8 @@ pub fn apply_pipeline_outcome(
     if result.should_surface_alert() {
         let case_id = result.case_match.case_id;
         conn.execute(
-            "INSERT INTO pending_email_alerts (message_id, sender, subject, body_snippet, body_text, received_at, suggested_case_id, confidence, reason, attachments_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO pending_email_alerts (message_id, sender, subject, body_snippet, body_text, received_at, suggested_case_id, confidence, reason, attachments_json, in_reply_to, references_ids)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 email.message_id,
                 email.sender,
@@ -268,6 +287,8 @@ pub fn apply_pipeline_outcome(
                 result.case_match.confidence,
                 result.case_match.reason,
                 email.attachments_json,
+                email.in_reply_to,
+                serde_json::to_string(&email.references).unwrap_or_else(|_| "[]".to_string()),
             ],
         )
         .map_err(|e| format!("Database insert error: {e}"))?;
@@ -312,6 +333,9 @@ mod tests {
             body_text: "שלום עו\"ד".to_string(),
             received_at: "2026-01-01T00:00:00Z".to_string(),
             attachments_json: "[]".to_string(),
+            attachment_text: String::new(),
+            in_reply_to: None,
+            references: vec![],
         }
     }
 
@@ -381,6 +405,10 @@ mod tests {
             sender: "a@b.com".to_string(),
             subject: "test".to_string(),
             snippet: "body".to_string(),
+            body_text: "body".to_string(),
+            attachment_text: String::new(),
+            in_reply_to: None,
+            references: vec![],
             search_terms: vec!["12345/23".to_string()],
             deterministic: EmailExtractedSignals::default(),
             classification: None,
