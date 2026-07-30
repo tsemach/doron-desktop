@@ -201,15 +201,103 @@ fn score_source(
     out
 }
 
+/// Titles shorter than this match too much to be evidence — a case called "Asaf" would
+/// claim every email mentioning Asaf.
+const MIN_TITLE_TERMS: usize = 2;
+
+/// How much of a case's own title the email's subject reproduces.
+///
+/// Separate from [`evaluate`] because coverage over the whole email cannot express this.
+/// A subject is the primary human-readable case reference in real correspondence, but it is
+/// a handful of terms against a body and attachments that may run to thousands: divided by
+/// the query's total weight, an exact title match is diluted to nothing. Measured on real
+/// mail, a subject *identical* to a case's title scored 0.03 while an unrelated case won on
+/// 32 boilerplate terms shared with its own attachments.
+///
+/// Scored against the *case title* rather than the email, so length of the email is
+/// irrelevant: the question is how much of the case's name the sender wrote down.
+fn subject_match(
+    conn: &Connection,
+    request: &CaseMatchRequest,
+    config: &MatcherConfig,
+) -> Result<Vec<(i64, SignalContribution)>, String> {
+    let subject_terms: HashSet<String> = tokenize(&request.subject)
+        .filter(|t| t.chars().count() >= 3 && !is_stop_word(t))
+        .collect();
+    if subject_terms.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, COALESCE(subject,''), COALESCE(name,'') FROM cases
+             WHERE deleted = 0 OR deleted IS NULL",
+        )
+        .map_err(|e| format!("[subject_match] {e}"))?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    for (case_id, subject, name) in rows.flatten() {
+        // The case's subject is its title; `name` is the client, which routinely appears in
+        // unrelated mail and would match far too much on its own.
+        let title: HashSet<String> = tokenize(&subject)
+            .filter(|t| t.chars().count() >= 3 && !is_stop_word(t))
+            .collect();
+        if title.len() < MIN_TITLE_TERMS {
+            continue;
+        }
+
+        let hits = title
+            .iter()
+            .filter(|t| {
+                subject_terms.contains(*t)
+                    || strip_clitic_prefix(t)
+                        .map(|s| subject_terms.contains(&s))
+                        .unwrap_or(false)
+            })
+            .count();
+        if hits < MIN_TITLE_TERMS {
+            continue;
+        }
+
+        let raw = hits as f64 / title.len() as f64;
+        out.push((
+            case_id,
+            SignalContribution {
+                tier: "B",
+                name: "subject_match",
+                raw,
+                weighted: raw * config.weights.subject_match,
+                detail: format!(
+                    "subject carries {hits} of {} terms from case title \"{}\"",
+                    title.len(),
+                    subject.chars().take(40).collect::<String>()
+                ),
+                // A shared title is strong but not proof: two matters for one client can be
+                // titled almost identically.
+                decisive: false,
+            },
+        ));
+        let _ = name;
+    }
+    Ok(out)
+}
+
 /// Evaluate content similarity for every case with any term overlap.
 pub fn evaluate(
     conn: &Connection,
     request: &CaseMatchRequest,
     config: &MatcherConfig,
 ) -> Result<Vec<(i64, SignalContribution)>, String> {
+    let mut out = subject_match(conn, request, config)?;
+
     let terms = query_terms(request, config);
     if terms.is_empty() {
-        return Ok(Vec::new());
+        return Ok(out);
     }
 
     let total_cases = active_case_count(conn);
@@ -220,7 +308,6 @@ pub fn evaluate(
     case_ids.sort_unstable();
     case_ids.dedup();
 
-    let mut out = Vec::new();
     for case_id in case_ids {
         let text_score = case_text.get(&case_id).map(|c| c.score).unwrap_or(0.0);
         let doc_score = documents.get(&case_id).map(|c| c.score).unwrap_or(0.0);
@@ -455,6 +542,56 @@ mod tests {
         let conn = db();
         add_case(&conn, 1, "מכירת דירה", "");
         assert!(run(&conn, &request("", "")).is_empty());
+    }
+
+    /// The reported failure: an email whose subject *is* a case's title was filed to a
+    /// different case, because two decisive subject terms were diluted by ~38 boilerplate
+    /// terms from an attachment that happened to resemble the other case's documents.
+    #[test]
+    fn a_subject_matching_a_case_title_outranks_bulk_vocabulary() {
+        let conn = db();
+        add_case(&conn, 29, "כל מסמכי התבנית", "");
+        add_case(&conn, 35, "pdf tests", "טופס תבנית מסמך בקשה אישור");
+        add_document(&conn, 10, 35, "טופס תבנית מסמך בקשה אישור נספח הצהרה קבלה");
+
+        let mut req = request("כל מסמכי התבנית", "טופס תבנית מסמך בקשה אישור נספח הצהרה קבלה");
+        req.attachment_text = "טופס תבנית מסמך בקשה אישור נספח הצהרה קבלה".into();
+
+        let hits = run(&conn, &req);
+        let best = hits
+            .iter()
+            .max_by(|a, b| a.1.weighted.partial_cmp(&b.1.weighted).unwrap())
+            .expect("something must match");
+        assert_eq!(best.0, 29, "the case named by the subject must win: {hits:?}");
+    }
+
+    #[test]
+    fn subject_match_is_never_decisive() {
+        let conn = db();
+        add_case(&conn, 1, "מכירת דירה בנאמנות", "");
+        let hits = run(&conn, &request("מכירת דירה בנאמנות", ""));
+        assert!(hits.iter().all(|(_, s)| !s.decisive));
+    }
+
+    /// One shared word is a coincidence, not a title match.
+    #[test]
+    fn a_single_shared_title_word_is_not_a_subject_match() {
+        let conn = db();
+        add_case(&conn, 1, "מכירת דירה בנאמנות", "");
+        let hits = run(&conn, &request("מכירת רכב", ""));
+        assert!(
+            !hits.iter().any(|(_, s)| s.name == "subject_match"),
+            "one word must not count: {hits:?}"
+        );
+    }
+
+    /// A one-word case title would otherwise claim every email containing that word.
+    #[test]
+    fn a_short_case_title_never_produces_a_subject_match() {
+        let conn = db();
+        add_case(&conn, 1, "אסף", "");
+        let hits = run(&conn, &request("אסף", ""));
+        assert!(!hits.iter().any(|(_, s)| s.name == "subject_match"));
     }
 
     /// FTS5 binds Hebrew clitics to their word, so the query side must try both forms.

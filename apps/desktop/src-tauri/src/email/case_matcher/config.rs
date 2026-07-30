@@ -41,6 +41,7 @@ pub struct SignalWeights {
     pub sender_metadata: f64,
     pub phone: f64,
     pub content: f64,
+    pub subject_match: f64,
     pub party_name: f64,
 }
 
@@ -61,6 +62,7 @@ impl SignalWeights {
         "sender_metadata",
         "phone",
         "content",
+        "subject_match",
         "party_name",
     ];
 
@@ -77,6 +79,7 @@ impl SignalWeights {
             "sender_metadata" => self.sender_metadata,
             "phone" => self.phone,
             "content" => self.content,
+            "subject_match" => self.subject_match,
             "party_name" => self.party_name,
             _ => return None,
         })
@@ -95,6 +98,7 @@ impl SignalWeights {
             "sender_metadata" => self.sender_metadata = value,
             "phone" => self.phone = value,
             "content" => self.content = value,
+            "subject_match" => self.subject_match = value,
             "party_name" => self.party_name = value,
             _ => return false,
         }
@@ -118,6 +122,10 @@ impl Default for SignalWeights {
             sender_metadata: 0.50,
             phone: 0.45,
             content: 0.70,
+            // The subject is where a sender writes the matter's name, so reproducing a
+            // case title is strong evidence — but two matters for one client can carry
+            // near-identical titles, so it stays below the hard identifiers.
+            subject_match: 0.70,
             party_name: 0.40,
         }
     }
