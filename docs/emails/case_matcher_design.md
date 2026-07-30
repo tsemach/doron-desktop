@@ -1117,61 +1117,67 @@ quoted case number, so they match on an identifier even with `thread_ref` gone. 
 identifier-free thread replies would separate the two numbers. Recorded so the equality is not
 mistaken for evidence that confirmations do not matter — §10.2 still applies.
 
-### 10.11 First run against real mail — two calibration failures
+### 10.11 First run against real mail
 
 `eval email real`, 130 emails over 30 days from the configured Gmail account, matched
 against the live profile (9 active cases, 76 identifiers, 82 documents linked to a case).
-Migrations and backfill ran clean on real data for the first time. The matcher's behaviour
-did not survive contact.
+Migrations and the backfill ran clean on real data for the first time.
 
-**1. Real emails are ~30× longer than the corpus generates.**
+**What this sample is.** A developer's personal Gmail, containing one thread of test mail
+sent to exercise the app some months ago. It is *not* law-firm correspondence. That makes
+it a strong test of one thing and no test at all of another:
 
-| | median | mean | p90 |
+- **Precision on unrelated mail — tested, and passed emphatically.**
+- **Recall on genuine legal correspondence — not tested.** There is almost none in the
+  sample.
+
+**Result: a clean separation with nothing in between.**
+
+| | count | band | top score |
 |---|---|---|---|
-| Synthetic corpus | 68 chars | 73 | 106 |
-| Real mail | 2,077 chars | 4,210 | 13,340 |
+| Test-mail thread | 6 | Review | 1.00 (`thread_ref`) |
+| Everything else | 124 | Ignore | **0.16** |
 
-Tier B scores by IDF-weighted *coverage* — matched weight over the query's total weight.
-Real mail carries signatures, disclaimers, quoted reply chains and legal boilerplate, so
-the denominator explodes while the matching terms do not. Measured `content` contribution
-on real mail was **0.02–0.03**, against 0.30–0.50 on the corpus. Tier B is effectively
-inert in production, and every conclusion drawn about it — including its +8.0 ablation
-marginal — is an artefact of unrealistically short synthetic emails.
+No email sat near the 0.45 threshold from either side. The highest-scoring unrelated mail
+was a YouTube link at 0.12 and a documentation URL at 0.16, both correctly declined. That
+gap — 1.00 against 0.16 — is far cleaner than anything the synthetic corpus produces, where
+the correct and decoy populations overlap in the 0.20–0.40 band.
 
-Fixing this is a scoring change, not a threshold change: coverage has to be robust to
-irrelevant text. Candidates are scoring against the best-matching *window* rather than the
-whole email, stripping quoted/boilerplate blocks before tokenizing, or replacing coverage
-with a saturating sum of matched IDF that never divides by the query length.
+This is a direct improvement on the previous LLM-backed classifier, which per the account
+owner surfaced substantial amounts of personal, non-legal mail as case-related. The
+deterministic pipeline declined all of it.
 
-**2. The strongest signal has nothing to bind to.**
+**Correcting an earlier reading of this run.** An initial write-up concluded from
+`content` scoring 0.02–0.16 that Tier B was "inert in production". That was wrong, and
+wrong in a way worth recording: on a mailbox with no legal correspondence, a low content
+score is Tier B *working* — correctly finding no case that reads like the email. It cannot
+be evidence of failure without legal mail present to be loud about. The honest statement is
+that Tier B's behaviour on genuine legal correspondence remains **unmeasured**.
 
-Identifier kinds actually mined from the real profile:
+**What does still stand.**
 
-| kind | count |
-|---|---|
-| `party_name` | 38 |
-| `folder_token` | 16 |
-| `national_id` | 15 |
-| `land_registry` | 6 |
-| `phone` | 1 |
-| **`email`** | **0** |
+1. **Corpus emails are unrealistically short.** Median 68 characters against 2,077 in this
+   sample; p90 106 against 13,340. Whatever the mail is about, no real message is 68
+   characters. Tier B divides matched weight by the query's total weight, so length
+   directly suppresses its score, and the corpus never exercises that. The generator should
+   produce realistic bodies — signatures, quoted replies, boilerplate — before Tier B's
+   calibration is trusted either way.
 
-`case_fields` on the real profile contains **zero** `@` addresses. `sender_metadata` — the
-signal the P6 ablation measured at 70% solo accuracy, the highest of any — cannot fire at
-all, because the data it reads does not exist outside the corpus. The corpus plants contact
-emails in case fields precisely because P4 added them to make matching work; that made the
-instrument agree with the design instead of testing it.
+2. **`case_fields` holds no email addresses on this profile.** Identifier kinds actually
+   mined: `party_name` 38, `folder_token` 16, `national_id` 15, `land_registry` 6, `phone`
+   1, `email` **0**. So `sender_metadata` — measured at 70% solo accuracy in the P6
+   ablation, the highest of any signal — could not fire. The corpus plants contact emails
+   in case fields because P4 added them to make matching work; the instrument was made to
+   agree with the design rather than to test it. Whether real firm data records contact
+   addresses is still unknown, and worth checking against a customer profile.
 
-Across all 130 emails only two signals fired: `content` (negligible, above) and
-`thread_ref` (6 emails, all one thread). No `case_number`, no `sender_metadata`, no
-`deed` — consistent with §10.7, which already measured that the real templates define no
-case-number field.
+3. Only `content` and `thread_ref` fired across all 130 emails. No `case_number` — which is
+   consistent with §10.7, where the real templates were measured to define no case-number
+   field at all.
 
-**Consequence.** 95.4% of real mail was banded `Ignore`. That is *plausibly* correct for a
-personal inbox with little client mail, but it is not evidence of correctness, and the two
-failures above mean the effective matcher in production is Tier A identifiers plus thread
-references — roughly the P4 feature set. Tiers B and C are not contributing.
-
-The synthetic numbers (78% accuracy, 0 mislinks) should not be quoted as production
-expectations until a corpus with realistic email length and realistic case-field content
-reproduces them.
+**Where that leaves confidence.** Precision looks genuinely good on real non-legal mail,
+which was the previous implementation's main failure. Recall on real legal mail is
+untested, and the two calibration gaps above mean the synthetic 78% / 0-mislink figures
+should not yet be quoted as production expectations. The cheapest way to close this is a
+handful of realistic case-related emails sent to the configured account, then re-running
+`eval email real`.
