@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use super::cases::shared_party_pairs;
+use super::cases::{cases_sharing_party, shared_party_groups};
 use super::pools::*;
 use super::{
     Band, CorpusCase, CorpusConfig, Difficulty, EmailFixture, Expected, ExpectedSignals,
@@ -149,6 +149,7 @@ fn build_easy(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> EmailFixture 
             signal: signal.to_string(),
             band: Band::AutoLink,
             competing_case_id: None,
+            also_matches: Vec::new(),
             signals,
         },
     }
@@ -216,6 +217,7 @@ fn build_medium(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> EmailFixtur
             },
             band: Band::Review,
             competing_case_id: None,
+            also_matches: Vec::new(),
             signals,
         },
     }
@@ -270,6 +272,9 @@ fn build_hard(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> EmailFixture 
             signal: "party_name_fuzzy".to_string(),
             band: Band::Review,
             competing_case_id: None,
+            // The only signal here is a spelling variant of `party`. If another case lists
+            // the same party, it is an equally valid answer and must not score as an error.
+            also_matches: cases_sharing_party(ctx.cases, &party, case.id),
             signals,
         },
     }
@@ -314,6 +319,7 @@ fn build_thread(
             signal: "thread_ref".to_string(),
             band: Band::AutoLink,
             competing_case_id: None,
+            also_matches: Vec::new(),
             signals,
         },
     })
@@ -322,11 +328,15 @@ fn build_thread(
 /// Names a party that belongs to two cases and nothing else — the matcher must decline
 /// to auto-link. This is the fixture that exercises the ambiguity guard.
 fn build_adversarial(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> Option<EmailFixture> {
-    let pairs = shared_party_pairs(ctx.cases);
-    if pairs.is_empty() {
+    let groups = shared_party_groups(ctx.cases);
+    if groups.is_empty() {
         return None;
     }
-    let (a, b, shared) = rng.choose(&pairs).clone();
+    let (shared, ids) = rng.choose(&groups).clone();
+    // The first two are the labelled competing pair; any further case holding the same
+    // name is equally correct, so it is recorded rather than counted as a mislink.
+    let (a, b) = (ids[0], ids[1]);
+    let also_matches = ids[2..].to_vec();
 
     let sender = format!("info{}@{}", rng.range(10, 999), rng.choose(NEUTRAL_DOMAINS));
     let mut signals = ExpectedSignals::default();
@@ -354,6 +364,7 @@ fn build_adversarial(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> Option
             signal: "shared_party".to_string(),
             band: Band::Review,
             competing_case_id: Some(b),
+            also_matches,
             signals,
         },
     })
@@ -382,6 +393,7 @@ fn build_unrelated(rng: &mut Rng, id: &str, index: usize) -> EmailFixture {
             signal: "none".to_string(),
             band: Band::Ignore,
             competing_case_id: None,
+            also_matches: Vec::new(),
             signals,
         },
     }
@@ -488,6 +500,7 @@ fn build_decoy(rng: &mut Rng, ctx: &Ctx, id: &str, index: usize) -> EmailFixture
             },
             band: Band::Ignore,
             competing_case_id: None,
+            also_matches: Vec::new(),
             signals,
         },
     }

@@ -151,6 +151,7 @@ pub async fn run(
             fixture_id: fixture.id.clone(),
             expected_case: fixture.expected.case_id,
             competing_case: fixture.expected.competing_case_id,
+            also_matches: fixture.expected.also_matches.clone(),
             predicted_case,
             top_case,
             confidence,

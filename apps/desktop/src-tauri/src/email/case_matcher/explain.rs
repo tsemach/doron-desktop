@@ -83,6 +83,7 @@ mod tests {
             best: Some(CaseCandidate {
                 case_id: 42,
                 confidence: 0.91,
+                score: 0.91,
                 signals: vec![
                     sig("sender_confirmed", 0.18, false, "adv@lawfirm.co.il"),
                     sig("case_number", 0.45, true, "case number 12345/23"),
@@ -91,6 +92,7 @@ mod tests {
             runners_up: vec![CaseCandidate {
                 case_id: 17,
                 confidence: 0.31,
+                score: 0.31,
                 signals: vec![],
             }],
             band: MatchBand::Review,

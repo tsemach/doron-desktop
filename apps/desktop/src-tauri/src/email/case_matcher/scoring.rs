@@ -38,7 +38,16 @@ pub struct SignalContribution {
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct CaseCandidate {
     pub case_id: i64,
+    /// Displayed and banded on: the total evidence capped into 0..1.
     pub confidence: f64,
+    /// The uncapped total. **Ranking and the ambiguity margin use this, not `confidence`.**
+    ///
+    /// A case with a decisive identifier *and* content agreement can total well above 1.0.
+    /// Ranking on the capped value makes every such case indistinguishable, so the order
+    /// falls through to the tie-break on case id — and the lowest id wins on nothing but
+    /// being created first. Two saturated candidates also show a margin of 0, which the
+    /// guard reads as ambiguity that isn't there.
+    pub score: f64,
     pub signals: Vec<SignalContribution>,
 }
 
@@ -92,19 +101,21 @@ pub fn aggregate(contributions: Vec<(i64, SignalContribution)>) -> Vec<CaseCandi
         .into_iter()
         .map(|(case_id, signals)| {
             let signals: Vec<SignalContribution> = signals.into_values().collect();
-            let confidence = signals.iter().map(|s| s.weighted).sum::<f64>().clamp(0.0, 1.0);
+            let score = signals.iter().map(|s| s.weighted).sum::<f64>().max(0.0);
             CaseCandidate {
                 case_id,
-                confidence,
+                confidence: score.clamp(0.0, 1.0),
+                score,
                 signals,
             }
         })
         .collect();
 
-    // Highest confidence first; ties broken by case id so output is deterministic.
+    // Highest *uncapped* score first — see `CaseCandidate::score`. Ties broken by case id
+    // so output is deterministic, but that must stay a last resort: it is arbitrary.
     candidates.sort_by(|a, b| {
-        b.confidence
-            .partial_cmp(&a.confidence)
+        b.score
+            .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.case_id.cmp(&b.case_id))
     });
@@ -128,9 +139,11 @@ pub fn decide(mut candidates: Vec<CaseCandidate>, config: &MatcherConfig) -> Cas
     }
 
     let best = candidates.remove(0);
-    let runner_up_confidence = candidates.first().map(|c| c.confidence).unwrap_or(0.0);
+    // Uncapped, for the same reason the ranking is: two candidates that both saturate show
+    // a `confidence` gap of 0 and would be called ambiguous however far apart they really are.
+    let runner_up_score = candidates.first().map(|c| c.score).unwrap_or(0.0);
     let ambiguous = !candidates.is_empty()
-        && (best.confidence - runner_up_confidence) < config.ambiguity_margin - MARGIN_EPSILON;
+        && (best.score - runner_up_score) < config.ambiguity_margin - MARGIN_EPSILON;
 
     let band = if best.confidence < config.review_threshold {
         MatchBand::Ignore
@@ -218,6 +231,48 @@ mod tests {
             (1, sig("case_number", 0.95, true)),
         ]);
         assert!((out[0].confidence - 1.0).abs() < 1e-9);
+        assert!((out[0].score - 1.95).abs() < 1e-9, "score must stay uncapped");
+    }
+
+    /// Regression: two cases that both saturate must still be ranked by how much evidence
+    /// they actually have.
+    ///
+    /// Found on a 100-case corpus, where a threaded reply was linked to the wrong matter at
+    /// confidence 1.00. Both cases capped at 1.0, so the sort fell through to the tie-break
+    /// on case id and the lower id won — on nothing but having been created first. It cannot
+    /// happen on a small corpus, because two cases rarely both saturate.
+    #[test]
+    fn saturated_candidates_still_rank_by_evidence() {
+        let out = aggregate(vec![
+            // Case 60: the thread it actually belongs to, plus corroboration.
+            (60, sig("thread_ref", 1.0, true)),
+            (60, sig("content", 0.7, false)),
+            (60, sig("party_name", 0.4, false)),
+            // Case 33: shares a party, and happens to have the lower id.
+            (33, sig("case_number", 0.95, true)),
+            (33, sig("party_name", 0.4, false)),
+        ]);
+        assert_eq!(out[0].case_id, 60, "the better-evidenced case must win the tie");
+        assert!((out[0].confidence - 1.0).abs() < 1e-9);
+        assert!((out[1].confidence - 1.0).abs() < 1e-9, "both still display as 1.00");
+    }
+
+    /// The same failure in the guard: saturated candidates showed a gap of 0 and were
+    /// called ambiguous however far apart the underlying evidence was.
+    #[test]
+    fn saturation_does_not_manufacture_ambiguity() {
+        let outcome = decide(
+            aggregate(vec![
+                (1, sig("thread_ref", 1.0, true)),
+                (1, sig("case_number", 0.95, true)),
+                (1, sig("content", 0.7, false)),
+                (2, sig("national_id", 0.85, false)),
+                (2, sig("content", 0.2, false)),
+            ]),
+            &config(),
+        );
+        assert!(!outcome.ambiguous, "2.65 vs 1.05 is not a close call");
+        assert_eq!(outcome.band, MatchBand::AutoLink);
     }
 
     #[test]

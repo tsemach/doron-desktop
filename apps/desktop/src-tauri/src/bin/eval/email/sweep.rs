@@ -79,6 +79,7 @@ fn predict(scored: &Scored, config: &MatcherConfig, signals: Signals) -> Predict
         fixture_id: scored.fixture.id.clone(),
         expected_case: expected,
         competing_case: scored.fixture.expected.competing_case_id,
+        also_matches: scored.fixture.expected.also_matches.clone(),
         predicted_case,
         top_case,
         confidence: outcome.best.as_ref().map(|b| b.confidence).unwrap_or(0.0),
