@@ -1116,3 +1116,62 @@ That is a corpus limitation, not a finding about the product: the generator give
 quoted case number, so they match on an identifier even with `thread_ref` gone. A corpus with
 identifier-free thread replies would separate the two numbers. Recorded so the equality is not
 mistaken for evidence that confirmations do not matter — §10.2 still applies.
+
+### 10.11 First run against real mail — two calibration failures
+
+`eval email real`, 130 emails over 30 days from the configured Gmail account, matched
+against the live profile (9 active cases, 76 identifiers, 82 documents linked to a case).
+Migrations and backfill ran clean on real data for the first time. The matcher's behaviour
+did not survive contact.
+
+**1. Real emails are ~30× longer than the corpus generates.**
+
+| | median | mean | p90 |
+|---|---|---|---|
+| Synthetic corpus | 68 chars | 73 | 106 |
+| Real mail | 2,077 chars | 4,210 | 13,340 |
+
+Tier B scores by IDF-weighted *coverage* — matched weight over the query's total weight.
+Real mail carries signatures, disclaimers, quoted reply chains and legal boilerplate, so
+the denominator explodes while the matching terms do not. Measured `content` contribution
+on real mail was **0.02–0.03**, against 0.30–0.50 on the corpus. Tier B is effectively
+inert in production, and every conclusion drawn about it — including its +8.0 ablation
+marginal — is an artefact of unrealistically short synthetic emails.
+
+Fixing this is a scoring change, not a threshold change: coverage has to be robust to
+irrelevant text. Candidates are scoring against the best-matching *window* rather than the
+whole email, stripping quoted/boilerplate blocks before tokenizing, or replacing coverage
+with a saturating sum of matched IDF that never divides by the query length.
+
+**2. The strongest signal has nothing to bind to.**
+
+Identifier kinds actually mined from the real profile:
+
+| kind | count |
+|---|---|
+| `party_name` | 38 |
+| `folder_token` | 16 |
+| `national_id` | 15 |
+| `land_registry` | 6 |
+| `phone` | 1 |
+| **`email`** | **0** |
+
+`case_fields` on the real profile contains **zero** `@` addresses. `sender_metadata` — the
+signal the P6 ablation measured at 70% solo accuracy, the highest of any — cannot fire at
+all, because the data it reads does not exist outside the corpus. The corpus plants contact
+emails in case fields precisely because P4 added them to make matching work; that made the
+instrument agree with the design instead of testing it.
+
+Across all 130 emails only two signals fired: `content` (negligible, above) and
+`thread_ref` (6 emails, all one thread). No `case_number`, no `sender_metadata`, no
+`deed` — consistent with §10.7, which already measured that the real templates define no
+case-number field.
+
+**Consequence.** 95.4% of real mail was banded `Ignore`. That is *plausibly* correct for a
+personal inbox with little client mail, but it is not evidence of correctness, and the two
+failures above mean the effective matcher in production is Tier A identifiers plus thread
+references — roughly the P4 feature set. Tiers B and C are not contributing.
+
+The synthetic numbers (78% accuracy, 0 mislinks) should not be quoted as production
+expectations until a corpus with realistic email length and realistic case-field content
+reproduces them.
