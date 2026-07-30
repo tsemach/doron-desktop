@@ -4,7 +4,7 @@
 //! the same function the pipeline calls. Nothing is reimplemented here, so a green eval
 //! means the shipped path works, not that a parallel copy of it does.
 
-use tauri_app_lib::email::case_matcher::{CaseMatcher, MatcherConfig};
+use tauri_app_lib::email::case_matcher::{CaseMatcher, MatchBand, MatcherConfig};
 
 use tauri_app_lib::email::{
     combined_text, extract_attachment_texts, extract_email_signals, AttachmentLimits,
@@ -13,7 +13,9 @@ use tauri_app_lib::email::{
 
 use super::corpus::EmailFixture;
 use super::harness::{build_profile, BuildOptions, Profile};
-use super::matcher_metrics::{print_report, summarize, Prediction, Summary};
+use super::matcher_metrics::{
+    print_report, print_threshold_sweep, summarize, Prediction, Summary,
+};
 
 /// Rebuild the request exactly as `run_email_pipeline` would, so the eval exercises the
 /// same inputs: signals over subject + full body + attachment text, plus thread headers.
@@ -78,6 +80,7 @@ pub async fn run(
     // accuracy numbers below are about *which* case is picked, independent of banding.
     let config = MatcherConfig::load(&profile.conn);
     let config_json = serde_json::to_string(&config).unwrap_or_default();
+    let review_threshold = config.review_threshold;
     let matcher = CaseMatcher::new(config);
 
     let mut predictions = Vec::with_capacity(profile.emails.len());
@@ -85,7 +88,16 @@ pub async fn run(
         let request = build_request(&profile, fixture);
         let outcome = matcher.match_email_core(&profile.conn, &request)?;
 
-        let predicted_case = outcome.best.as_ref().map(|b| b.case_id);
+        // A ranking always has a top entry; a *link* is what the band decides. Below the
+        // review threshold the pipeline neither links nor surfaces anything, so scoring an
+        // Ignore-band candidate as a link would count a failure the user cannot experience.
+        // Tier A alone never produced one — it only spoke when it held a hard identifier —
+        // which is why this only starts to matter now that Tier B scores nearly every case.
+        let top_case = outcome.best.as_ref().map(|b| b.case_id);
+        let predicted_case = match outcome.band {
+            MatchBand::Ignore => None,
+            _ => top_case,
+        };
         let confidence = outcome.best.as_ref().map(|b| b.confidence).unwrap_or(0.0);
         let signals = outcome
             .best
@@ -106,6 +118,7 @@ pub async fn run(
             expected_case: fixture.expected.case_id,
             competing_case: fixture.expected.competing_case_id,
             predicted_case,
+            top_case,
             confidence,
             band: outcome.band,
             rank_of_expected,
@@ -119,10 +132,13 @@ pub async fn run(
     let summary = summarize(&profile.emails, &predictions);
     print_report(&summary, profile.cases.len());
 
-    if verbose && !summary.failures.is_empty() {
-        println!("\nFailures");
-        for f in &summary.failures {
-            println!("  {f}");
+    if verbose {
+        print_threshold_sweep(&summary, review_threshold);
+        if !summary.failures.is_empty() {
+            println!("\nFailures");
+            for f in &summary.failures {
+                println!("  {f}");
+            }
         }
     }
     Ok((summary, profile.cases.len(), config_json))
