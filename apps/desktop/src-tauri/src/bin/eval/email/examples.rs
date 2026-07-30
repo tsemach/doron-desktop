@@ -72,7 +72,17 @@ pub async fn execute(_args: ExamplesArgs) -> Result<(), String> {
     );
     example("All three in one collection pass", "run --corpus-dir ./email_eval_corpus --sweep --ablate --cold-start");
 
-    section("4. Diagnose a bad score");
+    section("4. Run against REAL mail (the check the corpus cannot make)");
+    println!("\n  Reads the account already configured in the app. Never marks anything read:");
+    println!("  the mailbox is opened with EXAMINE and bodies fetched with BODY.PEEK.");
+    println!("\n  python3 apps/desktop/src-tauri/scripts/gmail_export.py \\");
+    println!("      --out ./real_emails.json --days 30 --with-attachments");
+    example(
+        "Match that mail against a copy of your profile (--in-place to use the live one)",
+        "real --emails ./real_emails.json",
+    );
+
+    section("5. Diagnose a bad score");
     println!("\n  Run these before debugging the scoring — a bad number is usually an empty");
     println!("  index or a missed extraction, not the matcher.");
     example(
@@ -84,7 +94,7 @@ pub async fn execute(_args: ExamplesArgs) -> Result<(), String> {
         "signals --corpus-dir ./email_eval_corpus --verbose",
     );
 
-    section("5. Compare runs over time");
+    section("6. Compare runs over time");
     example("Recorded runs, newest first", "list");
     example("Everything about one run, including the config it used", "show 11");
     example(
@@ -92,7 +102,7 @@ pub async fn execute(_args: ExamplesArgs) -> Result<(), String> {
         "compare 11 12",
     );
 
-    section("6. Legacy LLM classification eval (--mode classification)");
+    section("7. Legacy LLM classification eval (--mode classification)");
     println!("\n  Separate from the matcher: scores the LLM's review/search_terms output.");
     println!("  The shipping pipeline does not call an LLM at all.");
     example(
@@ -146,6 +156,7 @@ mod tests {
             "list",
             "show",
             "compare",
+            "real",
         ] {
             assert!(
                 source.contains(&format!("\"{command} ")) || source.contains(&format!("\"{command}\"")),
