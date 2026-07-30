@@ -36,7 +36,8 @@ pub struct RunArgs {
     #[arg(long, default_value = "matcher")]
     pub mode: String,
 
-    /// Rebuild the scratch index database (matcher mode)
+    /// Reuse the existing scratch index database instead of rebuilding it (matcher mode).
+    /// Much faster, but stale if the corpus or the indexers changed.
     #[arg(long)]
     pub reuse: bool,
 
