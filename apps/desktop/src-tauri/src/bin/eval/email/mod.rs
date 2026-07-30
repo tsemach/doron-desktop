@@ -1,10 +1,12 @@
 mod dataset;
 
+pub mod compare;
 pub mod corpus;
 pub mod corpus_stats;
 pub mod docx_writer;
 pub mod harness;
 pub mod history;
+pub mod history_compare;
 pub mod index_cmd;
 pub mod matcher_metrics;
 pub mod matcher_run;
@@ -49,4 +51,7 @@ pub enum EmailCommands {
 
     /// Show detailed analysis of a specific email evaluation run
     Show(show::ShowArgs),
+
+    /// Compare two recorded matcher runs, with per-difficulty deltas
+    Compare(compare::CompareArgs),
 }

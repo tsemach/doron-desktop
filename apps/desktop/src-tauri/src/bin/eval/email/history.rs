@@ -61,6 +61,11 @@ pub fn save(
         .iter()
         .map(|(p, s)| (p.to_string(), s.correct, s.total))
         .collect();
+    let per_signal: Vec<(String, usize, usize)> = summary
+        .per_signal
+        .iter()
+        .map(|(name, s)| (name.clone(), s.correct, s.total))
+        .collect();
 
     conn.execute(
         "INSERT INTO email_matcher_runs
@@ -84,7 +89,7 @@ pub fn save(
             summary.missed as i64,
             serde_json::to_string(&per_difficulty).unwrap_or_default(),
             serde_json::to_string(&per_practice).unwrap_or_default(),
-            serde_json::to_string(&summary.per_signal).unwrap_or_default(),
+            serde_json::to_string(&per_signal).unwrap_or_default(),
             config_json,
         ],
     )

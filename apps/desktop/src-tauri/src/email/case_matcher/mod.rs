@@ -13,6 +13,8 @@ pub mod config;
 pub mod explain;
 pub mod scoring;
 pub mod tier_a;
+pub mod tier_b;
+pub mod tier_c;
 
 use rusqlite::Connection;
 
@@ -36,14 +38,18 @@ impl CaseMatcher {
 
     /// Score an email against every case and return the ranked outcome.
     ///
-    /// Tiers B and C are not built yet (P5); Tier A alone decides here, so emails with no
-    /// hard identifier legitimately return no match.
+    /// All three tiers always run and their contributions are pooled. Tier A can settle a
+    /// match on its own, but it is not an early exit: a decisive identifier plus content
+    /// agreement should outrank the identifier alone, and running B/C anyway is what lets
+    /// the ambiguity guard see a competing case.
     pub fn match_email_core(
         &self,
         conn: &Connection,
         request: &CaseMatchRequest,
     ) -> Result<CaseMatchOutcome, String> {
-        let contributions = tier_a::evaluate(conn, request, &self.config)?;
+        let mut contributions = tier_a::evaluate(conn, request, &self.config)?;
+        contributions.extend(tier_b::evaluate(conn, request, &self.config)?);
+        contributions.extend(tier_c::evaluate(conn, request, &self.config)?);
 
         if contributions.is_empty() {
             return Ok(CaseMatchOutcome::none(

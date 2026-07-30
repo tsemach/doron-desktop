@@ -17,6 +17,9 @@ pub struct Prediction {
     /// email. Linking to *either* is ambiguity, not error.
     pub competing_case: Option<i64>,
     pub predicted_case: Option<i64>,
+    /// The top-ranked case before the band decided whether to surface it. Diagnostic only:
+    /// it makes the cost of the review threshold visible instead of silently absorbed.
+    pub top_case: Option<i64>,
     pub confidence: f64,
     pub band: MatchBand,
     pub rank_of_expected: Option<usize>,
@@ -80,6 +83,17 @@ impl Prediction {
     fn missed(&self) -> bool {
         self.expected_case.is_some() && self.predicted_case.is_none()
     }
+
+    /// Ranked a case first but stayed below the review threshold.
+    fn suppressed(&self) -> bool {
+        self.predicted_case.is_none() && self.top_case.is_some()
+    }
+
+    /// A suppression that cost a right answer — what raising recall would buy.
+    fn suppressed_right(&self) -> bool {
+        self.suppressed() && self.top_case.is_some() && self.top_case == self.expected_case
+    }
+
 }
 
 #[derive(Default, Clone, Copy)]
@@ -110,10 +124,19 @@ pub struct Summary {
     pub false_positives: usize,
     pub missed: usize,
     pub auto_links: usize,
+    pub suppressed_right: usize,
+    pub suppressed_wrong: usize,
     pub per_difficulty: BTreeMap<Difficulty, DifficultyStats>,
     pub per_practice: BTreeMap<&'static str, DifficultyStats>,
-    pub per_signal: BTreeMap<String, usize>,
+    /// Per signal, how many links it supported and how many of those were right. Counting
+    /// only the correct ones (as this did) cannot distinguish a signal that is always right
+    /// from one that fires constantly and is right a third of the time — which is exactly
+    /// the question P6's ablation has to answer.
+    pub per_signal: BTreeMap<String, DifficultyStats>,
     pub failures: Vec<String>,
+    /// `(confidence, was_right)` for every candidate the band declined, so a threshold
+    /// sweep can ask whether the two populations are separable at all.
+    pub suppressed_scores: Vec<(f64, bool)>,
 }
 
 pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summary {
@@ -124,10 +147,13 @@ pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summa
     let mut false_positives = 0;
     let mut missed = 0;
     let mut auto_links = 0;
+    let mut suppressed_right = 0;
+    let mut suppressed_wrong = 0;
+    let mut suppressed_scores: Vec<(f64, bool)> = Vec::new();
     let mut reciprocal_sum = 0.0;
     let mut per_difficulty: BTreeMap<Difficulty, DifficultyStats> = BTreeMap::new();
     let mut per_practice: BTreeMap<&'static str, DifficultyStats> = BTreeMap::new();
-    let mut per_signal: BTreeMap<String, usize> = BTreeMap::new();
+    let mut per_signal: BTreeMap<String, DifficultyStats> = BTreeMap::new();
     let mut failures = Vec::new();
 
     for p in predictions {
@@ -155,9 +181,16 @@ pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summa
             }
         }
 
-        if p.correct() {
+        // Only signals that actually supported a surfaced link are counted; a contribution
+        // the band discarded influenced nothing.
+        if p.predicted_case.is_some() {
+            let right = p.correct();
             for s in &p.signals {
-                *per_signal.entry(s.clone()).or_insert(0) += 1;
+                let e = per_signal.entry(s.clone()).or_default();
+                e.total += 1;
+                if right {
+                    e.correct += 1;
+                }
             }
         }
         if let Some(rank) = p.rank_of_expected {
@@ -192,6 +225,15 @@ pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summa
         }
         if p.missed() {
             missed += 1;
+        }
+        if p.suppressed() {
+            let right = p.suppressed_right();
+            if right {
+                suppressed_right += 1;
+            } else {
+                suppressed_wrong += 1;
+            }
+            suppressed_scores.push((p.confidence, right));
         }
     }
 
@@ -240,10 +282,41 @@ pub fn summarize(fixtures: &[EmailFixture], predictions: &[Prediction]) -> Summa
         false_positives,
         missed,
         auto_links,
+        suppressed_right,
+        suppressed_wrong,
         per_difficulty,
         per_practice,
         per_signal,
         failures,
+        suppressed_scores,
+    }
+}
+
+/// What each candidate review threshold would admit, over the suppressed population.
+///
+/// Answers the only question that matters when a tier ranks well but scores low: is there
+/// a threshold that lets the right answers through without the wrong ones? If every row
+/// gains and loses in step, the fix is the scoring, not the threshold.
+pub fn print_threshold_sweep(summary: &Summary, current: f64) {
+    if summary.suppressed_scores.is_empty() {
+        return;
+    }
+    println!("\nsuppressed population by threshold (current {current:.2})");
+    println!("  {:>9}  {:>7}  {:>7}", "threshold", "right", "wrong");
+    let mut t = 0.40;
+    while t > 0.049 {
+        let right = summary
+            .suppressed_scores
+            .iter()
+            .filter(|(c, ok)| *ok && *c >= t)
+            .count();
+        let wrong = summary
+            .suppressed_scores
+            .iter()
+            .filter(|(c, ok)| !*ok && *c >= t)
+            .count();
+        println!("  {t:>9.2}  {right:>7}  {wrong:>7}");
+        t -= 0.05;
     }
 }
 
@@ -274,6 +347,12 @@ pub fn print_report(summary: &Summary, case_count: usize) {
     println!("false positives   {}", summary.false_positives);
     println!("missed            {}", summary.missed);
     println!("auto-linked       {}", summary.auto_links);
+    println!(
+        "below threshold   {} suppressed ({} would have been right, {} wrong)",
+        summary.suppressed_right + summary.suppressed_wrong,
+        summary.suppressed_right,
+        summary.suppressed_wrong
+    );
 
     println!("\nby difficulty");
     for (difficulty, stats) in &summary.per_difficulty {
@@ -300,9 +379,15 @@ pub fn print_report(summary: &Summary, case_count: usize) {
     }
 
     if !summary.per_signal.is_empty() {
-        println!("\nby signal (correct matches)");
-        for (signal, n) in &summary.per_signal {
-            println!("  {signal:<24} {n:>4}");
+        println!("\nby signal (correct / links supported)");
+        for (signal, stats) in &summary.per_signal {
+            println!(
+                "  {:<24} {:>4}/{:<4} ({:>5.1}%)",
+                signal,
+                stats.correct,
+                stats.total,
+                stats.pct()
+            );
         }
     }
 }
@@ -322,6 +407,7 @@ mod tests {
             expected_case: expected,
             competing_case: None,
             predicted_case: predicted,
+            top_case: predicted,
             confidence: 0.9,
             band: MatchBand::Review,
             rank_of_expected: if expected.is_some() && expected == predicted {
@@ -404,6 +490,32 @@ mod tests {
         assert!(!p.correct(), "finding nothing is not the same as recognising ambiguity");
         assert!(p.missed());
         assert!(!p.mislinked());
+    }
+
+    /// A candidate the band declined to surface is not a link, and must not be scored as
+    /// one — but the run still has to say out loud what the threshold cost.
+    #[test]
+    fn a_suppressed_candidate_is_reported_but_not_scored_as_a_link() {
+        let saved = Prediction {
+            top_case: Some(7),
+            band: MatchBand::Ignore,
+            ..pred("f", None, None, Difficulty::Decoy)
+        };
+        let lost = Prediction {
+            top_case: Some(1),
+            band: MatchBand::Ignore,
+            ..pred("g", Some(1), None, Difficulty::Hard)
+        };
+        let s = summarize(&[], &[saved, lost]);
+
+        assert_eq!(s.mislinks, 0);
+        assert_eq!(s.false_positives, 0);
+        assert_eq!(
+            s.suppressed_wrong, 1,
+            "declining the decoy is what the gate buys"
+        );
+        assert_eq!(s.suppressed_right, 1, "and this is what it costs");
+        assert_eq!(s.missed, 1);
     }
 
     #[test]
