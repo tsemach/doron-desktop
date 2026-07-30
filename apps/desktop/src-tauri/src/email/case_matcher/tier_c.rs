@@ -123,7 +123,11 @@ pub fn evaluate(
                 SignalContribution {
                     tier: "C",
                     name: "party_name",
-                    raw: score,
+                    // The rescaled value, not the similarity: `raw` has to mean the same
+                    // thing in every tier — strength in 0..1 before weighting — or anything
+                    // recomputing `raw * weight` (the sweep does) silently inflates Tier C.
+                    // The similarity itself stays visible in `detail`.
+                    raw: scaled,
                     weighted: scaled * config.weights.party_name,
                     detail: format!("\"{email_name}\" ≈ \"{party}\" ({score:.2})"),
                     // A shared surname is common; never enough on its own.
@@ -265,6 +269,26 @@ mod tests {
         conn.execute("INSERT INTO cases (id, name) VALUES (1, 'c')", [])
             .unwrap();
         assert!(run(&conn, "דוד מזרחי").is_empty());
+    }
+
+    /// `weighted` must be exactly `raw * weight` in every tier. The sweep re-derives it
+    /// that way to vary weights without re-querying, so a tier that encodes anything else
+    /// in `weighted` would be scored differently there than in the real pipeline.
+    #[test]
+    fn weighted_is_raw_times_the_signal_weight() {
+        let conn = db();
+        party(&conn, 1, "דוד מזרחי");
+        let config = MatcherConfig::default();
+        for (_, signal) in evaluate(&conn, &request_from("דוד מזרחי-כהן"), &config).unwrap() {
+            assert!(
+                (signal.weighted - signal.raw * config.weights.party_name).abs() < 1e-9,
+                "raw {} × {} ≠ weighted {}",
+                signal.raw,
+                config.weights.party_name,
+                signal.weighted
+            );
+            assert!((0.0..=1.0).contains(&signal.raw), "raw must be a 0..1 strength");
+        }
     }
 
     #[test]

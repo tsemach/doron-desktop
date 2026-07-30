@@ -498,7 +498,11 @@ pub fn learn_from_confirmed_email(
 ) -> Result<usize, String> {
     let mut items = Vec::new();
 
-    let sender_norm = normalize_email(sender);
+    // The bare address, parsed the same way signal extraction parses it. `sender` is the
+    // raw From header off the alert row, so it is routinely `Name <addr>` — storing that
+    // verbatim would never match Tier A's lookup, which normalizes the extracted address.
+    let (_, address) = crate::email::parse_sender(sender);
+    let sender_norm = address.map(|a| normalize_email(&a)).unwrap_or_default();
     if !sender_norm.is_empty() {
         items.push(MinedIdentifier::new(
             KIND_EMAIL,
@@ -669,6 +673,104 @@ mod tests {
         assert!(!mined.iter().any(|m| m.kind == KIND_CASE_NUMBER));
         assert!(mined.iter().any(|m| m.kind == KIND_LAND_REGISTRY));
         assert!(mined.iter().any(|m| m.kind == KIND_NATIONAL_ID));
+    }
+
+    fn db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE cases (id INTEGER PRIMARY KEY, subject TEXT, name TEXT, folder TEXT, deleted INTEGER DEFAULT 0);
+             CREATE TABLE documents (id INTEGER PRIMARY KEY, file_path TEXT);
+             CREATE TABLE case_emails (id INTEGER PRIMARY KEY, message_id TEXT);
+             CREATE TABLE pending_email_alerts (id INTEGER PRIMARY KEY, message_id TEXT);
+             INSERT INTO cases (id, name) VALUES (1, 'c'), (2, 'c2');",
+        )
+        .unwrap();
+        crate::store::matcher_schema::init_matcher_schema(&conn).unwrap();
+        conn
+    }
+
+    fn identifiers_of(conn: &Connection, case_id: i64, kind: &str) -> Vec<String> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT value_norm FROM case_identifiers
+                 WHERE case_id = ?1 AND kind = ?2 AND source = ?3 ORDER BY value_norm",
+            )
+            .unwrap();
+        let rows = stmt
+            .query_map(rusqlite::params![case_id, kind, SOURCE_CONFIRMED], |r| {
+                r.get::<_, String>(0)
+            })
+            .unwrap();
+        rows.flatten().collect()
+    }
+
+    /// The cold-start closer (design §10.2): confirming an email is the only way a sender
+    /// or thread becomes a known identifier for a case.
+    #[test]
+    fn confirming_an_email_records_its_sender_and_thread() {
+        let conn = db();
+        let n = learn_from_confirmed_email(&conn, 1, "Adv <ADV@LawFirm.co.il>", "<abc@mail>")
+            .unwrap();
+        assert_eq!(n, 2);
+        assert_eq!(
+            identifiers_of(&conn, 1, KIND_EMAIL),
+            vec!["adv@lawfirm.co.il"],
+            "address must be lowercased but otherwise intact"
+        );
+        assert_eq!(
+            identifiers_of(&conn, 1, KIND_THREAD_REF),
+            vec!["abc@mail"],
+            "angle brackets must be stripped so replies resolve"
+        );
+    }
+
+    /// Confirming the same sender twice must not accumulate duplicate rows, or a
+    /// frequently-corresponding client would slowly outweigh every other signal.
+    #[test]
+    fn confirming_twice_does_not_duplicate() {
+        let conn = db();
+        learn_from_confirmed_email(&conn, 1, "a@b.com", "<m1@x>").unwrap();
+        learn_from_confirmed_email(&conn, 1, "a@b.com", "<m1@x>").unwrap();
+        assert_eq!(identifiers_of(&conn, 1, KIND_EMAIL), vec!["a@b.com"]);
+        assert_eq!(identifiers_of(&conn, 1, KIND_THREAD_REF), vec!["m1@x"]);
+    }
+
+    /// One address legitimately corresponds on several matters, so learning it for a
+    /// second case must not overwrite the first — Tier A treats a shared sender as
+    /// ambiguous, which is the correct outcome.
+    #[test]
+    fn the_same_sender_can_be_learned_for_two_cases() {
+        let conn = db();
+        learn_from_confirmed_email(&conn, 1, "a@b.com", "<m1@x>").unwrap();
+        learn_from_confirmed_email(&conn, 2, "a@b.com", "<m2@x>").unwrap();
+        assert_eq!(identifiers_of(&conn, 1, KIND_EMAIL), vec!["a@b.com"]);
+        assert_eq!(identifiers_of(&conn, 2, KIND_EMAIL), vec!["a@b.com"]);
+    }
+
+    #[test]
+    fn a_missing_sender_or_message_id_is_skipped_not_stored_empty() {
+        let conn = db();
+        assert_eq!(learn_from_confirmed_email(&conn, 1, "", "<m@x>").unwrap(), 1);
+        assert!(identifiers_of(&conn, 1, KIND_EMAIL).is_empty());
+
+        assert_eq!(learn_from_confirmed_email(&conn, 2, "a@b.com", "  ").unwrap(), 1);
+        assert!(identifiers_of(&conn, 2, KIND_THREAD_REF).is_empty());
+    }
+
+    /// Learned identifiers must be distinguishable from mined ones, both so the sweep can
+    /// model cold start and so `sender_confirmed` can outweigh `sender_metadata`.
+    #[test]
+    fn learned_identifiers_are_marked_as_confirmed() {
+        let conn = db();
+        learn_from_confirmed_email(&conn, 1, "a@b.com", "<m@x>").unwrap();
+        let sources: Vec<String> = {
+            let mut stmt = conn
+                .prepare("SELECT DISTINCT source FROM case_identifiers WHERE case_id = 1")
+                .unwrap();
+            let rows = stmt.query_map([], |r| r.get::<_, String>(0)).unwrap();
+            rows.flatten().collect()
+        };
+        assert_eq!(sources, vec![SOURCE_CONFIRMED]);
     }
 
     #[test]

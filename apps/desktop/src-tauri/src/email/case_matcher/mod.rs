@@ -36,31 +36,49 @@ impl CaseMatcher {
         &self.config
     }
 
-    /// Score an email against every case and return the ranked outcome.
+    /// Every tier's raw contributions for this email, before aggregation or banding.
     ///
     /// All three tiers always run and their contributions are pooled. Tier A can settle a
     /// match on its own, but it is not an early exit: a decisive identifier plus content
     /// agreement should outrank the identifier alone, and running B/C anyway is what lets
     /// the ambiguity guard see a competing case.
+    ///
+    /// Separate from [`Self::match_email_core`] because everything downstream of it — the
+    /// weights, the thresholds, the ambiguity margin — is exactly what P6's sweep varies.
+    /// Collecting once and re-scoring in memory turns a grid search from N database passes
+    /// into one, and is what makes ablation (drop a signal, re-score) possible at all.
+    pub fn contributions(
+        &self,
+        conn: &Connection,
+        request: &CaseMatchRequest,
+    ) -> Result<Vec<(i64, SignalContribution)>, String> {
+        let mut contributions = tier_a::evaluate(conn, request, &self.config)?;
+        contributions.extend(tier_b::evaluate(conn, request, &self.config)?);
+        contributions.extend(tier_c::evaluate(conn, request, &self.config)?);
+        Ok(contributions)
+    }
+
+    /// Score an email against every case and return the ranked outcome.
     pub fn match_email_core(
         &self,
         conn: &Connection,
         request: &CaseMatchRequest,
     ) -> Result<CaseMatchOutcome, String> {
-        let mut contributions = tier_a::evaluate(conn, request, &self.config)?;
-        contributions.extend(tier_b::evaluate(conn, request, &self.config)?);
-        contributions.extend(tier_c::evaluate(conn, request, &self.config)?);
+        Ok(self.decide(self.contributions(conn, request)?))
+    }
 
+    /// Aggregate, band and explain a set of contributions under this matcher's config.
+    pub fn decide(&self, contributions: Vec<(i64, SignalContribution)>) -> CaseMatchOutcome {
         if contributions.is_empty() {
-            return Ok(CaseMatchOutcome::none(
+            return CaseMatchOutcome::none(
                 "No case identifier in this email matched a known case.",
-            ));
+            );
         }
 
         let candidates = scoring::aggregate(contributions);
         let mut outcome = scoring::decide(candidates, &self.config);
         outcome.explanation = explain::describe(&outcome);
-        Ok(outcome)
+        outcome
     }
 }
 
@@ -255,6 +273,39 @@ mod tests {
             .into_case_match_result();
         assert_eq!(ignored.case_id, None);
         assert!(!ignored.is_matched());
+    }
+
+    /// The feedback loop end to end: confirming an email must make the *next* email from
+    /// that sender matchable. Unit tests on either half passed while the loop was broken —
+    /// `learn_from_confirmed_email` stored the whole `Name <addr>` header while Tier A
+    /// looks up the bare address, so nothing ever matched.
+    #[test]
+    fn a_confirmed_sender_matches_the_next_email_from_them() {
+        let conn = db();
+        conn.execute("INSERT INTO cases (id, name) VALUES (5, 'case')", [])
+            .unwrap();
+
+        let follow_up = request(EmailExtractedSignals {
+            sender_email: Some("adv@lawfirm.co.il".into()),
+            ..Default::default()
+        });
+        assert!(
+            matcher().match_email_core(&conn, &follow_up).unwrap().best.is_none(),
+            "nothing is known about this sender yet"
+        );
+
+        crate::case::identifiers::learn_from_confirmed_email(
+            &conn,
+            5,
+            "Adv Levy <Adv@LawFirm.co.il>",
+            "<first@mail>",
+        )
+        .unwrap();
+
+        let outcome = matcher().match_email_core(&conn, &follow_up).unwrap();
+        let best = outcome.best.expect("confirmation should have taught the matcher");
+        assert_eq!(best.case_id, 5);
+        assert!(best.signals.iter().any(|s| s.name == "sender_confirmed"));
     }
 
     #[test]

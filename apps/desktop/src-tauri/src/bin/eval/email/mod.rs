@@ -17,6 +17,7 @@ pub mod list;
 pub mod rng;
 pub mod run;
 pub mod show;
+pub mod sweep;
 
 use clap::{Args, Subcommand};
 

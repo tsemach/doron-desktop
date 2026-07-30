@@ -218,7 +218,12 @@ pub fn extract_email_signals(sender: &str, subject: &str, snippet: &str) -> Emai
     signals
 }
 
-fn parse_sender(sender: &str) -> (Option<String>, Option<String>) {
+/// Split a From header into display name and bare address.
+///
+/// Public because the confirmation hook must derive the address exactly the way signal
+/// extraction does. Storing the raw header instead means the learned identifier is
+/// `name <addr>` while Tier A looks up `addr`, so `sender_confirmed` never fires.
+pub fn parse_sender(sender: &str) -> (Option<String>, Option<String>) {
     let trimmed = sender.trim();
     if trimmed.is_empty() {
         return (None, None);

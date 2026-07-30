@@ -1054,3 +1054,65 @@ whether Tier B is helping or whether a weight change was an improvement.
    and code design, not data entropy. Not trustworthy: any count, distribution, or per-case average.
    Ascurix targets **both litigation and conveyancing**, so Tier A carries both identifier families
    (§5.5) and must work for cases that have only one.
+
+---
+
+### 10.8 P6 sweep result — the defaults survive
+
+`eval email run --mode matcher --sweep` grid-searches `review_threshold` × `content` weight ×
+`ambiguity_margin` (144 points) over the seed-42 corpus (30 cases, 200 emails), re-scoring cached
+tier contributions rather than re-running the matcher.
+
+Baseline recorded as run 11 (`eval email show 11`, label `p6-swept-defaults`).
+
+**Outcome: no mislink-free point beats the shipped defaults.** They stand unchanged —
+`review_threshold` 0.45, `content` 0.70, `ambiguity_margin` 0.15 — but as a measured result rather
+than an informed guess, which is what the P6 exit criterion asked for.
+
+| Operating point | accuracy@1 | F1 | mislinks |
+|---|---|---|---|
+| Shipped defaults | 78.0% | 0.88 | **0** |
+| F1-optimal (review 0.25, content 1.00) | 92.7% | 0.94 | 8 |
+
+The F1 optimum is not shippable: mislinking is a constraint, not a term in the objective. Nothing
+sits between `review_threshold` 0.40 and 0.45, and the first threshold that admits anything new
+(0.35) admits 2 correct matches and 3 wrong ones.
+
+**`hard` therefore stays at 0/33.** Tier B ranks 22 of the 33 first (MRR 0.95), so the ranking is
+sound and the gap is calibration: content-only confidences (0.20–0.40) overlap the decoy population
+in the same range. Separating them needs a better content score, not a different threshold —
+candidates are phrase/proximity scoring, per-case length normalization, or an embedding signal.
+Recorded here rather than resolved, since P6's job was to find the operating point, and it did.
+
+### 10.9 Ablation — no dead signals, but heavy redundancy
+
+`--ablate` measures each signal twice: **marginal** (accuracy lost by removing it, all others
+present) and **solo** (accuracy it reaches alone). Both are needed. Marginal alone would have
+labelled `case_number` dead weight, when in fact it reaches 20% by itself and is merely covered by
+other identifiers on this corpus.
+
+| Signal | marginal | solo |
+|---|---|---|
+| `sender_metadata` | 0.0 | 70.0% |
+| `case_number`, `national_id` | 0.0 | 20.0% |
+| `land_registry` | 0.0 | 14.7% |
+| `thread_ref` | 0.0 | 10.0% |
+| `deed`, `land_registry_partial` | 0.0 | 6.7% |
+| `content` | **+8.0** | 0.7% |
+| `party_name` | **+8.0** | 0.0% |
+
+No signal is dead, so none is deleted. `content` and `party_name` are the only ones with a non-zero
+marginal — they are what P5 added, and each is worth 8 accuracy points. `party_name` reaching 0%
+solo while contributing 8 points marginally is the clearest evidence that the tiers are
+complementary rather than duplicative.
+
+### 10.10 Cold start vs. steady state
+
+`--cold-start` re-scores with the signals that can only exist after a confirmation removed
+(`thread_ref`, `sender_confirmed`). Day one and steady state both come out at **78.0%** on this
+corpus.
+
+That is a corpus limitation, not a finding about the product: the generator gives thread replies a
+quoted case number, so they match on an identifier even with `thread_ref` gone. A corpus with
+identifier-free thread replies would separate the two numbers. Recorded so the equality is not
+mistaken for evidence that confirmations do not matter — §10.2 still applies.

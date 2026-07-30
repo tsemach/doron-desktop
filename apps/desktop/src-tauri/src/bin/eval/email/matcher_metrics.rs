@@ -112,6 +112,7 @@ impl DifficultyStats {
     }
 }
 
+#[derive(Default)]
 pub struct Summary {
     pub total: usize,
     pub accuracy_at_1: f64,
