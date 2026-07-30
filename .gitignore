@@ -42,3 +42,6 @@ email_eval_corpus/
 
 scratch/
 **/__pycache__/
+
+# Real-mail exports from `gmail_export.py` — actual client correspondence, never commit
+real_emails.json

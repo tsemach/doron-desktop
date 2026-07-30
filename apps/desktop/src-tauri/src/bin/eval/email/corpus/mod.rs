@@ -162,6 +162,14 @@ pub struct Expected {
     /// with confidence.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub competing_case_id: Option<i64>,
+    /// Any *further* cases the fixture's identifying signal legitimately points at.
+    ///
+    /// A party name is drawn from a finite pool, so at 100 cases one name routinely lands
+    /// on four or five of them. Recording only a pair made the corpus claim a single right
+    /// answer where several are equally right, and the matcher was charged with a mislink
+    /// for picking one of the unrecorded ones — the label was wrong, not the match.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also_matches: Vec<i64>,
     pub signals: ExpectedSignals,
 }
 

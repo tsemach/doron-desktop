@@ -1054,3 +1054,130 @@ whether Tier B is helping or whether a weight change was an improvement.
    and code design, not data entropy. Not trustworthy: any count, distribution, or per-case average.
    Ascurix targets **both litigation and conveyancing**, so Tier A carries both identifier families
    (§5.5) and must work for cases that have only one.
+
+---
+
+### 10.8 P6 sweep result — the defaults survive
+
+`eval email run --mode matcher --sweep` grid-searches `review_threshold` × `content` weight ×
+`ambiguity_margin` (144 points) over the seed-42 corpus (30 cases, 200 emails), re-scoring cached
+tier contributions rather than re-running the matcher.
+
+Baseline recorded as run 11 (`eval email show 11`, label `p6-swept-defaults`).
+
+**Outcome: no mislink-free point beats the shipped defaults.** They stand unchanged —
+`review_threshold` 0.45, `content` 0.70, `ambiguity_margin` 0.15 — but as a measured result rather
+than an informed guess, which is what the P6 exit criterion asked for.
+
+| Operating point | accuracy@1 | F1 | mislinks |
+|---|---|---|---|
+| Shipped defaults | 78.0% | 0.88 | **0** |
+| F1-optimal (review 0.25, content 1.00) | 92.7% | 0.94 | 8 |
+
+The F1 optimum is not shippable: mislinking is a constraint, not a term in the objective. Nothing
+sits between `review_threshold` 0.40 and 0.45, and the first threshold that admits anything new
+(0.35) admits 2 correct matches and 3 wrong ones.
+
+**`hard` therefore stays at 0/33.** Tier B ranks 22 of the 33 first (MRR 0.95), so the ranking is
+sound and the gap is calibration: content-only confidences (0.20–0.40) overlap the decoy population
+in the same range. Separating them needs a better content score, not a different threshold —
+candidates are phrase/proximity scoring, per-case length normalization, or an embedding signal.
+Recorded here rather than resolved, since P6's job was to find the operating point, and it did.
+
+### 10.9 Ablation — no dead signals, but heavy redundancy
+
+`--ablate` measures each signal twice: **marginal** (accuracy lost by removing it, all others
+present) and **solo** (accuracy it reaches alone). Both are needed. Marginal alone would have
+labelled `case_number` dead weight, when in fact it reaches 20% by itself and is merely covered by
+other identifiers on this corpus.
+
+| Signal | marginal | solo |
+|---|---|---|
+| `sender_metadata` | 0.0 | 70.0% |
+| `case_number`, `national_id` | 0.0 | 20.0% |
+| `land_registry` | 0.0 | 14.7% |
+| `thread_ref` | 0.0 | 10.0% |
+| `deed`, `land_registry_partial` | 0.0 | 6.7% |
+| `content` | **+8.0** | 0.7% |
+| `party_name` | **+8.0** | 0.0% |
+
+No signal is dead, so none is deleted. `content` and `party_name` are the only ones with a non-zero
+marginal — they are what P5 added, and each is worth 8 accuracy points. `party_name` reaching 0%
+solo while contributing 8 points marginally is the clearest evidence that the tiers are
+complementary rather than duplicative.
+
+### 10.10 Cold start vs. steady state
+
+`--cold-start` re-scores with the signals that can only exist after a confirmation removed
+(`thread_ref`, `sender_confirmed`). Day one and steady state both come out at **78.0%** on this
+corpus.
+
+That is a corpus limitation, not a finding about the product: the generator gives thread replies a
+quoted case number, so they match on an identifier even with `thread_ref` gone. A corpus with
+identifier-free thread replies would separate the two numbers. Recorded so the equality is not
+mistaken for evidence that confirmations do not matter — §10.2 still applies.
+
+### 10.11 First run against real mail
+
+`eval email real`, 130 emails over 30 days from the configured Gmail account, matched
+against the live profile (9 active cases, 76 identifiers, 82 documents linked to a case).
+Migrations and the backfill ran clean on real data for the first time.
+
+**What this sample is.** A developer's personal Gmail, containing one thread of test mail
+sent to exercise the app some months ago. It is *not* law-firm correspondence. That makes
+it a strong test of one thing and no test at all of another:
+
+- **Precision on unrelated mail — tested, and passed emphatically.**
+- **Recall on genuine legal correspondence — not tested.** There is almost none in the
+  sample.
+
+**Result: a clean separation with nothing in between.**
+
+| | count | band | top score |
+|---|---|---|---|
+| Test-mail thread | 6 | Review | 1.00 (`thread_ref`) |
+| Everything else | 124 | Ignore | **0.16** |
+
+No email sat near the 0.45 threshold from either side. The highest-scoring unrelated mail
+was a YouTube link at 0.12 and a documentation URL at 0.16, both correctly declined. That
+gap — 1.00 against 0.16 — is far cleaner than anything the synthetic corpus produces, where
+the correct and decoy populations overlap in the 0.20–0.40 band.
+
+This is a direct improvement on the previous LLM-backed classifier, which per the account
+owner surfaced substantial amounts of personal, non-legal mail as case-related. The
+deterministic pipeline declined all of it.
+
+**Correcting an earlier reading of this run.** An initial write-up concluded from
+`content` scoring 0.02–0.16 that Tier B was "inert in production". That was wrong, and
+wrong in a way worth recording: on a mailbox with no legal correspondence, a low content
+score is Tier B *working* — correctly finding no case that reads like the email. It cannot
+be evidence of failure without legal mail present to be loud about. The honest statement is
+that Tier B's behaviour on genuine legal correspondence remains **unmeasured**.
+
+**What does still stand.**
+
+1. **Corpus emails are unrealistically short.** Median 68 characters against 2,077 in this
+   sample; p90 106 against 13,340. Whatever the mail is about, no real message is 68
+   characters. Tier B divides matched weight by the query's total weight, so length
+   directly suppresses its score, and the corpus never exercises that. The generator should
+   produce realistic bodies — signatures, quoted replies, boilerplate — before Tier B's
+   calibration is trusted either way.
+
+2. **`case_fields` holds no email addresses on this profile.** Identifier kinds actually
+   mined: `party_name` 38, `folder_token` 16, `national_id` 15, `land_registry` 6, `phone`
+   1, `email` **0**. So `sender_metadata` — measured at 70% solo accuracy in the P6
+   ablation, the highest of any signal — could not fire. The corpus plants contact emails
+   in case fields because P4 added them to make matching work; the instrument was made to
+   agree with the design rather than to test it. Whether real firm data records contact
+   addresses is still unknown, and worth checking against a customer profile.
+
+3. Only `content` and `thread_ref` fired across all 130 emails. No `case_number` — which is
+   consistent with §10.7, where the real templates were measured to define no case-number
+   field at all.
+
+**Where that leaves confidence.** Precision looks genuinely good on real non-legal mail,
+which was the previous implementation's main failure. Recall on real legal mail is
+untested, and the two calibration gaps above mean the synthetic 78% / 0-mislink figures
+should not yet be quoted as production expectations. The cheapest way to close this is a
+handful of realistic case-related emails sent to the configured account, then re-running
+`eval email real`.

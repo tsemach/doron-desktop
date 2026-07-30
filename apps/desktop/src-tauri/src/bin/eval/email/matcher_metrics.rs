@@ -16,6 +16,10 @@ pub struct Prediction {
     /// Adversarial fixtures only: the second case that legitimately competes for this
     /// email. Linking to *either* is ambiguity, not error.
     pub competing_case: Option<i64>,
+    /// Any further cases the fixture's signal points at just as legitimately — a party
+    /// name shared by more than two cases. Accepted for the same reason `competing_case`
+    /// is: charging a mislink for picking one of them scores the label, not the matcher.
+    pub also_matches: Vec<i64>,
     pub predicted_case: Option<i64>,
     /// The top-ranked case before the band decided whether to surface it. Diagnostic only:
     /// it makes the cost of the review threshold visible instead of silently absorbed.
@@ -40,6 +44,7 @@ impl Prediction {
         self.expected_case
             .into_iter()
             .chain(self.competing_case)
+            .chain(self.also_matches.iter().copied())
             .collect()
     }
 
@@ -54,7 +59,9 @@ impl Prediction {
                 // linking automatically. Confidently picking one is a failure, not a win.
                 self.acceptable().contains(&predicted) && self.band != MatchBand::AutoLink
             }
-            (Some(want), Some(predicted)) => predicted == want,
+            // `acceptable()` collapses to just the expected id when there are no
+            // alternatives, so this stays exact equality for the ordinary fixture.
+            (Some(_), Some(predicted)) => self.acceptable().contains(&predicted),
             _ => false,
         }
     }
@@ -112,6 +119,7 @@ impl DifficultyStats {
     }
 }
 
+#[derive(Default)]
 pub struct Summary {
     pub total: usize,
     pub accuracy_at_1: f64,
@@ -406,6 +414,7 @@ mod tests {
             fixture_id: id.into(),
             expected_case: expected,
             competing_case: None,
+            also_matches: Vec::new(),
             predicted_case: predicted,
             top_case: predicted,
             confidence: 0.9,

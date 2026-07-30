@@ -53,13 +53,26 @@ pub async fn trigger_email_ingestion(app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// How often the background worker checks IMAP for new mail.
+///
+/// Each tick opens a TLS connection, logs in, heals truncated case emails and searches, so
+/// this is not a free operation — Gmail throttles accounts that poll aggressively, and the
+/// cost is paid whether or not any mail arrived.
+pub const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15);
+
 pub async fn poll_emails_background(app: AppHandle) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+    let mut interval = tokio::time::interval(POLL_INTERVAL);
+    // A poll that outlasts the interval must not queue up catch-up ticks. The default
+    // `Burst` behaviour fires the missed ones back to back with no delay, which at a short
+    // interval turns one slow IMAP round trip into a run of immediate reconnections —
+    // exactly the pattern that gets an account throttled. `Delay` restarts the clock from
+    // when the poll actually finished, so the gap between polls is always at least
+    // `POLL_INTERVAL`.
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         interval.tick().await;
-        // Skip silently for Free tier -- this runs unattended every 5
-        // minutes, an error every tick would just spam the log for
-        // something that isn't actually wrong.
+        // Skip silently for Free tier -- this runs unattended, so an error every tick
+        // would just spam the log for something that isn't actually wrong.
         if !crate::auth::is_pro_tier(&app) {
             continue;
         }

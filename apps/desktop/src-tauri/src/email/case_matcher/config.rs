@@ -1,8 +1,16 @@
 //! Tunable configuration for the case matcher (design §6.3).
 //!
-//! Every constant here is currently an informed guess. P6 replaces them with values
-//! derived from an eval sweep; until then they are deliberately conservative, and
-//! `auto_link_enabled` is off so nothing is ever linked without a human confirming.
+//! These constants started as informed guesses and were checked against a 144-point sweep
+//! in P6 (`eval email run --sweep`, seed-42 corpus, 30 cases / 200 emails). The sweep found
+//! **no mislink-free operating point that beats them**, so they survive unchanged — now as
+//! a measured result rather than a guess. See design §10.8.
+//!
+//! The F1-optimal point (review 0.25, content 1.00) scores 0.94 but mislinks 8 emails.
+//! Mislinking is a constraint, not a term in the objective: it is the one failure a user
+//! cannot easily undo. `auto_link_enabled` stays off for the same reason.
+//!
+//! Re-run the sweep before changing anything here:
+//! `cargo run --bin eval -- email run --corpus-dir <c> --mode matcher --sweep --apply`
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -33,7 +41,69 @@ pub struct SignalWeights {
     pub sender_metadata: f64,
     pub phone: f64,
     pub content: f64,
+    pub subject_match: f64,
     pub party_name: f64,
+}
+
+impl SignalWeights {
+    /// Every weight by the signal name a [`SignalContribution`] carries, so a sweep can
+    /// vary one without knowing the struct's shape.
+    ///
+    /// [`SignalContribution`]: super::scoring::SignalContribution
+    pub const NAMES: &'static [&'static str] = &[
+        "thread_ref",
+        "case_number",
+        "land_registry",
+        "land_registry_partial",
+        "deed",
+        "national_id",
+        "company_id",
+        "sender_confirmed",
+        "sender_metadata",
+        "phone",
+        "content",
+        "subject_match",
+        "party_name",
+    ];
+
+    pub fn get(&self, name: &str) -> Option<f64> {
+        Some(match name {
+            "thread_ref" => self.thread_ref,
+            "case_number" => self.case_number,
+            "land_registry" => self.land_registry,
+            "land_registry_partial" => self.land_registry_partial,
+            "deed" => self.deed,
+            "national_id" => self.national_id,
+            "company_id" => self.company_id,
+            "sender_confirmed" => self.sender_confirmed,
+            "sender_metadata" => self.sender_metadata,
+            "phone" => self.phone,
+            "content" => self.content,
+            "subject_match" => self.subject_match,
+            "party_name" => self.party_name,
+            _ => return None,
+        })
+    }
+
+    pub fn set(&mut self, name: &str, value: f64) -> bool {
+        match name {
+            "thread_ref" => self.thread_ref = value,
+            "case_number" => self.case_number = value,
+            "land_registry" => self.land_registry = value,
+            "land_registry_partial" => self.land_registry_partial = value,
+            "deed" => self.deed = value,
+            "national_id" => self.national_id = value,
+            "company_id" => self.company_id = value,
+            "sender_confirmed" => self.sender_confirmed = value,
+            "sender_metadata" => self.sender_metadata = value,
+            "phone" => self.phone = value,
+            "content" => self.content = value,
+            "subject_match" => self.subject_match = value,
+            "party_name" => self.party_name = value,
+            _ => return false,
+        }
+        true
+    }
 }
 
 impl Default for SignalWeights {
@@ -52,6 +122,10 @@ impl Default for SignalWeights {
             sender_metadata: 0.50,
             phone: 0.45,
             content: 0.70,
+            // The subject is where a sender writes the matter's name, so reproducing a
+            // case title is strong evidence — but two matters for one client can carry
+            // near-identical titles, so it stays below the hard identifiers.
+            subject_match: 0.70,
             party_name: 0.40,
         }
     }
@@ -159,6 +233,28 @@ mod tests {
         assert!(!c.uses_llm(), "default pipeline must not call the LLM");
         assert!(c.review_threshold < c.auto_link_threshold);
         assert!((c.case_text_weight + c.document_weight - 1.0).abs() < f64::EPSILON);
+    }
+
+    /// A weight the accessors do not know is a weight a sweep silently cannot tune, and
+    /// nothing else would catch a field added without updating them.
+    #[test]
+    fn every_weight_is_reachable_by_name() {
+        let mut w = SignalWeights::default();
+        let json = serde_json::to_value(&w).unwrap();
+        let fields: Vec<String> = json.as_object().unwrap().keys().cloned().collect();
+
+        for field in &fields {
+            assert!(
+                SignalWeights::NAMES.contains(&field.as_str()),
+                "weight '{field}' is missing from SignalWeights::NAMES"
+            );
+            assert!(w.get(field).is_some(), "weight '{field}' has no getter");
+            assert!(w.set(field, 0.5), "weight '{field}' has no setter");
+            assert_eq!(w.get(field), Some(0.5));
+        }
+        assert_eq!(fields.len(), SignalWeights::NAMES.len());
+        assert_eq!(w.get("nonexistent"), None);
+        assert!(!w.set("nonexistent", 0.5));
     }
 
     #[test]

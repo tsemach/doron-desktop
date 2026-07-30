@@ -47,6 +47,7 @@ async fn main() {
             email::EmailCommands::List(args) => email::list::execute(args).await,
             email::EmailCommands::Show(args) => email::show::execute(args).await,
             email::EmailCommands::Compare(args) => email::compare::execute(args).await,
+            email::EmailCommands::Real(args) => email::real::execute(args).await,
         },
     };
 

@@ -14,9 +14,11 @@ pub mod signals_cmd;
 pub mod examples;
 pub mod generate;
 pub mod list;
+pub mod real;
 pub mod rng;
 pub mod run;
 pub mod show;
+pub mod sweep;
 
 use clap::{Args, Subcommand};
 
@@ -54,4 +56,7 @@ pub enum EmailCommands {
 
     /// Compare two recorded matcher runs, with per-difficulty deltas
     Compare(compare::CompareArgs),
+
+    /// Run the matcher over real mail exported from the configured account
+    Real(real::RealArgs),
 }

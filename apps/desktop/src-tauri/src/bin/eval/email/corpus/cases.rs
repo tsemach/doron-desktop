@@ -396,24 +396,42 @@ fn plant_shared_parties(rng: &mut Rng, cases: &mut [CorpusCase]) {
 }
 
 /// Pairs of case ids that share at least one party name.
-pub fn shared_party_pairs(cases: &[CorpusCase]) -> Vec<(i64, i64, String)> {
-    let mut out = Vec::new();
-    for a in cases {
-        for b in cases {
-            if a.id >= b.id {
-                continue;
-            }
-            if let Some(shared) = a
-                .planted
-                .party_names
-                .iter()
-                .find(|p| b.planted.party_names.contains(p))
-            {
-                out.push((a.id, b.id, shared.clone()));
+/// Every party name held by more than one case, with **all** the cases holding it.
+///
+/// Groups, not pairs. Names come from a finite pool, so at 100 cases a name lands on four
+/// or five cases routinely; enumerating pairs threw that away and let a fixture claim two
+/// cases were the only legitimate answers when five were.
+/// Ordered by name then case id so the corpus stays byte-reproducible.
+pub fn shared_party_groups(cases: &[CorpusCase]) -> Vec<(String, Vec<i64>)> {
+    let mut by_name: std::collections::BTreeMap<String, Vec<i64>> =
+        std::collections::BTreeMap::new();
+    for case in cases {
+        for party in &case.planted.party_names {
+            let ids = by_name.entry(party.clone()).or_default();
+            if !ids.contains(&case.id) {
+                ids.push(case.id);
             }
         }
     }
-    out
+    by_name
+        .into_iter()
+        .filter(|(_, ids)| ids.len() > 1)
+        .map(|(name, mut ids)| {
+            ids.sort_unstable();
+            (name, ids)
+        })
+        .collect()
+}
+
+/// Every case other than `case_id` that also lists `party`.
+pub fn cases_sharing_party(cases: &[CorpusCase], party: &str, case_id: i64) -> Vec<i64> {
+    let mut ids: Vec<i64> = cases
+        .iter()
+        .filter(|c| c.id != case_id && c.planted.party_names.iter().any(|p| p == party))
+        .map(|c| c.id)
+        .collect();
+    ids.sort_unstable();
+    ids
 }
 
 #[cfg(test)]
@@ -498,6 +516,35 @@ mod tests {
 
     #[test]
     fn some_cases_share_a_party_for_the_adversarial_slice() {
-        assert!(!shared_party_pairs(&build()).is_empty());
+        let groups = shared_party_groups(&build());
+        assert!(!groups.is_empty());
+        assert!(groups.iter().all(|(_, ids)| ids.len() >= 2));
+    }
+
+    /// A group must list *every* case holding the name, not the first two.
+    ///
+    /// The pools are finite, so at 100 cases a name lands on four or five cases. Recording
+    /// a pair made the corpus assert a single right answer where several were equally
+    /// right, and the matcher was charged with a mislink for picking an unrecorded one.
+    #[test]
+    fn a_group_lists_every_case_holding_the_name() {
+        let cases = build();
+        for (name, ids) in shared_party_groups(&cases) {
+            let actual: Vec<i64> = cases
+                .iter()
+                .filter(|c| c.planted.party_names.contains(&name))
+                .map(|c| c.id)
+                .collect();
+            assert_eq!(ids, actual, "group for {name:?} is incomplete");
+        }
+    }
+
+    #[test]
+    fn cases_sharing_a_party_excludes_the_case_itself() {
+        let cases = build();
+        let (name, ids) = shared_party_groups(&cases).remove(0);
+        let others = cases_sharing_party(&cases, &name, ids[0]);
+        assert!(!others.contains(&ids[0]));
+        assert_eq!(others.len(), ids.len() - 1);
     }
 }

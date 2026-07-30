@@ -36,7 +36,8 @@ pub struct RunArgs {
     #[arg(long, default_value = "matcher")]
     pub mode: String,
 
-    /// Rebuild the scratch index database (matcher mode)
+    /// Reuse the existing scratch index database instead of rebuilding it (matcher mode).
+    /// Much faster, but stale if the corpus or the indexers changed.
     #[arg(long)]
     pub reuse: bool,
 
@@ -47,6 +48,24 @@ pub struct RunArgs {
     /// Short label recorded with the run, e.g. "p4-tier-a"
     #[arg(long)]
     pub label: Option<String>,
+
+    /// Grid-search review threshold × content weight × ambiguity margin and report both
+    /// the F1-optimal and the highest-recall mislink-free operating point
+    #[arg(long)]
+    pub sweep: bool,
+
+    /// Report each signal's marginal contribution by removing it and re-scoring
+    #[arg(long)]
+    pub ablate: bool,
+
+    /// Also score with the signals that only exist after a confirmation removed
+    /// (`thread_ref`, `sender_confirmed`) — day-one accuracy rather than steady state
+    #[arg(long)]
+    pub cold_start: bool,
+
+    /// Print the sweep's shipping operating point as the exact `config.rs` defaults to set
+    #[arg(long)]
+    pub apply: bool,
 }
 
 fn resolve_dataset_file(corpus_dir: &str) -> Result<PathBuf, String> {
@@ -149,6 +168,10 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
 /// run. `medium`/`hard` are expected to be poor until Tiers B/C land in P5 — this run
 /// records the baseline they will be measured against.
 async fn run_matcher(args: &RunArgs) -> Result<(), String> {
+    if args.sweep || args.ablate || args.cold_start {
+        return run_tuning(args).await;
+    }
+
     let (summary, cases, config_json) =
         super::matcher_run::run(&args.corpus_dir, args.reuse, args.verbose).await?;
 
@@ -183,6 +206,101 @@ async fn run_matcher(args: &RunArgs) -> Result<(), String> {
             "\nWarning: {} email(s) belonging to no case were linked anyway.",
             summary.false_positives
         );
+    }
+    Ok(())
+}
+
+/// Signals that cannot exist before a user has ever confirmed an email to a case:
+/// `thread_ref` resolves through `case_emails`, and `sender_confirmed` requires an
+/// identifier this pipeline only writes on confirmation. Removing both is what day one
+/// actually looks like (design §10.2).
+const LEARNED_SIGNALS: &[&str] = &["thread_ref", "sender_confirmed"];
+
+/// `--sweep` / `--ablate` / `--cold-start`. Never records a run: these are diagnostics over
+/// a single collection pass, and writing a dozen re-scorings into the history would make
+/// `eval email list` useless for tracking phases.
+async fn run_tuning(args: &RunArgs) -> Result<(), String> {
+    use super::sweep;
+
+    let collected = super::matcher_run::collect(&args.corpus_dir, args.reuse).await?;
+    let baseline = sweep::score_all(&collected.scored, &collected.config, sweep::Signals::All);
+
+    println!(
+        "\n--- Baseline at current defaults ({} emails, {} cases) ---",
+        baseline.total, collected.cases
+    );
+    println!(
+        "accuracy@1 {:.1}%   recall {:.2}   F1 {:.2}   mislinks {}",
+        baseline.accuracy_at_1, baseline.recall, baseline.f1, baseline.mislinks
+    );
+
+    if args.cold_start {
+        // Removed rather than zero-weighted: a zero-weighted signal still makes its case a
+        // candidate, which is not what "this identifier does not exist yet" means.
+        let cold_summary = sweep::score_all(
+            &collected.scored,
+            &collected.config,
+            sweep::Signals::Without(LEARNED_SIGNALS),
+        );
+        println!("\n--- Cold start (no email ever confirmed) ---");
+        println!(
+            "accuracy@1 {:.1}%   recall {:.2}   F1 {:.2}   mislinks {}",
+            cold_summary.accuracy_at_1,
+            cold_summary.recall,
+            cold_summary.f1,
+            cold_summary.mislinks
+        );
+        println!(
+            "steady state is +{:.1} points — what confirmations buy over time",
+            baseline.accuracy_at_1 - cold_summary.accuracy_at_1
+        );
+        for (difficulty, stats) in &cold_summary.per_difficulty {
+            println!(
+                "  {:<14} {:>3}/{:<3} ({:>5.1}%)",
+                difficulty.label(),
+                stats.correct,
+                stats.total,
+                stats.pct()
+            );
+        }
+    }
+
+    if args.ablate {
+        let ablations = sweep::run_ablation(&collected.scored, &collected.config, &baseline);
+        sweep::print_ablation(&ablations);
+    }
+
+    if args.sweep {
+        let points = sweep::run_grid(&collected.scored, &collected.config);
+        sweep::print_grid(&points, &collected.config);
+
+        if args.apply {
+            let Some(point) = sweep::best_safe(&points, &collected.config) else {
+                return Err(
+                    "Refusing to apply: no mislink-free operating point on this corpus."
+                        .to_string(),
+                );
+            };
+            if sweep::is_status_quo(point, &collected.config) {
+                println!(
+                    "\nNothing to apply: no mislink-free point beats the current defaults."
+                );
+                return Ok(());
+            }
+            let tuned = point.config_from(&collected.config);
+            // Printed rather than written: the eval's scratch database is rebuilt on the
+            // next run, so persisting there would ship nothing. These are the shipping
+            // defaults, and they belong in `config.rs` under review like any other change.
+            println!("\n--- Apply to MatcherConfig::default() in email/case_matcher/config.rs ---");
+            println!("    review_threshold: {:.2},", tuned.review_threshold);
+            println!("    ambiguity_margin: {:.2},", tuned.ambiguity_margin);
+            println!("    // in SignalWeights::default()");
+            println!("    content: {:.2},", tuned.weights.content);
+            println!(
+                "\n{}",
+                serde_json::to_string(&tuned).unwrap_or_default()
+            );
+        }
     }
     Ok(())
 }

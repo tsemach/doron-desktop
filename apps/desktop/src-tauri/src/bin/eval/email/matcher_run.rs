@@ -16,6 +16,7 @@ use super::harness::{build_profile, BuildOptions, Profile};
 use super::matcher_metrics::{
     print_report, print_threshold_sweep, summarize, Prediction, Summary,
 };
+use super::sweep::Scored;
 
 /// Rebuild the request exactly as `run_email_pipeline` would, so the eval exercises the
 /// same inputs: signals over subject + full body + attachment text, plus thread headers.
@@ -69,6 +70,41 @@ fn build_request(profile: &Profile, fixture: &EmailFixture) -> CaseMatchRequest 
     }
 }
 
+/// Everything a scoring pass needs, collected in a single database traversal.
+pub struct Collected {
+    pub scored: Vec<Scored>,
+    pub config: MatcherConfig,
+    pub cases: usize,
+}
+
+/// Run every tier over every fixture once.
+///
+/// Kept separate from scoring so the sweep, the ablation and the cold-start run can each
+/// re-score the same contributions in memory instead of re-querying per grid point.
+pub async fn collect(corpus_dir: &str, reuse: bool) -> Result<Collected, String> {
+    let (profile, _indexed) = build_profile(corpus_dir, BuildOptions { fresh: !reuse }).await?;
+
+    // Auto-link stays disabled (the shipping default), so bands are Review/Ignore. The
+    // accuracy numbers are about *which* case is picked, independent of banding.
+    let config = MatcherConfig::load(&profile.conn);
+    let matcher = CaseMatcher::new(config.clone());
+
+    let mut scored = Vec::with_capacity(profile.emails.len());
+    for fixture in &profile.emails {
+        let request = build_request(&profile, fixture);
+        scored.push(Scored {
+            contributions: matcher.contributions(&profile.conn, &request)?,
+            fixture: fixture.clone(),
+        });
+    }
+
+    Ok(Collected {
+        scored,
+        config,
+        cases: profile.cases.len(),
+    })
+}
+
 pub async fn run(
     corpus_dir: &str,
     reuse: bool,
@@ -76,8 +112,6 @@ pub async fn run(
 ) -> Result<(Summary, usize, String), String> {
     let (profile, _indexed) = build_profile(corpus_dir, BuildOptions { fresh: !reuse }).await?;
 
-    // Auto-link stays disabled (the shipping default), so bands are Review/Ignore. The
-    // accuracy numbers below are about *which* case is picked, independent of banding.
     let config = MatcherConfig::load(&profile.conn);
     let config_json = serde_json::to_string(&config).unwrap_or_default();
     let review_threshold = config.review_threshold;
@@ -117,6 +151,7 @@ pub async fn run(
             fixture_id: fixture.id.clone(),
             expected_case: fixture.expected.case_id,
             competing_case: fixture.expected.competing_case_id,
+            also_matches: fixture.expected.also_matches.clone(),
             predicted_case,
             top_case,
             confidence,
