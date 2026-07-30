@@ -74,6 +74,30 @@ def load_account(db_path: Path) -> dict:
     return {"server": row[0], "port": int(row[1]), "username": row[2], "password": row[3]}
 
 
+"""Charsets Python's codec registry does not know, mapped to ones it does.
+
+Hebrew mail clients label messages `iso-8859-8-i` (the "-i" means implicit bidi, a
+rendering hint, not a different byte encoding) and sometimes `windows-1255`. Python raises
+`LookupError` on the first, which is fatal if not handled.
+"""
+CHARSET_ALIASES = {
+    "iso-8859-8-i": "iso-8859-8",
+    "iso-8859-8-e": "iso-8859-8",
+    "windows-1255": "cp1255",
+    "x-user-defined": "utf-8",
+}
+
+
+def decode_bytes(payload: bytes, charset: str | None) -> str:
+    name = (charset or "utf-8").strip().lower().strip('"')
+    for candidate in (CHARSET_ALIASES.get(name, name), "utf-8", "cp1255", "latin-1"):
+        try:
+            return payload.decode(candidate, errors="replace")
+        except LookupError:
+            continue
+    return payload.decode("utf-8", errors="replace")
+
+
 def decode_header(raw: str | None) -> str:
     """MIME-decode a header. Hebrew subjects arrive base64/quoted-printable encoded."""
     if not raw:
@@ -81,7 +105,7 @@ def decode_header(raw: str | None) -> str:
     out = []
     for text, charset in email.header.decode_header(raw):
         if isinstance(text, bytes):
-            out.append(text.decode(charset or "utf-8", errors="replace"))
+            out.append(decode_bytes(text, charset))
         else:
             out.append(text)
     return "".join(out).strip()
@@ -101,7 +125,7 @@ def body_text(msg: email.message.Message) -> str:
         payload = part.get_payload(decode=True)
         if not payload:
             continue
-        text = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+        text = decode_bytes(payload, part.get_content_charset())
         (plain if ctype == "text/plain" else html).append(text)
 
     if plain:
