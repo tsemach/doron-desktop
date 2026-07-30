@@ -249,8 +249,12 @@ export default function CaseManagementEmailAlertReview() {
                     >
                       <option value="">-- {t("select_case") || "Select Case to Link"} --</option>
                       {cases.map((c) => (
+                        // The matter title first, client second. Showing `name` alone made
+                        // case "pdf tests" read as "Asaf" — indistinguishable from the case
+                        // actually called "אסף", so there was no way to tell what you were
+                        // linking to.
                         <option key={c.id} value={c.id}>
-                          {c.name}
+                          {c.subject ? `${c.subject}${c.name ? ` — ${c.name}` : ""}` : c.name}
                         </option>
                       ))}
                     </select>

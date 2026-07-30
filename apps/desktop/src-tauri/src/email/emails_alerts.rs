@@ -7,6 +7,127 @@ use super::types::{PendingAlert, AttachmentMetadata};
 use super::emails_ops::is_transactional_or_spam;
 use super::get_email_settings;
 
+/// Recompute the stored suggestion for every pending alert.
+///
+/// The suggestion is derived data: it is computed once at ingestion and then frozen in the
+/// row. That makes it stale the moment anything it depends on changes — the matcher itself,
+/// the set of cases, or a case's title. A user who improves the matcher and restarts still
+/// sees the old answer, and a suggestion naming a since-deleted case survives forever.
+///
+/// Only a *better-informed* answer overwrites: if the matcher now finds nothing, the
+/// existing suggestion is kept rather than cleared, because `list_pending_email_alerts`
+/// treats a null suggestion as spam and deletes the alert outright. Losing a user's queued
+/// email to a scoring change would be far worse than showing a stale suggestion.
+fn refresh_alert_suggestions(conn: &rusqlite::Connection) -> Result<usize, String> {
+    use crate::email::case_matcher::{CaseMatcher, MatcherConfig};
+    use crate::email::{
+        combined_text, extract_attachment_texts, extract_email_signals, AttachmentLimits,
+        CaseMatchPhase, CaseMatchRequest,
+    };
+
+    struct Row {
+        id: i64,
+        message_id: String,
+        sender: String,
+        subject: String,
+        body_text: String,
+        attachments_json: String,
+        in_reply_to: Option<String>,
+        references_ids: Option<String>,
+        suggested_case_id: Option<i64>,
+    }
+
+    let rows: Vec<Row> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, message_id, sender, subject, COALESCE(body_text, body_snippet, ''),
+                        COALESCE(attachments_json, '[]'), in_reply_to, references_ids,
+                        suggested_case_id
+                 FROM pending_email_alerts",
+            )
+            .map_err(|e| format!("[refresh alerts] {e}"))?;
+        let mapped = stmt
+            .query_map([], |r| {
+                Ok(Row {
+                    id: r.get(0)?,
+                    message_id: r.get(1)?,
+                    sender: r.get(2)?,
+                    subject: r.get(3)?,
+                    body_text: r.get(4)?,
+                    attachments_json: r.get(5)?,
+                    in_reply_to: r.get(6)?,
+                    references_ids: r.get(7)?,
+                    suggested_case_id: r.get(8)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        mapped.flatten().collect()
+    };
+    if rows.is_empty() {
+        return Ok(0);
+    }
+
+    let matcher = CaseMatcher::new(MatcherConfig::load(conn));
+    let mut updated = 0;
+
+    for row in rows {
+        let attachment_text = combined_text(&extract_attachment_texts(
+            &row.attachments_json,
+            &AttachmentLimits::default(),
+        ));
+        let body = if attachment_text.is_empty() {
+            row.body_text.clone()
+        } else {
+            format!("{}\n{}", row.body_text, attachment_text)
+        };
+        let deterministic = extract_email_signals(&row.sender, &row.subject, &body);
+        let references: Vec<String> = row
+            .references_ids
+            .as_deref()
+            .and_then(|j| serde_json::from_str(j).ok())
+            .unwrap_or_default();
+
+        let request = CaseMatchRequest {
+            message_id: row.message_id.clone(),
+            sender: row.sender.clone(),
+            subject: row.subject.clone(),
+            snippet: row.body_text.chars().take(500).collect(),
+            body_text: row.body_text.clone(),
+            attachment_text,
+            in_reply_to: row.in_reply_to.clone(),
+            references,
+            search_terms: deterministic.to_search_terms(),
+            deterministic,
+            classification: None,
+            phase: CaseMatchPhase::AfterDeterministic,
+        };
+
+        let outcome = match matcher.match_email_core(conn, &request) {
+            Ok(outcome) => outcome,
+            // One unreadable alert must not stop the rest refreshing.
+            Err(e) => {
+                eprintln!("[refresh alerts] alert {}: {e}", row.id);
+                continue;
+            }
+        };
+        let result = outcome.into_case_match_result();
+        let Some(case_id) = result.case_id else {
+            continue;
+        };
+        if Some(case_id) == row.suggested_case_id {
+            continue;
+        }
+        conn.execute(
+            "UPDATE pending_email_alerts
+             SET suggested_case_id = ?1, confidence = ?2, reason = ?3 WHERE id = ?4",
+            params![case_id, result.confidence, result.reason, row.id],
+        )
+        .map_err(|e| format!("[refresh alerts] update {}: {e}", row.id))?;
+        updated += 1;
+    }
+    Ok(updated)
+}
+
 #[tauri::command]
 pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, String> {
     println!("[Rust Backend] list_pending_email_alerts called!");
@@ -44,6 +165,13 @@ pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, St
     }
 
     let _ = conn.execute("DELETE FROM pending_email_alerts WHERE suggested_case_id IS NULL OR confidence = 0.0", []);
+
+    // After the cleanup, so a re-scored alert is never a candidate for deletion.
+    match refresh_alert_suggestions(&conn) {
+        Ok(n) if n > 0 => println!("[Rust Backend] refreshed {n} alert suggestion(s)"),
+        Err(e) => eprintln!("[Rust Backend] could not refresh alert suggestions: {e}"),
+        _ => {}
+    }
 
     let mut stmt = conn
         .prepare("SELECT id, message_id, sender, subject, body_snippet, body_text, received_at, suggested_case_id, confidence, reason, attachments_json FROM pending_email_alerts ORDER BY id DESC")
@@ -268,4 +396,100 @@ pub fn delete_email_alert(app: AppHandle, alert_id: i64) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::matcher_schema::init_matcher_schema;
+    use rusqlite::Connection;
+
+    fn db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE cases (id INTEGER PRIMARY KEY, subject TEXT, name TEXT, folder TEXT, deleted INTEGER DEFAULT 0);
+             CREATE TABLE case_fields (case_id INTEGER, field_name TEXT, field_value TEXT);
+             CREATE TABLE case_annotations (case_id INTEGER PRIMARY KEY, notes TEXT);
+             CREATE TABLE documents (id INTEGER PRIMARY KEY, file_path TEXT);
+             CREATE TABLE case_emails (id INTEGER PRIMARY KEY, case_id INTEGER, message_id TEXT);
+             CREATE TABLE pending_email_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT, sender TEXT, subject TEXT,
+                body_snippet TEXT, body_text TEXT, received_at TEXT, suggested_case_id INTEGER,
+                confidence REAL, reason TEXT, attachments_json TEXT, in_reply_to TEXT,
+                references_ids TEXT);",
+        )
+        .unwrap();
+        init_matcher_schema(&conn).unwrap();
+        conn
+    }
+
+    fn add_case(conn: &Connection, id: i64, subject: &str) {
+        conn.execute(
+            "INSERT INTO cases (id, subject, name) VALUES (?1, ?2, 'client')",
+            params![id, subject],
+        )
+        .unwrap();
+        crate::case::case_text_index::rebuild_case_text_fts(conn, id).unwrap();
+    }
+
+    fn add_alert(conn: &Connection, subject: &str, suggested: i64) -> i64 {
+        conn.execute(
+            "INSERT INTO pending_email_alerts
+                (message_id, sender, subject, body_snippet, body_text, received_at,
+                 suggested_case_id, confidence, reason, attachments_json)
+             VALUES ('<m@x>', 'a@b.com', ?1, '', '', 'now', ?2, 0.5, 'stale', '[]')",
+            params![subject, suggested],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    fn suggestion_of(conn: &Connection, id: i64) -> Option<i64> {
+        conn.query_row(
+            "SELECT suggested_case_id FROM pending_email_alerts WHERE id = ?1",
+            params![id],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    /// The reported symptom: restarting the app kept showing a suggestion computed by the
+    /// old matcher, because it was frozen into the row at ingestion.
+    #[test]
+    fn a_stale_suggestion_is_recomputed() {
+        let conn = db();
+        add_case(&conn, 29, "כל מסמכי התבנית");
+        add_case(&conn, 35, "pdf tests");
+        let alert = add_alert(&conn, "כל מסמכי התבנית", 35);
+
+        assert_eq!(refresh_alert_suggestions(&conn).unwrap(), 1);
+        assert_eq!(suggestion_of(&conn, alert), Some(29));
+    }
+
+    /// Clearing a suggestion would let the caller's spam cleanup delete the alert, losing
+    /// a queued email to a scoring change.
+    #[test]
+    fn a_suggestion_is_never_cleared_when_nothing_matches() {
+        let conn = db();
+        add_case(&conn, 35, "pdf tests");
+        let alert = add_alert(&conn, "totally unrelated newsletter", 35);
+
+        refresh_alert_suggestions(&conn).unwrap();
+        assert_eq!(suggestion_of(&conn, alert), Some(35), "must not be cleared");
+    }
+
+    #[test]
+    fn an_already_correct_suggestion_is_left_alone() {
+        let conn = db();
+        add_case(&conn, 29, "כל מסמכי התבנית");
+        let alert = add_alert(&conn, "כל מסמכי התבנית", 29);
+
+        assert_eq!(refresh_alert_suggestions(&conn).unwrap(), 0, "no needless write");
+        assert_eq!(suggestion_of(&conn, alert), Some(29));
+    }
+
+    #[test]
+    fn no_alerts_is_not_an_error() {
+        assert_eq!(refresh_alert_suggestions(&db()).unwrap(), 0);
+    }
 }
