@@ -604,6 +604,10 @@ pub async fn generate_document_from_template(
         println!("Failed to create document version backup on generate: {}", e);
     }
 
+    // A generated document is filed into the case folder like any other, so it needs the
+    // same indexing to become searchable and linked.
+    crate::indexer::index_case_file_in_background(&app, output_path.clone());
+
     Ok(output_path)
 }
 

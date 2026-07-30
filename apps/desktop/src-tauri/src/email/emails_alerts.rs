@@ -289,17 +289,12 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
                 is_imported: None,
             });
 
-            // Trigger document indexing asynchronously
-            let app_clone = app.clone();
-            let dest_path_str = dest_path.to_string_lossy().to_string();
-            tauri::async_runtime::spawn(async move {
-                let _ = crate::indexer::index_file(
-                    app_clone,
-                    dest_path_str,
-                    Some("claude-3-5-sonnet-20241022".to_string()),
-                    Some(false),
-                ).await;
-            });
+            // Same helper the Add Document paths use, so an attachment filed onto a case
+            // is indexed and linked exactly like a document added by hand.
+            crate::indexer::index_case_file_in_background(
+                &app,
+                dest_path.to_string_lossy().to_string(),
+            );
         }
     }
 
