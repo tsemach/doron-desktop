@@ -23,6 +23,36 @@ use crate::email::emails_case_api::{CaseMatchRequest, CaseMatchResult};
 pub use config::{EmailPipelineMode, MatcherConfig, SignalWeights};
 pub use scoring::{CaseCandidate, CaseMatchOutcome, MatchBand, SignalContribution};
 
+/// Remove contributions pointing at soft-deleted cases.
+///
+/// One choke point rather than a `deleted = 0` clause in each tier's SQL, because the cost
+/// of missing one is invisible and severe. A deleted case is absent from `list_cases`, so a
+/// suggestion naming it cannot be shown, corrected, or even understood by the user — the
+/// email is filed somewhere the UI can never open, and looks lost.
+///
+/// The index builders already skip deleted cases, so `case_identifiers` and `case_text_fts`
+/// stay clean. `case_emails` does not: deleting a case leaves its linked mail behind, and
+/// Tier A's `thread_ref` reads that table directly. That is the path this actually failed
+/// on — a live thread with 21 prior emails kept resolving to a case deleted months later.
+fn drop_deleted_cases(
+    conn: &Connection,
+    contributions: &mut Vec<(i64, SignalContribution)>,
+) -> Result<(), String> {
+    if contributions.is_empty() {
+        return Ok(());
+    }
+    let mut stmt = conn
+        .prepare("SELECT id FROM cases WHERE deleted = 0 OR deleted IS NULL")
+        .map_err(|e| format!("[matcher active cases] {e}"))?;
+    let active: std::collections::HashSet<i64> = stmt
+        .query_map([], |r| r.get::<_, i64>(0))
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .collect();
+    contributions.retain(|(case_id, _)| active.contains(case_id));
+    Ok(())
+}
+
 pub struct CaseMatcher {
     config: MatcherConfig,
 }
@@ -55,6 +85,7 @@ impl CaseMatcher {
         let mut contributions = tier_a::evaluate(conn, request, &self.config)?;
         contributions.extend(tier_b::evaluate(conn, request, &self.config)?);
         contributions.extend(tier_c::evaluate(conn, request, &self.config)?);
+        drop_deleted_cases(conn, &mut contributions)?;
         Ok(contributions)
     }
 
@@ -306,6 +337,62 @@ mod tests {
         let best = outcome.best.expect("confirmation should have taught the matcher");
         assert_eq!(best.case_id, 5);
         assert!(best.signals.iter().any(|s| s.name == "sender_confirmed"));
+    }
+
+    /// Regression: a deleted case must never be suggested.
+    ///
+    /// Found in the running app. A thread with 21 prior emails kept resolving to a case
+    /// that had since been deleted; `list_cases` hides it, so the alert offered a case id
+    /// absent from its own dropdown, and confirming filed the email where nothing could
+    /// display it. Deleting a case does not delete its `case_emails` rows, which is exactly
+    /// the table Tier A's `thread_ref` reads.
+    #[test]
+    fn a_deleted_case_is_never_suggested() {
+        let conn = db();
+        conn.execute(
+            "INSERT INTO cases (id, name, deleted) VALUES (8, 'gone', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO case_emails (case_id, message_id) VALUES (8, 'parent@x')",
+            [],
+        )
+        .unwrap();
+
+        let mut request = request(EmailExtractedSignals::default());
+        request.in_reply_to = Some("<parent@x>".into());
+
+        let outcome = matcher().match_email_core(&conn, &request).unwrap();
+        assert!(
+            outcome.best.is_none(),
+            "suggested a deleted case: {:?}",
+            outcome.best
+        );
+    }
+
+    /// The same thread on a live case must still match — the filter has to remove the
+    /// deleted case, not the feature.
+    #[test]
+    fn a_thread_on_a_live_case_still_matches() {
+        let conn = db();
+        conn.execute("INSERT INTO cases (id, name) VALUES (9, 'live')", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO case_emails (case_id, message_id) VALUES (9, 'parent@x')",
+            [],
+        )
+        .unwrap();
+
+        let mut request = request(EmailExtractedSignals::default());
+        request.in_reply_to = Some("<parent@x>".into());
+
+        let best = matcher()
+            .match_email_core(&conn, &request)
+            .unwrap()
+            .best
+            .expect("a live case must still be found");
+        assert_eq!(best.case_id, 9);
     }
 
     #[test]

@@ -121,12 +121,21 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
         }
     ).map_err(|e| format!("Failed to find alert: {e}"))?;
 
-    // 2. Get case folder
-    let folder_path: String = conn.query_row(
-        "SELECT folder FROM cases WHERE id = ?1",
+    // 2. Get case folder.
+    //
+    // Soft-deleted cases are rejected: `list_cases` hides them, so an email linked to one
+    // is filed where the UI can never show it and simply looks lost. Checked here rather
+    // than only in the caller because this is the sole path that writes `case_emails`.
+    let (folder_path, deleted): (String, i64) = conn.query_row(
+        "SELECT folder, COALESCE(deleted, 0) FROM cases WHERE id = ?1",
         params![case_id],
-        |r| r.get(0)
+        |r| Ok((r.get(0)?, r.get(1)?))
     ).map_err(|e| format!("Failed to find case folder: {e}"))?;
+    if deleted != 0 {
+        return Err(format!(
+            "Case {case_id} has been deleted — pick an open case for this email."
+        ));
+    }
     let case_folder = Path::new(&folder_path);
 
     // 3. Move staged attachments to case folder's attachments directory

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../../context/LanguageContext";
 
 interface PendingAlert {
@@ -25,6 +26,7 @@ interface Attachment {
 
 export default function CaseManagementEmailAlertReview() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<PendingAlert[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -33,12 +35,11 @@ export default function CaseManagementEmailAlertReview() {
   type HashMap<K extends keyof any, V> = { [P in K]: V };
 
   useEffect(() => {
-    loadAlerts();
-    loadCases();
+    refresh();
 
     // Listen for backend real-time email alerts
     const unlisten = listen("new-email-alert", () => {
-      loadAlerts();
+      refresh();
     });
 
     return () => {
@@ -46,15 +47,24 @@ export default function CaseManagementEmailAlertReview() {
     };
   }, []);
 
-  async function loadAlerts() {
+  // Cases must load before alerts, so a suggestion can be checked against them.
+  async function refresh() {
+    const available = await loadCases();
+    await loadAlerts(available);
+  }
+
+  async function loadAlerts(available: Case[]) {
     try {
       const res = await invoke<PendingAlert[]>("list_pending_email_alerts");
       setAlerts(res);
 
-      // Pre-populate dropdown map with AI suggested cases
+      // Pre-populate the dropdown, but only with a case the dropdown actually offers.
+      // `list_cases` hides deleted cases, so pre-filling a deleted id left the select
+      // showing "-- Select Case --" while still submitting that id: the email was filed
+      // onto a case the UI can never open and looked lost.
       const map: HashMap<number, number> = {};
       for (const alert of res) {
-        if (alert.suggested_case_id) {
+        if (alert.suggested_case_id && isLinkable(alert.suggested_case_id, available)) {
           map[alert.id] = alert.suggested_case_id;
         }
       }
@@ -64,10 +74,10 @@ export default function CaseManagementEmailAlertReview() {
     }
   }
 
-  async function loadCases() {
+  async function loadCases(): Promise<Case[]> {
     try {
       const res = await invoke<any[]>("list_cases");
-      setCases(res.map(c => ({
+      const mapped: Case[] = res.map(c => ({
         id: String(c.id),
         name: c.name,
         subject: c.subject,
@@ -77,23 +87,45 @@ export default function CaseManagementEmailAlertReview() {
         folder: c.folder,
         notes: c.notes,
         tags: c.tags || [],
-      })));
+      }));
+      setCases(mapped);
+      return mapped;
     } catch (e) {
       console.error("Failed to load cases list:", e);
+      return [];
     }
+  }
+
+  // `Case.id` is a string here while alerts carry numbers, so compare as strings.
+  function isLinkable(caseId: number, available: Case[] = cases): boolean {
+    return available.some((c) => String(c.id) === String(caseId));
+  }
+
+  function goToCase(caseId: number) {
+    setIsOpen(false);
+    navigate(`/case-management/cases/${caseId}`);
   }
 
   async function handleConfirm(alertId: number) {
     const targetCaseId = selectedCaseMap[alertId];
     if (!targetCaseId) {
-      alert("Please select a case to link this email to.");
+      alert(t("select_case_first") || "Please select a case to link this email to.");
+      return;
+    }
+    if (!isLinkable(targetCaseId)) {
+      alert(
+        t("case_not_available") ||
+          "That case is no longer open. Pick another case for this email."
+      );
       return;
     }
 
     try {
       await invoke("confirm_email_alert", { alertId, caseId: Number(targetCaseId) });
-      // Reload alerts
-      loadAlerts();
+      await refresh();
+      // Land the user on the case so the filed email is visible immediately, rather than
+      // leaving them to find it — the previous flow gave no confirmation it had worked.
+      goToCase(Number(targetCaseId));
     } catch (e) {
       console.error(e);
       alert("Error confirming email match: " + e);
@@ -105,7 +137,7 @@ export default function CaseManagementEmailAlertReview() {
 
     try {
       await invoke("delete_email_alert", { alertId });
-      loadAlerts();
+      refresh();
     } catch (e) {
       console.error(e);
       alert("Error deleting email: " + e);
@@ -182,7 +214,15 @@ export default function CaseManagementEmailAlertReview() {
                   )}
 
                   {/* AI Suggesstion Alert */}
-                  {alert.suggested_case_id ? (
+                  {alert.suggested_case_id && !isLinkable(alert.suggested_case_id) ? (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-[11px] p-2.5 rounded-lg text-amber-800 dark:text-amber-300">
+                      <strong>⚠️ {t("suggested_case_closed") || "Suggested case is no longer open"}:</strong>
+                      <p className="mt-0.5 font-normal leading-normal">
+                        {t("suggested_case_closed_hint") ||
+                          "The best match is a deleted case, so it cannot be selected. Choose another case below."}
+                      </p>
+                    </div>
+                  ) : alert.suggested_case_id ? (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 text-[11px] p-2.5 rounded-lg text-emerald-800 dark:text-emerald-300">
                       <strong>💡 AI Suggestion ({Math.round(alert.confidence * 100)}%):</strong>
                       <p className="mt-0.5 font-normal leading-normal">{alert.reason}</p>
@@ -221,6 +261,15 @@ export default function CaseManagementEmailAlertReview() {
                         className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 rounded-lg cursor-pointer transition-colors shadow-xs"
                       >
                         ✓ {t("link_and_file") || "Link & File"}
+                      </button>
+                      {/* Inspect the case before committing the email to it. */}
+                      <button
+                        onClick={() => goToCase(Number(selectedCaseMap[alert.id]))}
+                        disabled={!selectedCaseMap[alert.id] || !isLinkable(selectedCaseMap[alert.id])}
+                        title={t("go_to_case") || "Go to case"}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-xs"
+                      >
+                        ↗ {t("go_to_case") || "Go to case"}
                       </button>
                       <button
                         onClick={() => handleDelete(alert.id)}
