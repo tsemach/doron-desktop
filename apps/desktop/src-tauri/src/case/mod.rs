@@ -533,6 +533,11 @@ pub fn add_file_to_case(
         }
     }
 
+    // Index it: this is what makes the document searchable and what links it to the case.
+    // Without it the file shows in the folder listing and nowhere else — invisible to
+    // search and to the email matcher's Tier B.
+    crate::indexer::index_case_file_in_background(&app, dest_path.to_string_lossy().to_string());
+
     Ok(dest_path.to_string_lossy().to_string())
 }
 

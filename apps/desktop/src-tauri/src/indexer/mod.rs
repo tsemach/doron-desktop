@@ -23,6 +23,26 @@ fn assign_case_for_indexed_document(conn: &rusqlite::Connection, doc_id: Option<
     }
 }
 
+/// Index a file that has just been placed in a case folder, in the background.
+///
+/// Indexing is what makes a document searchable *and* what links it to its case, via
+/// `assign_case_for_indexed_document`. A file copied into a case folder without it appears
+/// in the folder listing and nowhere else: not in search, and invisible to the email
+/// matcher's Tier B, which reads `documents_fts` joined on `documents.case_id`. Measured on
+/// a real profile, 140 of 225 documents had no case for exactly this reason.
+///
+/// Spawned rather than awaited: extraction plus embeddings takes seconds and must not hold
+/// the dialog open. Failure is logged, never surfaced — the file is already safely copied,
+/// and a later scan-and-index will pick it up.
+pub fn index_case_file_in_background(app: &AppHandle, file_path: String) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = index_file(app, file_path.clone(), None, Some(false)).await {
+            eprintln!("[indexer] could not index case document {file_path}: {e}");
+        }
+    });
+}
+
 #[tauri::command]
 pub fn stop_indexing() {
     SHOULD_STOP_INDEXING.store(true, Ordering::SeqCst);
