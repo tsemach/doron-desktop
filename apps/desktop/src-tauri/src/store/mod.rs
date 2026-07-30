@@ -1,3 +1,5 @@
+pub mod matcher_schema;
+
 use chrono::Utc;
 use rusqlite::{Connection, OpenFlags, params};
 use serde::Serialize;
@@ -439,6 +441,11 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
             }
         }
     }
+
+    // Last: the matcher schema adds a column to `documents` and references `cases`,
+    // `case_emails` and `pending_email_alerts`, all of which are created above.
+    matcher_schema::init_matcher_schema(&conn)
+        .map_err(|e| format!("[case matcher schema] {e}"))?;
 
     Ok(conn)
 }

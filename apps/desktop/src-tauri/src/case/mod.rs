@@ -8,7 +8,25 @@ use crate::store;
 use crate::tags::{list_all_tags_for_scope_type, list_tags_for_document_fuzzy, upsert_tag_internal, Tag, TagScope, TagType};
 
 pub mod annotations;
+pub mod case_text_index;
+pub mod documents_link;
+pub mod identifiers;
+pub mod matcher_backfill;
 pub mod lookup;
+
+
+/// Refresh the matcher's derived indexes after a case's data changed.
+///
+/// Best-effort by design: a stale index costs match quality, but a failure here must
+/// never break the user action that triggered it (saving fields, creating a case).
+pub fn refresh_case_matcher_indexes(conn: &rusqlite::Connection, case_id: i64) {
+    if let Err(e) = identifiers::rebuild_case_identifiers(conn, case_id) {
+        eprintln!("[case matcher] identifier rebuild failed for case {case_id}: {e}");
+    }
+    if let Err(e) = case_text_index::rebuild_case_text_fts(conn, case_id) {
+        eprintln!("[case matcher] text index rebuild failed for case {case_id}: {e}");
+    }
+}
 
 pub use annotations::*;
 pub use lookup::*;
@@ -133,6 +151,8 @@ pub async fn create_new_case(
             params![id, key, val],
         ).map_err(|e| format!("[insert case field] {e}"))?;
     }
+
+    refresh_case_matcher_indexes(&conn, id);
 
     // 3. If a template is chosen, copy then fill documents
     if let Some(ct_id) = case_template_id {
@@ -556,6 +576,7 @@ pub fn save_case_fields(
             params![case_id, key, val],
         ).map_err(|e| format!("[save_case_fields] {e}"))?;
     }
+    refresh_case_matcher_indexes(&conn, case_id);
     Ok(())
 }
 
