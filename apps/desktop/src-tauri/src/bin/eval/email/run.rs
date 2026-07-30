@@ -30,6 +30,23 @@ pub struct RunArgs {
     /// Skip LLM; use injected classifications from fixtures (CI / matcher regression)
     #[arg(long)]
     pub inject_only: bool,
+
+    /// What to evaluate: `matcher` (deterministic case matching, the default),
+    /// `classification` (the legacy LLM review/search_terms eval)
+    #[arg(long, default_value = "matcher")]
+    pub mode: String,
+
+    /// Rebuild the scratch index database (matcher mode)
+    #[arg(long)]
+    pub reuse: bool,
+
+    /// List every failing fixture
+    #[arg(long)]
+    pub verbose: bool,
+
+    /// Short label recorded with the run, e.g. "p4-tier-a"
+    #[arg(long)]
+    pub label: Option<String>,
 }
 
 fn resolve_dataset_file(corpus_dir: &str) -> Result<PathBuf, String> {
@@ -56,6 +73,16 @@ fn resolve_dataset_file(corpus_dir: &str) -> Result<PathBuf, String> {
 }
 
 pub async fn execute(args: RunArgs) -> Result<(), String> {
+    match args.mode.as_str() {
+        "matcher" => return run_matcher(&args).await,
+        "classification" => {}
+        other => {
+            return Err(format!(
+                "Unknown --mode '{other}' (expected matcher | classification)"
+            ))
+        }
+    }
+
     let dataset_file = resolve_dataset_file(&args.corpus_dir)?;
     let fixtures: Vec<EmailEvalFixture> = load_fixtures(&dataset_file)?;
 
@@ -114,5 +141,48 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         }
     }
 
+    Ok(())
+}
+
+/// Deterministic matcher evaluation. **Mislink rate is the gate**: linking an email to
+/// the wrong matter is the failure a user cannot easily undo, so any occurrence fails the
+/// run. `medium`/`hard` are expected to be poor until Tiers B/C land in P5 — this run
+/// records the baseline they will be measured against.
+async fn run_matcher(args: &RunArgs) -> Result<(), String> {
+    let (summary, cases, config_json) =
+        super::matcher_run::run(&args.corpus_dir, args.reuse, args.verbose).await?;
+
+    match super::history::save(&summary, &args.corpus_dir, cases, args.label.as_deref(), &config_json) {
+        Ok(id) => println!("\nRecorded as run {id}  (eval email show {id})"),
+        // A history failure must not fail the evaluation itself.
+        Err(e) => eprintln!("\nWarning: could not record run: {e}"),
+    }
+
+    if summary.mislinks > 0 {
+        for failure in summary.failures.iter().filter(|f| f.contains("MISLINK")) {
+            eprintln!("  {failure}");
+        }
+        return Err(format!(
+            "{} email(s) linked to the wrong case — the one failure a user cannot undo.",
+            summary.mislinks
+        ));
+    }
+    // Auto-linking an email that two cases legitimately compete for defeats the
+    // ambiguity guard, and is as unrecoverable for the user as a mislink.
+    if summary.ambiguity_failures > 0 {
+        for failure in summary.failures.iter().filter(|f| f.contains("AMBIGUITY")) {
+            eprintln!("  {failure}");
+        }
+        return Err(format!(
+            "{} ambiguous email(s) were auto-linked despite a competing case.",
+            summary.ambiguity_failures
+        ));
+    }
+    if summary.false_positives > 0 {
+        eprintln!(
+            "\nWarning: {} email(s) belonging to no case were linked anyway.",
+            summary.false_positives
+        );
+    }
     Ok(())
 }
