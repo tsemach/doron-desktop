@@ -250,7 +250,7 @@ attachment count, emails per case, how many cases have zero emails, adversarial 
   case number. A generator that leaks case numbers into conveyancing cases would mask exactly the
   failure P0 found.
 - Every `expected.case_id` refers to a case in `cases.json`; every attachment path exists.
-- Generated `.docx`/`.pdf` are readable by `crate::extractor::extract` (assert in a unit test — a
+- Generated `.docx` round-trips through `crate::extractor::extract` (assert in a unit test — a
   corpus of unparseable documents would silently zero out Tier B later).
 
 ### Notes
@@ -484,7 +484,9 @@ by signal
 ### Exit criteria
 
 - **Mislink rate 0.** Any auto-link to a wrong case fails the run.
-- `easy` ≥95%, `thread` ≥90%, `unrelated` ≥95% (i.e. correctly *not* matched).
+- `easy` ≥95%, `thread` ≥90%, `unrelated` + `decoy` ≥95% (i.e. correctly *not* matched). The
+  `decoy` half is the one that means something — obvious spam is mostly removed by the
+  transactional filter before the matcher ever sees it.
 - **Reported per practice area.** Litigation and conveyancing must both clear the bar — an
   aggregate that passes while conveyancing fails is the exact failure P0 predicted.
 - `medium`/`hard` expected to be poor — this is the recorded baseline, not a failure.
@@ -545,6 +547,7 @@ Compare  run 7 (P4 tier-a) → run 12 (P5 tier-abc)
   medium          18%  →  86%    +68     ← Tier B
   hard             7%  →  54%    +47     ← Tier B/C
   unrelated       96%  →  91%     -5     ← watch: content signal adds false positives
+  decoy           92%  →  74%    -18     ← the real false-positive cost of Tier B
 ```
 
 `compare` must surface per-difficulty deltas, because an aggregate gain can hide a regression —
@@ -553,8 +556,9 @@ the `unrelated` drop above is exactly the kind of thing to catch.
 ### Exit criteria
 
 - `medium` ≥80%, `hard` measurably above the P4 baseline (target ≥50%).
-- `unrelated` does not regress more than 5 points; if it does, `review_threshold` needs raising
-  before P6 rather than after.
+- `decoy` does not regress more than 10 points and `unrelated` not more than 5; if either does,
+  `review_threshold` needs raising before P6 rather than after. Decoys carry near-miss identifiers,
+  so a large drop here means the partial land-registry rule or the ambiguity guard is too loose.
 - Mislink rate still 0.
 - BM25 normalization unit-tested against hand-computed expectations.
 
