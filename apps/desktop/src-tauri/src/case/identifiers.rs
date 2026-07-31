@@ -487,9 +487,33 @@ pub fn rebuild_all_case_identifiers(conn: &Connection) -> Result<usize, String> 
     Ok(total)
 }
 
+/// Whether an address belongs to the account being ingested.
+///
+/// The mailbox owner's own address appears on everything they send, so learning it as a
+/// case identifier makes `sender_confirmed` fire for that case on every outgoing and
+/// forwarded message. Observed on a real profile: the configured account had been learned
+/// onto one case and a second alias onto three, which then pulled unrelated mail towards
+/// them for months. An address that identifies every case identifies none.
+fn is_own_address(conn: &Connection, normalized: &str) -> bool {
+    let mut stmt = match conn.prepare("SELECT username FROM email_configurations") {
+        Ok(stmt) => stmt,
+        // No configuration table or row is normal in tests; nothing to exclude.
+        Err(_) => return false,
+    };
+    let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) else {
+        return false;
+    };
+    let usernames: Vec<String> = rows.flatten().collect();
+    usernames
+        .iter()
+        .any(|username| normalize_email(username) == normalized)
+}
+
 /// Record what a confirmed email teaches: the sender now belongs to this case, and the
 /// message id anchors future replies. This is the feedback edge that closes the
 /// cold-start gap — these identifiers survive rebuilds.
+///
+/// The mailbox owner's own address is deliberately *not* learned — see [`is_own_address`].
 pub fn learn_from_confirmed_email(
     conn: &Connection,
     case_id: i64,
@@ -503,7 +527,7 @@ pub fn learn_from_confirmed_email(
     // verbatim would never match Tier A's lookup, which normalizes the extracted address.
     let (_, address) = crate::email::parse_sender(sender);
     let sender_norm = address.map(|a| normalize_email(&a)).unwrap_or_default();
-    if !sender_norm.is_empty() {
+    if !sender_norm.is_empty() && !is_own_address(conn, &sender_norm) {
         items.push(MinedIdentifier::new(
             KIND_EMAIL,
             sender_norm,
@@ -755,6 +779,37 @@ mod tests {
 
         assert_eq!(learn_from_confirmed_email(&conn, 2, "a@b.com", "  ").unwrap(), 1);
         assert!(identifiers_of(&conn, 2, KIND_THREAD_REF).is_empty());
+    }
+
+    /// The mailbox owner's own address is on everything they send, so learning it would
+    /// make `sender_confirmed` fire for that case on every outgoing and forwarded message.
+    /// Found on a real profile, where it had been learned onto four cases between two
+    /// aliases and was pulling unrelated mail towards them.
+    #[test]
+    fn the_accounts_own_address_is_not_learned() {
+        let conn = db();
+        conn.execute(
+            "CREATE TABLE email_configurations (id INTEGER PRIMARY KEY, username TEXT)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO email_configurations (username) VALUES ('Me@Example.com')",
+            [],
+        )
+        .unwrap();
+
+        // Only the thread ref is learned; the address is skipped.
+        assert_eq!(
+            learn_from_confirmed_email(&conn, 1, "Me <me@example.com>", "<m@x>").unwrap(),
+            1
+        );
+        assert!(identifiers_of(&conn, 1, KIND_EMAIL).is_empty());
+        assert_eq!(identifiers_of(&conn, 1, KIND_THREAD_REF), vec!["m@x"]);
+
+        // Anyone else is still learned normally.
+        learn_from_confirmed_email(&conn, 2, "client@other.com", "<m2@x>").unwrap();
+        assert_eq!(identifiers_of(&conn, 2, KIND_EMAIL), vec!["client@other.com"]);
     }
 
     /// Learned identifiers must be distinguishable from mined ones, both so the sweep can
