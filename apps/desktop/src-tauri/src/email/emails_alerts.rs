@@ -405,7 +405,7 @@ mod tests {
             "CREATE TABLE cases (id INTEGER PRIMARY KEY, subject TEXT, name TEXT, folder TEXT, deleted INTEGER DEFAULT 0);
              CREATE TABLE case_fields (case_id INTEGER, field_name TEXT, field_value TEXT);
              CREATE TABLE case_annotations (case_id INTEGER PRIMARY KEY, notes TEXT);
-             CREATE TABLE documents (id INTEGER PRIMARY KEY, file_path TEXT);
+             CREATE TABLE documents (id INTEGER PRIMARY KEY, file_path TEXT, title TEXT);
              CREATE TABLE case_emails (id INTEGER PRIMARY KEY, case_id INTEGER, message_id TEXT);
              CREATE TABLE pending_email_alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT, sender TEXT, subject TEXT,
