@@ -113,11 +113,17 @@ fn cases_matching(conn: &Connection, sql: &str, term: &str) -> HashSet<i64> {
 
 const CASE_TEXT_SQL: &str = "SELECT rowid FROM case_text_fts WHERE case_text_fts MATCH ?1";
 
+/// Deleted cases are excluded here as well as in `drop_deleted_cases`, because deleting a
+/// case leaves its documents behind: without the join they keep matching, inflating the IDF
+/// term counts with cases that can never be suggested.
 const DOCUMENT_SQL: &str = "
     SELECT DISTINCT d.case_id
     FROM documents_fts fts
     JOIN documents d ON d.id = fts.rowid
-    WHERE documents_fts MATCH ?1 AND d.case_id IS NOT NULL";
+    JOIN cases c ON c.id = d.case_id
+    WHERE documents_fts MATCH ?1
+      AND d.case_id IS NOT NULL
+      AND (c.deleted = 0 OR c.deleted IS NULL)";
 
 fn active_case_count(conn: &Connection) -> f64 {
     conn.query_row(
@@ -228,43 +234,118 @@ fn subject_match(
         return Ok(Vec::new());
     }
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, COALESCE(subject,''), COALESCE(name,'') FROM cases
-             WHERE deleted = 0 OR deleted IS NULL",
-        )
-        .map_err(|e| format!("[subject_match] {e}"))?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
-        })
-        .map_err(|e| e.to_string())?;
+    // Every title a case owns: its own subject, plus the title of each document filed
+    // under it. Users routinely name the document rather than the matter — an email about
+    // "צוואה אחרונה בהחלט" refers to a file with that title on a case called something
+    // else entirely, and comparing only against the case subject misses it completely.
+    // `(title, is_case_subject)` — a case title is curated by the user and identifies the
+    // matter; a document title is auto-extracted metadata and much noisier, so the two are
+    // not trusted equally (see the partial-match rule below).
+    let mut titles: BTreeMap<i64, Vec<(String, bool)>> = BTreeMap::new();
+    {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, COALESCE(subject,'') FROM cases
+                 WHERE (deleted = 0 OR deleted IS NULL) AND COALESCE(subject,'') <> ''",
+            )
+            .map_err(|e| format!("[subject_match cases] {e}"))?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?;
+        for (case_id, subject) in rows.flatten() {
+            titles.entry(case_id).or_default().push((subject, true));
+        }
+    }
+    {
+        // Only document titles unique to a single case. Most legal documents are named for
+        // their *type* — "כתב ויתור", "אישור זכויות", "תצהיר עדות ראשית" — and dozens of
+        // cases hold one. Matching a title that generic says which kind of document is
+        // being discussed, never which matter, and accepting them cost three decoy false
+        // positives on the 100-case corpus. A title held by exactly one case is the
+        // opposite: it names that matter's own document, which is what an email quoting it
+        // is actually referring to.
+        // Non-fatal: document titles are a supplementary source, so a schema that cannot
+        // serve them degrades to case subjects alone rather than failing the whole match.
+        let prepared = conn
+            .prepare(
+                "SELECT title, MIN(case_id), COUNT(DISTINCT case_id)
+                 FROM documents d
+                 JOIN cases c ON c.id = d.case_id
+                 WHERE d.case_id IS NOT NULL AND COALESCE(d.title,'') <> ''
+                   AND (c.deleted = 0 OR c.deleted IS NULL)
+                 GROUP BY d.title
+                 HAVING COUNT(DISTINCT d.case_id) = 1",
+            );
+        let mut stmt = match prepared {
+            Ok(stmt) => stmt,
+            Err(e) => {
+                eprintln!("[subject_match] document titles unavailable: {e}");
+                return finish(titles, &subject_terms, config);
+            }
+        };
+        let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+        else {
+            return finish(titles, &subject_terms, config);
+        };
+        for (title, case_id) in rows.flatten() {
+            // Only for cases already known to be active; the case query above is the
+            // authority on that, so a document on a deleted case adds nothing here.
+            if let Some(entry) = titles.get_mut(&case_id) {
+                entry.push((title, false));
+            }
+        }
+    }
 
+    finish(titles, &subject_terms, config)
+}
+
+/// Score each case's best-matching title against the email subject.
+fn finish(
+    titles: BTreeMap<i64, Vec<(String, bool)>>,
+    subject_terms: &HashSet<String>,
+    config: &MatcherConfig,
+) -> Result<Vec<(i64, SignalContribution)>, String> {
     let mut out = Vec::new();
-    for (case_id, subject, name) in rows.flatten() {
-        // The case's subject is its title; `name` is the client, which routinely appears in
-        // unrelated mail and would match far too much on its own.
-        let title: HashSet<String> = tokenize(&subject)
-            .filter(|t| t.chars().count() >= 3 && !is_stop_word(t))
-            .collect();
-        if title.len() < MIN_TITLE_TERMS {
-            continue;
+    for (case_id, owned) in titles {
+        // Best title wins, not the sum: a case with twenty documents must not out-score one
+        // with a single exactly-matching title.
+        let mut best: Option<(f64, usize, usize, String)> = None;
+        for (candidate, is_case_subject) in owned {
+            let title: HashSet<String> = tokenize(&candidate)
+                .filter(|t| t.chars().count() >= 3 && !is_stop_word(t))
+                .collect();
+            if title.len() < MIN_TITLE_TERMS {
+                continue;
+            }
+            let hits = title
+                .iter()
+                .filter(|t| {
+                    subject_terms.contains(*t)
+                        || strip_clitic_prefix(t)
+                            .map(|s| subject_terms.contains(&s))
+                            .unwrap_or(false)
+                })
+                .count();
+            if hits < MIN_TITLE_TERMS {
+                continue;
+            }
+            // A document title counts only when reproduced in full. Partially matching one
+            // is the noisy case: titles like "בקשה לסגירת תיק" share their words with
+            // ordinary business mail, and accepting partial hits cost three decoy false
+            // positives on the 100-case corpus. A case subject stays partially matchable —
+            // the user wrote it to name the matter, so quoting part of it is meaningful.
+            if !is_case_subject && hits < title.len() {
+                continue;
+            }
+            let raw = hits as f64 / title.len() as f64;
+            if best.as_ref().map(|(b, _, _, _)| raw > *b).unwrap_or(true) {
+                best = Some((raw, hits, title.len(), candidate));
+            }
         }
 
-        let hits = title
-            .iter()
-            .filter(|t| {
-                subject_terms.contains(*t)
-                    || strip_clitic_prefix(t)
-                        .map(|s| subject_terms.contains(&s))
-                        .unwrap_or(false)
-            })
-            .count();
-        if hits < MIN_TITLE_TERMS {
+        let Some((raw, hits, total, matched_title)) = best else {
             continue;
-        }
-
-        let raw = hits as f64 / title.len() as f64;
+        };
         out.push((
             case_id,
             SignalContribution {
@@ -273,16 +354,14 @@ fn subject_match(
                 raw,
                 weighted: raw * config.weights.subject_match,
                 detail: format!(
-                    "subject carries {hits} of {} terms from case title \"{}\"",
-                    title.len(),
-                    subject.chars().take(40).collect::<String>()
+                    "subject carries {hits} of {total} terms from \"{}\"",
+                    matched_title.chars().take(40).collect::<String>()
                 ),
                 // A shared title is strong but not proof: two matters for one client can be
                 // titled almost identically.
                 decisive: false,
             },
         ));
-        let _ = name;
     }
     Ok(out)
 }
@@ -563,6 +642,102 @@ mod tests {
             .max_by(|a, b| a.1.weighted.partial_cmp(&b.1.weighted).unwrap())
             .expect("something must match");
         assert_eq!(best.0, 29, "the case named by the subject must win: {hits:?}");
+    }
+
+    /// Users name the document, not the matter: an email titled after a file filed under a
+    /// case must find that case even when the case itself is called something unrelated.
+    #[test]
+    fn a_subject_matching_a_document_title_finds_the_case() {
+        let conn = db();
+        add_case(&conn, 36, "תביעה בגיו רשלנות", "");
+        add_case(&conn, 35, "pdf tests", "");
+        conn.execute(
+            "INSERT INTO documents (id, file_path, title, raw_text, case_id)
+             VALUES (90, '/f/90.docx', 'צוואה אחרונה בהחלט', 'גוף המסמך', 36)",
+            [],
+        )
+        .unwrap();
+
+        let hits = run(&conn, &request("צוואה אחרונה בהחלט", ""));
+        let sig = hits
+            .iter()
+            .find(|(id, s)| *id == 36 && s.name == "subject_match")
+            .unwrap_or_else(|| panic!("document title should match: {hits:?}"));
+        assert!((sig.1.raw - 1.0).abs() < 1e-9, "exact title match must score 1.0");
+    }
+
+    /// A case with many documents must not beat one whose single title matches exactly.
+    #[test]
+    fn many_document_titles_do_not_stack() {
+        let conn = db();
+        add_case(&conn, 1, "תיק א", "");
+        for (i, t) in ["צוואה אחרונה בהחלט", "נספח ראשון", "הסכם שני"].iter().enumerate() {
+            conn.execute(
+                "INSERT INTO documents (id, file_path, title, raw_text, case_id)
+                 VALUES (?1, ?2, ?3, 'x', 1)",
+                params![100 + i as i64, format!("/f/{i}.docx"), t],
+            )
+            .unwrap();
+        }
+        let hits: Vec<_> = run(&conn, &request("צוואה אחרונה בהחלט", ""))
+            .into_iter()
+            .filter(|(_, s)| s.name == "subject_match")
+            .collect();
+        assert_eq!(hits.len(), 1, "one contribution per case: {hits:?}");
+        assert!((hits[0].1.raw - 1.0).abs() < 1e-9);
+    }
+
+    /// A document on a deleted case must not drag it back into the candidates.
+    #[test]
+    fn a_document_title_on_a_deleted_case_is_ignored() {
+        let conn = db();
+        conn.execute(
+            "INSERT INTO cases (id, subject, name, deleted) VALUES (9, 'תיק מחוק', 'x', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO documents (id, file_path, title, raw_text, case_id)
+             VALUES (95, '/f/95.docx', 'צוואה אחרונה בהחלט', 'x', 9)",
+            [],
+        )
+        .unwrap();
+        let hits = run(&conn, &request("צוואה אחרונה בהחלט", ""));
+        assert!(hits.iter().all(|(id, _)| *id != 9), "deleted case returned: {hits:?}");
+    }
+
+    /// Document titles are supplementary: a schema that cannot serve them must degrade to
+    /// case subjects, not fail the match outright.
+    #[test]
+    fn a_documents_table_without_titles_still_matches_case_subjects() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE cases (id INTEGER PRIMARY KEY, subject TEXT, name TEXT, folder TEXT, deleted INTEGER DEFAULT 0);
+             CREATE TABLE case_fields (case_id INTEGER, field_name TEXT, field_value TEXT);
+             CREATE TABLE case_annotations (case_id INTEGER PRIMARY KEY, notes TEXT);
+             CREATE TABLE case_emails (id INTEGER PRIMARY KEY, case_id INTEGER, message_id TEXT);
+             CREATE TABLE pending_email_alerts (id INTEGER PRIMARY KEY, message_id TEXT);
+             CREATE TABLE documents (id INTEGER PRIMARY KEY, file_path TEXT NOT NULL);",
+        )
+        .unwrap();
+        init_matcher_schema(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO cases (id, subject, name) VALUES (1, 'מכירת דירה בנאמנות', 'x')",
+            [],
+        )
+        .unwrap();
+        rebuild_case_text_fts(&conn, 1).unwrap();
+
+        let hits = evaluate(
+            &conn,
+            &request("מכירת דירה בנאמנות", ""),
+            &MatcherConfig::default(),
+        )
+        .expect("must not fail when titles are unavailable");
+        assert!(
+            hits.iter().any(|(id, s)| *id == 1 && s.name == "subject_match"),
+            "case subject should still match: {hits:?}"
+        );
     }
 
     #[test]
