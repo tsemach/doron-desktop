@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fontsource-variable/assistant": "^5.3.0",
     "@sentry/react": "^10.68.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2",

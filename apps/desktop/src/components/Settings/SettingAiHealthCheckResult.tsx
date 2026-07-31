@@ -75,7 +75,7 @@ export default function SettingAiHealthCheckResult({ result, onClose }: SettingA
             <button
               type="button"
               onClick={handleUpgrade}
-              className="flex items-center gap-1.5 mt-1 px-3 py-1.5 bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 mt-1 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-lg transition-colors cursor-pointer"
             >
               <Sparkles className="size-3.5" />
               Upgrade to Pro

@@ -312,7 +312,7 @@ export default function SettingVoiceEngine({
         className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-sm ${
           saved
             ? "bg-emerald-600 text-white hover:bg-emerald-700 animate-pulse"
-            : "bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+            : "bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
         }`}
       >
         {isSaving ? (

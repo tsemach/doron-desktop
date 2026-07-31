@@ -124,7 +124,7 @@ export default function AppHome() {
               />
               <button
                 type="submit"
-                className="bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-black font-bold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-sm"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-sm"
               >
                 {t("save")}
               </button>
