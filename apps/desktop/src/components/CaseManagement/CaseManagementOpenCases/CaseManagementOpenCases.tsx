@@ -13,6 +13,7 @@ import OpenCasesList from "./OpenCasesList";
 import OpenCasesDocumentsPanel from "./OpenCasesDocumentsPanel";
 import OpenCasesHeader from "./OpenCasesHeader";
 import OpenCasesTopBar from "./OpenCasesTopBar";
+import type { OpenCasesTagFilter } from "./OpenCasesTagSearchBar";
 import { applyCaseSpecialStatus, clearCaseSpecialStatus } from "@/lib/caseSpecialStatus";
 
 import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
@@ -22,6 +23,7 @@ export default function CaseManagementOpenCases() {
   const [cases, setCases] = useState<Case[]>([]);
   const [filter, setFilter] = useState<CaseStatus | "all">("open");
   const [searchQuery, setSearchQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState<OpenCasesTagFilter | null>(null);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
 
   // Documents states
@@ -268,6 +270,9 @@ export default function CaseManagementOpenCases() {
     if (filter !== "all" && c.status !== filter) {
       return false;
     }
+    if (tagFilter && !c.tags.some((tg) => tg.name === tagFilter.name && tg.value === tagFilter.value)) {
+      return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const subjectMatch = c.subject?.toLowerCase().includes(q) ?? false;
@@ -304,6 +309,8 @@ export default function CaseManagementOpenCases() {
         setFilter={setFilter}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        tagFilter={tagFilter}
+        setTagFilter={setTagFilter}
         followupCount={followupCount}
         waitingCount={waitingCount}
       />

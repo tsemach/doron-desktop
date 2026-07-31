@@ -1,11 +1,13 @@
 import { Button } from "@/components/ui/button";
-import CaseManagementSearch from "../CaseManagementSearch";
+import OpenCasesTagSearchBar, { type OpenCasesTagFilter } from "./OpenCasesTagSearchBar";
 
 interface OpenCasesTopBarProps {
   filter: "all" | "open" | "waiting" | "closed" | "followup";
   setFilter: (filter: "all" | "open" | "waiting" | "closed" | "followup") => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  tagFilter: OpenCasesTagFilter | null;
+  setTagFilter: (filter: OpenCasesTagFilter | null) => void;
   followupCount?: number;
   waitingCount?: number;
 }
@@ -28,6 +30,8 @@ export default function OpenCasesTopBar({
   setFilter,
   searchQuery,
   setSearchQuery,
+  tagFilter,
+  setTagFilter,
   followupCount = 0,
   waitingCount = 0,
 }: OpenCasesTopBarProps) {
@@ -62,18 +66,11 @@ export default function OpenCasesTopBar({
       </div>
 
       {/* Search Input */}
-      <CaseManagementSearch
-        value={searchQuery}
-        onChange={setSearchQuery}
-        placeholder="Search cases by subject, customer, folder, fields..."
-        containerClassName="relative flex items-center w-full sm:w-80"
-        inputClassName="w-full rounded-md border border-input bg-background pl-9 pr-8 py-1.5 text-sm placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-        searchIconSize={14}
-        searchIconStrokeWidth={2.5}
-        searchIconClassName="absolute left-3 text-muted-foreground"
-        clearIconSize={12}
-        clearButtonClassName="absolute right-2.5 text-muted-foreground hover:text-foreground p-1 rounded-sm"
-        clearButtonTitle="Clear search"
+      <OpenCasesTagSearchBar
+        freeText={searchQuery}
+        onFreeTextChange={setSearchQuery}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
       />
     </div>
   );

@@ -259,6 +259,20 @@ pub fn list_tags(
     list_tags_internal(&app, scope)
 }
 
+/// Distinct existing values for a given tag name (e.g. every company name already
+/// used), so a "pick existing or create new" UI can offer suggestions.
+#[tauri::command]
+pub fn list_tag_values(app: AppHandle, name: String) -> Result<Vec<String>, String> {
+    let conn = store::open_db(&app)?;
+    let mut stmt = conn
+        .prepare("SELECT DISTINCT value FROM tags WHERE name = ?1 AND value IS NOT NULL ORDER BY value")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![name], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn list_all_tag_names(app: AppHandle, tag_type: Option<String>) -> Result<Vec<String>, String> {
     let conn = store::open_db(&app)?;

@@ -1,11 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { CaseTemplate } from "./CaseManagementTypes";
+import CaseManagementCompanyField from "./CaseManagementCompanyField";
 
 interface CaseManagementCaseCreateFormProps {
   subject: string;
   onSubjectChange: (value: string) => void;
   name: string;
   onNameChange: (value: string) => void;
+  company: string;
+  onCompanyChange: (value: string) => void;
   folder: string;
   onFolderChange: (value: string) => void;
   onBrowse: () => void;
@@ -20,6 +23,8 @@ export default function CaseManagementCaseCreateForm({
   onSubjectChange,
   name,
   onNameChange,
+  company,
+  onCompanyChange,
   folder,
   onFolderChange,
   onBrowse,
@@ -59,6 +64,20 @@ export default function CaseManagementCaseCreateForm({
           placeholder="e.g. John Doe, Acme Corp"
           className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
           disabled={loading}
+        />
+      </div>
+
+      {/* Company (optional) */}
+      <div className="space-y-1">
+        <label htmlFor="company" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Company
+        </label>
+        <CaseManagementCompanyField
+          value={company}
+          onChange={onCompanyChange}
+          placeholder="e.g. Acme Corp (optional)"
+          disabled={loading}
+          className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
         />
       </div>
 

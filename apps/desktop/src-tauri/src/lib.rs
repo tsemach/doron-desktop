@@ -209,6 +209,7 @@ pub fn run() {
             tags::remove_tag,
             tags::list_tags,
             tags::list_all_tag_names,
+            tags::list_tag_values,
             // user settings
             user_settings::get_user_settings,
             user_settings::save_user_settings,
