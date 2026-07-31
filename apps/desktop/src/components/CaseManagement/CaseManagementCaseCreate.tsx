@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { CaseTemplate, DocTemplate } from "./CaseManagementTypes";
+import { Case, CaseTemplate, DocTemplate } from "./CaseManagementTypes";
 import mammoth from "mammoth";
 import CaseManagementCaseCreateForm from "./CaseManagementCaseCreateForm";
 import CaseManagementCaseCreateFormActions from "./CaseManagementCaseCreateFormActions";
@@ -14,6 +14,7 @@ export default function CaseManagementCaseCreate() {
   const navigate = useNavigate();
   const [subject, setSubject] = useState("");
   const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
   const [folder, setFolder] = useState("");
   const [templates, setTemplates] = useState<CaseTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("empty");
@@ -349,13 +350,23 @@ export default function CaseManagementCaseCreate() {
       const templateIdNum = isTemplate ? Number(selectedTemplateId) : null;
 
       // Call Rust backend command
-      await invoke("create_new_case", {
+      const createdCase = await invoke<Case>("create_new_case", {
         subject: subject.trim(),
         name: name.trim(),
         folder: folder.trim(),
         caseTemplateId: templateIdNum,
         fieldValues,
       });
+
+      if (company.trim()) {
+        await invoke("add_tag", {
+          scopeType: "case",
+          scopeValue: String(createdCase.id),
+          name: "company",
+          value: company.trim(),
+          tagType: "user",
+        });
+      }
 
       // Redirect back to case list on success
       navigate("/case-management");
@@ -416,6 +427,8 @@ export default function CaseManagementCaseCreate() {
                 onSubjectChange={setSubject}
                 name={name}
                 onNameChange={setName}
+                company={company}
+                onCompanyChange={setCompany}
                 folder={folder}
                 onFolderChange={setFolder}
                 onBrowse={handleBrowse}
