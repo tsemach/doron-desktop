@@ -14,10 +14,14 @@ use super::get_email_settings;
 /// the set of cases, or a case's title. A user who improves the matcher and restarts still
 /// sees the old answer, and a suggestion naming a since-deleted case survives forever.
 ///
-/// Only a *better-informed* answer overwrites: if the matcher now finds nothing, the
-/// existing suggestion is kept rather than cleared, because `list_pending_email_alerts`
-/// treats a null suggestion as spam and deletes the alert outright. Losing a user's queued
-/// email to a scoring change would be far worse than showing a stale suggestion.
+/// A suggestion that no longer holds is **cleared**, not kept. Keeping it — the first
+/// version of this — meant a suggestion whose evidence had since been removed stayed on
+/// screen forever: deleting a stale learned identifier fixed the matcher but the alert went
+/// on showing the same false positive. The alert survives the clearing and renders as
+/// "could not find a matching case", because the spam cleanup now requires a null
+/// suggestion *and* a zero score, and a cleared row keeps its best candidate's score. An
+/// email that scores zero against every case is still swept — that is what the cleanup is
+/// for — but a near-miss the band merely declined is preserved.
 fn refresh_alert_suggestions(conn: &rusqlite::Connection) -> Result<usize, String> {
     use crate::email::case_matcher::{CaseMatcher, MatcherConfig};
     use crate::email::{
@@ -110,17 +114,40 @@ fn refresh_alert_suggestions(conn: &rusqlite::Connection) -> Result<usize, Strin
                 continue;
             }
         };
+        // Best candidate's score even when the band declined it, so a cleared row still
+        // records how close the matcher got, and stays distinguishable from a spam row
+        // that was never scored at all (see the cleanup in `list_pending_email_alerts`).
+        let best_score = outcome.best.as_ref().map(|b| b.confidence).unwrap_or(0.0);
         let result = outcome.into_case_match_result();
-        let Some(case_id) = result.case_id else {
-            continue;
-        };
-        if Some(case_id) == row.suggested_case_id {
+
+        // A suggestion that no longer holds is cleared, not kept. The alert survives and
+        // renders as "could not find a matching case" — the previous rule of only ever
+        // overwriting with a better answer meant a suggestion whose evidence had since been
+        // removed stayed on screen forever, which is exactly how a deleted stale identifier
+        // kept producing the same false positive.
+        if result.case_id == row.suggested_case_id && result.case_id.is_some() {
+            // Same case, but the score or explanation may have moved.
+            conn.execute(
+                "UPDATE pending_email_alerts SET confidence = ?1, reason = ?2 WHERE id = ?3",
+                params![result.confidence, result.reason, row.id],
+            )
+            .map_err(|e| format!("[refresh alerts] update {}: {e}", row.id))?;
             continue;
         }
+
         conn.execute(
             "UPDATE pending_email_alerts
              SET suggested_case_id = ?1, confidence = ?2, reason = ?3 WHERE id = ?4",
-            params![case_id, result.confidence, result.reason, row.id],
+            params![
+                result.case_id,
+                if result.case_id.is_some() {
+                    result.confidence
+                } else {
+                    best_score
+                },
+                result.reason,
+                row.id
+            ],
         )
         .map_err(|e| format!("[refresh alerts] update {}: {e}", row.id))?;
         updated += 1;
@@ -133,9 +160,15 @@ pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, St
     println!("[Rust Backend] list_pending_email_alerts called!");
     let conn = store::open_db(&app)?;
 
-    // Clean up existing unrelated/spam pending alerts (suggested_case_id IS NULL or confidence = 0.0)
+    // Clean up unrelated/spam pending alerts: never scored against any case at all.
+    //
+    // Both conditions, not either. `refresh_alert_suggestions` clears a suggestion that no
+    // longer holds while keeping the best candidate's score, so an alert that *was* scored
+    // and simply lost its match survives here and renders as "could not find a matching
+    // case". Deleting on a null suggestion alone would silently discard the user's queued
+    // email — and permanently, since these message ids also go into `ignored_emails`.
     let mut cleanup_stmt = conn
-        .prepare("SELECT message_id FROM pending_email_alerts WHERE suggested_case_id IS NULL OR confidence = 0.0")
+        .prepare("SELECT message_id FROM pending_email_alerts WHERE suggested_case_id IS NULL AND confidence = 0.0")
         .map_err(|e| e.to_string())?;
 
     let message_ids: Vec<String> = cleanup_stmt
@@ -164,7 +197,7 @@ pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, St
         );
     }
 
-    let _ = conn.execute("DELETE FROM pending_email_alerts WHERE suggested_case_id IS NULL OR confidence = 0.0", []);
+    let _ = conn.execute("DELETE FROM pending_email_alerts WHERE suggested_case_id IS NULL AND confidence = 0.0", []);
 
     // After the cleanup, so a re-scored alert is never a candidate for deletion.
     match refresh_alert_suggestions(&conn) {
@@ -461,16 +494,41 @@ mod tests {
         assert_eq!(suggestion_of(&conn, alert), Some(29));
     }
 
-    /// Clearing a suggestion would let the caller's spam cleanup delete the alert, losing
-    /// a queued email to a scoring change.
+    /// A suggestion whose evidence is gone must be cleared, or the alert shows the same
+    /// false positive forever — which is exactly what happened after a stale learned
+    /// identifier was deleted from a real profile.
     #[test]
-    fn a_suggestion_is_never_cleared_when_nothing_matches() {
+    fn a_suggestion_that_no_longer_holds_is_cleared() {
         let conn = db();
         add_case(&conn, 35, "pdf tests");
         let alert = add_alert(&conn, "totally unrelated newsletter", 35);
 
+        assert_eq!(refresh_alert_suggestions(&conn).unwrap(), 1);
+        assert_eq!(suggestion_of(&conn, alert), None, "stale suggestion must go");
+    }
+
+    /// ...but an alert that still scores *something* must survive the clearing, so the user
+    /// can file it by hand. Only a row that matched nothing anywhere looks like spam.
+    #[test]
+    fn clearing_a_suggestion_does_not_make_the_alert_look_like_spam() {
+        let conn = db();
+        add_case(&conn, 35, "pdf tests");
+        // Shares a term with the case, so it scores below the threshold rather than zero —
+        // the shape of a real near-miss, and of the false positive this came from.
+        let alert = add_alert(&conn, "pdf conversion questions", 35);
         refresh_alert_suggestions(&conn).unwrap();
-        assert_eq!(suggestion_of(&conn, alert), Some(35), "must not be cleared");
+        assert_eq!(suggestion_of(&conn, alert), None, "suggestion still cleared");
+
+        // Mirrors the cleanup in `list_pending_email_alerts`.
+        let doomed: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pending_email_alerts
+                 WHERE id = ?1 AND suggested_case_id IS NULL AND confidence = 0.0",
+                params![alert],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(doomed, 0, "a scored-then-cleared alert must not be swept as spam");
     }
 
     #[test]
