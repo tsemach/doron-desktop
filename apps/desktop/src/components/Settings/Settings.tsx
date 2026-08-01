@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
+import { AppFont, useFont } from "../../context/FontContext";
 import { Language } from "../../locales/translations";
 import { invoke } from "@tauri-apps/api/core";
 import { useAtom, useAtomValue } from "jotai";
@@ -27,6 +28,7 @@ export const API_KEY_STORAGE_KEY = "claude_api_key";
 export default function Settings() {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
+  const { font, setFont } = useFont();
   const [activeTab, setActiveTab] = useState<TabType>("preferences");
   const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | null>(null);
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
@@ -34,6 +36,7 @@ export default function Settings() {
   const [username, setUsername] = useState("");
   const [saved, setSaved] = useState(false);
   const [tempLang, setTempLang] = useState<Language>(language);
+  const [tempFont, setTempFont] = useState<AppFont>(font);
 
   // Email Server Configuration States
   const [imapServer, setImapServer] = useState("");
@@ -182,6 +185,10 @@ export default function Settings() {
     setTempLang(language);
   }, [language]);
 
+  useEffect(() => {
+    setTempFont(font);
+  }, [font]);
+
   async function loadSettings() {
     setIsLoadingSettings(true);
     try {
@@ -278,6 +285,7 @@ export default function Settings() {
     // TODO: Remove localStorage API key — LLM config should be resolved on the backend only.
     localStorage.setItem(API_KEY_STORAGE_KEY, providerApiKey.trim());
     setLanguage(tempLang);
+    setFont(tempFont);
 
     // Save user settings (display name)
     try {
@@ -383,6 +391,8 @@ export default function Settings() {
             setUsername={setUsername}
             tempLang={tempLang}
             setTempLang={setTempLang}
+            tempFont={tempFont}
+            setTempFont={setTempFont}
             onSave={handleSave}
             saved={saved}
             setSaved={setSaved}

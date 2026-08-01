@@ -1,17 +1,65 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@fontsource/ibm-plex-sans-hebrew/400.css";
+@import "@fontsource/ibm-plex-sans-hebrew/500.css";
+@import "@fontsource/ibm-plex-sans-hebrew/600.css";
+@import "@fontsource/ibm-plex-sans-hebrew/700.css";
 @import "@fontsource-variable/assistant";
+@import "@fontsource-variable/noto-sans-hebrew";
+@import "@fontsource-variable/frank-ruhl-libre";
+@import "@fontsource-variable/rubik";
+@import "@fontsource-variable/heebo";
 @import "./pages/index.css";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Hebrew-only face, kept at the font's natural scale (size-adjust 100%).
-   It covers just the Hebrew ranges, which is what lets --font-mono render Hebrew
-   proportionally in Assistant while Latin, digits and punctuation still fall
-   through to the monospace fonts. In --font-sans it is a passthrough. */
+/* Hebrew-only faces — one per selectable font, declared with a Hebrew unicode-range
+   so they cover Hebrew codepoints and nothing else. Each leads both --font-sans and
+   --font-mono, which gives two things at once:
+     1. size-adjust applies to Hebrew alone, leaving Latin untouched.
+     2. Hebrew in font-mono contexts renders proportionally instead of being forced
+        onto a fixed advance grid, which reads as broken spacing rather than as code.
+   IBM Plex needs four declarations because it ships static weights; the rest are
+   variable and cover 100-900 in a single face. */
 @font-face {
-  font-family: "Assistant Hebrew Adjusted";
+  font-family: "IBM Plex Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  size-adjust: 95%;
+  src: url("@fontsource/ibm-plex-sans-hebrew/files/ibm-plex-sans-hebrew-hebrew-400-normal.woff2") format("woff2");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
+@font-face {
+  font-family: "IBM Plex Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  size-adjust: 95%;
+  src: url("@fontsource/ibm-plex-sans-hebrew/files/ibm-plex-sans-hebrew-hebrew-500-normal.woff2") format("woff2");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
+@font-face {
+  font-family: "IBM Plex Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  size-adjust: 95%;
+  src: url("@fontsource/ibm-plex-sans-hebrew/files/ibm-plex-sans-hebrew-hebrew-600-normal.woff2") format("woff2");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
+@font-face {
+  font-family: "IBM Plex Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  size-adjust: 95%;
+  src: url("@fontsource/ibm-plex-sans-hebrew/files/ibm-plex-sans-hebrew-hebrew-700-normal.woff2") format("woff2");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
+@font-face {
+  font-family: "Assistant Hebrew Only";
   font-style: normal;
   font-display: swap;
   font-weight: 200 800;
@@ -19,15 +67,51 @@
   src: url("@fontsource-variable/assistant/files/assistant-hebrew-wght-normal.woff2") format("woff2-variations");
   unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
 }
+@font-face {
+  font-family: "Noto Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  size-adjust: 95%;
+  src: url("@fontsource-variable/noto-sans-hebrew/files/noto-sans-hebrew-hebrew-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
+@font-face {
+  font-family: "Frank Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  size-adjust: 95%;
+  src: url("@fontsource-variable/frank-ruhl-libre/files/frank-ruhl-libre-hebrew-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
+@font-face {
+  font-family: "Rubik Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  size-adjust: 95%;
+  src: url("@fontsource-variable/rubik/files/rubik-hebrew-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
+@font-face {
+  font-family: "Heebo Hebrew Only";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  size-adjust: 95%;
+  src: url("@fontsource-variable/heebo/files/heebo-hebrew-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0590-05FF, U+FB1D-FB4F, U+20AA, U+200C-200F;
+}
 
 @theme inline {
-  --font-sans: "Assistant Hebrew Adjusted", "Assistant Variable", ui-sans-serif, system-ui, sans-serif;
-  /* Hebrew leads the mono stack so it renders proportionally in Assistant; the face
-     declares only Hebrew ranges, so Latin, digits and punctuation still fall through
-     to the monospace fonts. Monospaced Hebrew forces varied letterforms onto a fixed
-     advance grid, which reads as broken spacing rather than as code. */
-  --font-mono: "Assistant Hebrew Adjusted", ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", "Courier New", monospace;
+  /* Both stacks read a runtime variable that FontContext sets on <html> from the
+     saved preference, falling back to IBM Plex when nothing is stored. The var()
+     indirection is what keeps these switchable at runtime — @theme inline would
+     otherwise bake a literal font stack into the compiled utilities. */
+  --font-sans: var(--app-font-sans, "IBM Plex Hebrew Only", "IBM Plex Sans Hebrew", ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--app-font-hebrew, "IBM Plex Hebrew Only"), ui-monospace, SFMono-Regular,
+    Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

@@ -120,6 +120,21 @@ importers:
       '@fontsource-variable/assistant':
         specifier: ^5.3.0
         version: 5.3.0
+      '@fontsource-variable/frank-ruhl-libre':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/heebo':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/noto-sans-hebrew':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/rubik':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/ibm-plex-sans-hebrew':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@sentry/react':
         specifier: ^10.68.0
         version: 10.68.0(react@19.2.7)
@@ -1019,6 +1034,21 @@ packages:
 
   '@fontsource-variable/assistant@5.3.0':
     resolution: {integrity: sha512-rH3USV32Zb1TmyFIkuvJfL/ySKWgDAxEDsso5fY5Pnsgg8rzKk3TSNWiCZllFrDwRiJjEgUgMlaoR+PsYdAnZA==}
+
+  '@fontsource-variable/frank-ruhl-libre@5.3.0':
+    resolution: {integrity: sha512-BgE4pEPDSXfg7741yQYdxB7XShRgdMTYoP4sdoRXfo0FCDWlQdDUm+o1xPcISC8+TTmC6ytvq+u/QmnpQ+EhpQ==}
+
+  '@fontsource-variable/heebo@5.3.0':
+    resolution: {integrity: sha512-gaCKIbnx83+Za844O2dn4XYoAitS2jjBSj08bELHfCIL5gKMBDWl82oWte2CEBrnXwNMVJNd3ojZqFOd9+mCFg==}
+
+  '@fontsource-variable/noto-sans-hebrew@5.3.0':
+    resolution: {integrity: sha512-jGIZ2EOCTtT1ZhLthz6nEpPXGMniSPI/0tv5CDFDZ7MPYyoj6FskW7WJ0YTyesFADdzjx7F2Pg5W1PWD6y9UFw==}
+
+  '@fontsource-variable/rubik@5.3.0':
+    resolution: {integrity: sha512-yQUf8qle24MJYA+EuauyF+cqjjN6I715nGjitt3sGmwZA0XfA4fWJcLq1C/diREZl4Qzn1E80nLMc0ipC/a4Lg==}
+
+  '@fontsource/ibm-plex-sans-hebrew@5.3.0':
+    resolution: {integrity: sha512-6sYM3VzG65AnG1jul3dl+H8eBWYfx6Rqzm7946VNBIXx/ArU1NR5ZKdFx80EDehVqdbPsLOpP1fjImQFjVMopg==}
 
   '@hono/node-server@1.19.14':
     resolution: {integrity: sha512-GwtvgtXxnWsucXvbQXkRgqksiH2Qed37H9xHZocE5sA3N8O8O8/8FA3uclQXxXVzc9XBZuEOMK7+r02FmSpHtw==}
@@ -5570,6 +5600,16 @@ snapshots:
   '@floating-ui/utils@0.2.11': {}
 
   '@fontsource-variable/assistant@5.3.0': {}
+
+  '@fontsource-variable/frank-ruhl-libre@5.3.0': {}
+
+  '@fontsource-variable/heebo@5.3.0': {}
+
+  '@fontsource-variable/noto-sans-hebrew@5.3.0': {}
+
+  '@fontsource-variable/rubik@5.3.0': {}
+
+  '@fontsource/ibm-plex-sans-hebrew@5.3.0': {}
 
   '@hono/node-server@1.19.14(hono@4.12.25)':
     dependencies:

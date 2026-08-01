@@ -1,11 +1,14 @@
-import { User, Check } from "lucide-react";
+import { User, Check, Type } from "lucide-react";
 import { Language, TranslationKey } from "../../locales/translations";
+import { AppFont, FONT_OPTIONS, buildFontStack } from "../../context/FontContext";
 
 interface SettingPreferencesProps {
   username: string;
   setUsername: (val: string) => void;
   tempLang: Language;
   setTempLang: (val: Language) => void;
+  tempFont: AppFont;
+  setTempFont: (val: AppFont) => void;
   onSave: () => void;
   saved: boolean;
   setSaved: (val: boolean) => void;
@@ -17,6 +20,8 @@ export default function SettingPreferences({
   setUsername,
   tempLang,
   setTempLang,
+  tempFont,
+  setTempFont,
   onSave,
   saved,
   setSaved,
@@ -87,6 +92,53 @@ export default function SettingPreferences({
         <p className="text-xs text-muted-foreground">
           {tempLang === "he" ? "שפת ממשק המערכת תוגדר לעברית בכיוון ימין לשמאל." : "System user interface language will be set to English."}
         </p>
+      </div>
+
+      {/* Separator line */}
+      <div className="border-t border-border/60 my-6"></div>
+
+      {/* Interface Font Section */}
+      <div className="space-y-2">
+        <label className="text-sm font-semibold tracking-wide text-foreground flex items-center gap-1.5" htmlFor="font-select">
+          <Type className="size-4 text-foreground" />
+          {t("interface_font")}
+        </label>
+        <div className="relative">
+          <select
+            id="font-select"
+            value={tempFont}
+            onChange={(e) => {
+              setTempFont(e.target.value as AppFont);
+              setSaved(false);
+            }}
+            className="w-full pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer appearance-none"
+          >
+            {FONT_OPTIONS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label} — {f.note}
+              </option>
+            ))}
+          </select>
+          {/* Custom arrow down */}
+          <div className="absolute inset-y-0 right-3 rtl:left-3 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Live preview — mixed Hebrew/Latin, since balancing the two scripts is
+            the whole reason this setting exists. */}
+        <div
+          className="mt-3 rounded-xl border border-border/70 bg-background/60 px-4 py-3.5 space-y-1"
+          style={{ fontFamily: buildFontStack(tempFont) }}
+        >
+          <div className="text-lg font-bold leading-snug">Case Management &nbsp;·&nbsp; ניהול תיקים</div>
+          <div className="text-sm font-semibold">תביעה בגין רשלנות &nbsp;·&nbsp; בדיקת אינטגרציה</div>
+          <div className="text-xs text-muted-foreground">Tsemach Mizracho &nbsp;·&nbsp; משה ישראלי &nbsp;·&nbsp; לשכת רישום המקרקעין</div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">{t("interface_font_desc")}</p>
       </div>
 
       {/* Separator line */}
