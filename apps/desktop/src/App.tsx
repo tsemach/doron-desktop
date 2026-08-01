@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Loader2 } from "lucide-react";
 import { LanguageProvider } from "./context/LanguageContext";
+import { FontProvider } from "./context/FontContext";
 import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
 import { initIndexingBridge } from "./hooks/indexingBridge";
@@ -75,16 +76,18 @@ function App() {
 
   return (
     <LanguageProvider>
-      <UpdateBanner />
-      {checkingSession ? (
-        <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : gated ? (
-        <AppLogin />
-      ) : (
-        <AppMain />
-      )}
+      <FontProvider>
+        <UpdateBanner />
+        {checkingSession ? (
+          <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : gated ? (
+          <AppLogin />
+        ) : (
+          <AppMain />
+        )}
+      </FontProvider>
     </LanguageProvider>
   );
 }

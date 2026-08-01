@@ -10,6 +10,8 @@
   "language": "Language",
   "english": "English",
   "hebrew": "Hebrew",
+  "interface_font": "Interface Font",
+  "interface_font_desc": "Font used across the app. Each option includes matching Hebrew and Latin letterforms, so mixed-script text stays balanced.",
   "setting_system_preferences": "System Preferences",
   "setting_save_preferences": "Save Preferences",
   "setting_save_email_integration": "Save Email Integration",

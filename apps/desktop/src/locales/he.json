@@ -10,6 +10,8 @@
   "language": "שפה",
   "english": "אנגלית",
   "hebrew": "עברית",
+  "interface_font": "גופן הממשק",
+  "interface_font_desc": "הגופן שבו מוצג הממשק. כל אפשרות כוללת אותיות עבריות ולטיניות תואמות, כך שטקסט מעורב נשאר מאוזן.",
   "setting_system_preferences": "העדפות מערכת",
   "setting_save_preferences": "שמור העדפות",
   "setting_save_email_integration": "שמור הגדרות מייל",
