@@ -8,6 +8,7 @@ import CaseManagementCaseCreateForm from "./CaseManagementCaseCreateForm";
 import CaseManagementCaseCreateFormActions from "./CaseManagementCaseCreateFormActions";
 import CaseManagementCaseCreateTemplateFields from "./CaseManagementCaseCreateTemplateFields";
 import { useRowFields } from "@/hooks/useRowFields";
+import { useSplitPane } from "@/hooks/useSplitPane";
 import {
   caseCreateReducer,
   createInitialCaseCreateState,
@@ -41,12 +42,31 @@ export default function CaseManagementCaseCreate() {
     loadingContext,
     loading,
     error,
-    leftPercent,
-    bottomPercent,
-    isDragging,
-    isDraggingHeight,
     isLgScreen,
   } = state;
+
+  const {
+    percent: leftPercent,
+    isDragging,
+    startDragging,
+  } = useSplitPane({
+    containerId: "create-case-split-container",
+    initialPercent: 36,
+    minPercent: 25,
+    maxPercent: 75,
+  });
+
+  const {
+    percent: bottomPercent,
+    isDragging: isDraggingHeight,
+    startDragging: startDraggingHeight,
+  } = useSplitPane({
+    containerId: "right-fields-container",
+    initialPercent: 55,
+    minPercent: 15,
+    maxPercent: 65,
+    axis: "vertical",
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -58,60 +78,6 @@ export default function CaseManagementCaseCreate() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const container = document.getElementById("create-case-split-container");
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const relativeX = e.clientX - rect.left;
-      const percentage = (relativeX / rect.width) * 100;
-      const clamped = Math.max(25, Math.min(75, percentage));
-      dispatch({ type: CaseCreateActionType.SET_LEFT_PERCENT, payload: clamped });
-    };
-
-    const handleMouseUp = () => {
-      dispatch({ type: CaseCreateActionType.SET_DRAGGING, payload: false });
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging]);
-
-  // Dragging handler for the horizontal split pane
-  useEffect(() => {
-    if (!isDraggingHeight) return;
-
-    const handleMouseMoveHeight = (e: MouseEvent) => {
-      const container = document.getElementById("right-fields-container");
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const relativeY = e.clientY - rect.top;
-      const percentage = ((rect.height - relativeY) / rect.height) * 100;
-      // Clamp between 15% and 65% of total height
-      const clamped = Math.max(15, Math.min(65, percentage));
-      dispatch({ type: CaseCreateActionType.SET_BOTTOM_PERCENT, payload: clamped });
-    };
-
-    const handleMouseUpHeight = () => {
-      dispatch({ type: CaseCreateActionType.SET_DRAGGING_HEIGHT, payload: false });
-    };
-
-    window.addEventListener("mousemove", handleMouseMoveHeight);
-    window.addEventListener("mouseup", handleMouseUpHeight);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMoveHeight);
-      window.removeEventListener("mouseup", handleMouseUpHeight);
-    };
-  }, [isDraggingHeight]);
 
   useEffect(() => {
     // Fetch case templates and doc templates from SQLite
@@ -138,23 +104,30 @@ export default function CaseManagementCaseCreate() {
     [activeTemplate]
   );
 
-  // Map each field to the documents containing it
-  const associatedDocs = docTemplates.filter((doc) =>
-    activeTemplate?.doc_template_ids.includes(doc.id)
+  // Map each field to the documents containing it. Both are memoised because
+  // fieldToDocsMap feeds the filteredTemplateFields dependency array below — as
+  // a bare object literal it took a new identity every render, which defeated
+  // that memo entirely and churned every callback derived from it.
+  const associatedDocs = useMemo(
+    () => docTemplates.filter((doc) => activeTemplate?.doc_template_ids.includes(doc.id)),
+    [docTemplates, activeTemplate]
   );
 
-  const fieldToDocsMap: Record<string, DocTemplate[]> = {};
-  associatedDocs.forEach((doc) => {
-    try {
-      const fields = JSON.parse(doc.fields_found) as string[];
-      fields.forEach((f) => {
-        if (!fieldToDocsMap[f]) {
-          fieldToDocsMap[f] = [];
-        }
-        fieldToDocsMap[f].push(doc);
-      });
-    } catch {}
-  });
+  const fieldToDocsMap: Record<string, DocTemplate[]> = useMemo(() => {
+    const map: Record<string, DocTemplate[]> = {};
+    associatedDocs.forEach((doc) => {
+      try {
+        const fields = JSON.parse(doc.fields_found) as string[];
+        fields.forEach((f) => {
+          if (!map[f]) {
+            map[f] = [];
+          }
+          map[f].push(doc);
+        });
+      } catch {}
+    });
+    return map;
+  }, [associatedDocs]);
 
   const { uniqueRows, getFilteredFields } = useRowFields(templateFields);
 
@@ -168,31 +141,7 @@ export default function CaseManagementCaseCreate() {
     });
   }, [getFilteredFields, selectedRow, searchQuery, filterDocId, fieldToDocsMap]);
 
-  // Clicking a placeholder in the bottom preview jumps the top fields panel to
-  // that field's input and focuses it, so the user can type a value right away.
-  const handleFieldClickFromPreview = useCallback((field: string) => {
-    const isHidden = !filteredTemplateFields.includes(field);
-    dispatch({
-      type: CaseCreateActionType.FOCUS_FIELD_FROM_PREVIEW,
-      payload: { field, resetFilters: isHidden },
-    });
-
-    // Wait for React to actually commit + paint the re-render (filter reset
-    // and/or focused-field highlight) before the target input can be scrolled
-    // to/focused — an arbitrary setTimeout delay was unreliable here; a double
-    // rAF reliably waits for the next painted frame regardless of what changed.
-    const focusInput = () => {
-      const input = document.getElementById(`field-${field}`) as HTMLInputElement | null;
-      if (!input) return;
-      input.scrollIntoView({ behavior: "smooth", block: "center" });
-      // preventScroll avoids the browser's own focus-triggered auto-scroll
-      // fighting with the smooth scrollIntoView call above.
-      input.focus({ preventScroll: true });
-    };
-    requestAnimationFrame(() => requestAnimationFrame(focusInput));
-  }, [filteredTemplateFields]);
-
-  const loadFullDocHtml = async (docId: number) => {
+  const loadFullDocHtml = useCallback(async (docId: number) => {
     dispatch({ type: CaseCreateActionType.PREVIEW_LOAD_START });
     try {
       const doc = docTemplates.find((d) => d.id === docId);
@@ -223,7 +172,7 @@ export default function CaseManagementCaseCreate() {
         payload: `Failed to load document preview: ${err}`,
       });
     }
-  };
+  }, [docTemplates]);
 
   const handleToggleDocContext = async (docId: number) => {
     if (expandedDocId === docId) {
@@ -237,20 +186,72 @@ export default function CaseManagementCaseCreate() {
     }
   };
 
-  useEffect(() => {
-    if (showAllPreviews || !focusedField || expandedDocId === null) return;
+  // Keeps the expanded document in step with whichever field just took focus:
+  // load it if it covers that field, collapse it if it doesn't. This runs from
+  // the handlers that change the focused field rather than from an Effect — it
+  // reacts to a user action, not to an external system, and as an Effect it had
+  // to omit most of what it read from its dependency array to avoid firing on
+  // every render.
+  //
+  // The predecessor also bailed out when showAllPreviews was set. That guard is
+  // deliberately not carried over: every path that focuses a field clears
+  // showAllPreviews in the same tick (FOCUS_FIELD_FROM_PREVIEW sets it false,
+  // and the fields list calls onShowAllPreviewsChange(false) alongside), so a
+  // non-null field always implies showAllPreviews is false by the time this
+  // settles. Reading it here would read the pre-dispatch value and wrongly skip.
+  const syncExpandedDocToField = useCallback(
+    (field: string | null) => {
+      if (!field || expandedDocId === null) return;
 
-    const docs = fieldToDocsMap[focusedField] || [];
-    const hasDoc = docs.some((d) => d.id === expandedDocId);
+      const docs = fieldToDocsMap[field] || [];
+      const hasDoc = docs.some((d) => d.id === expandedDocId);
 
-    if (hasDoc) {
-      if (!docHtmlCache[expandedDocId]) {
-        loadFullDocHtml(expandedDocId);
+      if (hasDoc) {
+        if (!docHtmlCache[expandedDocId]) {
+          loadFullDocHtml(expandedDocId);
+        }
+      } else {
+        dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: null });
       }
-    } else {
-      dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: null });
-    }
-  }, [focusedField]);
+    },
+    [expandedDocId, fieldToDocsMap, docHtmlCache, loadFullDocHtml]
+  );
+
+  // Clicking a placeholder in the bottom preview jumps the top fields panel to
+  // that field's input and focuses it, so the user can type a value right away.
+  const handleFieldClickFromPreview = useCallback(
+    (field: string) => {
+      const isHidden = !filteredTemplateFields.includes(field);
+      dispatch({
+        type: CaseCreateActionType.FOCUS_FIELD_FROM_PREVIEW,
+        payload: { field, resetFilters: isHidden },
+      });
+      syncExpandedDocToField(field);
+
+      // Wait for React to actually commit + paint the re-render (filter reset
+      // and/or focused-field highlight) before the target input can be scrolled
+      // to/focused — an arbitrary setTimeout delay was unreliable here; a double
+      // rAF reliably waits for the next painted frame regardless of what changed.
+      const focusInput = () => {
+        const input = document.getElementById(`field-${field}`) as HTMLInputElement | null;
+        if (!input) return;
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
+        // preventScroll avoids the browser's own focus-triggered auto-scroll
+        // fighting with the smooth scrollIntoView call above.
+        input.focus({ preventScroll: true });
+      };
+      requestAnimationFrame(() => requestAnimationFrame(focusInput));
+    },
+    [filteredTemplateFields, syncExpandedDocToField]
+  );
+
+  const handleFocusedFieldChange = useCallback(
+    (field: string | null) => {
+      dispatch({ type: CaseCreateActionType.SET_FOCUSED_FIELD, payload: field });
+      syncExpandedDocToField(field);
+    },
+    [syncExpandedDocToField]
+  );
 
   const handleOpenTemplateFile = async (e: React.MouseEvent, filePath: string) => {
     e.stopPropagation();
@@ -441,7 +442,7 @@ export default function CaseManagementCaseCreate() {
             {/* Resizable Divider (rendered only on large screens when fields are shown) */}
             {hasFields && isLgScreen && (
               <div
-                onMouseDown={() => dispatch({ type: CaseCreateActionType.SET_DRAGGING, payload: true })}
+                onMouseDown={startDragging}
                 className={`w-3 group cursor-col-resize flex items-center justify-center shrink-0 z-20 select-none ${
                   isDragging ? "bg-primary/10" : "hover:bg-primary/5"
                 } transition-colors`}
@@ -483,14 +484,10 @@ export default function CaseManagementCaseCreate() {
                   dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
                 }
                 focusedField={focusedField}
-                onFocusedFieldChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_FOCUSED_FIELD, payload: value })
-                }
+                onFocusedFieldChange={handleFocusedFieldChange}
                 loading={loading}
                 isDraggingHeight={isDraggingHeight}
-                onDraggingHeightChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_DRAGGING_HEIGHT, payload: value })
-                }
+                onStartDraggingHeight={startDraggingHeight}
                 bottomPercent={bottomPercent}
                 fieldToDocsMap={fieldToDocsMap}
                 expandedDocId={expandedDocId}

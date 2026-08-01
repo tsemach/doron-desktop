@@ -24,7 +24,7 @@ interface CaseManagementCaseCreateTemplateFieldsProps {
   onFocusedFieldChange: (value: string | null) => void;
   loading: boolean;
   isDraggingHeight: boolean;
-  onDraggingHeightChange: (value: boolean) => void;
+  onStartDraggingHeight: () => void;
   bottomPercent: number;
   fieldToDocsMap: Record<string, DocTemplate[]>;
   expandedDocId: number | null;
@@ -59,7 +59,7 @@ export default function CaseManagementCaseCreateTemplateFields({
   onFocusedFieldChange,
   loading,
   isDraggingHeight,
-  onDraggingHeightChange,
+  onStartDraggingHeight,
   bottomPercent,
   fieldToDocsMap,
   expandedDocId,
@@ -142,7 +142,7 @@ export default function CaseManagementCaseCreateTemplateFields({
         <div
           onMouseDown={(e) => {
             e.preventDefault();
-            onDraggingHeightChange(true);
+            onStartDraggingHeight();
           }}
           className={`h-[1px] cursor-row-resize z-20 select-none shrink-0 ${
             isDraggingHeight ? "bg-primary" : "bg-border hover:bg-primary/50"
