@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useCallback, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -8,41 +8,52 @@ import CaseManagementCaseCreateForm from "./CaseManagementCaseCreateForm";
 import CaseManagementCaseCreateFormActions from "./CaseManagementCaseCreateFormActions";
 import CaseManagementCaseCreateTemplateFields from "./CaseManagementCaseCreateTemplateFields";
 import { useRowFields } from "@/hooks/useRowFields";
+import {
+  caseCreateReducer,
+  createInitialCaseCreateState,
+  parseTemplateFields,
+  CaseCreateActionType,
+  EMPTY_TEMPLATE_ID,
+  FOLDER_IN_USE_ERROR,
+} from "@/reducers/case-create.reducer";
 
 
 export default function CaseManagementCaseCreate() {
   const navigate = useNavigate();
-  const [subject, setSubject] = useState("");
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
-  const [folder, setFolder] = useState("");
-  const [templates, setTemplates] = useState<CaseTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("empty");
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRow, setSelectedRow] = useState<number | null>(null);
-  const [docTemplates, setDocTemplates] = useState<DocTemplate[]>([]);
-  const [filterDocId, setFilterDocId] = useState<number | null>(null);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [showAllPreviews, setShowAllPreviews] = useState(false);
-  const [expandedDocId, setExpandedDocId] = useState<number | null>(null);
-  const [docHtmlCache, setDocHtmlCache] = useState<Record<number, string>>({});
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [loadingContext, setLoadingContext] = useState(false);
-  const [bottomPercent, setBottomPercent] = useState(55);
-  const [isDraggingHeight, setIsDraggingHeight] = useState(false);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Split-pane resizing states
-  const [leftPercent, setLeftPercent] = useState(36);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isLgScreen, setIsLgScreen] = useState(window.innerWidth >= 1024);
+  const [state, dispatch] = useReducer(caseCreateReducer, undefined, createInitialCaseCreateState);
+  const {
+    subject,
+    name,
+    company,
+    folder,
+    selectedTemplateId,
+    templates,
+    docTemplates,
+    fieldValues,
+    searchQuery,
+    selectedRow,
+    filterDocId,
+    focusedField,
+    showAllPreviews,
+    expandedDocId,
+    docHtmlCache,
+    previewError,
+    loadingContext,
+    loading,
+    error,
+    leftPercent,
+    bottomPercent,
+    isDragging,
+    isDraggingHeight,
+    isLgScreen,
+  } = state;
 
   useEffect(() => {
     const handleResize = () => {
-      setIsLgScreen(window.innerWidth >= 1024);
+      dispatch({
+        type: CaseCreateActionType.SET_IS_LG_SCREEN,
+        payload: window.innerWidth >= 1024,
+      });
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -58,11 +69,11 @@ export default function CaseManagementCaseCreate() {
       const relativeX = e.clientX - rect.left;
       const percentage = (relativeX / rect.width) * 100;
       const clamped = Math.max(25, Math.min(75, percentage));
-      setLeftPercent(clamped);
+      dispatch({ type: CaseCreateActionType.SET_LEFT_PERCENT, payload: clamped });
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
+      dispatch({ type: CaseCreateActionType.SET_DRAGGING, payload: false });
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -86,11 +97,11 @@ export default function CaseManagementCaseCreate() {
       const percentage = ((rect.height - relativeY) / rect.height) * 100;
       // Clamp between 15% and 65% of total height
       const clamped = Math.max(15, Math.min(65, percentage));
-      setBottomPercent(clamped);
+      dispatch({ type: CaseCreateActionType.SET_BOTTOM_PERCENT, payload: clamped });
     };
 
     const handleMouseUpHeight = () => {
-      setIsDraggingHeight(false);
+      dispatch({ type: CaseCreateActionType.SET_DRAGGING_HEIGHT, payload: false });
     };
 
     window.addEventListener("mousemove", handleMouseMoveHeight);
@@ -109,44 +120,23 @@ export default function CaseManagementCaseCreate() {
       invoke<DocTemplate[]>("list_templates"),
     ])
       .then(([caseRes, docRes]) => {
-        setTemplates(caseRes);
-        setDocTemplates(docRes);
+        dispatch({
+          type: CaseCreateActionType.TEMPLATES_LOADED,
+          payload: { templates: caseRes, docTemplates: docRes },
+        });
       })
       .catch((err) => {
         console.error("Failed to load templates:", err);
-        setError("Failed to load templates.");
+        dispatch({ type: CaseCreateActionType.SET_ERROR, payload: "Failed to load templates." });
       });
   }, []);
 
   // Parse fields for the currently selected template
   const activeTemplate = templates.find((t) => String(t.id) === selectedTemplateId);
-  const templateFields: string[] = useMemo(() => {
-    if (!activeTemplate) return [];
-    try {
-      const parsed = JSON.parse(activeTemplate.fields);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.error("Failed to parse template fields:", e);
-      return [];
-    }
-  }, [activeTemplate]);
-
-  // Reset/sync fields when template changes
-  useEffect(() => {
-    const initialValues: Record<string, string> = {};
-    templateFields.forEach((field) => {
-      initialValues[field] = "";
-    });
-    setFieldValues(initialValues);
-    setSearchQuery(""); // Reset search query when template changes
-    setFilterDocId(null); // Reset document filter when template changes
-    setSelectedRow(null); // Reset row filter when template changes
-    setFocusedField(null); // Reset focused field
-    setShowAllPreviews(false); // Reset "show all previews" mode
-    setExpandedDocId(null); // Reset expanded document details
-    setDocHtmlCache({}); // Clear preview HTML cache
-    setPreviewError(null); // Clear preview error
-  }, [selectedTemplateId]);
+  const templateFields: string[] = useMemo(
+    () => parseTemplateFields(activeTemplate),
+    [activeTemplate]
+  );
 
   // Map each field to the documents containing it
   const associatedDocs = docTemplates.filter((doc) =>
@@ -182,13 +172,10 @@ export default function CaseManagementCaseCreate() {
   // that field's input and focuses it, so the user can type a value right away.
   const handleFieldClickFromPreview = useCallback((field: string) => {
     const isHidden = !filteredTemplateFields.includes(field);
-    if (isHidden) {
-      setSearchQuery("");
-      setSelectedRow(null);
-      setFilterDocId(null);
-    }
-    setFocusedField(field);
-    setShowAllPreviews(false);
+    dispatch({
+      type: CaseCreateActionType.FOCUS_FIELD_FROM_PREVIEW,
+      payload: { field, resetFilters: isHidden },
+    });
 
     // Wait for React to actually commit + paint the re-render (filter reset
     // and/or focused-field highlight) before the target input can be scrolled
@@ -206,8 +193,7 @@ export default function CaseManagementCaseCreate() {
   }, [filteredTemplateFields]);
 
   const loadFullDocHtml = async (docId: number) => {
-    setLoadingContext(true);
-    setPreviewError(null);
+    dispatch({ type: CaseCreateActionType.PREVIEW_LOAD_START });
     try {
       const doc = docTemplates.find((d) => d.id === docId);
       if (!doc) throw new Error("Document template not found");
@@ -218,30 +204,34 @@ export default function CaseManagementCaseCreate() {
         const bytes = await invoke<number[]>("read_file_bytes", { path: doc.marked_path });
         const arrayBuffer = new Uint8Array(bytes).buffer;
         const result = await mammoth.convertToHtml({ arrayBuffer });
-        setDocHtmlCache((prev) => ({ ...prev, [docId]: result.value }));
+        dispatch({
+          type: CaseCreateActionType.PREVIEW_LOAD_SUCCESS,
+          payload: { docId, html: result.value },
+        });
       } else if (ext === "txt" || ext === "json" || ext === "md") {
         const bytes = await invoke<number[]>("read_file_bytes", { path: doc.marked_path });
         const text = new TextDecoder().decode(new Uint8Array(bytes));
         const html = text.split('\n').map((line) => `<p>${line}</p>`).join('');
-        setDocHtmlCache((prev) => ({ ...prev, [docId]: html }));
+        dispatch({ type: CaseCreateActionType.PREVIEW_LOAD_SUCCESS, payload: { docId, html } });
       } else {
         throw new Error(`Unsupported preview format: ${ext}`);
       }
     } catch (err) {
       console.error(err);
-      setPreviewError(`Failed to load document preview: ${err}`);
-    } finally {
-      setLoadingContext(false);
+      dispatch({
+        type: CaseCreateActionType.PREVIEW_LOAD_FAILURE,
+        payload: `Failed to load document preview: ${err}`,
+      });
     }
   };
 
   const handleToggleDocContext = async (docId: number) => {
     if (expandedDocId === docId) {
-      setExpandedDocId(null);
+      dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: null });
       return;
     }
 
-    setExpandedDocId(docId);
+    dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: docId });
     if (!docHtmlCache[docId]) {
       await loadFullDocHtml(docId);
     }
@@ -258,7 +248,7 @@ export default function CaseManagementCaseCreate() {
         loadFullDocHtml(expandedDocId);
       }
     } else {
-      setExpandedDocId(null);
+      dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: null });
     }
   }, [focusedField]);
 
@@ -275,9 +265,7 @@ export default function CaseManagementCaseCreate() {
   // Verify if case storage folder is already in use by another case
   useEffect(() => {
     if (!folder.trim()) {
-      setError((prev) =>
-        prev === "A case with this storage directory path already exists." ? null : prev
-      );
+      dispatch({ type: CaseCreateActionType.CLEAR_FOLDER_IN_USE_ERROR });
       return;
     }
 
@@ -285,11 +273,9 @@ export default function CaseManagementCaseCreate() {
       try {
         const inUse = await invoke<boolean>("verify_folder_in_use", { folderPath: folder.trim() });
         if (inUse) {
-          setError("A case with this storage directory path already exists.");
+          dispatch({ type: CaseCreateActionType.SET_ERROR, payload: FOLDER_IN_USE_ERROR });
         } else {
-          setError((prev) =>
-            prev === "A case with this storage directory path already exists." ? null : prev
-          );
+          dispatch({ type: CaseCreateActionType.CLEAR_FOLDER_IN_USE_ERROR });
         }
       } catch (err) {
         console.error("verify_folder_in_use failed:", err);
@@ -302,7 +288,7 @@ export default function CaseManagementCaseCreate() {
 
   // Browse Directory Dialog
   async function handleBrowse() {
-    setError(null);
+    dispatch({ type: CaseCreateActionType.SET_ERROR, payload: null });
     try {
       const selected = await open({
         directory: true,
@@ -310,43 +296,46 @@ export default function CaseManagementCaseCreate() {
         title: "Select Case Storage Directory",
       });
       if (selected && typeof selected === "string") {
-        setFolder(selected);
+        dispatch({ type: CaseCreateActionType.SET_FOLDER, payload: selected });
       }
     } catch (err) {
       console.error("Directory browse error:", err);
-      setError("Failed to open folder picker.");
+      dispatch({ type: CaseCreateActionType.SET_ERROR, payload: "Failed to open folder picker." });
     }
   }
 
   // Handle Form Submission
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    dispatch({ type: CaseCreateActionType.SET_ERROR, payload: null });
 
     if (!subject.trim()) {
-      setError("Please enter a case subject.");
+      dispatch({ type: CaseCreateActionType.SET_ERROR, payload: "Please enter a case subject." });
       return;
     }
     if (!name.trim()) {
-      setError("Please enter a customer name.");
+      dispatch({ type: CaseCreateActionType.SET_ERROR, payload: "Please enter a customer name." });
       return;
     }
     if (!folder.trim()) {
-      setError("Please select or enter the case folder path.");
+      dispatch({
+        type: CaseCreateActionType.SET_ERROR,
+        payload: "Please select or enter the case folder path.",
+      });
       return;
     }
 
-    setLoading(true);
+    dispatch({ type: CaseCreateActionType.SET_LOADING, payload: true });
     try {
       // Proactively check if the folder is in use one last time before creating
       const inUse = await invoke<boolean>("verify_folder_in_use", { folderPath: folder.trim() });
       if (inUse) {
-        setError("A case with this storage directory path already exists.");
-        setLoading(false);
+        dispatch({ type: CaseCreateActionType.SET_ERROR, payload: FOLDER_IN_USE_ERROR });
+        dispatch({ type: CaseCreateActionType.SET_LOADING, payload: false });
         return;
       }
 
-      const isTemplate = selectedTemplateId !== "empty";
+      const isTemplate = selectedTemplateId !== EMPTY_TEMPLATE_ID;
       const templateIdNum = isTemplate ? Number(selectedTemplateId) : null;
 
       // Call Rust backend command
@@ -372,13 +361,13 @@ export default function CaseManagementCaseCreate() {
       navigate("/case-management");
     } catch (err) {
       console.error("Case creation failed:", err);
-      setError(String(err));
+      dispatch({ type: CaseCreateActionType.SET_ERROR, payload: String(err) });
     } finally {
-      setLoading(false);
+      dispatch({ type: CaseCreateActionType.SET_LOADING, payload: false });
     }
   }
 
-  const hasFields = selectedTemplateId !== "empty" && templateFields.length > 0;
+  const hasFields = selectedTemplateId !== EMPTY_TEMPLATE_ID && templateFields.length > 0;
 
   return (
     <main className="flex-1 overflow-auto p-4 bg-background">
@@ -424,17 +413,27 @@ export default function CaseManagementCaseCreate() {
             >
               <CaseManagementCaseCreateForm
                 subject={subject}
-                onSubjectChange={setSubject}
+                onSubjectChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_SUBJECT, payload: value })
+                }
                 name={name}
-                onNameChange={setName}
+                onNameChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_NAME, payload: value })
+                }
                 company={company}
-                onCompanyChange={setCompany}
+                onCompanyChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_COMPANY, payload: value })
+                }
                 folder={folder}
-                onFolderChange={setFolder}
+                onFolderChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_FOLDER, payload: value })
+                }
                 onBrowse={handleBrowse}
                 templates={templates}
                 selectedTemplateId={selectedTemplateId}
-                onTemplateChange={setSelectedTemplateId}
+                onTemplateChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SELECT_TEMPLATE, payload: value })
+                }
                 loading={loading}
               />
             </div>
@@ -442,7 +441,7 @@ export default function CaseManagementCaseCreate() {
             {/* Resizable Divider (rendered only on large screens when fields are shown) */}
             {hasFields && isLgScreen && (
               <div
-                onMouseDown={() => setIsDragging(true)}
+                onMouseDown={() => dispatch({ type: CaseCreateActionType.SET_DRAGGING, payload: true })}
                 className={`w-3 group cursor-col-resize flex items-center justify-center shrink-0 z-20 select-none ${
                   isDragging ? "bg-primary/10" : "hover:bg-primary/5"
                 } transition-colors`}
@@ -462,26 +461,42 @@ export default function CaseManagementCaseCreate() {
                 activeTemplate={activeTemplate}
                 associatedDocs={associatedDocs}
                 showAllPreviews={showAllPreviews}
-                onShowAllPreviewsChange={setShowAllPreviews}
+                onShowAllPreviewsChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_SHOW_ALL_PREVIEWS, payload: value })
+                }
                 searchQuery={searchQuery}
-                onSearchQueryChange={setSearchQuery}
+                onSearchQueryChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_SEARCH_QUERY, payload: value })
+                }
                 uniqueRows={uniqueRows}
                 selectedRow={selectedRow}
-                onSelectedRowChange={setSelectedRow}
+                onSelectedRowChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_SELECTED_ROW, payload: value })
+                }
                 filterDocId={filterDocId}
-                onFilterDocIdChange={setFilterDocId}
+                onFilterDocIdChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_FILTER_DOC_ID, payload: value })
+                }
                 filteredTemplateFields={filteredTemplateFields}
                 fieldValues={fieldValues}
-                onFieldValuesChange={setFieldValues}
+                onFieldValuesChange={(values) =>
+                  dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
+                }
                 focusedField={focusedField}
-                onFocusedFieldChange={setFocusedField}
+                onFocusedFieldChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_FOCUSED_FIELD, payload: value })
+                }
                 loading={loading}
                 isDraggingHeight={isDraggingHeight}
-                onDraggingHeightChange={setIsDraggingHeight}
+                onDraggingHeightChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_DRAGGING_HEIGHT, payload: value })
+                }
                 bottomPercent={bottomPercent}
                 fieldToDocsMap={fieldToDocsMap}
                 expandedDocId={expandedDocId}
-                onExpandedDocIdChange={setExpandedDocId}
+                onExpandedDocIdChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: value })
+                }
                 onToggleDocContext={handleToggleDocContext}
                 onOpenTemplateFile={handleOpenTemplateFile}
                 docTemplates={docTemplates}

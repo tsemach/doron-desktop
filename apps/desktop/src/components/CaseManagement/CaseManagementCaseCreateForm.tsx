@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { CaseTemplate } from "./CaseManagementTypes";
 import CaseManagementCompanyField from "./CaseManagementCompanyField";
+import { EMPTY_TEMPLATE_ID } from "@/reducers/case-create.reducer";
 
 interface CaseManagementCaseCreateFormProps {
   subject: string;
@@ -118,7 +119,7 @@ export default function CaseManagementCaseCreateForm({
             className="w-full rounded-md border-0 bg-background pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[46px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
             disabled={loading}
           >
-            <option value="empty">Create Empty Case (No Documents)</option>
+            <option value={EMPTY_TEMPLATE_ID}>Create Empty Case (No Documents)</option>
             {templates.map((t) => (
               <option key={t.id} value={String(t.id)}>
                 {t.name}
