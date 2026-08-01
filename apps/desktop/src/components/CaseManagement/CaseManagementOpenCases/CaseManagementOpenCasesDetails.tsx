@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSplitPane } from "@/hooks/useSplitPane";
 import { useParams, Link } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -54,8 +55,12 @@ export default function CaseManagementOpenCasesDetails() {
   const [attachments, setAttachments] = useState<{ name: string; staged_path: string; size_kb: number }[]>([]);
 
   // Split pane states
-  const [leftPercent, setLeftPercent] = useState(30);
-  const [isDragging, setIsDragging] = useState(false);
+  const { percent: leftPercent, isDragging, startDragging } = useSplitPane({
+    containerId: "case-management-split-container",
+    initialPercent: 30,
+    minPercent: 20,
+    maxPercent: 80,
+  });
   const [isLgScreen, setIsLgScreen] = useState(window.innerWidth >= 1024);
 
   useEffect(() => {
@@ -65,32 +70,6 @@ export default function CaseManagementOpenCasesDetails() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const container = document.getElementById("case-management-split-container");
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const relativeX = e.clientX - rect.left;
-      const percentage = (relativeX / rect.width) * 100;
-      const clamped = Math.max(20, Math.min(80, percentage));
-      setLeftPercent(clamped);
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging]);
 
   useEffect(() => {
     if (caseId) {
@@ -509,7 +488,7 @@ export default function CaseManagementOpenCasesDetails() {
           {/* Resizable Divider (rendered only on large screens) */}
           {isLgScreen && (
             <div
-              onMouseDown={() => setIsDragging(true)}
+              onMouseDown={startDragging}
               className={`w-3 group cursor-col-resize flex items-center justify-center shrink-0 z-20 select-none ${isDragging ? "bg-primary/10" : "hover:bg-primary/5"
                 } transition-colors`}
             >

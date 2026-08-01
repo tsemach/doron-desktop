@@ -25,10 +25,6 @@ export enum CaseCreateActionType {
   SET_LOADING = "SET_LOADING",
   SET_ERROR = "SET_ERROR",
   CLEAR_FOLDER_IN_USE_ERROR = "CLEAR_FOLDER_IN_USE_ERROR",
-  SET_LEFT_PERCENT = "SET_LEFT_PERCENT",
-  SET_BOTTOM_PERCENT = "SET_BOTTOM_PERCENT",
-  SET_DRAGGING = "SET_DRAGGING",
-  SET_DRAGGING_HEIGHT = "SET_DRAGGING_HEIGHT",
   SET_IS_LG_SCREEN = "SET_IS_LG_SCREEN",
 }
 
@@ -62,11 +58,8 @@ export interface CaseCreateState {
   loading: boolean;
   error: string | null;
 
-  // Split-pane layout
-  leftPercent: number;
-  bottomPercent: number;
-  isDragging: boolean;
-  isDraggingHeight: boolean;
+  // Split-pane layout — the divider position and drag state live in
+  // useSplitPane; only the breakpoint flag is still reducer state.
   isLgScreen: boolean;
 }
 
@@ -97,10 +90,6 @@ export type CaseCreateAction =
   | { type: CaseCreateActionType.SET_LOADING; payload: boolean }
   | { type: CaseCreateActionType.SET_ERROR; payload: string | null }
   | { type: CaseCreateActionType.CLEAR_FOLDER_IN_USE_ERROR }
-  | { type: CaseCreateActionType.SET_LEFT_PERCENT; payload: number }
-  | { type: CaseCreateActionType.SET_BOTTOM_PERCENT; payload: number }
-  | { type: CaseCreateActionType.SET_DRAGGING; payload: boolean }
-  | { type: CaseCreateActionType.SET_DRAGGING_HEIGHT; payload: boolean }
   | { type: CaseCreateActionType.SET_IS_LG_SCREEN; payload: boolean };
 
 export function parseTemplateFields(template: CaseTemplate | undefined): string[] {
@@ -135,10 +124,6 @@ export function createInitialCaseCreateState(): CaseCreateState {
     loadingContext: false,
     loading: false,
     error: null,
-    leftPercent: 36,
-    bottomPercent: 55,
-    isDragging: false,
-    isDraggingHeight: false,
     isLgScreen: window.innerWidth >= 1024,
   };
 }
@@ -232,14 +217,6 @@ export function caseCreateReducer(state: CaseCreateState, action: CaseCreateActi
     case CaseCreateActionType.CLEAR_FOLDER_IN_USE_ERROR:
       return state.error === FOLDER_IN_USE_ERROR ? { ...state, error: null } : state;
 
-    case CaseCreateActionType.SET_LEFT_PERCENT:
-      return { ...state, leftPercent: action.payload };
-    case CaseCreateActionType.SET_BOTTOM_PERCENT:
-      return { ...state, bottomPercent: action.payload };
-    case CaseCreateActionType.SET_DRAGGING:
-      return { ...state, isDragging: action.payload };
-    case CaseCreateActionType.SET_DRAGGING_HEIGHT:
-      return { ...state, isDraggingHeight: action.payload };
     case CaseCreateActionType.SET_IS_LG_SCREEN:
       return { ...state, isLgScreen: action.payload };
 
