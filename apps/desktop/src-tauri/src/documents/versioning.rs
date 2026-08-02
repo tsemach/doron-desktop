@@ -101,11 +101,11 @@ pub fn create_document_backup_if_exists(
                 return Ok(());
             }
 
-            // 2. Skip if it is within the 3-hour cooldown window (and not bypassing cooldown)
+            // 2. Skip if it is within the 12-hour cooldown window (and not bypassing cooldown)
             if !bypass_cooldown {
                 if let Ok(last_time) = chrono::DateTime::parse_from_rfc3339(&created_at_str) {
                     let diff = chrono::Utc::now().signed_duration_since(last_time.with_timezone(&chrono::Utc));
-                    if diff.num_seconds() < 10800 { // 3 hours cooldown
+                    if diff.num_seconds() < 43200 { // 12 hours cooldown
                         return Ok(());
                     }
                 }
@@ -242,7 +242,7 @@ async fn scan_and_version_case_folder(
                 // If the file is not locked anymore, we trigger the version check
                 if !is_locked {
                     // Create backup version (MD5 verify will prevent empty versions)
-                    // If it transitioned from locked to unlocked (e.g. Word closed), we bypass the 2-min cooldown
+                    // If it transitioned from locked to unlocked (e.g. Word closed), we bypass the cooldown
                     if let Err(e) = create_document_backup_if_exists(app, &file_path, None, was_locked, false) {
                         println!("Auto-backup failed for {}: {}", name, e);
                     } else {
