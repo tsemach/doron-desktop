@@ -5,14 +5,12 @@ import AiStatusBadge from "../ui/AiStatusBadge";
 import ScanFileCount from "./scan/ScanFileCount";
 
 type DocsManagementHeaderProps = {
-  dbPath: string;
   isProcessing: boolean;
   scanCount?: { current: number; total: number };
   resetState?: () => void;
 };
 
 export default function DocsManagementHeader({
-  dbPath,
   isProcessing,
   scanCount,
   resetState,
@@ -30,9 +28,6 @@ export default function DocsManagementHeader({
   };
 
   const activeTab = getActiveTab();
-
-  // Get database file name for badge
-  const dbFileName = dbPath ? dbPath.split(/[/\\]/).pop() : "No Database Connected";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md shrink-0 px-6 py-4">
@@ -59,8 +54,13 @@ export default function DocsManagementHeader({
               <path d="M12 9h.01" />
             </svg>
             <div>
-              <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-muted-foreground bg-clip-text text-transparent">
-                Documents Vault
+              <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+                <span className="bg-gradient-to-r from-primary to-muted-foreground bg-clip-text text-transparent">
+                  Documents Vault
+                </span>
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-red-50 text-red-600 border border-red-200">
+                  Beta
+                </span>
               </h1>
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                 Enterprise Document AI
@@ -171,31 +171,6 @@ export default function DocsManagementHeader({
               ) : (
                 <span>Scanning...</span>
               )}
-            </div>
-          )}
-
-          {/* Database Badge */}
-          {dbPath && (
-            <div
-              className="flex items-center gap-1.5 bg-muted border border-border/80 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground"
-              title={dbPath}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <ellipse cx="12" cy="5" rx="9" ry="3" />
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
-              </svg>
-              <span className="font-mono max-w-[120px] truncate">{dbFileName}</span>
             </div>
           )}
 
