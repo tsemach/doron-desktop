@@ -30,9 +30,40 @@ export default function SettingAiHealthCheckResult({ result, onClose }: SettingA
     }
   };
 
+  // Backend-proxied (online mode) failures carry a stable code prefix --
+  // see llm_settings.rs's check_ai_health / llm_provider_backend_online.rs.
+  // Strip it here so the log's [ERROR] line reads as a sentence, matching
+  // how the status banner above already displays the message.
+  const KNOWN_CODE_PREFIXES = ["QUOTA_EXCEEDED:", "RATE_LIMITED:", "PROVIDER_ERROR:"];
+  const stripKnownCodePrefix = (message: string) => {
+    const prefix = KNOWN_CODE_PREFIXES.find((p) => message.startsWith(p));
+    return prefix ? message.slice(prefix.length).trim() : message;
+  };
+
+  // Categorizes the real failure instead of always claiming a generic
+  // connection/server error -- a quota or rate-limit failure never even
+  // reaches the network layer, so labeling it that way was misleading.
+  const getFailureDiagnostic = () => {
+    if (result.quotaExceeded) {
+      return { diagnostic: "Pre-flight quota check failed.", status: "Request blocked before reaching the AI provider." };
+    }
+    if (result.message.startsWith("RATE_LIMITED:")) {
+      return { diagnostic: "Provider rate limit exceeded.", status: "AI service temporarily unavailable." };
+    }
+    if (result.message.startsWith("PROVIDER_ERROR:")) {
+      return { diagnostic: "Provider returned an error.", status: "AI service unavailable." };
+    }
+    if (result.message.toLowerCase().includes("timed out")) {
+      return { diagnostic: "Request timed out.", status: "AI service unresponsive." };
+    }
+    return { diagnostic: "Connection failed.", status: "AI service offline." };
+  };
+
   async function handleUpgrade() {
     await openUrl(`${BACKEND_URL}/register/plan?platform=desktop`);
   }
+
+  const failureDiagnostic = getFailureDiagnostic();
 
   return (
     <div className="space-y-4 animate-fade-in relative">
@@ -133,9 +164,9 @@ export default function SettingAiHealthCheckResult({ result, onClose }: SettingA
             </>
           ) : (
             <>
-              {`[DIAGNOSTIC] Connection failed.\n`}
-              {`[ERROR] Server returned connection error.\n`}
-              {`[STATUS] AI service offline.`}
+              {`[DIAGNOSTIC] ${failureDiagnostic.diagnostic}\n`}
+              {`[ERROR] ${stripKnownCodePrefix(result.message)}\n`}
+              {`[STATUS] ${failureDiagnostic.status}`}
             </>
           )}
         </div>
