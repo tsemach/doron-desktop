@@ -8,4 +8,3 @@ export const isFolderAtom = atom<boolean>(false);
 export const itemsAtom = atom<ProgressItem[]>([]);
 export const summaryAtom = atom<IndexSummary | null>(null);
 export const errorAtom = atom<string | null>(null);
-export const dbPathAtom = atom<string>("");

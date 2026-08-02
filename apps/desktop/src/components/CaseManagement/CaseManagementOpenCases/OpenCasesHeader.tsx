@@ -12,7 +12,12 @@ export default function OpenCasesHeader({
   return (
     <div className="flex items-center justify-between mb-6 shrink-0">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Case Management</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Case Management{" "}
+          <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider align-middle bg-red-50 text-red-600 border border-red-200">
+            Beta
+          </span>
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Track active cases, their statuses, and associated documents.
         </p>

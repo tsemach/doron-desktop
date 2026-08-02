@@ -8,11 +8,9 @@ import { Scan } from "./scan";
 import { SmartSearch } from "./search";
 import { useAtom } from "jotai";
 import { aiConfigAtom } from "../../store/aiStore";
-import { dbPathAtom } from "../../store/indexStore";
 import { useIndexing } from "../../hooks/useIndexing";
 
 export default function DocsManagement() {
-  const [dbPath, setDbPath] = useAtom(dbPathAtom);
   const [aiConfig, setAiConfig] = useAtom(aiConfigAtom);
   const {
     isProcessing,
@@ -30,16 +28,14 @@ export default function DocsManagement() {
   } = useIndexing();
 
   useEffect(() => {
-    invoke<string>("get_db_path").then(setDbPath).catch(() => { });
     invoke<any>("get_ai_settings").then(setAiConfig).catch(() => { });
-  }, [setDbPath, setAiConfig]);
+  }, [setAiConfig]);
 
   const currentItem = items.find((i) => i.status === "processing");
 
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       <DocsManagementHeader
-        dbPath={dbPath}
         isProcessing={isProcessing}
         scanCount={
           isFolder && (isProcessing || showOutput || items.length > 0)

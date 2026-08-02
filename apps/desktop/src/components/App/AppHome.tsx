@@ -104,6 +104,9 @@ export default function AppHome() {
           <h2 className="text-3xl font-bold tracking-tight">
             {username ? (
               <>
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider align-middle bg-red-50 text-red-600 border border-red-200 mr-2">
+                  Beta
+                </span>
                 {t("welcome")}, {username} <PlanBadge />
               </>
             ) : (
