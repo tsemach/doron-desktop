@@ -150,6 +150,24 @@ export default function CasesManagementTaskTemplate() {
     }
   }
 
+  async function handleUpdateItem(itemId: number, item: TaskTemplateItemDraft) {
+    if (!activeTemplate) return;
+    try {
+      await invoke("update_task_template", {
+        id: activeTemplate.id,
+        name: activeTemplate.name,
+        items: activeTemplate.items.map((i) =>
+          i.id === itemId
+            ? { title: item.title, estimate_value: item.estimateValue, estimate_unit: item.estimateUnit, description: item.description || null }
+            : toItemInput(i)
+        ),
+      });
+      await loadData();
+    } catch (err) {
+      alert(`Error updating task: ${err}`);
+    }
+  }
+
   async function handleRemoveItem(itemId: number) {
     if (!activeTemplate) return;
     try {
@@ -218,6 +236,7 @@ export default function CasesManagementTaskTemplate() {
                   onDelete={handleDeleteTemplate}
                   onRename={handleRenameTemplate}
                   onAddItem={handleAddItem}
+                  onUpdateItem={handleUpdateItem}
                   onRemoveItem={handleRemoveItem}
                 />
               ) : (

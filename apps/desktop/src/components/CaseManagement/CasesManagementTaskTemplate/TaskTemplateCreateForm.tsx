@@ -122,8 +122,8 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
             )}
           </div>
 
-          <form onSubmit={handleAddItem} className="space-y-2 pt-1">
-            <div className="flex gap-2">
+          <form onSubmit={handleAddItem} className="space-y-4 pt-1">
+            <div className="flex gap-4">
               <input
                 type="text"
                 value={newTitle}

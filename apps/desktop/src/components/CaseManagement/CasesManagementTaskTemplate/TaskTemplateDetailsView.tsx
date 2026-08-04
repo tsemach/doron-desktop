@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TaskTemplate, TaskTemplateItemDraft } from "@/lib/task/types";
+import { TaskTemplate, TaskTemplateItem, TaskTemplateItemDraft } from "@/lib/task/types";
 import { parseEstimateShorthand, formatEstimateShorthand } from "@/lib/task/estimate";
 import TaskTemplateDeleteWarningModal from "./TaskTemplateDeleteWarningModal";
 
@@ -8,6 +8,7 @@ interface TaskTemplateDetailsViewProps {
   onDelete: () => Promise<void>;
   onRename: (newName: string) => Promise<void>;
   onAddItem: (item: TaskTemplateItemDraft) => Promise<void>;
+  onUpdateItem: (itemId: number, item: TaskTemplateItemDraft) => Promise<void>;
   onRemoveItem: (itemId: number) => Promise<void>;
 }
 
@@ -16,6 +17,7 @@ export default function TaskTemplateDetailsView({
   onDelete,
   onRename,
   onAddItem,
+  onUpdateItem,
   onRemoveItem,
 }: TaskTemplateDetailsViewProps) {
   const [isEditingName, setIsEditingName] = useState(false);
@@ -28,12 +30,45 @@ export default function TaskTemplateDetailsView({
   const [titleError, setTitleError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editEstimate, setEditEstimate] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editTitleError, setEditTitleError] = useState<string | null>(null);
+  const [editEstimateError, setEditEstimateError] = useState<string | null>(null);
+
   useEffect(() => {
     setIsEditingName(false);
     setIsAddingItem(false);
+    setEditingItemId(null);
     setShowDeleteConfirm(false);
     setEditingNameValue(activeTemplate.name);
   }, [activeTemplate]);
+
+  function startEditItem(item: TaskTemplateItem) {
+    setIsAddingItem(false);
+    setEditingItemId(item.id);
+    setEditTitle(item.title);
+    setEditEstimate(formatEstimateShorthand(item.estimate_value, item.estimate_unit));
+    setEditDescription(item.description ?? "");
+    setEditTitleError(null);
+    setEditEstimateError(null);
+  }
+
+  async function handleSaveEditItem(e: React.FormEvent, itemId: number) {
+    e.preventDefault();
+    if (!editTitle.trim()) {
+      setEditTitleError("Please enter a task title.");
+      return;
+    }
+    const parsed = parseEstimateShorthand(editEstimate);
+    if (!parsed) {
+      setEditEstimateError('Enter an estimate like "3d", "0.5d" or "4h".');
+      return;
+    }
+    await onUpdateItem(itemId, { title: editTitle.trim(), estimateValue: parsed.value, estimateUnit: parsed.unit, description: editDescription.trim() });
+    setEditingItemId(null);
+  }
 
   async function handleSaveNameInline(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -135,7 +170,10 @@ export default function TaskTemplateDetailsView({
             <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
               <button
                 type="button"
-                onClick={() => setIsAddingItem(true)}
+                onClick={() => {
+                  setEditingItemId(null);
+                  setIsAddingItem(true);
+                }}
                 className="inline-flex items-center gap-0.5 text-xs text-primary-foreground hover:underline hover:text-primary-foreground/80 font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
@@ -152,42 +190,109 @@ export default function TaskTemplateDetailsView({
           <p className="text-xs text-muted-foreground italic">No tasks in this template yet.</p>
         ) : (
           <div className="space-y-2">
-            {activeTemplate.items.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-start justify-between p-3 rounded-md border border-border bg-muted/20"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground truncate" title={item.title}>
-                      {item.title}
-                    </span>
-                    <span className="text-xs font-mono bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 border border-border shrink-0">
-                      {formatEstimateShorthand(item.estimate_value, item.estimate_unit)}
-                    </span>
-                  </div>
-                  {item.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-line">{item.description}</p>
-                  )}
-                </div>
-                <button
-                  onClick={() => onRemoveItem(item.id)}
-                  className="p-1 text-muted-foreground hover:text-destructive hover:bg-accent rounded transition-all cursor-pointer ml-2 shrink-0"
-                  title="Remove task from template"
+            {activeTemplate.items.map((item) =>
+              editingItemId === item.id ? (
+                <form
+                  key={item.id}
+                  onSubmit={(e) => handleSaveEditItem(e, item.id)}
+                  className="space-y-4 p-3 rounded-md border border-dashed border-input bg-muted/10"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
+                  <div className="flex gap-4">
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => {
+                        setEditTitle(e.target.value);
+                        setEditTitleError(null);
+                      }}
+                      placeholder="Task title"
+                      className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                      autoFocus
+                    />
+                    <input
+                      type="text"
+                      value={editEstimate}
+                      onChange={(e) => {
+                        setEditEstimate(e.target.value);
+                        setEditEstimateError(null);
+                      }}
+                      placeholder="3d, 0.5d, 4h"
+                      className="w-32 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    />
+                  </div>
+                  {editTitleError && <p className="text-xs text-destructive">{editTitleError}</p>}
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Description (optional)"
+                    rows={2}
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-y"
+                  />
+                  {editEstimateError && <p className="text-xs text-destructive">{editEstimateError}</p>}
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingItemId(null)}
+                      className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
+                    >
+                      Cancel
+                    </button>
+                    <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
+                      <button type="submit" className="text-xs font-semibold text-primary-foreground hover:underline hover:text-primary-foreground/80">
+                        Save Task
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <div
+                  key={item.id}
+                  className="flex items-start justify-between p-3 rounded-md border border-border bg-muted/20"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground truncate" title={item.title}>
+                        {item.title}
+                      </span>
+                      <span className="text-xs font-mono bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 border border-border shrink-0">
+                        {formatEstimateShorthand(item.estimate_value, item.estimate_unit)}
+                      </span>
+                    </div>
+                    {item.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-line">{item.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
+                    <button
+                      onClick={() => startEditItem(item)}
+                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all cursor-pointer"
+                      title="Edit task"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => onRemoveItem(item.id)}
+                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-accent rounded transition-all cursor-pointer"
+                      title="Remove task from template"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
 
         {isAddingItem && (
-          <form onSubmit={handleAddItemInline} className="space-y-2 p-3 rounded-md border border-dashed border-input bg-muted/10">
-            <div className="flex gap-2">
+          <form onSubmit={handleAddItemInline} className="space-y-4 p-3 rounded-md border border-dashed border-input bg-muted/10">
+            <div className="flex gap-4">
               <input
                 type="text"
                 value={newTitle}
