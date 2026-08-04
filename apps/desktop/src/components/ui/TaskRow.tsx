@@ -62,16 +62,23 @@ function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }:
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        <select
-          value={task.status}
-          onChange={(e) => onStatusChange(task.id, e.target.value as TaskStatus)}
-          className="rounded border border-input bg-background px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
-          title="Change status"
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            value={task.status}
+            onChange={(e) => onStatusChange(task.id, e.target.value as TaskStatus)}
+            className="rounded border-0 shadow-[0_0_0_1px_var(--border)] bg-background pl-1.5 pr-5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+            title="Change status"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-1.5 flex items-center pointer-events-none text-muted-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
         <button
           onClick={() => onEdit(task)}
           className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all cursor-pointer"
