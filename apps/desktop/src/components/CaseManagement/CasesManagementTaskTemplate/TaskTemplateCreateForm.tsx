@@ -15,6 +15,7 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
   const [newEstimate, setNewEstimate] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function handleAddItem(e?: React.FormEvent) {
@@ -38,7 +39,7 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
 
   async function handleFormSubmit() {
     if (!templateName.trim()) {
-      alert("Please enter a template name.");
+      setNameError("Please enter a template name.");
       return;
     }
     setSubmitting(true);
@@ -67,11 +68,15 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
             id="taskTemplateName"
             type="text"
             value={templateName}
-            onChange={(e) => setTemplateName(e.target.value)}
+            onChange={(e) => {
+              setTemplateName(e.target.value);
+              setNameError(null);
+            }}
             placeholder="e.g. Litigation Basics, Tenant Eviction"
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
             disabled={submitting}
           />
+          {nameError && <p className="text-xs text-destructive">{nameError}</p>}
         </div>
 
         <div className="space-y-1.5">
