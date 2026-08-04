@@ -26,3 +26,15 @@ export interface TaskTemplateItemDraft {
   estimateUnit: EstimateUnit;
   description: string;
 }
+
+// Editable per-case-creation-flow review row, seeded from a selected
+// TaskTemplate's items before the case (and its concrete tasks) exist.
+// estimateShorthand keeps the raw "3d"/"0.5d"/"4h" text so the user can type
+// freely; it's parsed back to (value, unit) only at submit time.
+export interface CaseTaskDraft {
+  templateItemId: number;
+  selected: boolean;
+  title: string;
+  estimateShorthand: string;
+  description: string;
+}

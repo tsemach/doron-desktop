@@ -4,10 +4,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Case, CaseTemplate, DocTemplate } from "./CaseManagementTypes";
 import { TaskTemplate } from "@/lib/task/types";
+import { parseEstimateShorthand } from "@/lib/task/estimate";
 import mammoth from "mammoth";
 import CaseManagementCaseCreateForm from "./CaseManagementCaseCreateForm";
 import CaseManagementCaseCreateFormActions from "./CaseManagementCaseCreateFormActions";
 import CaseManagementCaseCreateTemplateFields from "./CaseManagementCaseCreateTemplateFields";
+import CaseManagementCaseCreateTaskReview from "./CaseManagementCaseCreateTaskReview";
 import { useRowFields } from "@/hooks/useRowFields";
 import { useSplitPane } from "@/hooks/useSplitPane";
 import {
@@ -33,6 +35,7 @@ export default function CaseManagementCaseCreate() {
     templates,
     docTemplates,
     taskTemplates,
+    taskDrafts,
     fieldValues,
     searchQuery,
     selectedRow,
@@ -103,6 +106,7 @@ export default function CaseManagementCaseCreate() {
 
   // Parse fields for the currently selected template
   const activeTemplate = templates.find((t) => String(t.id) === selectedTemplateId);
+  const activeTaskTemplate = taskTemplates.find((t) => String(t.id) === selectedTaskTemplateId);
   const templateFields: string[] = useMemo(
     () => parseTemplateFields(activeTemplate),
     [activeTemplate]
@@ -345,6 +349,58 @@ export default function CaseManagementCaseCreate() {
       const isTaskTemplate = selectedTaskTemplateId !== EMPTY_TEMPLATE_ID;
       const taskTemplateIdNum = isTaskTemplate ? Number(selectedTaskTemplateId) : null;
 
+      // The user may have unchecked/edited any of the reviewed task drafts,
+      // so this explicit list -- not a blind re-materialization of the
+      // template -- is what actually gets created (create_new_case gives it
+      // priority over taskTemplateId).
+      let taskInputs: {
+        title: string;
+        description: string | null;
+        estimate_value: number | null;
+        estimate_unit: string | null;
+        template_item_id: number;
+      }[] | null = null;
+
+      if (isTaskTemplate) {
+        taskInputs = [];
+        for (const draft of taskDrafts) {
+          if (!draft.selected) continue;
+
+          if (!draft.title.trim()) {
+            dispatch({
+              type: CaseCreateActionType.SET_ERROR,
+              payload: "Please enter a title for every selected task, or uncheck it.",
+            });
+            dispatch({ type: CaseCreateActionType.SET_LOADING, payload: false });
+            return;
+          }
+
+          let estimateValue: number | null = null;
+          let estimateUnit: string | null = null;
+          if (draft.estimateShorthand.trim()) {
+            const parsed = parseEstimateShorthand(draft.estimateShorthand);
+            if (!parsed) {
+              dispatch({
+                type: CaseCreateActionType.SET_ERROR,
+                payload: `Invalid estimate for task "${draft.title}". Use a format like "3d" or "4h".`,
+              });
+              dispatch({ type: CaseCreateActionType.SET_LOADING, payload: false });
+              return;
+            }
+            estimateValue = parsed.value;
+            estimateUnit = parsed.unit;
+          }
+
+          taskInputs.push({
+            title: draft.title.trim(),
+            description: draft.description.trim() || null,
+            estimate_value: estimateValue,
+            estimate_unit: estimateUnit,
+            template_item_id: draft.templateItemId,
+          });
+        }
+      }
+
       // Call Rust backend command
       const createdCase = await invoke<Case>("create_new_case", {
         subject: subject.trim(),
@@ -352,6 +408,7 @@ export default function CaseManagementCaseCreate() {
         folder: folder.trim(),
         caseTemplateId: templateIdNum,
         taskTemplateId: taskTemplateIdNum,
+        tasks: taskInputs,
         fieldValues,
       });
 
@@ -376,10 +433,12 @@ export default function CaseManagementCaseCreate() {
   }
 
   const hasFields = selectedTemplateId !== EMPTY_TEMPLATE_ID && templateFields.length > 0;
+  const hasTasks = selectedTaskTemplateId !== EMPTY_TEMPLATE_ID && taskDrafts.length > 0;
+  const showRightPanel = hasFields || hasTasks;
 
   return (
     <main className="flex-1 overflow-auto p-4 bg-background">
-      <div className={`space-y-4 ${hasFields ? "max-w-none w-full" : "max-w-2xl"} transition-all duration-300`}>
+      <div className={`space-y-4 ${showRightPanel ? "max-w-none w-full" : "max-w-2xl"} transition-all duration-300`}>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Create New Case</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -405,7 +464,7 @@ export default function CaseManagementCaseCreate() {
           <div
             id="create-case-split-container"
             className={
-              hasFields
+              showRightPanel
                 ? `flex ${isLgScreen ? "flex-row gap-0 h-[calc(100vh-220px)] lg:h-[calc(100vh-200px)] min-h-[350px]" : "flex-col gap-4"} items-stretch relative ${
                     isDragging ? "select-none cursor-col-resize" : ""
                   }`
@@ -415,9 +474,9 @@ export default function CaseManagementCaseCreate() {
             {/* Left Column: Main Case Details */}
             <div
               className={`rounded-lg border border-border bg-card p-4 space-y-3 ${
-                hasFields && isLgScreen ? "shrink-0 overflow-y-auto" : ""
+                showRightPanel && isLgScreen ? "shrink-0 overflow-y-auto" : ""
               }`}
-              style={hasFields && isLgScreen ? { flex: `0 0 calc(${leftPercent}% - 6px)` } : undefined}
+              style={showRightPanel && isLgScreen ? { flex: `0 0 calc(${leftPercent}% - 6px)` } : undefined}
             >
               <CaseManagementCaseCreateForm
                 subject={subject}
@@ -451,8 +510,8 @@ export default function CaseManagementCaseCreate() {
               />
             </div>
 
-            {/* Resizable Divider (rendered only on large screens when fields are shown) */}
-            {hasFields && isLgScreen && (
+            {/* Resizable Divider (rendered only on large screens when the right panel is shown) */}
+            {showRightPanel && isLgScreen && (
               <div
                 onMouseDown={startDragging}
                 className={`w-3 group cursor-col-resize flex items-center justify-center shrink-0 z-20 select-none ${
@@ -467,54 +526,74 @@ export default function CaseManagementCaseCreate() {
               </div>
             )}
 
-            {/* Right Column: Dynamic Template Fields */}
-            {hasFields && (
-              <CaseManagementCaseCreateTemplateFields
-                isLgScreen={isLgScreen}
-                activeTemplate={activeTemplate}
-                associatedDocs={associatedDocs}
-                showAllPreviews={showAllPreviews}
-                onShowAllPreviewsChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_SHOW_ALL_PREVIEWS, payload: value })
-                }
-                searchQuery={searchQuery}
-                onSearchQueryChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_SEARCH_QUERY, payload: value })
-                }
-                uniqueRows={uniqueRows}
-                selectedRow={selectedRow}
-                onSelectedRowChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_SELECTED_ROW, payload: value })
-                }
-                filterDocId={filterDocId}
-                onFilterDocIdChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_FILTER_DOC_ID, payload: value })
-                }
-                filteredTemplateFields={filteredTemplateFields}
-                fieldValues={fieldValues}
-                onFieldValuesChange={(values) =>
-                  dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
-                }
-                focusedField={focusedField}
-                onFocusedFieldChange={handleFocusedFieldChange}
-                loading={loading}
-                isDraggingHeight={isDraggingHeight}
-                onStartDraggingHeight={startDraggingHeight}
-                bottomPercent={bottomPercent}
-                fieldToDocsMap={fieldToDocsMap}
-                expandedDocId={expandedDocId}
-                onExpandedDocIdChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: value })
-                }
-                onToggleDocContext={handleToggleDocContext}
-                onOpenTemplateFile={handleOpenTemplateFile}
-                docTemplates={docTemplates}
-                loadingContext={loadingContext}
-                previewError={previewError}
-                docHtmlCache={docHtmlCache}
-                templateFields={templateFields}
-                onFieldClickFromPreview={handleFieldClickFromPreview}
-              />
+            {/* Right Column: Dynamic Template Fields + Task Review, stacked when both apply */}
+            {showRightPanel && (
+              <div
+                className={`flex flex-col gap-4 min-w-0 ${isLgScreen ? "h-full" : ""}`}
+                style={isLgScreen ? { flex: "1 1 0%" } : undefined}
+              >
+                {hasFields && (
+                  <CaseManagementCaseCreateTemplateFields
+                    isLgScreen={isLgScreen}
+                    activeTemplate={activeTemplate}
+                    associatedDocs={associatedDocs}
+                    showAllPreviews={showAllPreviews}
+                    onShowAllPreviewsChange={(value) =>
+                      dispatch({ type: CaseCreateActionType.SET_SHOW_ALL_PREVIEWS, payload: value })
+                    }
+                    searchQuery={searchQuery}
+                    onSearchQueryChange={(value) =>
+                      dispatch({ type: CaseCreateActionType.SET_SEARCH_QUERY, payload: value })
+                    }
+                    uniqueRows={uniqueRows}
+                    selectedRow={selectedRow}
+                    onSelectedRowChange={(value) =>
+                      dispatch({ type: CaseCreateActionType.SET_SELECTED_ROW, payload: value })
+                    }
+                    filterDocId={filterDocId}
+                    onFilterDocIdChange={(value) =>
+                      dispatch({ type: CaseCreateActionType.SET_FILTER_DOC_ID, payload: value })
+                    }
+                    filteredTemplateFields={filteredTemplateFields}
+                    fieldValues={fieldValues}
+                    onFieldValuesChange={(values) =>
+                      dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
+                    }
+                    focusedField={focusedField}
+                    onFocusedFieldChange={handleFocusedFieldChange}
+                    loading={loading}
+                    isDraggingHeight={isDraggingHeight}
+                    onStartDraggingHeight={startDraggingHeight}
+                    bottomPercent={bottomPercent}
+                    fieldToDocsMap={fieldToDocsMap}
+                    expandedDocId={expandedDocId}
+                    onExpandedDocIdChange={(value) =>
+                      dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: value })
+                    }
+                    onToggleDocContext={handleToggleDocContext}
+                    onOpenTemplateFile={handleOpenTemplateFile}
+                    docTemplates={docTemplates}
+                    loadingContext={loadingContext}
+                    previewError={previewError}
+                    docHtmlCache={docHtmlCache}
+                    templateFields={templateFields}
+                    onFieldClickFromPreview={handleFieldClickFromPreview}
+                  />
+                )}
+
+                {hasTasks && (
+                  <CaseManagementCaseCreateTaskReview
+                    taskTemplateName={activeTaskTemplate?.name}
+                    taskDrafts={taskDrafts}
+                    onUpdateDraft={(index, patch) =>
+                      dispatch({ type: CaseCreateActionType.UPDATE_TASK_DRAFT, payload: { index, patch } })
+                    }
+                    loading={loading}
+                    isLgScreen={isLgScreen}
+                    fillsAvailableSpace={!hasFields}
+                  />
+                )}
+              </div>
             )}
           </div>
 
