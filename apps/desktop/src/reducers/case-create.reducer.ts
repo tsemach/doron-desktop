@@ -1,4 +1,5 @@
 import { CaseTemplate, DocTemplate } from "@/components/CaseManagement/CaseManagementTypes";
+import { TaskTemplate } from "@/lib/task/types";
 
 export const FOLDER_IN_USE_ERROR = "A case with this storage directory path already exists.";
 
@@ -10,6 +11,7 @@ export enum CaseCreateActionType {
   SET_COMPANY = "SET_COMPANY",
   SET_FOLDER = "SET_FOLDER",
   SELECT_TEMPLATE = "SELECT_TEMPLATE",
+  SELECT_TASK_TEMPLATE = "SELECT_TASK_TEMPLATE",
   TEMPLATES_LOADED = "TEMPLATES_LOADED",
   SET_FIELD_VALUES = "SET_FIELD_VALUES",
   SET_SEARCH_QUERY = "SET_SEARCH_QUERY",
@@ -35,10 +37,12 @@ export interface CaseCreateState {
   company: string;
   folder: string;
   selectedTemplateId: string;
+  selectedTaskTemplateId: string;
 
   // Templates loaded from SQLite
   templates: CaseTemplate[];
   docTemplates: DocTemplate[];
+  taskTemplates: TaskTemplate[];
 
   // Template field entry and filtering
   fieldValues: Record<string, string>;
@@ -69,9 +73,10 @@ export type CaseCreateAction =
   | { type: CaseCreateActionType.SET_COMPANY; payload: string }
   | { type: CaseCreateActionType.SET_FOLDER; payload: string }
   | { type: CaseCreateActionType.SELECT_TEMPLATE; payload: string }
+  | { type: CaseCreateActionType.SELECT_TASK_TEMPLATE; payload: string }
   | {
       type: CaseCreateActionType.TEMPLATES_LOADED;
-      payload: { templates: CaseTemplate[]; docTemplates: DocTemplate[] };
+      payload: { templates: CaseTemplate[]; docTemplates: DocTemplate[]; taskTemplates: TaskTemplate[] };
     }
   | { type: CaseCreateActionType.SET_FIELD_VALUES; payload: Record<string, string> }
   | { type: CaseCreateActionType.SET_SEARCH_QUERY; payload: string }
@@ -110,8 +115,10 @@ export function createInitialCaseCreateState(): CaseCreateState {
     company: "",
     folder: "",
     selectedTemplateId: EMPTY_TEMPLATE_ID,
+    selectedTaskTemplateId: EMPTY_TEMPLATE_ID,
     templates: [],
     docTemplates: [],
+    taskTemplates: [],
     fieldValues: {},
     searchQuery: "",
     selectedRow: null,
@@ -163,11 +170,17 @@ export function caseCreateReducer(state: CaseCreateState, action: CaseCreateActi
       };
     }
 
+    // No dynamic fields to reset for a task template (unlike a case template's
+    // document field values), so this is a plain selection with no side effects.
+    case CaseCreateActionType.SELECT_TASK_TEMPLATE:
+      return { ...state, selectedTaskTemplateId: action.payload };
+
     case CaseCreateActionType.TEMPLATES_LOADED:
       return {
         ...state,
         templates: action.payload.templates,
         docTemplates: action.payload.docTemplates,
+        taskTemplates: action.payload.taskTemplates,
       };
 
     case CaseCreateActionType.SET_FIELD_VALUES:

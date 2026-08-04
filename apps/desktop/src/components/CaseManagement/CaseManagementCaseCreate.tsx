@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Case, CaseTemplate, DocTemplate } from "./CaseManagementTypes";
+import { TaskTemplate } from "@/lib/task/types";
 import mammoth from "mammoth";
 import CaseManagementCaseCreateForm from "./CaseManagementCaseCreateForm";
 import CaseManagementCaseCreateFormActions from "./CaseManagementCaseCreateFormActions";
@@ -28,8 +29,10 @@ export default function CaseManagementCaseCreate() {
     company,
     folder,
     selectedTemplateId,
+    selectedTaskTemplateId,
     templates,
     docTemplates,
+    taskTemplates,
     fieldValues,
     searchQuery,
     selectedRow,
@@ -80,15 +83,16 @@ export default function CaseManagementCaseCreate() {
   }, []);
 
   useEffect(() => {
-    // Fetch case templates and doc templates from SQLite
+    // Fetch case templates, doc templates, and task templates from SQLite
     Promise.all([
       invoke<CaseTemplate[]>("list_case_templates"),
       invoke<DocTemplate[]>("list_templates"),
+      invoke<TaskTemplate[]>("list_task_templates"),
     ])
-      .then(([caseRes, docRes]) => {
+      .then(([caseRes, docRes, taskRes]) => {
         dispatch({
           type: CaseCreateActionType.TEMPLATES_LOADED,
-          payload: { templates: caseRes, docTemplates: docRes },
+          payload: { templates: caseRes, docTemplates: docRes, taskTemplates: taskRes },
         });
       })
       .catch((err) => {
@@ -338,6 +342,8 @@ export default function CaseManagementCaseCreate() {
 
       const isTemplate = selectedTemplateId !== EMPTY_TEMPLATE_ID;
       const templateIdNum = isTemplate ? Number(selectedTemplateId) : null;
+      const isTaskTemplate = selectedTaskTemplateId !== EMPTY_TEMPLATE_ID;
+      const taskTemplateIdNum = isTaskTemplate ? Number(selectedTaskTemplateId) : null;
 
       // Call Rust backend command
       const createdCase = await invoke<Case>("create_new_case", {
@@ -345,6 +351,7 @@ export default function CaseManagementCaseCreate() {
         name: name.trim(),
         folder: folder.trim(),
         caseTemplateId: templateIdNum,
+        taskTemplateId: taskTemplateIdNum,
         fieldValues,
       });
 
@@ -434,6 +441,11 @@ export default function CaseManagementCaseCreate() {
                 selectedTemplateId={selectedTemplateId}
                 onTemplateChange={(value) =>
                   dispatch({ type: CaseCreateActionType.SELECT_TEMPLATE, payload: value })
+                }
+                taskTemplates={taskTemplates}
+                selectedTaskTemplateId={selectedTaskTemplateId}
+                onTaskTemplateChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SELECT_TASK_TEMPLATE, payload: value })
                 }
                 loading={loading}
               />
