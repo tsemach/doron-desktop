@@ -106,15 +106,22 @@ export default function TaskManagementDashboard() {
                   placeholder="Search title or case..."
                   className="rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring transition-all w-56"
                 />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "all")}
-                  className="rounded-md border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
-                >
-                  {STATUS_FILTER_OPTIONS.map((s) => (
-                    <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "all")}
+                    className="rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background pl-2 pr-7 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+                  >
+                    {STATUS_FILTER_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-muted-foreground">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </div>
             <TaskList
