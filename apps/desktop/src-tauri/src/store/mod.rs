@@ -1023,10 +1023,23 @@ const TASKS_SCHEMA: &str = "
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 ";
 
+/// Computes a due_date timestamp from a base (usually the case's created_at)
+/// plus an estimate, converted to minutes (a "day" estimate is treated as
+/// 24h) since estimates may be fractional (e.g. 0.5 day) or already
+/// hour-granular. Shared by template materialization and explicit ad-hoc
+/// task creation so both compute due dates identically.
+fn compute_due_date_from_estimate(base_iso: &str, estimate_value: f64, estimate_unit: &str) -> String {
+    let base = chrono::DateTime::parse_from_rfc3339(base_iso)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|_| chrono::Utc::now());
+    let value_in_hours = if estimate_unit == "day" { estimate_value * 24.0 } else { estimate_value };
+    (base + chrono::Duration::minutes((value_in_hours * 60.0).round() as i64)).to_rfc3339()
+}
+
 /// Materializes a task_template's items into concrete `tasks` rows for a newly
-/// created case. due_date is computed from the case's created_at plus the item's
-/// estimate, converted to minutes (a "day" estimate is treated as 24h) since
-/// estimates may be fractional (e.g. 0.5 day) or already hour-granular.
+/// created case, unedited. Used when the caller passes a task_template_id with
+/// no explicit `tasks` override (see `create_tasks_for_new_case` for the
+/// user-reviewed/edited path, which takes priority when both are given).
 pub fn materialize_tasks_from_template(
     conn: &Connection,
     case_id: i64,
@@ -1043,19 +1056,55 @@ pub fn materialize_tasks_from_template(
         })?
         .collect::<Result<Vec<_>, _>>()?;
 
-    let base = chrono::DateTime::parse_from_rfc3339(case_created_at)
-        .map(|dt| dt.with_timezone(&chrono::Utc))
-        .unwrap_or_else(|_| chrono::Utc::now());
     let now = chrono::Utc::now().to_rfc3339();
 
     for (item_id, title, estimate_value, estimate_unit, description) in items {
-        let value_in_hours = if estimate_unit == "day" { estimate_value * 24.0 } else { estimate_value };
-        let due_date = (base + chrono::Duration::minutes((value_in_hours * 60.0).round() as i64)).to_rfc3339();
+        let due_date = compute_due_date_from_estimate(case_created_at, estimate_value, &estimate_unit);
 
         conn.execute(
             "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at)
              VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
             params![case_id, title, description, estimate_value, estimate_unit, due_date, item_id, now],
+        )?;
+    }
+
+    Ok(())
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct NewTaskInput {
+    pub title: String,
+    pub description: Option<String>,
+    pub estimate_value: Option<f64>,
+    pub estimate_unit: Option<String>,
+    // Set when this draft originated from a task_template_item the user
+    // reviewed/edited in the case-creation UI, kept for traceability; None
+    // for a task typed from scratch (not currently offered in that UI, but
+    // the column and this input both already support it).
+    pub template_item_id: Option<i64>,
+}
+
+/// Inserts explicit, already-reviewed task drafts for a newly created case
+/// (the case-creation UI's task review panel lets the user uncheck/edit a
+/// task template's items before the case exists) -- see `NewTaskInput`.
+pub fn create_tasks_for_new_case(
+    conn: &Connection,
+    case_id: i64,
+    case_created_at: &str,
+    tasks: &[NewTaskInput],
+) -> Result<(), rusqlite::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for t in tasks {
+        let due_date = match (t.estimate_value, t.estimate_unit.as_deref()) {
+            (Some(value), Some(unit)) => Some(compute_due_date_from_estimate(case_created_at, value, unit)),
+            _ => None,
+        };
+
+        conn.execute(
+            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at)
+             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
+            params![case_id, t.title, t.description, t.estimate_value, t.estimate_unit, due_date, t.template_item_id, now],
         )?;
     }
 
