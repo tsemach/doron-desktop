@@ -132,16 +132,19 @@ export default function TaskTemplateDetailsView({
             Tasks ({activeTemplate.items.length})
           </h4>
           {!isAddingItem && (
-            <button
-              onClick={() => setIsAddingItem(true)}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
-                <path d="M5 12h14" />
-                <path d="M12 5v14" />
-              </svg>
-              Add Task
-            </button>
+            <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
+              <button
+                type="button"
+                onClick={() => setIsAddingItem(true)}
+                className="inline-flex items-center gap-0.5 text-xs text-primary-foreground hover:underline hover:text-primary-foreground/80 font-medium"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+                Add Task
+              </button>
+            </div>
           )}
         </div>
 
