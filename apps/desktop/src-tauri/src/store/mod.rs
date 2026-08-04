@@ -138,6 +138,20 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     conn.execute_batch(CASE_TEMPLATES_SCHEMA).map_err(|e| format!("[case templates schema] {e}"))?;
 
+    // Drop task_template_items if it still has the pre-estimate_value/estimate_unit
+    // shape (estimate_time INTEGER). That column layout only ever existed in local
+    // dev databases during this feature's own development, before this table shipped
+    // anywhere -- CREATE TABLE IF NOT EXISTS won't fix an already-existing table with
+    // the old columns, and there's no real data to preserve, so recreate it fresh.
+    let task_template_items_stale: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('task_template_items') WHERE name='estimate_time'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if task_template_items_stale {
+        let _ = conn.execute("DROP TABLE task_template_items;", []);
+    }
+
     conn.execute_batch(TASK_TEMPLATES_SCHEMA).map_err(|e| format!("[task templates schema] {e}"))?;
 
     conn.execute_batch("
