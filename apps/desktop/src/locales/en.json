@@ -4,6 +4,7 @@
   "search": "Search",
   "new_case": "New Case",
   "template": "Case Templates",
+  "task_templates": "Task Templates",
   "settings": "Settings",
   "user_name": "User Name",
   "claude_api_key": "Claude API Key",

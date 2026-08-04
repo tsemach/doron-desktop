@@ -4,6 +4,7 @@
   "search": "חיפוש",
   "new_case": "תיק חדש",
   "template": "תבניות תיקים",
+  "task_templates": "תבניות משימות",
   "settings": "הגדרות",
   "user_name": "שם משתמש",
   "claude_api_key": "מפתח API של Claude",
