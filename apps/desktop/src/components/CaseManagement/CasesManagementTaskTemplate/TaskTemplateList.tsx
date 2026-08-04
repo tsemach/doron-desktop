@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import { Button } from "../../ui/button";
 import { TaskTemplate } from "@/lib/task/types";
 
@@ -39,9 +40,15 @@ export default function TaskTemplateList({
         <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
           Templates ({taskTemplates.length})
         </span>
-        <Button size="sm" onClick={onStartCreate} className="h-7 px-2.5 text-xs">
-          + New Template
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" disabled title="Coming soon">
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Download
+          </Button>
+          <Button size="sm" onClick={onStartCreate} className="h-7 px-2.5 text-xs">
+            + New Template
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto divide-y divide-border">
