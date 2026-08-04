@@ -8,6 +8,7 @@ pub mod llm;
 pub mod indexer;
 pub mod doc_template;
 pub mod case_template;
+pub mod task_template;
 pub mod case;
 pub mod query;
 pub mod embeddings;
@@ -175,6 +176,11 @@ pub fn run() {
             case_template::create_case_template,
             case_template::update_case_template,
             case_template::delete_case_template,
+            // task_template
+            task_template::list_task_templates,
+            task_template::create_task_template,
+            task_template::update_task_template,
+            task_template::delete_task_template,
             // case
             case::list_cases,
             case::resolve_cases_for_paths,

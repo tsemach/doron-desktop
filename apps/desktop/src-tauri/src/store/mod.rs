@@ -138,6 +138,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     conn.execute_batch(CASE_TEMPLATES_SCHEMA).map_err(|e| format!("[case templates schema] {e}"))?;
 
+    conn.execute_batch(TASK_TEMPLATES_SCHEMA).map_err(|e| format!("[task templates schema] {e}"))?;
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -832,6 +834,146 @@ pub fn update_case_template(
 pub fn delete_case_template(conn: &Connection, id: i64) -> Result<(), rusqlite::Error> {
     conn.execute(
         "DELETE FROM case_templates WHERE id = ?1",
+        params![id],
+    )?;
+    Ok(())
+}
+
+// ── Task Templates ────────────────────────────────────────────────────────────
+
+const TASK_TEMPLATES_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS task_templates (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT    NOT NULL UNIQUE,
+        created_at  TEXT    NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS task_template_items (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_template_id  INTEGER NOT NULL,
+        title             TEXT    NOT NULL,
+        estimate_time     INTEGER NOT NULL, -- days
+        description       TEXT,
+        sort_order        INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (task_template_id) REFERENCES task_templates(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_task_template_items_template ON task_template_items(task_template_id);
+";
+
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct TaskTemplateItemRow {
+    pub id: i64,
+    pub title: String,
+    pub estimate_time: i64,
+    pub description: Option<String>,
+}
+
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct TaskTemplateRow {
+    pub id: i64,
+    pub name: String,
+    pub created_at: String,
+    pub items: Vec<TaskTemplateItemRow>,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct TaskTemplateItemInput {
+    pub title: String,
+    pub estimate_time: i64,
+    pub description: Option<String>,
+}
+
+pub fn create_task_template(
+    conn: &Connection,
+    name: &str,
+    items: &[TaskTemplateItemInput],
+) -> Result<i64, rusqlite::Error> {
+    let created_at = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT INTO task_templates (name, created_at) VALUES (?1, ?2)",
+        params![name, created_at],
+    )?;
+    let task_template_id = conn.last_insert_rowid();
+
+    for (idx, item) in items.iter().enumerate() {
+        conn.execute(
+            "INSERT INTO task_template_items (task_template_id, title, estimate_time, description, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![task_template_id, item.title, item.estimate_time, item.description, idx as i64],
+        )?;
+    }
+
+    Ok(task_template_id)
+}
+
+fn list_task_template_items(conn: &Connection, task_template_id: i64) -> Result<Vec<TaskTemplateItemRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, estimate_time, description FROM task_template_items
+         WHERE task_template_id = ?1 ORDER BY sort_order ASC"
+    )?;
+    let rows = stmt.query_map(params![task_template_id], |row| {
+        Ok(TaskTemplateItemRow {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            estimate_time: row.get(2)?,
+            description: row.get(3)?,
+        })
+    })?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub fn list_task_templates(conn: &Connection) -> Result<Vec<TaskTemplateRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, created_at FROM task_templates ORDER BY name ASC"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let id: i64 = row.get(0)?;
+        let name: String = row.get(1)?;
+        let created_at: String = row.get(2)?;
+        Ok((id, name, created_at))
+    })?;
+
+    let mut templates = Vec::new();
+    for r in rows {
+        let (id, name, created_at) = r?;
+        let items = list_task_template_items(conn, id)?;
+        templates.push(TaskTemplateRow { id, name, created_at, items });
+    }
+
+    Ok(templates)
+}
+
+pub fn update_task_template(
+    conn: &Connection,
+    id: i64,
+    name: &str,
+    items: &[TaskTemplateItemInput],
+) -> Result<(), rusqlite::Error> {
+    conn.execute(
+        "UPDATE task_templates SET name = ?1 WHERE id = ?2",
+        params![name, id],
+    )?;
+
+    conn.execute(
+        "DELETE FROM task_template_items WHERE task_template_id = ?1",
+        params![id],
+    )?;
+
+    for (idx, item) in items.iter().enumerate() {
+        conn.execute(
+            "INSERT INTO task_template_items (task_template_id, title, estimate_time, description, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, item.title, item.estimate_time, item.description, idx as i64],
+        )?;
+    }
+
+    Ok(())
+}
+
+pub fn delete_task_template(conn: &Connection, id: i64) -> Result<(), rusqlite::Error> {
+    conn.execute(
+        "DELETE FROM task_templates WHERE id = ?1",
         params![id],
     )?;
     Ok(())
