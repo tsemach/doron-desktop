@@ -852,7 +852,8 @@ const TASK_TEMPLATES_SCHEMA: &str = "
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
         task_template_id  INTEGER NOT NULL,
         title             TEXT    NOT NULL,
-        estimate_time     INTEGER NOT NULL, -- days
+        estimate_value    REAL    NOT NULL,
+        estimate_unit     TEXT    NOT NULL CHECK (estimate_unit IN ('day','hour')),
         description       TEXT,
         sort_order        INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (task_template_id) REFERENCES task_templates(id) ON DELETE CASCADE
@@ -864,7 +865,8 @@ const TASK_TEMPLATES_SCHEMA: &str = "
 pub struct TaskTemplateItemRow {
     pub id: i64,
     pub title: String,
-    pub estimate_time: i64,
+    pub estimate_value: f64,
+    pub estimate_unit: String,
     pub description: Option<String>,
 }
 
@@ -879,7 +881,8 @@ pub struct TaskTemplateRow {
 #[derive(serde::Deserialize, Clone)]
 pub struct TaskTemplateItemInput {
     pub title: String,
-    pub estimate_time: i64,
+    pub estimate_value: f64,
+    pub estimate_unit: String,
     pub description: Option<String>,
 }
 
@@ -898,9 +901,9 @@ pub fn create_task_template(
 
     for (idx, item) in items.iter().enumerate() {
         conn.execute(
-            "INSERT INTO task_template_items (task_template_id, title, estimate_time, description, sort_order)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![task_template_id, item.title, item.estimate_time, item.description, idx as i64],
+            "INSERT INTO task_template_items (task_template_id, title, estimate_value, estimate_unit, description, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![task_template_id, item.title, item.estimate_value, item.estimate_unit, item.description, idx as i64],
         )?;
     }
 
@@ -909,15 +912,16 @@ pub fn create_task_template(
 
 fn list_task_template_items(conn: &Connection, task_template_id: i64) -> Result<Vec<TaskTemplateItemRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, estimate_time, description FROM task_template_items
+        "SELECT id, title, estimate_value, estimate_unit, description FROM task_template_items
          WHERE task_template_id = ?1 ORDER BY sort_order ASC"
     )?;
     let rows = stmt.query_map(params![task_template_id], |row| {
         Ok(TaskTemplateItemRow {
             id: row.get(0)?,
             title: row.get(1)?,
-            estimate_time: row.get(2)?,
-            description: row.get(3)?,
+            estimate_value: row.get(2)?,
+            estimate_unit: row.get(3)?,
+            description: row.get(4)?,
         })
     })?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
@@ -962,9 +966,9 @@ pub fn update_task_template(
 
     for (idx, item) in items.iter().enumerate() {
         conn.execute(
-            "INSERT INTO task_template_items (task_template_id, title, estimate_time, description, sort_order)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, item.title, item.estimate_time, item.description, idx as i64],
+            "INSERT INTO task_template_items (task_template_id, title, estimate_value, estimate_unit, description, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![id, item.title, item.estimate_value, item.estimate_unit, item.description, idx as i64],
         )?;
     }
 
