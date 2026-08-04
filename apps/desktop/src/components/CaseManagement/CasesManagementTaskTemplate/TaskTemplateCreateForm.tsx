@@ -15,12 +15,16 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
   const [newEstimate, setNewEstimate] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function handleAddItem(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim()) {
+      setTitleError("Please enter a task title.");
+      return;
+    }
     const parsed = parseEstimateShorthand(newEstimate);
     if (!parsed) {
       setEstimateError('Enter an estimate like "3d", "0.5d" or "4h".');
@@ -30,6 +34,7 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
     setNewTitle("");
     setNewEstimate("");
     setNewDescription("");
+    setTitleError(null);
     setEstimateError(null);
   }
 
@@ -101,7 +106,7 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
                       </span>
                     </div>
                     {item.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-line">{item.description}</p>
                     )}
                   </div>
                   <button
@@ -122,7 +127,10 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
               <input
                 type="text"
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={(e) => {
+                  setNewTitle(e.target.value);
+                  setTitleError(null);
+                }}
                 placeholder="Task title (e.g. File response)"
                 className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 disabled={submitting}
@@ -139,12 +147,13 @@ export default function TaskTemplateCreateForm({ onSave, onCancel }: TaskTemplat
                 disabled={submitting}
               />
             </div>
-            <input
-              type="text"
+            {titleError && <p className="text-xs text-destructive">{titleError}</p>}
+            <textarea
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               placeholder="Description (optional)"
-              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              rows={2}
+              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-y"
               disabled={submitting}
             />
             {estimateError && <p className="text-xs text-destructive">{estimateError}</p>}

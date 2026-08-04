@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { TaskTemplate, TaskTemplateItemDraft } from "@/lib/task/types";
 import { parseEstimateShorthand, formatEstimateShorthand } from "@/lib/task/estimate";
 import TaskTemplateDeleteWarningModal from "./TaskTemplateDeleteWarningModal";
+import { Button } from "../../ui/button";
 
 interface TaskTemplateDetailsViewProps {
   activeTemplate: TaskTemplate;
@@ -25,6 +26,7 @@ export default function TaskTemplateDetailsView({
   const [newEstimate, setNewEstimate] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
@@ -43,7 +45,10 @@ export default function TaskTemplateDetailsView({
 
   async function handleAddItemInline(e: React.FormEvent) {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim()) {
+      setTitleError("Please enter a task title.");
+      return;
+    }
     const parsed = parseEstimateShorthand(newEstimate);
     if (!parsed) {
       setEstimateError('Enter an estimate like "3d", "0.5d" or "4h".');
@@ -53,6 +58,7 @@ export default function TaskTemplateDetailsView({
     setNewTitle("");
     setNewEstimate("");
     setNewDescription("");
+    setTitleError(null);
     setEstimateError(null);
     setIsAddingItem(false);
   }
@@ -127,16 +133,13 @@ export default function TaskTemplateDetailsView({
             Tasks ({activeTemplate.items.length})
           </h4>
           {!isAddingItem && (
-            <button
-              onClick={() => setIsAddingItem(true)}
-              className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline hover:text-primary/80 font-medium"
-            >
+            <Button size="sm" onClick={() => setIsAddingItem(true)} className="h-7 px-2.5 text-xs">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
                 <path d="M5 12h14" />
                 <path d="M12 5v14" />
               </svg>
               Add Task
-            </button>
+            </Button>
           )}
         </div>
 
@@ -159,7 +162,7 @@ export default function TaskTemplateDetailsView({
                     </span>
                   </div>
                   {item.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-line">{item.description}</p>
                   )}
                 </div>
                 <button
@@ -183,7 +186,10 @@ export default function TaskTemplateDetailsView({
               <input
                 type="text"
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={(e) => {
+                  setNewTitle(e.target.value);
+                  setTitleError(null);
+                }}
                 placeholder="Task title"
                 className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 autoFocus
@@ -199,12 +205,13 @@ export default function TaskTemplateDetailsView({
                 className="w-32 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring transition-all"
               />
             </div>
-            <input
-              type="text"
+            {titleError && <p className="text-xs text-destructive">{titleError}</p>}
+            <textarea
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               placeholder="Description (optional)"
-              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              rows={2}
+              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-y"
             />
             {estimateError && <p className="text-xs text-destructive">{estimateError}</p>}
             <div className="flex justify-end gap-2">
