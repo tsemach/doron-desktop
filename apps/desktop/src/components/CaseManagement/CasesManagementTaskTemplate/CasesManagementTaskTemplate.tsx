@@ -33,7 +33,7 @@ export default function CasesManagementTaskTemplate() {
   const activeTemplate = taskTemplates.find((tt) => tt.id === selectedTemplateId) || null;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [sidebarWidth, setSidebarWidth] = useState(400);
   const [isResizing, setIsResizing] = useState(false);
 
   const startResizing = (mouseDownEvent: React.MouseEvent) => {
