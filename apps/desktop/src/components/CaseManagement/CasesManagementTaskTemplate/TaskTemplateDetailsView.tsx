@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { TaskTemplate, TaskTemplateItemDraft } from "@/lib/task/types";
 import { parseEstimateShorthand, formatEstimateShorthand } from "@/lib/task/estimate";
 import TaskTemplateDeleteWarningModal from "./TaskTemplateDeleteWarningModal";
-import { Button } from "../../ui/button";
 
 interface TaskTemplateDetailsViewProps {
   activeTemplate: TaskTemplate;
@@ -133,13 +132,16 @@ export default function TaskTemplateDetailsView({
             Tasks ({activeTemplate.items.length})
           </h4>
           {!isAddingItem && (
-            <Button size="sm" onClick={() => setIsAddingItem(true)} className="h-7 px-2.5 text-xs">
+            <button
+              onClick={() => setIsAddingItem(true)}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-colors"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
                 <path d="M5 12h14" />
                 <path d="M12 5v14" />
               </svg>
               Add Task
-            </Button>
+            </button>
           )}
         </div>
 
