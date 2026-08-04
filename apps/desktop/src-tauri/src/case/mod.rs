@@ -116,6 +116,7 @@ pub async fn create_new_case(
     name: String,
     folder: String,
     case_template_id: Option<i64>,
+    task_template_id: Option<i64>,
     field_values: std::collections::HashMap<String, String>,
 ) -> Result<Case, String> {
     // 1. Open DB first and verify that this folder path is not already in use by another active case
@@ -153,6 +154,12 @@ pub async fn create_new_case(
     }
 
     refresh_case_matcher_indexes(&conn, id);
+
+    // If a task template is chosen, materialize its items into concrete tasks
+    if let Some(tt_id) = task_template_id {
+        store::materialize_tasks_from_template(&conn, id, tt_id, &created_at)
+            .map_err(|e| format!("[materialize tasks] {e}"))?;
+    }
 
     // 3. If a template is chosen, copy then fill documents
     if let Some(ct_id) = case_template_id {

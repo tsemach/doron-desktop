@@ -154,6 +154,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     conn.execute_batch(TASK_TEMPLATES_SCHEMA).map_err(|e| format!("[task templates schema] {e}"))?;
 
+    conn.execute_batch(TASKS_SCHEMA).map_err(|e| format!("[tasks schema] {e}"))?;
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -994,6 +996,69 @@ pub fn delete_task_template(conn: &Connection, id: i64) -> Result<(), rusqlite::
         "DELETE FROM task_templates WHERE id = ?1",
         params![id],
     )?;
+    Ok(())
+}
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+const TASKS_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS tasks (
+        id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+        case_id                INTEGER NOT NULL,
+        title                  TEXT    NOT NULL,
+        description            TEXT,
+        status                 TEXT    NOT NULL DEFAULT 'Waiting'
+                                       CHECK (status IN ('Waiting','In progress','Cancel','Done')),
+        estimate_value         REAL,
+        estimate_unit          TEXT    CHECK (estimate_unit IS NULL OR estimate_unit IN ('day','hour')),
+        due_date               TEXT,
+        task_template_item_id  INTEGER,
+        created_at             TEXT    NOT NULL,
+        updated_at             TEXT,
+        FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+        FOREIGN KEY (task_template_item_id) REFERENCES task_template_items(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tasks_case_id  ON tasks(case_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+";
+
+/// Materializes a task_template's items into concrete `tasks` rows for a newly
+/// created case. due_date is computed from the case's created_at plus the item's
+/// estimate, converted to minutes (a "day" estimate is treated as 24h) since
+/// estimates may be fractional (e.g. 0.5 day) or already hour-granular.
+pub fn materialize_tasks_from_template(
+    conn: &Connection,
+    case_id: i64,
+    task_template_id: i64,
+    case_created_at: &str,
+) -> Result<(), rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, estimate_value, estimate_unit, description FROM task_template_items
+         WHERE task_template_id = ?1 ORDER BY sort_order ASC"
+    )?;
+    let items: Vec<(i64, String, f64, String, Option<String>)> = stmt
+        .query_map(params![task_template_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let base = chrono::DateTime::parse_from_rfc3339(case_created_at)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|_| chrono::Utc::now());
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for (item_id, title, estimate_value, estimate_unit, description) in items {
+        let value_in_hours = if estimate_unit == "day" { estimate_value * 24.0 } else { estimate_value };
+        let due_date = (base + chrono::Duration::minutes((value_in_hours * 60.0).round() as i64)).to_rfc3339();
+
+        conn.execute(
+            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at)
+             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
+            params![case_id, title, description, estimate_value, estimate_unit, due_date, item_id, now],
+        )?;
+    }
+
     Ok(())
 }
 
