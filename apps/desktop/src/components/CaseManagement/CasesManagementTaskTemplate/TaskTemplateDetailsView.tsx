@@ -227,9 +227,11 @@ export default function TaskTemplateDetailsView({
               >
                 Cancel
               </button>
-              <button type="submit" className="text-xs font-semibold text-primary hover:underline px-2 py-1">
-                Save Task
-              </button>
+              <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
+                <button type="submit" className="text-xs font-semibold text-primary-foreground hover:underline hover:text-primary-foreground/80">
+                  Save Task
+                </button>
+              </div>
             </div>
           </form>
         )}
