@@ -23,7 +23,8 @@ Revised per feedback on the first draft:
 ## Cross-cutting design decisions (carried over from prior round, still valid)
 
 - **`status`**: `CHECK (status IN ('Waiting','In progress','Cancel','Done'))`, following the `tags` table precedent (`store/mod.rs:200,204`).
-- **`estimate_time` unit**: whole **days**. `due_date = case_created_at.date() + Duration::days(estimate_time)` via `chrono::Duration`.
+- **Estimate time**: structured `estimate_value REAL NOT NULL` + `estimate_unit TEXT NOT NULL CHECK (estimate_unit IN ('day','hour'))`, not a plain integer day-count. Supports fractional values (`0.5` day) and both granularities — `3d`, `0.5d`, `4h`, `10h` is a UI input/display format only, parsed into `(value, unit)` on save; the DB never stores the raw string. Applies to both `task_template_items` (PR-1) and `tasks` (PR-3).
+- **`due_date` is a full ISO8601 timestamp**, not a date-only field, so hour-granularity estimates (`4h`) produce a precise due time instead of rounding to a day. Computed as `case_created_at + Duration::minutes(round(value_in_hours * 60))`, where `value_in_hours = estimate_value * 24` for `unit = 'day'` or `estimate_value` unchanged for `unit = 'hour'` — via `chrono::Duration` (already used in `email/emails_ingestion.rs:314`).
 - **"Urgent" (dashboard)**: overdue/due-today (date-based) and `In progress` (status-based) are separate highlighted buckets, mirroring `lib/followupStatus.ts`'s shape; terminal statuses (`Cancel`, `Done`) excluded.
 - **Ad-hoc task creation** (not from a template) lives in the case-tasks-tab branch, not the dashboard branch — the dashboard reuses the same mutation commands, it doesn't add new ones.
 - **No migration framework** — new tables follow the existing `const ..._SCHEMA` + `execute_batch` pattern in `store/mod.rs::open_db_by_path`.
@@ -35,7 +36,7 @@ Built once, in its own branch (B6 below), consumed by both the case-tasks tab an
 - **`components/ui/TaskStatusBadge.tsx`** — mirrors `CaseStatusBadge.tsx` exactly.
 - **`components/ui/TaskRow.tsx`** — single task row, wrapped in `React.memo`. Props are primitives + stable callback references only (`{ task: Task; caseLabel?: string; onStatusChange: (id, status) => void; onEdit: (task) => void; onDelete: (id) => void }`) — `caseLabel` is optional so the *same* component serves the case-scoped view (no case column, per the issue's "some fields may not be present depending on where the task view is displayed") and the dashboard (case column shown).
 - **`components/ui/TaskList.tsx`** — pure presentational container: maps an already-sorted/filtered `tasks` array to memoized `TaskRow`s. Sorting/filtering happens in the caller via `useMemo`, keeping `TaskList` itself dumb and reusable.
-- **`components/ui/TaskForm.tsx`** — create/edit modal (title, description, status, estimate_time, due_date).
+- **`components/ui/TaskForm.tsx`** — create/edit modal (title, description, status, estimate as a `1d`/`0.5d`/`4h` shorthand input parsed to `(estimate_value, estimate_unit)`, due_date).
 - **`reducers/task-list.reducer.ts`** + a `useTaskList(fetchArgs)` hook — shared `useReducer`-based state (`{ tasks, loading, error, editingTask, taskPendingDelete }`) and mutation handlers (wrapped in `useCallback`, defined once per container instance so `TaskRow`'s memoization isn't broken by re-created closures per row), used identically by `CaseTasksPanel` (case-scoped: `list_tasks_for_case`) and `TaskManagementDashboard` (global: `list_all_tasks`) — they differ only in which Tauri command they call to populate `tasks`.
 
 ---
@@ -67,13 +68,16 @@ CREATE TABLE IF NOT EXISTS task_templates (
 );
 CREATE TABLE IF NOT EXISTS task_template_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT, task_template_id INTEGER NOT NULL,
-    title TEXT NOT NULL, estimate_time INTEGER NOT NULL, description TEXT,
+    title TEXT NOT NULL,
+    estimate_value REAL NOT NULL,
+    estimate_unit  TEXT NOT NULL CHECK (estimate_unit IN ('day','hour')),
+    description TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (task_template_id) REFERENCES task_templates(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_task_template_items_template ON task_template_items(task_template_id);
 ```
-Owned child table (not a join table like `case_template_docs` — items aren't independently reusable). New `apps/desktop/src-tauri/src/task_template/mod.rs` mirrors `case_template/mod.rs`: `list/create/update/delete_task_template`. `store/mod.rs` gains `TaskTemplateRow`/`TaskTemplateItemRow`/`TaskTemplateItemInput` + matching query fns. `lib.rs`: `pub mod task_template;` + register under `// task_template`.
+Owned child table (not a join table like `case_template_docs` — items aren't independently reusable). New `apps/desktop/src-tauri/src/task_template/mod.rs` mirrors `case_template/mod.rs`: `list/create/update/delete_task_template`. `store/mod.rs` gains `TaskTemplateRow`/`TaskTemplateItemRow`/`TaskTemplateItemInput` (`estimate_value: f64, estimate_unit: String`) + matching query fns. `lib.rs`: `pub mod task_template;` + register under `// task_template`. Frontend (PR-2) parses/formats the `1d`/`0.5d`/`4h` shorthand at the form boundary only — `estimate_value`/`estimate_unit` cross the Tauri IPC boundary as separate fields, never as a combined string.
 
 **B2 — task-template-ui.** New `lib/task/types.ts` (`TaskStatus`, `TaskTemplateItem`, `TaskTemplate`). New `CaseManagement/CasesManagementTaskTemplate/` — 1:1 structural mirror of `CasesManagementTemplate/CasesManagementTemplate.tsx`: orchestrator + `TaskTemplateList`/`TaskTemplateCreateForm`/`TaskTemplateDetailsView`/`TaskTemplateEmptyState`/`TaskTemplateDeleteWarningModal`. Route in `CaseManagement.tsx`, nav button in `CasesManagementSidebar.tsx`.
 
@@ -83,7 +87,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT, case_id INTEGER NOT NULL, title TEXT NOT NULL,
     description TEXT, status TEXT NOT NULL DEFAULT 'Waiting'
         CHECK (status IN ('Waiting','In progress','Cancel','Done')),
-    estimate_time INTEGER, due_date TEXT, task_template_item_id INTEGER,
+    estimate_value REAL, estimate_unit TEXT CHECK (estimate_unit IN ('day','hour')),
+    due_date TEXT, task_template_item_id INTEGER,
     created_at TEXT NOT NULL, updated_at TEXT,
     FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
     FOREIGN KEY (task_template_item_id) REFERENCES task_template_items(id) ON DELETE SET NULL
@@ -92,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_case_id ON tasks(case_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 ```
-`case/mod.rs::create_new_case` (currently `case/mod.rs:112-120`) gains `task_template_id: Option<i64>`; new `store::materialize_tasks_from_template(conn, case_id, task_template_id, case_created_at)` inserts concrete rows with computed `due_date`. Verified via DB inspection — no UI yet.
+`estimate_value`/`estimate_unit` are nullable together (both-or-neither at the app layer) since ad-hoc tasks (PR-7) may have no estimate at all; `due_date` is a full ISO8601 timestamp per the cross-cutting decision above, not a date. `case/mod.rs::create_new_case` (currently `case/mod.rs:112-120`) gains `task_template_id: Option<i64>`; new `store::materialize_tasks_from_template(conn, case_id, task_template_id, case_created_at)` inserts concrete rows with `due_date` computed from the item's `(estimate_value, estimate_unit)`. Verified via DB inspection — no UI yet.
 
 **B4 — case-create-tasks-ui.** `reducers/case-create.reducer.ts` gains `selectedTaskTemplateId`/`taskTemplates` state; `CaseManagementCaseCreate.tsx` parallel-loads `list_task_templates` and passes `taskTemplateId` to `create_new_case`; `CaseManagementCaseCreateForm.tsx` gets a second "Task Template" `<select>` beside the existing Case Template one (~lines 109-135).
 
