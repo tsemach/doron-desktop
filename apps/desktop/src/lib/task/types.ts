@@ -55,3 +55,10 @@ export interface Task {
   created_at: string;
   updated_at: string | null;
 }
+
+// Mirrors Rust's TaskWithCaseRow ( #[serde(flatten)] task + case_subject/
+// case_name), returned by list_all_tasks for the cross-case dashboard.
+export interface TaskWithCase extends Task {
+  case_subject: string | null;
+  case_name: string;
+}
