@@ -16,7 +16,9 @@ interface TaskRowProps {
   task: Task;
   caseLabel?: string;
   onStatusChange: (id: number, status: TaskStatus) => void;
-  onEdit: (task: Task) => void;
+  // Omitted on views that don't support editing (e.g. the dashboard, which
+  // per design only reuses status-change/delete) -- the edit button hides.
+  onEdit?: (task: Task) => void;
   onDelete: (id: number) => void;
 }
 
@@ -66,16 +68,18 @@ function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }:
           onChange={(status) => onStatusChange(task.id, status)}
           title="Change status"
         />
-        <button
-          onClick={() => onEdit(task)}
-          className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all cursor-pointer"
-          title="Edit task"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          </svg>
-        </button>
+        {onEdit && (
+          <button
+            onClick={() => onEdit(task)}
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all cursor-pointer"
+            title="Edit task"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
+        )}
         <button
           onClick={() => onDelete(task.id)}
           className="p-1 text-muted-foreground hover:text-destructive hover:bg-accent rounded transition-all cursor-pointer"

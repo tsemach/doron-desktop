@@ -5,7 +5,7 @@ interface TaskListProps {
   tasks: Task[];
   getCaseLabel?: (task: Task) => string | undefined;
   onStatusChange: (id: number, status: TaskStatus) => void;
-  onEdit: (task: Task) => void;
+  onEdit?: (task: Task) => void;
   onDelete: (id: number) => void;
   emptyMessage?: string;
 }
