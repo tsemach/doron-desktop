@@ -14,6 +14,7 @@ import CaseEmailsChat from "./OpenCasesEmailsChat";
 import OpenCasesDocumentPreview from "./OpenCasesDocumentPreview";
 import OpenCasesDocumentHistory from "./OpenCasesDocumentHistory";
 import OpenCasesDocumentFields from "./OpenCasesDocumentFields";
+import CaseTasksPanel from "./CaseTasksPanel";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
 
@@ -36,7 +37,7 @@ export default function CaseManagementOpenCasesDetails() {
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
 
   // Right side panel tab state
-  const [activeRightTab, setActiveRightTab] = useState<"preview" | "emails">("preview");
+  const [activeRightTab, setActiveRightTab] = useState<"preview" | "emails" | "tasks">("preview");
   const [docSubTab, setDocSubTab] = useState<"preview" | "history" | "fields">("preview");
 
   // Document preview states
@@ -508,6 +509,8 @@ export default function CaseManagementOpenCasesDetails() {
                 <span className="truncate">
                   {activeRightTab === "emails"
                     ? (t("emails_exchange") || "Case Email Correspondence")
+                    : activeRightTab === "tasks"
+                    ? "Tasks"
                     : (t("document_details") || "Document Details")}
                 </span>
                 {activeRightTab === "preview" && selectedDocument && (
@@ -582,10 +585,12 @@ export default function CaseManagementOpenCasesDetails() {
 
             <div className="flex-1 overflow-y-auto bg-background/50 dark:bg-background/20 relative flex flex-col min-h-0">
               {activeRightTab === "emails" ? (
-                <CaseEmailsChat 
-                  caseId={Number(selectedCase?.id || 0)} 
-                  caseFolder={selectedCase?.folder || ""} 
+                <CaseEmailsChat
+                  caseId={Number(selectedCase?.id || 0)}
+                  caseFolder={selectedCase?.folder || ""}
                 />
+              ) : activeRightTab === "tasks" ? (
+                <CaseTasksPanel caseId={Number(selectedCase?.id || 0)} />
               ) : docSubTab === "history" && selectedDocument ? (
                 <OpenCasesDocumentHistory
                   selectedDocument={selectedDocument}
