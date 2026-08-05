@@ -42,6 +42,10 @@ export default function AppHome() {
     navigate("/docs-management");
   }
 
+  function handleTaskManagement() {
+    navigate("/task-management");
+  }
+
   function handleSettings() {
     navigate("/settings");
   }
@@ -142,7 +146,7 @@ export default function AppHome() {
         {/* Action cards & Settings Wrapper */}
         <div className="w-full max-w-[1008px] flex flex-col gap-2">
           {/* Action cards - Keep Case Management and Document Management as is */}
-          <div className="flex flex-col md:flex-row justify-center gap-8 w-full">
+          <div className="flex flex-col md:flex-row flex-wrap justify-center gap-8 w-full">
             <button
               type="button"
               onClick={handleCaseMagement}
@@ -162,6 +166,13 @@ export default function AppHome() {
                   <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-500"></span>
                 </span>
               )}
+            </button>
+            <button
+              type="button"
+              onClick={handleTaskManagement}
+              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
+            >
+              {t("task_management")}
             </button>
           </div>
 

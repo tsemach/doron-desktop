@@ -154,6 +154,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     conn.execute_batch(TASK_TEMPLATES_SCHEMA).map_err(|e| format!("[task templates schema] {e}"))?;
 
+    conn.execute_batch(TASKS_SCHEMA).map_err(|e| format!("[tasks schema] {e}"))?;
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -995,6 +997,264 @@ pub fn delete_task_template(conn: &Connection, id: i64) -> Result<(), rusqlite::
         params![id],
     )?;
     Ok(())
+}
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+const TASKS_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS tasks (
+        id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+        case_id                INTEGER NOT NULL,
+        title                  TEXT    NOT NULL,
+        description            TEXT,
+        status                 TEXT    NOT NULL DEFAULT 'Waiting'
+                                       CHECK (status IN ('Waiting','In progress','Cancel','Done')),
+        estimate_value         REAL,
+        estimate_unit          TEXT    CHECK (estimate_unit IS NULL OR estimate_unit IN ('day','hour')),
+        due_date               TEXT,
+        task_template_item_id  INTEGER,
+        created_at             TEXT    NOT NULL,
+        updated_at             TEXT,
+        FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+        FOREIGN KEY (task_template_item_id) REFERENCES task_template_items(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tasks_case_id  ON tasks(case_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+";
+
+/// Computes a due_date timestamp from a base (usually the case's created_at)
+/// plus an estimate, converted to minutes (a "day" estimate is treated as
+/// 24h) since estimates may be fractional (e.g. 0.5 day) or already
+/// hour-granular. Shared by template materialization and explicit ad-hoc
+/// task creation so both compute due dates identically.
+fn compute_due_date_from_estimate(base_iso: &str, estimate_value: f64, estimate_unit: &str) -> String {
+    let base = chrono::DateTime::parse_from_rfc3339(base_iso)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|_| chrono::Utc::now());
+    let value_in_hours = if estimate_unit == "day" { estimate_value * 24.0 } else { estimate_value };
+    (base + chrono::Duration::minutes((value_in_hours * 60.0).round() as i64)).to_rfc3339()
+}
+
+/// Materializes a task_template's items into concrete `tasks` rows for a newly
+/// created case, unedited. Used when the caller passes a task_template_id with
+/// no explicit `tasks` override (see `create_tasks_for_new_case` for the
+/// user-reviewed/edited path, which takes priority when both are given).
+pub fn materialize_tasks_from_template(
+    conn: &Connection,
+    case_id: i64,
+    task_template_id: i64,
+    case_created_at: &str,
+) -> Result<(), rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, estimate_value, estimate_unit, description FROM task_template_items
+         WHERE task_template_id = ?1 ORDER BY sort_order ASC"
+    )?;
+    let items: Vec<(i64, String, f64, String, Option<String>)> = stmt
+        .query_map(params![task_template_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for (item_id, title, estimate_value, estimate_unit, description) in items {
+        let due_date = compute_due_date_from_estimate(case_created_at, estimate_value, &estimate_unit);
+
+        conn.execute(
+            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at)
+             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
+            params![case_id, title, description, estimate_value, estimate_unit, due_date, item_id, now],
+        )?;
+    }
+
+    Ok(())
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct NewTaskInput {
+    pub title: String,
+    pub description: Option<String>,
+    pub estimate_value: Option<f64>,
+    pub estimate_unit: Option<String>,
+    // Set when this draft originated from a task_template_item the user
+    // reviewed/edited in the case-creation UI, kept for traceability; None
+    // for a task typed from scratch (not currently offered in that UI, but
+    // the column and this input both already support it).
+    pub template_item_id: Option<i64>,
+}
+
+/// Inserts explicit, already-reviewed task drafts for a newly created case
+/// (the case-creation UI's task review panel lets the user uncheck/edit a
+/// task template's items before the case exists) -- see `NewTaskInput`.
+pub fn create_tasks_for_new_case(
+    conn: &Connection,
+    case_id: i64,
+    case_created_at: &str,
+    tasks: &[NewTaskInput],
+) -> Result<(), rusqlite::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for t in tasks {
+        let due_date = match (t.estimate_value, t.estimate_unit.as_deref()) {
+            (Some(value), Some(unit)) => Some(compute_due_date_from_estimate(case_created_at, value, unit)),
+            _ => None,
+        };
+
+        conn.execute(
+            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at)
+             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
+            params![case_id, t.title, t.description, t.estimate_value, t.estimate_unit, due_date, t.template_item_id, now],
+        )?;
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct TaskRow {
+    pub id: i64,
+    pub case_id: i64,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub estimate_value: Option<f64>,
+    pub estimate_unit: Option<String>,
+    pub due_date: Option<String>,
+    pub task_template_item_id: Option<i64>,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+fn task_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<TaskRow> {
+    Ok(TaskRow {
+        id: row.get(0)?,
+        case_id: row.get(1)?,
+        title: row.get(2)?,
+        description: row.get(3)?,
+        status: row.get(4)?,
+        estimate_value: row.get(5)?,
+        estimate_unit: row.get(6)?,
+        due_date: row.get(7)?,
+        task_template_item_id: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+    })
+}
+
+pub fn list_tasks_for_case(conn: &Connection, case_id: i64) -> Result<Vec<TaskRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, updated_at
+         FROM tasks WHERE case_id = ?1 ORDER BY (due_date IS NULL), due_date ASC, id ASC"
+    )?;
+    let rows = stmt.query_map(params![case_id], task_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub fn create_task(
+    conn: &Connection,
+    case_id: i64,
+    title: &str,
+    description: Option<&str>,
+    estimate_value: Option<f64>,
+    estimate_unit: Option<&str>,
+    due_date: Option<&str>,
+) -> Result<TaskRow, rusqlite::Error> {
+    let created_at = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, created_at)
+         VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7)",
+        params![case_id, title, description, estimate_value, estimate_unit, due_date, created_at],
+    )?;
+    let id = conn.last_insert_rowid();
+    Ok(TaskRow {
+        id,
+        case_id,
+        title: title.to_string(),
+        description: description.map(|s| s.to_string()),
+        status: "Waiting".to_string(),
+        estimate_value,
+        estimate_unit: estimate_unit.map(|s| s.to_string()),
+        due_date: due_date.map(|s| s.to_string()),
+        task_template_item_id: None,
+        created_at,
+        updated_at: None,
+    })
+}
+
+pub fn update_task(
+    conn: &Connection,
+    id: i64,
+    title: &str,
+    description: Option<&str>,
+    estimate_value: Option<f64>,
+    estimate_unit: Option<&str>,
+    due_date: Option<&str>,
+    status: &str,
+) -> Result<(), rusqlite::Error> {
+    let updated_at = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE tasks SET title = ?1, description = ?2, estimate_value = ?3, estimate_unit = ?4, due_date = ?5, status = ?6, updated_at = ?7
+         WHERE id = ?8",
+        params![title, description, estimate_value, estimate_unit, due_date, status, updated_at, id],
+    )?;
+    Ok(())
+}
+
+pub fn update_task_status(conn: &Connection, id: i64, status: &str) -> Result<(), rusqlite::Error> {
+    let updated_at = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE tasks SET status = ?1, updated_at = ?2 WHERE id = ?3",
+        params![status, updated_at, id],
+    )?;
+    Ok(())
+}
+
+pub fn delete_task(conn: &Connection, id: i64) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+#[derive(Serialize, Clone)]
+pub struct TaskWithCaseRow {
+    #[serde(flatten)]
+    pub task: TaskRow,
+    pub case_subject: Option<String>,
+    pub case_name: String,
+}
+
+/// Cross-case task list for the dashboard. Mirrors `list_cases`'s join style
+/// (store/mod.rs `list_cases`): joins in the owning case and excludes soft-deleted
+/// cases the same way.
+pub fn list_all_tasks(conn: &Connection) -> Result<Vec<TaskWithCaseRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT t.id, t.case_id, t.title, t.description, t.status, t.estimate_value, t.estimate_unit,
+                t.due_date, t.task_template_item_id, t.created_at, t.updated_at, c.subject, c.name
+         FROM tasks t
+         JOIN cases c ON t.case_id = c.id
+         WHERE c.deleted = 0 OR c.deleted IS NULL
+         ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id ASC"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(TaskWithCaseRow {
+            task: TaskRow {
+                id: row.get(0)?,
+                case_id: row.get(1)?,
+                title: row.get(2)?,
+                description: row.get(3)?,
+                status: row.get(4)?,
+                estimate_value: row.get(5)?,
+                estimate_unit: row.get(6)?,
+                due_date: row.get(7)?,
+                task_template_item_id: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            },
+            case_subject: row.get(11)?,
+            case_name: row.get(12)?,
+        })
+    })?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────────
