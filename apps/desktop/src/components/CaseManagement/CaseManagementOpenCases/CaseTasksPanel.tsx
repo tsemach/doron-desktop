@@ -1,8 +1,11 @@
+import { useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTaskList } from "@/hooks/useTaskList";
 import TaskList from "@/components/ui/TaskList";
 import TaskForm, { TaskFormValues } from "@/components/ui/TaskForm";
-import { Task } from "@/lib/task/types";
+import { Task, TaskStatus } from "@/lib/task/types";
+
+const STATUS_FILTER_OPTIONS: Array<TaskStatus | "all"> = ["all", "Waiting", "In progress", "Cancel", "Done"];
 
 interface CaseTasksPanelProps {
   caseId: number;
@@ -23,6 +26,13 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
     closeForm,
     setPendingDelete,
   } = useTaskList(() => invoke<Task[]>("list_tasks_for_case", { caseId }), caseId);
+
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
+
+  const filteredTasks = useMemo(
+    () => (statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter)),
+    [tasks, statusFilter]
+  );
 
   async function handleSave(values: TaskFormValues) {
     try {
@@ -57,22 +67,40 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
 
   return (
     <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Tasks ({tasks.length})
+          Tasks ({filteredTasks.length})
         </h4>
-        <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
-          <button
-            type="button"
-            onClick={startCreate}
-            className="inline-flex items-center gap-0.5 text-xs text-primary-foreground hover:underline hover:text-primary-foreground/80 font-medium"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
-              <path d="M5 12h14" />
-              <path d="M12 5v14" />
-            </svg>
-            Add Task
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "all")}
+              className="rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background pl-2 pr-7 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+            >
+              {STATUS_FILTER_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-muted-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+          </div>
+          <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
+            <button
+              type="button"
+              onClick={startCreate}
+              className="inline-flex items-center gap-0.5 text-xs text-primary-foreground hover:underline hover:text-primary-foreground/80 font-medium"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
+                <path d="M5 12h14" />
+                <path d="M12 5v14" />
+              </svg>
+              Add Task
+            </button>
+          </div>
         </div>
       </div>
 
@@ -86,11 +114,11 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
         <div className="text-xs text-muted-foreground">Loading tasks...</div>
       ) : (
         <TaskList
-          tasks={tasks}
+          tasks={filteredTasks}
           onStatusChange={changeStatus}
           onEdit={startEdit}
           onDelete={setPendingDelete}
-          emptyMessage="No tasks for this case yet."
+          emptyMessage={statusFilter === "all" ? "No tasks for this case yet." : "No tasks match this filter."}
         />
       )}
 
