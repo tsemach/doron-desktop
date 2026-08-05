@@ -38,3 +38,27 @@ export interface CaseTaskDraft {
   estimateShorthand: string;
   description: string;
 }
+
+// Mirrors the Rust `TaskRow` struct's wire shape as-is (snake_case), same
+// convention as `CaseTemplate`/`DocTemplate` — used directly from invoke()
+// results without a remapping step.
+export interface Task {
+  id: number;
+  case_id: number;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  estimate_value: number | null;
+  estimate_unit: EstimateUnit | null;
+  due_date: string | null;
+  task_template_item_id: number | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+// Mirrors Rust's TaskWithCaseRow ( #[serde(flatten)] task + case_subject/
+// case_name), returned by list_all_tasks for the cross-case dashboard.
+export interface TaskWithCase extends Task {
+  case_subject: string | null;
+  case_name: string;
+}
