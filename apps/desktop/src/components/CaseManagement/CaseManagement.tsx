@@ -2,6 +2,7 @@ import CaseManagementSidebar from "./CasesManagementSidebar";
 import { Route, Routes } from "react-router-dom";
 import CaseManagementOpenCases from "./CaseManagementOpenCases/CaseManagementOpenCases";
 import CasesManagementTemplate from "./CasesManagementTemplate/CasesManagementTemplate";
+import CasesManagementTaskTemplate from "./CasesManagementTaskTemplate/CasesManagementTaskTemplate";
 import CaseManagementCaseCreate from "./CaseManagementCaseCreate";
 import CaseManagementOpenCasesDetails from "./CaseManagementOpenCases/CaseManagementOpenCasesDetails";
 import CaseManagementEmailAlertReview from "./CaseManagementOpenCases/CaseManagementEmailAlertReview";
@@ -14,6 +15,7 @@ export default function CaseManagement() {
       <Routes>
         <Route path="/" element={<CaseManagementOpenCases />} />
         <Route path="templates" element={<CasesManagementTemplate />} />
+        <Route path="task-templates" element={<CasesManagementTaskTemplate />} />
         <Route path="new-case" element={<CaseManagementCaseCreate />} />
         <Route path="cases/:caseId" element={<CaseManagementOpenCasesDetails />} />
       </Routes>

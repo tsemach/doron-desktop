@@ -13,10 +13,12 @@ export default function CaseManagementSidebar() {
     pathname === "/case-management" ||
     (pathname.startsWith("/case-management") &&
       !pathname.startsWith("/case-management/templates") &&
+      !pathname.startsWith("/case-management/task-templates") &&
       !pathname.startsWith("/case-management/new-case"));
 
   const isNewCaseActive = pathname.startsWith("/case-management/new-case");
   const isTemplatesActive = pathname.startsWith("/case-management/templates");
+  const isTaskTemplatesActive = pathname.startsWith("/case-management/task-templates");
 
   const displayName = localStorage.getItem("user_name");
 
@@ -66,7 +68,18 @@ export default function CaseManagementSidebar() {
             {t("template").split(" ").map((word, i) => (
               <span key={i} className="block">{word}</span>
             ))}
-          </Button>        
+          </Button>
+          <Button
+            variant="ghost"
+            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
+              isTaskTemplatesActive ? "bg-muted text-foreground font-semibold" : ""
+            }`}
+            onClick={() => navigate("/case-management/task-templates")}
+          >
+            {t("task_templates").split(" ").map((word, i) => (
+              <span key={i} className="block">{word}</span>
+            ))}
+          </Button>
         </div>
       </div>
 
