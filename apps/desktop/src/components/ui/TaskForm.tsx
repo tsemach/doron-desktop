@@ -2,9 +2,7 @@ import { useState } from "react";
 import { Button } from "./button";
 import { Task, TaskStatus, EstimateUnit } from "@/lib/task/types";
 import { parseEstimateShorthand, formatEstimateShorthand } from "@/lib/task/estimate";
-import { STATUS_OPTION_COLORS } from "@/lib/task/statusColors";
-
-const STATUS_OPTIONS: TaskStatus[] = ["Waiting", "In progress", "Cancel", "Done"];
+import TaskStatusSelect from "./TaskStatusSelect";
 
 export interface TaskFormValues {
   title: string;
@@ -107,23 +105,7 @@ export default function TaskForm({ mode, initialTask, onSave, onCancel }: TaskFo
         {mode === "edit" && (
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</label>
-            <div className="relative">
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                className="w-full rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background pl-3 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none cursor-pointer"
-                disabled={submitting}
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s} style={STATUS_OPTION_COLORS[s]}>{s}</option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-muted-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </div>
-            </div>
+            <TaskStatusSelect value={status} onChange={setStatus} disabled={submitting} size="md" />
           </div>
         )}
 
