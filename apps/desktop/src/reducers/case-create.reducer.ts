@@ -1,4 +1,6 @@
 import { CaseTemplate, DocTemplate } from "@/components/CaseManagement/CaseManagementTypes";
+import { CaseTaskDraft, TaskTemplate } from "@/lib/task/types";
+import { formatEstimateShorthand } from "@/lib/task/estimate";
 
 export const FOLDER_IN_USE_ERROR = "A case with this storage directory path already exists.";
 
@@ -10,6 +12,8 @@ export enum CaseCreateActionType {
   SET_COMPANY = "SET_COMPANY",
   SET_FOLDER = "SET_FOLDER",
   SELECT_TEMPLATE = "SELECT_TEMPLATE",
+  SELECT_TASK_TEMPLATE = "SELECT_TASK_TEMPLATE",
+  UPDATE_TASK_DRAFT = "UPDATE_TASK_DRAFT",
   TEMPLATES_LOADED = "TEMPLATES_LOADED",
   SET_FIELD_VALUES = "SET_FIELD_VALUES",
   SET_SEARCH_QUERY = "SET_SEARCH_QUERY",
@@ -35,10 +39,16 @@ export interface CaseCreateState {
   company: string;
   folder: string;
   selectedTemplateId: string;
+  selectedTaskTemplateId: string;
 
   // Templates loaded from SQLite
   templates: CaseTemplate[];
   docTemplates: DocTemplate[];
+  taskTemplates: TaskTemplate[];
+
+  // Editable review rows for the selected task template's items -- the user
+  // can uncheck/edit any of these before the case (and its tasks) are created.
+  taskDrafts: CaseTaskDraft[];
 
   // Template field entry and filtering
   fieldValues: Record<string, string>;
@@ -69,9 +79,11 @@ export type CaseCreateAction =
   | { type: CaseCreateActionType.SET_COMPANY; payload: string }
   | { type: CaseCreateActionType.SET_FOLDER; payload: string }
   | { type: CaseCreateActionType.SELECT_TEMPLATE; payload: string }
+  | { type: CaseCreateActionType.SELECT_TASK_TEMPLATE; payload: string }
+  | { type: CaseCreateActionType.UPDATE_TASK_DRAFT; payload: { index: number; patch: Partial<CaseTaskDraft> } }
   | {
       type: CaseCreateActionType.TEMPLATES_LOADED;
-      payload: { templates: CaseTemplate[]; docTemplates: DocTemplate[] };
+      payload: { templates: CaseTemplate[]; docTemplates: DocTemplate[]; taskTemplates: TaskTemplate[] };
     }
   | { type: CaseCreateActionType.SET_FIELD_VALUES; payload: Record<string, string> }
   | { type: CaseCreateActionType.SET_SEARCH_QUERY; payload: string }
@@ -110,8 +122,11 @@ export function createInitialCaseCreateState(): CaseCreateState {
     company: "",
     folder: "",
     selectedTemplateId: EMPTY_TEMPLATE_ID,
+    selectedTaskTemplateId: EMPTY_TEMPLATE_ID,
     templates: [],
     docTemplates: [],
+    taskTemplates: [],
+    taskDrafts: [],
     fieldValues: {},
     searchQuery: "",
     selectedRow: null,
@@ -163,11 +178,37 @@ export function caseCreateReducer(state: CaseCreateState, action: CaseCreateActi
       };
     }
 
+    // Unlike a case template's document field values, a task template has no
+    // dynamic fields to reset -- but it does seed the editable review rows
+    // (all selected by default) that the case-creation UI shows before the
+    // case exists, so the user can uncheck/edit any task before submitting.
+    case CaseCreateActionType.SELECT_TASK_TEMPLATE: {
+      const template = state.taskTemplates.find((t) => String(t.id) === action.payload);
+      const taskDrafts: CaseTaskDraft[] = (template?.items ?? []).map((item) => ({
+        templateItemId: item.id,
+        selected: true,
+        title: item.title,
+        estimateShorthand: formatEstimateShorthand(item.estimate_value, item.estimate_unit),
+        description: item.description ?? "",
+      }));
+
+      return { ...state, selectedTaskTemplateId: action.payload, taskDrafts };
+    }
+
+    case CaseCreateActionType.UPDATE_TASK_DRAFT:
+      return {
+        ...state,
+        taskDrafts: state.taskDrafts.map((draft, i) =>
+          i === action.payload.index ? { ...draft, ...action.payload.patch } : draft
+        ),
+      };
+
     case CaseCreateActionType.TEMPLATES_LOADED:
       return {
         ...state,
         templates: action.payload.templates,
         docTemplates: action.payload.docTemplates,
+        taskTemplates: action.payload.taskTemplates,
       };
 
     case CaseCreateActionType.SET_FIELD_VALUES:

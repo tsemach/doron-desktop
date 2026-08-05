@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { CaseTemplate } from "./CaseManagementTypes";
+import { TaskTemplate } from "@/lib/task/types";
 import CaseManagementCompanyField from "./CaseManagementCompanyField";
 import { EMPTY_TEMPLATE_ID } from "@/reducers/case-create.reducer";
 
@@ -16,6 +17,9 @@ interface CaseManagementCaseCreateFormProps {
   templates: CaseTemplate[];
   selectedTemplateId: string;
   onTemplateChange: (value: string) => void;
+  taskTemplates: TaskTemplate[];
+  selectedTaskTemplateId: string;
+  onTaskTemplateChange: (value: string) => void;
   loading: boolean;
 }
 
@@ -32,6 +36,9 @@ export default function CaseManagementCaseCreateForm({
   templates,
   selectedTemplateId,
   onTemplateChange,
+  taskTemplates,
+  selectedTaskTemplateId,
+  onTaskTemplateChange,
   loading,
 }: CaseManagementCaseCreateFormProps) {
   return (
@@ -121,6 +128,34 @@ export default function CaseManagementCaseCreateForm({
           >
             <option value={EMPTY_TEMPLATE_ID}>Create Empty Case (No Documents)</option>
             {templates.map((t) => (
+              <option key={t.id} value={String(t.id)}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-3.5 rtl:left-3.5 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Task Template Selector */}
+      <div className="space-y-1">
+        <label htmlFor="taskTemplate" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Task Template
+        </label>
+        <div className="relative">
+          <select
+            id="taskTemplate"
+            value={selectedTaskTemplateId}
+            onChange={(e) => onTaskTemplateChange(e.target.value)}
+            className="w-full rounded-md border-0 bg-background pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[46px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
+            disabled={loading}
+          >
+            <option value={EMPTY_TEMPLATE_ID}>Create Empty Case (No Tasks)</option>
+            {taskTemplates.map((t) => (
               <option key={t.id} value={String(t.id)}>
                 {t.name}
               </option>
