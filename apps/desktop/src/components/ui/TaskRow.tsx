@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Task, TaskStatus } from "@/lib/task/types";
 import { formatEstimateShorthand } from "@/lib/task/estimate";
 import { getTaskUrgency } from "@/lib/task/taskUrgency";
+import { STATUS_OPTION_COLORS } from "@/lib/task/statusColors";
 import TaskStatusBadge from "./TaskStatusBadge";
 
 const STATUS_OPTIONS: TaskStatus[] = ["Waiting", "In progress", "Cancel", "Done"];
@@ -70,7 +71,7 @@ function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }:
             title="Change status"
           >
             {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s} style={STATUS_OPTION_COLORS[s]}>{s}</option>
             ))}
           </select>
           <div className="absolute inset-y-0 right-1.5 flex items-center pointer-events-none text-muted-foreground">

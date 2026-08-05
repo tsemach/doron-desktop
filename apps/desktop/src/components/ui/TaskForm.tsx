@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "./button";
 import { Task, TaskStatus, EstimateUnit } from "@/lib/task/types";
 import { parseEstimateShorthand, formatEstimateShorthand } from "@/lib/task/estimate";
+import { STATUS_OPTION_COLORS } from "@/lib/task/statusColors";
 
 const STATUS_OPTIONS: TaskStatus[] = ["Waiting", "In progress", "Cancel", "Done"];
 
@@ -114,7 +115,7 @@ export default function TaskForm({ mode, initialTask, onSave, onCancel }: TaskFo
                 disabled={submitting}
               >
                 {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s} style={STATUS_OPTION_COLORS[s]}>{s}</option>
                 ))}
               </select>
               <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-muted-foreground">
