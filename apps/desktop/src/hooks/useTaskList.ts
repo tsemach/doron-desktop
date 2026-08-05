@@ -16,8 +16,12 @@ import {
 /// (status change, delete). Create/full-edit calls create_task/update_task
 /// directly with whatever extra context it has (e.g. a case_id) and then
 /// calls `reload()` + `closeForm()` itself.
-export function useTaskList(fetchTasks: () => Promise<Task[]>, dependencyKey: string | number) {
-  const [state, dispatch] = useReducer(taskListReducer, undefined, createInitialTaskListState);
+///
+/// Generic over T extends Task: CaseTasksPanel uses the default (plain
+/// Task from list_tasks_for_case), the dashboard instantiates it with
+/// TaskWithCase (list_all_tasks) to keep case_subject/case_name on each row.
+export function useTaskList<T extends Task = Task>(fetchTasks: () => Promise<T[]>, dependencyKey: string | number) {
+  const [state, dispatch] = useReducer(taskListReducer<T>, undefined, createInitialTaskListState<T>);
   const fetchRef = useRef(fetchTasks);
   fetchRef.current = fetchTasks;
 
@@ -59,7 +63,7 @@ export function useTaskList(fetchTasks: () => Promise<Task[]>, dependencyKey: st
     dispatch({ type: TaskListActionType.SET_EDITING_TASK, payload: "new" });
   }, []);
 
-  const startEdit = useCallback((task: Task) => {
+  const startEdit = useCallback((task: T) => {
     dispatch({ type: TaskListActionType.SET_EDITING_TASK, payload: task });
   }, []);
 

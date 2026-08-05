@@ -1215,6 +1215,48 @@ pub fn delete_task(conn: &Connection, id: i64) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
+#[derive(Serialize, Clone)]
+pub struct TaskWithCaseRow {
+    #[serde(flatten)]
+    pub task: TaskRow,
+    pub case_subject: Option<String>,
+    pub case_name: String,
+}
+
+/// Cross-case task list for the dashboard. Mirrors `list_cases`'s join style
+/// (store/mod.rs `list_cases`): joins in the owning case and excludes soft-deleted
+/// cases the same way.
+pub fn list_all_tasks(conn: &Connection) -> Result<Vec<TaskWithCaseRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT t.id, t.case_id, t.title, t.description, t.status, t.estimate_value, t.estimate_unit,
+                t.due_date, t.task_template_item_id, t.created_at, t.updated_at, c.subject, c.name
+         FROM tasks t
+         JOIN cases c ON t.case_id = c.id
+         WHERE c.deleted = 0 OR c.deleted IS NULL
+         ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id ASC"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(TaskWithCaseRow {
+            task: TaskRow {
+                id: row.get(0)?,
+                case_id: row.get(1)?,
+                title: row.get(2)?,
+                description: row.get(3)?,
+                status: row.get(4)?,
+                estimate_value: row.get(5)?,
+                estimate_unit: row.get(6)?,
+                due_date: row.get(7)?,
+                task_template_item_id: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            },
+            case_subject: row.get(11)?,
+            case_name: row.get(12)?,
+        })
+    })?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 // ── Documents ─────────────────────────────────────────────────────────────────
 
 pub fn insert_document(conn: &Connection, record: &DocumentRecord) -> Result<(), rusqlite::Error> {

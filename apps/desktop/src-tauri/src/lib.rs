@@ -188,6 +188,7 @@ pub fn run() {
             task::update_task,
             task::update_task_status,
             task::delete_task,
+            task::list_all_tasks,
             // case
             case::list_cases,
             case::resolve_cases_for_paths,
