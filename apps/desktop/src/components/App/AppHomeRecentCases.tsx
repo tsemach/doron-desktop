@@ -44,7 +44,7 @@ export default function AppHomeRecentCases() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                      {c.subject || t("no_subject")}
+                      {c.subject || t("no_subject")}o
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">{c.name}</span>
                   </span>
