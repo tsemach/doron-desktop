@@ -10,6 +10,7 @@ import { clearSession } from "../../store/authStore";
 import { useSubscriptionTier } from "../../lib/featureGating";
 import PlanBadge from "../ui/PlanBadge";
 import KebabMenu from "../ui/KebabMenu";
+import ascurixLogo from "@/assets/ascurix-logo-black.png";
 
 // Same VITE_BACKEND_URL convention as Auth/AuthLanding.tsx.
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
@@ -75,6 +76,10 @@ export default function AppHome() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-background text-foreground justify-center items-center px-4 py-12">
+      <div className="absolute top-6 left-6">
+        <img src={ascurixLogo} alt="Ascurix" className="h-10 w-10 object-contain" />
+      </div>
+
       <div className="absolute top-6 right-6">
         <KebabMenu
           title="Account"
