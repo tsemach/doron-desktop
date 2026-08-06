@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useReducer } from "react";
+import { useEffect, useMemo, useCallback, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -10,6 +10,7 @@ import CaseManagementCaseCreateForm from "./CaseManagementCaseCreateForm";
 import CaseManagementCaseCreateFormActions from "./CaseManagementCaseCreateFormActions";
 import CaseManagementCaseCreateTemplateFields from "./CaseManagementCaseCreateTemplateFields";
 import CaseManagementCaseCreateTaskReview from "./CaseManagementCaseCreateTaskReview";
+import CaseTemplateHelp from "./CaseTemplateHelp";
 import { useRowFields } from "@/hooks/useRowFields";
 import { useSplitPane } from "@/hooks/useSplitPane";
 import {
@@ -25,6 +26,7 @@ import {
 export default function CaseManagementCaseCreate() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(caseCreateReducer, undefined, createInitialCaseCreateState);
+  const [templateHelpOpen, setTemplateHelpOpen] = useState(false);
   const {
     subject,
     name,
@@ -434,7 +436,7 @@ export default function CaseManagementCaseCreate() {
 
   const hasFields = selectedTemplateId !== EMPTY_TEMPLATE_ID && templateFields.length > 0;
   const hasTasks = selectedTaskTemplateId !== EMPTY_TEMPLATE_ID && taskDrafts.length > 0;
-  const showRightPanel = hasFields || hasTasks;
+  const showRightPanel = hasFields || hasTasks || templateHelpOpen;
 
   return (
     <main className="flex-1 overflow-auto p-4 bg-background">
@@ -507,6 +509,8 @@ export default function CaseManagementCaseCreate() {
                   dispatch({ type: CaseCreateActionType.SELECT_TASK_TEMPLATE, payload: value })
                 }
                 loading={loading}
+                templateHelpOpen={templateHelpOpen}
+                onToggleTemplateHelp={() => setTemplateHelpOpen((open) => !open)}
               />
             </div>
 
@@ -532,6 +536,10 @@ export default function CaseManagementCaseCreate() {
                 className={`flex flex-col gap-4 min-w-0 ${isLgScreen ? "h-full" : ""}`}
                 style={isLgScreen ? { flex: "1 1 0%" } : undefined}
               >
+                {templateHelpOpen && (
+                  <CaseTemplateHelp onClose={() => setTemplateHelpOpen(false)} />
+                )}
+
                 {hasFields && (
                   <CaseManagementCaseCreateTemplateFields
                     isLgScreen={isLgScreen}
