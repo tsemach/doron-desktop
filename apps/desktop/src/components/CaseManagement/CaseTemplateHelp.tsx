@@ -4,13 +4,13 @@ interface CaseTemplateHelpProps {
 
 export default function CaseTemplateHelp({ onClose }: CaseTemplateHelpProps) {
   return (
-    <div className="rounded-xl border border-border/80 bg-card p-4 sm:p-5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 min-w-0 space-y-4 relative overflow-hidden h-full text-foreground flex flex-col justify-between">
+    <div className="rounded-xl border border-border/80 bg-card p-3 sm:p-4 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 min-w-0 space-y-3 relative overflow-hidden text-foreground flex flex-col justify-start">
       {/* Background Accent Decorative Glow */}
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-border/60 pb-3 shrink-0">
+      <div className="flex items-center justify-between border-b border-border/60 pb-2 shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-primary/10 text-primary">
             {/* Help Icon */}
@@ -49,22 +49,20 @@ export default function CaseTemplateHelp({ onClose }: CaseTemplateHelpProps) {
         )}
       </div>
 
-      {/* Top Graphic: SVG Diagram stretched almost full width */}
-      <div className="w-full bg-slate-900/5 dark:bg-slate-950/40 rounded-xl border border-border/60 p-2.5 sm:p-3 flex flex-col items-center justify-center overflow-hidden shadow-inner shrink-0">
-        <div className="w-full max-w-[1050px] mx-auto">
-          <img
-            src="/case-template-help.svg"
-            onError={(e) => {
-              // Fallback to relative path if absolute root path fails in Tauri
-              const target = e.currentTarget;
-              if (target.src.endsWith('/case-template-help.svg')) {
-                target.src = './case-template-help.svg';
-              }
-            }}
-            alt="Case Template Generation Workflow Diagram"
-            className="w-full h-auto max-h-[250px] sm:max-h-[270px] object-contain rounded-lg transition-transform duration-200 hover:scale-[1.005]"
-          />
-        </div>
+      {/* Top Graphic: SVG Diagram */}
+      <div className="w-full bg-slate-900/5 dark:bg-slate-950/40 rounded-xl border border-border/60 py-2 px-3 flex items-center justify-center overflow-hidden shadow-inner shrink-0">
+        <img
+          src="/case-template-help.svg"
+          onError={(e) => {
+            // Fallback to relative path if absolute root path fails in Tauri
+            const target = e.currentTarget;
+            if (target.src.endsWith('/case-template-help.svg')) {
+              target.src = './case-template-help.svg';
+            }
+          }}
+          alt="Case Template Generation Workflow Diagram"
+          className="w-full max-w-[650px] sm:max-w-[780px] h-auto object-contain rounded-lg transition-transform duration-200 hover:scale-[1.005] block mx-auto"
+        />
       </div>
 
       {/* 3-Step Detailed Graphical Flow Section */}
