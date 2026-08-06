@@ -16,11 +16,11 @@ export default function CaseManagementCaseCreateFormActions({
         variant="outline"
         onClick={onCancel}
         disabled={loading}
-        className="px-6 py-2.5 h-auto"
+        className="px-5 py-1.5 h-[36px]"
       >
         Cancel
       </Button>
-      <Button type="submit" disabled={loading} className="px-6 py-2.5 h-auto">
+      <Button type="submit" disabled={loading} className="px-5 py-1.5 h-[36px]">
         {loading ? "Creating..." : "Create Case"}
       </Button>
     </div>
