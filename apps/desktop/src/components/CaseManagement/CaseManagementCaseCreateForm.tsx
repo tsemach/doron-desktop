@@ -58,7 +58,7 @@ export default function CaseManagementCaseCreateForm({
           value={subject}
           onChange={(e) => onSubjectChange(e.target.value)}
           placeholder="e.g. Eviction Notice, Acquisition Agreement"
-          className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
+          className="w-full rounded-md border border-input bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all h-[36px]"
           disabled={loading}
         />
       </div>
@@ -74,7 +74,7 @@ export default function CaseManagementCaseCreateForm({
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           placeholder="e.g. John Doe, Acme Corp"
-          className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
+          className="w-full rounded-md border border-input bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all h-[36px]"
           disabled={loading}
         />
       </div>
@@ -89,7 +89,7 @@ export default function CaseManagementCaseCreateForm({
           onChange={onCompanyChange}
           placeholder="e.g. Acme Corp (optional)"
           disabled={loading}
-          className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
+          className="w-full rounded-md border border-input bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all h-[36px]"
         />
       </div>
 
@@ -108,10 +108,10 @@ export default function CaseManagementCaseCreateForm({
             value={folder}
             onChange={(e) => onFolderChange(e.target.value)}
             placeholder="Select or type folder path..."
-            className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all font-mono"
+            className="flex-1 rounded-md border border-input bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all font-mono h-[36px]"
             disabled={loading}
           />
-          <Button type="button" variant="secondary" onClick={onBrowse} disabled={loading} className="px-5 py-3 h-auto">
+          <Button type="button" variant="secondary" onClick={onBrowse} disabled={loading} className="px-4 py-1.5 h-[36px]">
             Browse...
           </Button>
         </div>
@@ -141,7 +141,7 @@ export default function CaseManagementCaseCreateForm({
             id="template"
             value={selectedTemplateId}
             onChange={(e) => onTemplateChange(e.target.value)}
-            className="w-full rounded-md border-0 bg-background pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[46px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
+            className="w-full rounded-md border-0 bg-background pl-3.5 pr-10 rtl:pr-3.5 rtl:pl-10 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[36px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
             disabled={loading}
           >
             <option value={EMPTY_TEMPLATE_ID}>Create Empty Case (No Documents)</option>
@@ -169,7 +169,7 @@ export default function CaseManagementCaseCreateForm({
             id="taskTemplate"
             value={selectedTaskTemplateId}
             onChange={(e) => onTaskTemplateChange(e.target.value)}
-            className="w-full rounded-md border-0 bg-background pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[46px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
+            className="w-full rounded-md border-0 bg-background pl-3.5 pr-10 rtl:pr-3.5 rtl:pl-10 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[36px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
             disabled={loading}
           >
             <option value={EMPTY_TEMPLATE_ID}>Create Empty Case (No Tasks)</option>
