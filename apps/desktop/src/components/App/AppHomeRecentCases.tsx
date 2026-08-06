@@ -13,17 +13,9 @@ export default function AppHomeRecentCases() {
   const [recentCases] = useState(getRecentCases);
 
   return (
-    <div className="w-96 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+    <div className="w-96 rounded-xl bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3">
         <span className="text-sm font-semibold text-foreground">{t("recent_cases")}</span>
-        <button
-          type="button"
-          onClick={() => navigate("/case-management/new-case")}
-          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline cursor-pointer"
-        >
-          <Plus className="size-3.5" />
-          {t("new_case")}
-        </button>
       </div>
 
       {recentCases.length === 0 ? (
@@ -32,7 +24,7 @@ export default function AppHomeRecentCases() {
         </div>
       ) : (
         <>
-          <ul className="divide-y divide-border">
+          <ul className="pl-4">
             {recentCases.map((c) => (
               <li key={c.id}>
                 <Link
@@ -44,7 +36,7 @@ export default function AppHomeRecentCases() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                      {c.subject || t("no_subject")}o
+                      {c.subject || t("no_subject")}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">{c.name}</span>
                   </span>
@@ -59,7 +51,15 @@ export default function AppHomeRecentCases() {
             ))}
           </ul>
 
-          <div className="px-4 py-2.5 border-t border-border text-right">
+          <div className="px-4 py-2.5 flex items-center justify-between text-right">
+            <button
+              type="button"
+              onClick={() => navigate("/case-management/new-case")}
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:underline cursor-pointer"
+            >
+              <Plus className="size-3.5" />
+              {t("new_case")}
+            </button>
             <Link
               to="/case-management"
               className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"

@@ -83,33 +83,40 @@ export default function AppHome() {
           {/* Primary navigation wrapper - Aligns content strictly to the left edge */}
           <div className="flex flex-col gap-16 justify-self-start">
             <div className="flex items-start gap-20">
-              <div className="flex flex-col items-center gap-2">
-                <button type="button" onClick={handleCaseMagement} className={NAV_TILE_CLASS}>
-                  <div className="flex flex-col items-center gap-2">
-                    <Briefcase className="size-8" />
-                    <span className="text-2xl font-medium text-foreground/80">{t("cases")}</span>
-                  </div>
-                </button>
-              </div>
+              <button type="button" onClick={handleCaseMagement} className={NAV_TILE_CLASS}>
+                <div className="flex flex-col items-center gap-2">
+                  <Briefcase className="size-8" />
+                  <span className="text-2xl font-medium text-foreground/80">{t("cases")}</span>
+                </div>
+              </button>
               <AppHomeRecentCases />
             </div>
 
             <div className="flex items-start gap-20">
-              <div className="flex flex-col items-center gap-2">
-                <button type="button" onClick={handleDocsManagement} className={NAV_TILE_CLASS}>
-                  <div className="flex flex-col items-center gap-2">
-                    <FileText className="size-8" />
-                    <span className="text-2xl font-medium text-foreground/80">{t("documents")}</span>
-                  </div>
-                  {isProcessing && (
-                    <span className="absolute bottom-2 right-2 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                    </span>
-                  )}
-                </button>
+              <button type="button" onClick={handleDocsManagement} className={NAV_TILE_CLASS}>
+                <div className="flex flex-col items-center gap-2">
+                  <FileText className="size-8" />
+                  <span className="text-2xl font-medium text-foreground/80">{t("documents")}</span>
+                </div>
+                {isProcessing && (
+                  <span className="absolute bottom-2 right-2 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                  </span>
+                )}
+              </button>
+              <div className="flex flex-col items-end gap-2 w-96">
+                <AppHomeDocumentsPanel />
+                <div className="flex items-center gap-4 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSettings}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {t("settings_footer")}
+                  </button>
+                </div>
               </div>
-              <AppHomeDocumentsPanel />
             </div>
           </div>
 
@@ -119,24 +126,6 @@ export default function AppHome() {
           </div>
 
         </div>
-      </div>
-
-      {/* Footer Settings Link */}
-      <div className="flex justify-end items-center gap-4 w-full">
-        <button
-          type="button"
-          onClick={handleTaskManagement}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 flex items-center gap-1.5 cursor-pointer"
-        >
-          {t("task_management")}
-        </button>
-        <button
-          type="button"
-          onClick={handleSettings}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 flex items-center gap-1.5 cursor-pointer"
-        >
-          {t("settings_footer")}
-        </button>
       </div>
     </div>
   );

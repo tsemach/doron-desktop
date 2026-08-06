@@ -16,8 +16,8 @@ export default function AppHomeDocumentsPanel() {
   }
 
   return (
-    <div className="w-96 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+    <div className="w-96 rounded-xl bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3">
         <span className="text-sm font-semibold text-foreground">{t("docs_management")}</span>
         <button
           type="button"
@@ -46,7 +46,7 @@ export default function AppHomeDocumentsPanel() {
       <button
         type="button"
         onClick={() => navigate("/docs-management/templates")}
-        className="group flex w-full items-center gap-3 px-4 py-2.5 border-t border-border hover:bg-accent/50 transition-colors cursor-pointer"
+        className="group flex w-full items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors cursor-pointer"
       >
         <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
           <LayoutTemplate className="size-4" />
