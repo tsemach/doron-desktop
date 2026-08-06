@@ -27,16 +27,8 @@ export default function CaseManagementCaseCreate() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(caseCreateReducer, undefined, createInitialCaseCreateState);
   const [templateHelpOpen, setTemplateHelpOpen] = useState(false);
-  const [activeRightTab, setActiveRightTab] = useState<"fields" | "tasks">("fields");
+  const [activeRightView, setActiveRightView] = useState<"help" | "caseTemplate" | "taskTemplate" | null>(null);
 
-  // Keep active tab in sync when templates change
-  useEffect(() => {
-    if (selectedTemplateId && selectedTemplateId !== EMPTY_TEMPLATE_ID) {
-      setActiveRightTab("fields");
-    } else if (selectedTaskTemplateId && selectedTaskTemplateId !== EMPTY_TEMPLATE_ID) {
-      setActiveRightTab("tasks");
-    }
-  }, [selectedTemplateId, selectedTaskTemplateId]);
   const {
     subject,
     name,
@@ -62,6 +54,22 @@ export default function CaseManagementCaseCreate() {
     error,
     isLgScreen,
   } = state;
+
+  const isCaseTemplateSelected = selectedTemplateId !== EMPTY_TEMPLATE_ID;
+  const isTaskTemplateSelected = selectedTaskTemplateId !== EMPTY_TEMPLATE_ID;
+
+  // Automatically update active view when selections or help change
+  useEffect(() => {
+    if (templateHelpOpen) {
+      setActiveRightView("help");
+    } else if (isCaseTemplateSelected && activeRightView !== "taskTemplate") {
+      setActiveRightView("caseTemplate");
+    } else if (isTaskTemplateSelected && activeRightView !== "caseTemplate") {
+      setActiveRightView("taskTemplate");
+    } else if (!isCaseTemplateSelected && !isTaskTemplateSelected) {
+      setActiveRightView(null);
+    }
+  }, [templateHelpOpen, isCaseTemplateSelected, isTaskTemplateSelected]);
 
   const {
     percent: leftPercent,
@@ -444,9 +452,9 @@ export default function CaseManagementCaseCreate() {
     }
   }
 
-  const hasFields = selectedTemplateId !== EMPTY_TEMPLATE_ID && templateFields.length > 0;
-  const hasTasks = selectedTaskTemplateId !== EMPTY_TEMPLATE_ID && taskDrafts.length > 0;
-  const showRightPanel = hasFields || hasTasks || templateHelpOpen;
+  const hasFields = isCaseTemplateSelected && templateFields.length > 0;
+  const hasTasks = isTaskTemplateSelected && taskDrafts.length > 0;
+  const showRightPanel = isCaseTemplateSelected || isTaskTemplateSelected || templateHelpOpen;
 
   return (
     <main className="flex-1 overflow-auto p-4 bg-background">
@@ -510,17 +518,47 @@ export default function CaseManagementCaseCreate() {
                 onBrowse={handleBrowse}
                 templates={templates}
                 selectedTemplateId={selectedTemplateId}
-                onTemplateChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SELECT_TEMPLATE, payload: value })
-                }
+                onTemplateChange={(value) => {
+                  dispatch({ type: CaseCreateActionType.SELECT_TEMPLATE, payload: value });
+                  setTemplateHelpOpen(false);
+                  if (value !== EMPTY_TEMPLATE_ID) {
+                    setActiveRightView("caseTemplate");
+                  } else if (selectedTaskTemplateId !== EMPTY_TEMPLATE_ID) {
+                    setActiveRightView("taskTemplate");
+                  } else {
+                    setActiveRightView(null);
+                  }
+                }}
                 taskTemplates={taskTemplates}
                 selectedTaskTemplateId={selectedTaskTemplateId}
-                onTaskTemplateChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SELECT_TASK_TEMPLATE, payload: value })
-                }
+                onTaskTemplateChange={(value) => {
+                  dispatch({ type: CaseCreateActionType.SELECT_TASK_TEMPLATE, payload: value });
+                  setTemplateHelpOpen(false);
+                  if (value !== EMPTY_TEMPLATE_ID) {
+                    setActiveRightView("taskTemplate");
+                  } else if (selectedTemplateId !== EMPTY_TEMPLATE_ID) {
+                    setActiveRightView("caseTemplate");
+                  } else {
+                    setActiveRightView(null);
+                  }
+                }}
                 loading={loading}
                 templateHelpOpen={templateHelpOpen}
-                onToggleTemplateHelp={() => setTemplateHelpOpen((open) => !open)}
+                onToggleTemplateHelp={() => {
+                  setTemplateHelpOpen((open) => {
+                    const next = !open;
+                    if (next) {
+                      setActiveRightView("help");
+                    } else if (selectedTemplateId !== EMPTY_TEMPLATE_ID) {
+                      setActiveRightView("caseTemplate");
+                    } else if (selectedTaskTemplateId !== EMPTY_TEMPLATE_ID) {
+                      setActiveRightView("taskTemplate");
+                    } else {
+                      setActiveRightView(null);
+                    }
+                    return next;
+                  });
+                }}
               />
 
               {/* Action Buttons stay directly below Task Template */}
@@ -546,119 +584,105 @@ export default function CaseManagementCaseCreate() {
               </div>
             )}
 
-            {/* Right Column: Exclusive views (Help, Case Template Fields, or Task Review) */}
+            {/* Right Column: Dynamic single view replacement (Help, Case Template, or Task Review) */}
             {showRightPanel && (
               <div
                 className={`flex flex-col min-w-0 ${isLgScreen ? "h-full" : ""}`}
                 style={isLgScreen ? { flex: "1 1 0%" } : undefined}
               >
-                {templateHelpOpen ? (
-                  /* Mode 1: Case Template Help (Rendered completely on its own full height) */
-                  <CaseTemplateHelp onClose={() => setTemplateHelpOpen(false)} />
-                ) : (
-                  /* Mode 2: Template Views */
-                  <div className="flex flex-col h-full space-y-3 min-h-0">
-                    {/* Tab Switcher if BOTH Case Template Fields and Task Review apply */}
-                    {hasFields && hasTasks && (
-                      <div className="flex items-center gap-2 border-b border-border pb-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setActiveRightTab("fields")}
-                          className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                            activeRightTab === "fields"
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          }`}
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                            <polyline points="14 2 14 8 20 8" />
-                          </svg>
-                          <span>Document Template Fields</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveRightTab("tasks")}
-                          className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                            activeRightTab === "tasks"
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          }`}
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path d="M9 11l3 3L22 4" />
-                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                          </svg>
-                          <span>Task Template Review</span>
-                        </button>
+                {activeRightView === "help" || (templateHelpOpen && !isCaseTemplateSelected && !isTaskTemplateSelected) ? (
+                  /* Mode 1: Case Template Help */
+                  <CaseTemplateHelp onClose={() => {
+                    setTemplateHelpOpen(false);
+                    if (isCaseTemplateSelected) setActiveRightView("caseTemplate");
+                    else if (isTaskTemplateSelected) setActiveRightView("taskTemplate");
+                    else setActiveRightView(null);
+                  }} />
+                ) : activeRightView === "taskTemplate" ? (
+                  /* Mode 2: Task Template Review */
+                  <CaseManagementCaseCreateTaskReview
+                    taskTemplateName={activeTaskTemplate?.name}
+                    taskDrafts={taskDrafts}
+                    onUpdateDraft={(index, patch) =>
+                      dispatch({ type: CaseCreateActionType.UPDATE_TASK_DRAFT, payload: { index, patch } })
+                    }
+                    loading={loading}
+                    isLgScreen={isLgScreen}
+                    fillsAvailableSpace={true}
+                  />
+                ) : isCaseTemplateSelected ? (
+                  /* Mode 3: Case Template View */
+                  hasFields ? (
+                    <CaseManagementCaseCreateTemplateFields
+                      isLgScreen={isLgScreen}
+                      activeTemplate={activeTemplate}
+                      associatedDocs={associatedDocs}
+                      showAllPreviews={showAllPreviews}
+                      onShowAllPreviewsChange={(value) =>
+                        dispatch({ type: CaseCreateActionType.SET_SHOW_ALL_PREVIEWS, payload: value })
+                      }
+                      searchQuery={searchQuery}
+                      onSearchQueryChange={(value) =>
+                        dispatch({ type: CaseCreateActionType.SET_SEARCH_QUERY, payload: value })
+                      }
+                      uniqueRows={uniqueRows}
+                      selectedRow={selectedRow}
+                      onSelectedRowChange={(value) =>
+                        dispatch({ type: CaseCreateActionType.SET_SELECTED_ROW, payload: value })
+                      }
+                      filterDocId={filterDocId}
+                      onFilterDocIdChange={(value) =>
+                        dispatch({ type: CaseCreateActionType.SET_FILTER_DOC_ID, payload: value })
+                      }
+                      filteredTemplateFields={filteredTemplateFields}
+                      fieldValues={fieldValues}
+                      onFieldValuesChange={(values) =>
+                        dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
+                      }
+                      focusedField={focusedField}
+                      onFocusedFieldChange={handleFocusedFieldChange}
+                      loading={loading}
+                      isDraggingHeight={isDraggingHeight}
+                      onStartDraggingHeight={startDraggingHeight}
+                      bottomPercent={bottomPercent}
+                      fieldToDocsMap={fieldToDocsMap}
+                      expandedDocId={expandedDocId}
+                      onExpandedDocIdChange={(value) =>
+                        dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: value })
+                      }
+                      onToggleDocContext={handleToggleDocContext}
+                      onOpenTemplateFile={handleOpenTemplateFile}
+                      docTemplates={docTemplates}
+                      loadingContext={loadingContext}
+                      previewError={previewError}
+                      docHtmlCache={docHtmlCache}
+                      templateFields={templateFields}
+                      onFieldClickFromPreview={handleFieldClickFromPreview}
+                    />
+                  ) : (
+                    /* Empty Case Template Message Card */
+                    <div className="rounded-lg border border-border bg-card p-8 flex flex-col items-center justify-center text-center flex-1 h-full min-h-[350px] space-y-4 animate-in fade-in duration-200">
+                      <div className="size-14 rounded-full bg-muted/60 flex items-center justify-center text-muted-foreground">
+                        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="9" y1="13" x2="15" y2="13" />
+                        </svg>
                       </div>
-                    )}
-
-                    {/* View 1: Case Template Fields */}
-                    {(hasFields && (!hasTasks || activeRightTab === "fields")) && (
-                      <CaseManagementCaseCreateTemplateFields
-                        isLgScreen={isLgScreen}
-                        activeTemplate={activeTemplate}
-                        associatedDocs={associatedDocs}
-                        showAllPreviews={showAllPreviews}
-                        onShowAllPreviewsChange={(value) =>
-                          dispatch({ type: CaseCreateActionType.SET_SHOW_ALL_PREVIEWS, payload: value })
-                        }
-                        searchQuery={searchQuery}
-                        onSearchQueryChange={(value) =>
-                          dispatch({ type: CaseCreateActionType.SET_SEARCH_QUERY, payload: value })
-                        }
-                        uniqueRows={uniqueRows}
-                        selectedRow={selectedRow}
-                        onSelectedRowChange={(value) =>
-                          dispatch({ type: CaseCreateActionType.SET_SELECTED_ROW, payload: value })
-                        }
-                        filterDocId={filterDocId}
-                        onFilterDocIdChange={(value) =>
-                          dispatch({ type: CaseCreateActionType.SET_FILTER_DOC_ID, payload: value })
-                        }
-                        filteredTemplateFields={filteredTemplateFields}
-                        fieldValues={fieldValues}
-                        onFieldValuesChange={(values) =>
-                          dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
-                        }
-                        focusedField={focusedField}
-                        onFocusedFieldChange={handleFocusedFieldChange}
-                        loading={loading}
-                        isDraggingHeight={isDraggingHeight}
-                        onStartDraggingHeight={startDraggingHeight}
-                        bottomPercent={bottomPercent}
-                        fieldToDocsMap={fieldToDocsMap}
-                        expandedDocId={expandedDocId}
-                        onExpandedDocIdChange={(value) =>
-                          dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: value })
-                        }
-                        onToggleDocContext={handleToggleDocContext}
-                        onOpenTemplateFile={handleOpenTemplateFile}
-                        docTemplates={docTemplates}
-                        loadingContext={loadingContext}
-                        previewError={previewError}
-                        docHtmlCache={docHtmlCache}
-                        templateFields={templateFields}
-                        onFieldClickFromPreview={handleFieldClickFromPreview}
-                      />
-                    )}
-
-                    {/* View 2: Task Review */}
-                    {(hasTasks && (!hasFields || activeRightTab === "tasks")) && (
-                      <CaseManagementCaseCreateTaskReview
-                        taskTemplateName={activeTaskTemplate?.name}
-                        taskDrafts={taskDrafts}
-                        onUpdateDraft={(index, patch) =>
-                          dispatch({ type: CaseCreateActionType.UPDATE_TASK_DRAFT, payload: { index, patch } })
-                        }
-                        loading={loading}
-                        isLgScreen={isLgScreen}
-                        fillsAvailableSpace={true}
-                      />
-                    )}
-                  </div>
-                )}
+                      <div className="space-y-1.5 max-w-sm">
+                        <h3 className="text-base font-semibold text-foreground">
+                          {activeTemplate?.name || "Empty Case Template"}
+                        </h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          This case template does not contain any associated document templates or field variables.
+                        </p>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground/80 bg-muted/40 px-3 py-2 rounded-md border border-border/50 max-w-md">
+                        💡 You can proceed with creating the case without documents, or add document templates to this case template in <strong className="text-foreground">Case Templates</strong> settings.
+                      </div>
+                    </div>
+                  )
+                ) : null}
               </div>
             )}
           </div>
