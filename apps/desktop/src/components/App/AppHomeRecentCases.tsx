@@ -14,7 +14,7 @@ export default function AppHomeRecentCases() {
 
   return (
     <div className="w-96 rounded-xl bg-card overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-4 pt-0.5 pb-3">
         <span className="text-sm font-semibold text-foreground">{t("recent_cases")}</span>
       </div>
 
