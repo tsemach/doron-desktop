@@ -4,13 +4,13 @@ interface CaseTemplateHelpProps {
 
 export default function CaseTemplateHelp({ onClose }: CaseTemplateHelpProps) {
   return (
-    <div className="rounded-xl border border-border/80 bg-card p-5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 min-w-0 space-y-6 relative overflow-hidden text-foreground">
+    <div className="rounded-xl border border-border/80 bg-card p-5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 min-w-0 space-y-5 relative overflow-y-auto max-h-full h-full text-foreground flex flex-col">
       {/* Background Accent Decorative Glow */}
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-border/60 pb-3">
+      <div className="flex items-center justify-between border-b border-border/60 pb-3 shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-primary/10 text-primary">
             {/* Help Icon */}
@@ -50,7 +50,7 @@ export default function CaseTemplateHelp({ onClose }: CaseTemplateHelpProps) {
       </div>
 
       {/* Top Graphic: SVG Diagram stretched almost full width */}
-      <div className="w-full bg-slate-900/5 dark:bg-slate-950/40 rounded-xl border border-border/60 p-3 sm:p-4 flex flex-col items-center justify-center overflow-hidden shadow-inner">
+      <div className="w-full bg-slate-900/5 dark:bg-slate-950/40 rounded-xl border border-border/60 p-3 sm:p-4 flex flex-col items-center justify-center overflow-hidden shadow-inner shrink-0">
         <div className="w-full max-w-[1050px] mx-auto">
           <img
             src="/case-template-help.svg"
@@ -62,13 +62,13 @@ export default function CaseTemplateHelp({ onClose }: CaseTemplateHelpProps) {
               }
             }}
             alt="Case Template Generation Workflow Diagram"
-            className="w-full h-auto max-h-[420px] object-contain rounded-lg transition-transform duration-200 hover:scale-[1.005]"
+            className="w-full h-auto max-h-[300px] object-contain rounded-lg transition-transform duration-200 hover:scale-[1.005]"
           />
         </div>
       </div>
 
       {/* 3-Step Detailed Graphical Flow Section */}
-      <div className="space-y-3">
+      <div className="space-y-3 pb-2 shrink-0">
         <div className="flex items-center justify-between px-1">
           <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             {/* Sparkles Icon */}

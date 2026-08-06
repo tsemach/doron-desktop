@@ -27,6 +27,16 @@ export default function CaseManagementCaseCreate() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(caseCreateReducer, undefined, createInitialCaseCreateState);
   const [templateHelpOpen, setTemplateHelpOpen] = useState(false);
+  const [activeRightTab, setActiveRightTab] = useState<"fields" | "tasks">("fields");
+
+  // Keep active tab in sync when templates change
+  useEffect(() => {
+    if (selectedTemplateId && selectedTemplateId !== EMPTY_TEMPLATE_ID) {
+      setActiveRightTab("fields");
+    } else if (selectedTaskTemplateId && selectedTaskTemplateId !== EMPTY_TEMPLATE_ID) {
+      setActiveRightTab("tasks");
+    }
+  }, [selectedTemplateId, selectedTaskTemplateId]);
   const {
     subject,
     name,
@@ -475,7 +485,7 @@ export default function CaseManagementCaseCreate() {
           >
             {/* Left Column: Main Case Details */}
             <div
-              className={`rounded-lg border border-border bg-card p-4 space-y-3 ${
+              className={`rounded-lg border border-border bg-card p-4 space-y-4 ${
                 showRightPanel && isLgScreen ? "shrink-0 overflow-y-auto" : ""
               }`}
               style={showRightPanel && isLgScreen ? { flex: `0 0 calc(${leftPercent}% - 6px)` } : undefined}
@@ -512,6 +522,12 @@ export default function CaseManagementCaseCreate() {
                 templateHelpOpen={templateHelpOpen}
                 onToggleTemplateHelp={() => setTemplateHelpOpen((open) => !open)}
               />
+
+              {/* Action Buttons stay directly below Task Template */}
+              <CaseManagementCaseCreateFormActions
+                loading={loading}
+                onCancel={() => navigate("/case-management")}
+              />
             </div>
 
             {/* Resizable Divider (rendered only on large screens when the right panel is shown) */}
@@ -530,86 +546,122 @@ export default function CaseManagementCaseCreate() {
               </div>
             )}
 
-            {/* Right Column: Dynamic Template Fields + Task Review, stacked when both apply */}
+            {/* Right Column: Exclusive views (Help, Case Template Fields, or Task Review) */}
             {showRightPanel && (
               <div
-                className={`flex flex-col gap-4 min-w-0 ${isLgScreen ? "h-full" : ""}`}
+                className={`flex flex-col min-w-0 ${isLgScreen ? "h-full" : ""}`}
                 style={isLgScreen ? { flex: "1 1 0%" } : undefined}
               >
-                {templateHelpOpen && (
+                {templateHelpOpen ? (
+                  /* Mode 1: Case Template Help (Rendered completely on its own full height) */
                   <CaseTemplateHelp onClose={() => setTemplateHelpOpen(false)} />
-                )}
+                ) : (
+                  /* Mode 2: Template Views */
+                  <div className="flex flex-col h-full space-y-3 min-h-0">
+                    {/* Tab Switcher if BOTH Case Template Fields and Task Review apply */}
+                    {hasFields && hasTasks && (
+                      <div className="flex items-center gap-2 border-b border-border pb-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setActiveRightTab("fields")}
+                          className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                            activeRightTab === "fields"
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                          <span>Document Template Fields</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveRightTab("tasks")}
+                          className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                            activeRightTab === "tasks"
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path d="M9 11l3 3L22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                          </svg>
+                          <span>Task Template Review</span>
+                        </button>
+                      </div>
+                    )}
 
-                {hasFields && (
-                  <CaseManagementCaseCreateTemplateFields
-                    isLgScreen={isLgScreen}
-                    activeTemplate={activeTemplate}
-                    associatedDocs={associatedDocs}
-                    showAllPreviews={showAllPreviews}
-                    onShowAllPreviewsChange={(value) =>
-                      dispatch({ type: CaseCreateActionType.SET_SHOW_ALL_PREVIEWS, payload: value })
-                    }
-                    searchQuery={searchQuery}
-                    onSearchQueryChange={(value) =>
-                      dispatch({ type: CaseCreateActionType.SET_SEARCH_QUERY, payload: value })
-                    }
-                    uniqueRows={uniqueRows}
-                    selectedRow={selectedRow}
-                    onSelectedRowChange={(value) =>
-                      dispatch({ type: CaseCreateActionType.SET_SELECTED_ROW, payload: value })
-                    }
-                    filterDocId={filterDocId}
-                    onFilterDocIdChange={(value) =>
-                      dispatch({ type: CaseCreateActionType.SET_FILTER_DOC_ID, payload: value })
-                    }
-                    filteredTemplateFields={filteredTemplateFields}
-                    fieldValues={fieldValues}
-                    onFieldValuesChange={(values) =>
-                      dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
-                    }
-                    focusedField={focusedField}
-                    onFocusedFieldChange={handleFocusedFieldChange}
-                    loading={loading}
-                    isDraggingHeight={isDraggingHeight}
-                    onStartDraggingHeight={startDraggingHeight}
-                    bottomPercent={bottomPercent}
-                    fieldToDocsMap={fieldToDocsMap}
-                    expandedDocId={expandedDocId}
-                    onExpandedDocIdChange={(value) =>
-                      dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: value })
-                    }
-                    onToggleDocContext={handleToggleDocContext}
-                    onOpenTemplateFile={handleOpenTemplateFile}
-                    docTemplates={docTemplates}
-                    loadingContext={loadingContext}
-                    previewError={previewError}
-                    docHtmlCache={docHtmlCache}
-                    templateFields={templateFields}
-                    onFieldClickFromPreview={handleFieldClickFromPreview}
-                  />
-                )}
+                    {/* View 1: Case Template Fields */}
+                    {(hasFields && (!hasTasks || activeRightTab === "fields")) && (
+                      <CaseManagementCaseCreateTemplateFields
+                        isLgScreen={isLgScreen}
+                        activeTemplate={activeTemplate}
+                        associatedDocs={associatedDocs}
+                        showAllPreviews={showAllPreviews}
+                        onShowAllPreviewsChange={(value) =>
+                          dispatch({ type: CaseCreateActionType.SET_SHOW_ALL_PREVIEWS, payload: value })
+                        }
+                        searchQuery={searchQuery}
+                        onSearchQueryChange={(value) =>
+                          dispatch({ type: CaseCreateActionType.SET_SEARCH_QUERY, payload: value })
+                        }
+                        uniqueRows={uniqueRows}
+                        selectedRow={selectedRow}
+                        onSelectedRowChange={(value) =>
+                          dispatch({ type: CaseCreateActionType.SET_SELECTED_ROW, payload: value })
+                        }
+                        filterDocId={filterDocId}
+                        onFilterDocIdChange={(value) =>
+                          dispatch({ type: CaseCreateActionType.SET_FILTER_DOC_ID, payload: value })
+                        }
+                        filteredTemplateFields={filteredTemplateFields}
+                        fieldValues={fieldValues}
+                        onFieldValuesChange={(values) =>
+                          dispatch({ type: CaseCreateActionType.SET_FIELD_VALUES, payload: values })
+                        }
+                        focusedField={focusedField}
+                        onFocusedFieldChange={handleFocusedFieldChange}
+                        loading={loading}
+                        isDraggingHeight={isDraggingHeight}
+                        onStartDraggingHeight={startDraggingHeight}
+                        bottomPercent={bottomPercent}
+                        fieldToDocsMap={fieldToDocsMap}
+                        expandedDocId={expandedDocId}
+                        onExpandedDocIdChange={(value) =>
+                          dispatch({ type: CaseCreateActionType.SET_EXPANDED_DOC_ID, payload: value })
+                        }
+                        onToggleDocContext={handleToggleDocContext}
+                        onOpenTemplateFile={handleOpenTemplateFile}
+                        docTemplates={docTemplates}
+                        loadingContext={loadingContext}
+                        previewError={previewError}
+                        docHtmlCache={docHtmlCache}
+                        templateFields={templateFields}
+                        onFieldClickFromPreview={handleFieldClickFromPreview}
+                      />
+                    )}
 
-                {hasTasks && (
-                  <CaseManagementCaseCreateTaskReview
-                    taskTemplateName={activeTaskTemplate?.name}
-                    taskDrafts={taskDrafts}
-                    onUpdateDraft={(index, patch) =>
-                      dispatch({ type: CaseCreateActionType.UPDATE_TASK_DRAFT, payload: { index, patch } })
-                    }
-                    loading={loading}
-                    isLgScreen={isLgScreen}
-                    fillsAvailableSpace={!hasFields}
-                  />
+                    {/* View 2: Task Review */}
+                    {(hasTasks && (!hasFields || activeRightTab === "tasks")) && (
+                      <CaseManagementCaseCreateTaskReview
+                        taskTemplateName={activeTaskTemplate?.name}
+                        taskDrafts={taskDrafts}
+                        onUpdateDraft={(index, patch) =>
+                          dispatch({ type: CaseCreateActionType.UPDATE_TASK_DRAFT, payload: { index, patch } })
+                        }
+                        loading={loading}
+                        isLgScreen={isLgScreen}
+                        fillsAvailableSpace={true}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             )}
           </div>
-
-          {/* Action Buttons */}
-          <CaseManagementCaseCreateFormActions
-            loading={loading}
-            onCancel={() => navigate("/case-management")}
-          />
         </form>
       </div>
     </main>
