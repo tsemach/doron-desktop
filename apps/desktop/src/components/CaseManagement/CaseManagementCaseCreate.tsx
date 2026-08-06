@@ -453,7 +453,6 @@ export default function CaseManagementCaseCreate() {
   }
 
   const hasFields = isCaseTemplateSelected && templateFields.length > 0;
-  const hasTasks = isTaskTemplateSelected && taskDrafts.length > 0;
   const showRightPanel = isCaseTemplateSelected || isTaskTemplateSelected || templateHelpOpen;
 
   return (
