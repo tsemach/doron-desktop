@@ -124,5 +124,11 @@
   "scan_and_index": "סריקה ואינדוקס",
   "documents_templates": "תבניות מסמכים",
   "go_to_smart_search": "עבור לחיפוש חכם",
-  "software_updates": "עדכוני תוכנה"
+  "software_updates": "עדכוני תוכנה",
+  "cases": "תיקים",
+  "documents": "מסמכים",
+  "recent_cases": "תיקים אחרונים",
+  "no_recent_cases": "עדיין לא נצפו תיקים",
+  "view_all_cases": "הצג הכל",
+  "search_documents_placeholder": "חפש מסמכים בעברית או באנגלית..."
 }

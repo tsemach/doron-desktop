@@ -17,6 +17,7 @@ import OpenCasesDocumentFields from "./OpenCasesDocumentFields";
 import CaseTasksPanel from "./CaseTasksPanel";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
+import { rememberRecentCase } from "@/lib/case";
 
 import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
 
@@ -229,6 +230,13 @@ export default function CaseManagementOpenCasesDetails() {
       const found = mapped.find((c) => c.id === id);
       if (found) {
         setSelectedCase(found);
+        rememberRecentCase({
+          id: found.id,
+          subject: found.subject,
+          name: found.name,
+          status: found.status,
+          date: found.updatedAt || found.createdAt,
+        });
       } else {
         setError(`Case with ID ${id} not found.`);
       }
