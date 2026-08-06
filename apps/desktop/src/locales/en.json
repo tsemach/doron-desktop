@@ -124,5 +124,11 @@
   "scan_and_index": "Scan & Index",
   "documents_templates": "Documents Templates",
   "go_to_smart_search": "Go to Smart Search",
-  "software_updates": "Software Updates"
+  "software_updates": "Software Updates",
+  "cases": "Cases",
+  "documents": "Documents",
+  "recent_cases": "Recent Cases",
+  "no_recent_cases": "No cases visited yet",
+  "view_all_cases": "View all",
+  "search_documents_placeholder": "Search documents in Hebrew or English..."
 }

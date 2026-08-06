@@ -13,4 +13,7 @@ export async function searchCases(filters: CaseSearchFilters): Promise<CaseSearc
   });
 }
 
+export { forgetRecentCase, getRecentCases, rememberRecentCase } from "./recentCases";
+export type { RecentCase } from "./recentCases";
+
 export type { CaseLink, CasePathResolution, CaseSearchFilters, CaseSearchRow };

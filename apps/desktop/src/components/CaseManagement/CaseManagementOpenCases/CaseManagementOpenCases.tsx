@@ -16,6 +16,7 @@ import OpenCasesHeader from "./OpenCasesHeader";
 import OpenCasesTopBar from "./OpenCasesTopBar";
 import type { OpenCasesTagFilter } from "./OpenCasesTagSearchBar";
 import { applyCaseSpecialStatus, clearCaseSpecialStatus } from "@/lib/caseSpecialStatus";
+import { forgetRecentCase, rememberRecentCase } from "@/lib/case";
 
 import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
 
@@ -195,6 +196,19 @@ export default function CaseManagementOpenCases() {
     }
   }
 
+  // Only a user click records a recent case -- the auto-select of cases[0] on
+  // load goes through setSelectedCase directly and must not pollute the list.
+  function handleSelectCase(c: Case) {
+    setSelectedCase(c);
+    rememberRecentCase({
+      id: c.id,
+      subject: c.subject,
+      name: c.name,
+      status: c.status,
+      date: c.updatedAt || c.createdAt,
+    });
+  }
+
   function handleDeleteCase(c: Case) {
     setCaseToDelete(c);
   }
@@ -206,6 +220,7 @@ export default function CaseManagementOpenCases() {
     setError(null);
     try {
       await invoke("delete_case", { id: Number(id) });
+      forgetRecentCase(id);
       setCases((prev) => prev.filter((c) => c.id !== id));
       if (selectedCase?.id === id) {
         setSelectedCase(null);
@@ -305,7 +320,7 @@ export default function CaseManagementOpenCases() {
           loading={loading}
           isLgScreen={isLgScreen}
           leftPercent={leftPercent}
-          onSelectCase={setSelectedCase}
+          onSelectCase={handleSelectCase}
           onCloseCase={handleCloseCase}
           onReopenCase={handleReopenCase}
           onDeleteCase={handleDeleteCase}

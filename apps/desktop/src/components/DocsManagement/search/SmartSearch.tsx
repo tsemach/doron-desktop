@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import { useCaseLinksForPaths, useCaseSearch } from "@/hooks/case";
 import { useSearch } from "@/hooks/useSearch";
@@ -14,6 +15,7 @@ import {
 import { buildQuery } from "./buildQuery";
 
 export default function SmartSearch() {
+  const location = useLocation();
   const [text, setText] = useState("");
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<DocumentSearchAdvancedFilters>(
@@ -82,6 +84,19 @@ export default function SmartSearch() {
     setText(suggestion);
     setTimeout(handleSearch, 50);
   }
+
+  // Prefills and auto-runs a query handed off by the home screen's search box
+  // (AppHome.tsx navigates here with router state instead of duplicating the
+  // search UI). Runs once per navigation -- location.key changes on every
+  // navigate() call, including repeat visits with the same query.
+  useEffect(() => {
+    const initialQuery = (location.state as { initialQuery?: string } | null)?.initialQuery;
+    if (initialQuery) {
+      setText(initialQuery);
+      setTimeout(handleSearch, 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   return (
     <div className="doc-search animate-fade-in">

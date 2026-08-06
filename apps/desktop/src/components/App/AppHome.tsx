@@ -1,26 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { User, Settings, Sparkles, LogOut } from "lucide-react";
+import { Briefcase, FileText } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "../../store/indexStore";
 import { clearSession } from "../../store/authStore";
-import { useSubscriptionTier } from "../../lib/featureGating";
-import PlanBadge from "../ui/PlanBadge";
-import KebabMenu from "../ui/KebabMenu";
+import AppHomeRecentCases from "./AppHomeRecentCases";
+import AppHomeDocumentsPanel from "./AppHomeDocumentsPanel";
+import { AppUserMenu } from "./AppUserMenu";
+import { AppHomeWelcome } from "./AppHomeWelcome";
 
 // Same VITE_BACKEND_URL convention as Auth/AuthLanding.tsx.
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
+// Compact icon tile for the two primary nav destinations -- label sits below
+// the tile rather than inside it, so the tile itself stays a simple square.
+const NAV_TILE_CLASS =
+  "relative size-48 shrink-0 rounded-2xl border border-border bg-muted/40 hover:bg-accent hover:border-foreground/25 shadow-sm transition-colors flex items-center justify-center text-foreground/70 hover:text-foreground cursor-pointer";
+
 export default function AppHome() {
-  const navigate = useNavigate();
-  const [username, setUsername] = useState<string>(() => localStorage.getItem("user_name") || "");
-  const [nameInput, setNameInput] = useState("");
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const isProcessing = useAtomValue(isProcessingAtom);
-  const tier = useSubscriptionTier();
 
   useEffect(() => {
     const setupWindow = async () => {
@@ -64,129 +67,76 @@ export default function AppHome() {
     await clearSession();
   }
 
-  function handleSaveName(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = nameInput.trim();
-    if (trimmed) {
-      localStorage.setItem("user_name", trimmed);
-      setUsername(trimmed);
-    }
-  }
-
   return (
-    <div className="relative min-h-screen flex flex-col bg-background text-foreground justify-center items-center px-4 py-12">
+    <div className="relative min-h-screen flex flex-col bg-background text-foreground px-10 py-10">
       <div className="absolute top-6 right-6">
-        <KebabMenu
-          title="Account"
-          triggerIcon={<User className="size-6" />}
-          triggerClassName="h-14 w-14 rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-accent"
-          items={[
-            {
-              label: t("settings_footer"),
-              icon: <Settings className="size-4" />,
-              onClick: handleSettings,
-            },
-            {
-              label: "Upgrade to Pro",
-              icon: <Sparkles className="size-4" />,
-              onClick: handleUpgrade,
-              hidden: tier === "pro",
-            },
-            {
-              label: t("log_out"),
-              icon: <LogOut className="size-4" />,
-              onClick: handleLogout,
-              variant: "destructive",
-            },
-          ]}
+        <AppUserMenu
+          handleSettings={handleSettings}
+          handleUpgrade={handleUpgrade}
+          handleLogout={handleLogout}
         />
       </div>
 
-      <div className="max-w-5xl w-full flex flex-col items-center gap-12">
-        {/* Welcome Title & Input */}
-        <div className="text-center space-y-4">
-          <h2 className="text-3xl font-bold tracking-tight">
-            {username ? (
-              <>
-                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider align-middle bg-red-50 text-red-600 border border-red-200 mr-2">
-                  Beta
-                </span>
-                {t("welcome")}, {username} <PlanBadge />
-              </>
-            ) : (
-              t("welcome_workspace")
-            )}
-          </h2>
+      <div className="flex-1 flex items-center justify-center">       
+        <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 items-center gap-160 px-6">
 
-          {/* Show input below the heading if name doesn't exist */}
-          {!username && (
-            <form onSubmit={handleSaveName} className="flex items-center justify-center gap-2 mt-6">
-              <input
-                type="text"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                placeholder={t("enter_name")}
-                className="border border-border/80 rounded-lg px-4 py-2 text-sm bg-background w-64 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-sm"
-              >
-                {t("save")}
-              </button>
-            </form>
-          )}
+          {/* Primary navigation wrapper - Aligns content strictly to the left edge */}
+          <div className="flex flex-col gap-16 justify-self-start">
+            <div className="flex items-start gap-20">
+              <div className="flex flex-col items-center gap-2">
+                <button type="button" onClick={handleCaseMagement} className={NAV_TILE_CLASS}>
+                  <div className="flex flex-col items-center gap-2">
+                    <Briefcase className="size-8" />
+                    <span className="text-2xl font-medium text-foreground/80">{t("cases")}</span>
+                  </div>
+                </button>
+              </div>
+              <AppHomeRecentCases />
+            </div>
 
-          <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            {t("home_desc")}
-          </p>
-        </div>
-
-        {/* Action cards & Settings Wrapper */}
-        <div className="w-full max-w-[1008px] flex flex-col gap-2">
-          {/* Action cards - Keep Case Management and Document Management as is */}
-          <div className="flex flex-col md:flex-row flex-wrap justify-center gap-8 w-full">
-            <button
-              type="button"
-              onClick={handleCaseMagement}
-              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
-            >
-              {t("case_management")}
-            </button>
-            <button
-              type="button"
-              onClick={handleDocsManagement}
-              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10 relative"
-            >
-              {t("docs_management")}
-              {isProcessing && (
-                <span className="absolute bottom-4 right-4 flex h-3.5 w-3.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-500"></span>
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleTaskManagement}
-              className="border-4 text-[rgb(120,120,120)] hover:border-gray-400 rounded h-60 w-full md:w-120 px-4 py-2 text-[48px] font-large hover:border-blue-500 transition-colors flex items-center justify-center cursor-pointer bg-card hover:bg-accent/10"
-            >
-              {t("task_management")}
-            </button>
+            <div className="flex items-start gap-20">
+              <div className="flex flex-col items-center gap-2">
+                <button type="button" onClick={handleDocsManagement} className={NAV_TILE_CLASS}>
+                  <div className="flex flex-col items-center gap-2">
+                    <FileText className="size-8" />
+                    <span className="text-2xl font-medium text-foreground/80">{t("documents")}</span>
+                  </div>
+                  {isProcessing && (
+                    <span className="absolute bottom-2 right-2 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                    </span>
+                  )}
+                </button>
+              </div>
+              <AppHomeDocumentsPanel />
+            </div>
           </div>
 
-          {/* Footer Settings Link */}
-          <div className="flex justify-end w-full">
-            <button
-              type="button"
-              onClick={handleSettings}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 flex items-center gap-1.5 cursor-pointer"
-            >
-              {t("settings_footer")}
-            </button>
+          {/* Welcome Component Wrapper - Centered perfectly inside its own right column */}
+          <div className="justify-self-center">
+            <AppHomeWelcome />
           </div>
+
         </div>
+      </div>
+
+      {/* Footer Settings Link */}
+      <div className="flex justify-end items-center gap-4 w-full">
+        <button
+          type="button"
+          onClick={handleTaskManagement}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 flex items-center gap-1.5 cursor-pointer"
+        >
+          {t("task_management")}
+        </button>
+        <button
+          type="button"
+          onClick={handleSettings}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 flex items-center gap-1.5 cursor-pointer"
+        >
+          {t("settings_footer")}
+        </button>
       </div>
     </div>
   );
