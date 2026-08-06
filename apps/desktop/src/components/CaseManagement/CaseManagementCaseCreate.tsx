@@ -485,7 +485,7 @@ export default function CaseManagementCaseCreate() {
             id="create-case-split-container"
             className={
               showRightPanel
-                ? `flex ${isLgScreen ? "flex-row gap-0 h-[calc(100vh-220px)] lg:h-[calc(100vh-200px)] min-h-[350px]" : "flex-col gap-4"} items-stretch relative ${
+                ? `flex ${isLgScreen ? "flex-row gap-0 h-[calc(100vh-130px)] lg:h-[calc(100vh-120px)] min-h-[500px]" : "flex-col gap-4"} items-stretch relative ${
                     isDragging ? "select-none cursor-col-resize" : ""
                   }`
                 : "space-y-4"
