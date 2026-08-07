@@ -42,8 +42,12 @@ export default function CaseManagementEmailAlertReview() {
       refresh();
     });
 
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("open-email-alert-review", handleOpen);
+
     return () => {
       unlisten.then((f) => f());
+      window.removeEventListener("open-email-alert-review", handleOpen);
     };
   }, []);
 
@@ -57,6 +61,7 @@ export default function CaseManagementEmailAlertReview() {
     try {
       const res = await invoke<PendingAlert[]>("list_pending_email_alerts");
       setAlerts(res);
+      window.dispatchEvent(new CustomEvent("email-alerts-updated", { detail: res.length }));
 
       // Pre-populate the dropdown, but only with a case the dropdown actually offers.
       // `list_cases` hides deleted cases, so pre-filling a deleted id left the select
