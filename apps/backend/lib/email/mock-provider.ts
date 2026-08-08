@@ -8,4 +8,8 @@ export class MockEmailProvider implements EmailProvider {
   async sendVerificationEmail(email: string, verifyUrl: string): Promise<void> {
     console.log(`[MockEmailProvider] Verification link for ${email}:\n${verifyUrl}`);
   }
+
+  async sendInvitationEmail(email: string, acceptUrl: string, role: string): Promise<void> {
+    console.log(`[MockEmailProvider] Invitation (role: ${role}) for ${email}:\n${acceptUrl}`);
+  }
 }

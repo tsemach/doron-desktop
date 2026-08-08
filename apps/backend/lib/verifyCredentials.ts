@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "../database";
 import { users } from "../database/schema";
@@ -17,7 +17,13 @@ export async function verifyCredentials(
   email: string,
   password: string
 ): Promise<{ user: typeof users.$inferSelect } | { error: string }> {
-  const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  // ASC-142: a soft-deleted user (users.deletedAt set) must never be able
+  // to authenticate -- filtered out here rather than relying on callers.
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.email, email), isNull(users.deletedAt)))
+    .limit(1);
 
   if (!user || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
     return { error: GENERIC_ERROR };
