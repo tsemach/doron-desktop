@@ -1,6 +1,18 @@
 import { pgTable, text, integer, timestamp, primaryKey, uuid, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
+// ASC-142 -- a firm is created only when its first admin is invited from
+// apps/office (see invitations.role below); firms are fully isolated from
+// each other (no cross-firm queries anywhere in the app).
+export const firms = pgTable("firms", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const users = pgTable("users", {
   id: text("id")
     .primaryKey()
@@ -17,6 +29,17 @@ export const users = pgTable("users", {
   // is what the OAuth callback pages check to decide whether to route a
   // fresh sign-in to /register/plan or straight into the app.
   planSelectedAt: timestamp("plan_selected_at", { mode: "date" }),
+  // ASC-142 -- account role. Self-registered accounts (app/api/v1/auth/signup)
+  // default to "flat": full access, no firm, peers with other flat users via
+  // flatGroupMembers below. "admin" is never self-assignable -- it's only
+  // ever set by accepting an office-issued invitation (see invitations.role).
+  role: text("role", { enum: ["admin", "manager", "user", "flat"] }).default("flat").notNull(),
+  // Null for flat users. Set from the accepted invitation for admin/manager/user.
+  firmId: text("firm_id").references(() => firms.id, { onDelete: "cascade" }),
+  // Soft delete only (ASC-142 rule 12) -- every lookup used for
+  // authentication (verifyCredentials, desktop-session, authorizeOrgRequest)
+  // must filter this out; nothing here hard-deletes a user row.
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -82,6 +105,84 @@ export const desktopSessions = pgTable("desktop_sessions", {
   expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+// ASC-142 -- a group of users with one manager. managerId is not unique, so
+// a manager can own several teams (rule 4). Membership is a separate join
+// table (teamMembers) rather than a teamId column on users, because a team
+// member can itself be a manager who owns their own team(s) -- "a team of
+// managers" (rule 6) -- which a single FK on users can't represent.
+export const teams = pgTable("teams", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: text("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  managerId: text("manager_id")
+    .notNull()
+    .references(() => users.id),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// A user's manager is derived by walking teamMembers -> teams.managerId
+// (deliberately no users.managerId column -- see teams' comment above).
+export const teamMembers = pgTable(
+  "team_members",
+  {
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.userId] })]
+);
+
+// ASC-142 email-invitation onboarding. A dedicated table rather than
+// reusing verificationTokens -- an invitation carries a role/firm/team
+// payload that an identifier+token+expires row can't hold. role="admin"
+// rows may only ever be created by apps/office's invite-admin route (rule
+// 2); the firm-facing invite API (admins/managers) must never produce one.
+// role="flat" invitations carry no firmId/teamId -- acceptance instead adds
+// both parties to a flatGroups row (rule 13).
+export const invitations = pgTable("invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  role: text("role", { enum: ["admin", "manager", "user", "flat"] }).notNull(),
+  // Nullable only for the office's admin invite, issued before the firms
+  // row exists in the same transaction; every other role sets it.
+  firmId: text("firm_id").references(() => firms.id, { onDelete: "cascade" }),
+  teamId: uuid("team_id").references(() => teams.id, { onDelete: "cascade" }),
+  invitedByUserId: text("invited_by_user_id").references(() => users.id),
+  token: text("token").unique().notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  // Set (not row-deleted) on acceptance, unlike consumeEmailVerification --
+  // keeps an audit trail of who accepted what, when.
+  acceptedAt: timestamp("accepted_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ASC-142 rule 13 -- flat users have no firm, but can form a peer group
+// with other flat users via a role="flat" invitation. A flat user belongs
+// to at most one group (userId unique).
+export const flatGroups = pgTable("flat_groups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const flatGroupMembers = pgTable(
+  "flat_group_members",
+  {
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => flatGroups.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.userId] })]
+);
 
 export const documentTemplates = pgTable("document_templates", {
   id: uuid("id").primaryKey().defaultRandom(),
