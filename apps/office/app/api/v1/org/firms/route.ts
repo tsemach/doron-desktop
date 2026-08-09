@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { firms } from "@workspace/backend-orm";
 import { auth } from "../../../../../auth";
@@ -45,6 +45,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Firm name contains invalid characters." }, { status: 400 });
     }
 
+    // firms.name has a DB-level unique constraint (the real source of
+    // truth, see packages/backend-orm/src/schema.ts) -- this check exists
+    // only to turn the common case into a clean 400 instead of the
+    // constraint violation's raw SQL error message reaching the UI.
+    const [existing] = await backendDb.select({ id: firms.id }).from(firms).where(eq(firms.name, name)).limit(1);
+    if (existing) {
+      return NextResponse.json({ error: "A firm with this name already exists." }, { status: 400 });
+    }
+
     const [firm] = await backendDb
       .insert(firms)
       .values({ name })
@@ -52,6 +61,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ firm }, { status: 201 });
   } catch (error: any) {
+    // Fallback for the race between the check above and the insert (two
+    // concurrent requests for the same name) -- Postgres's own unique
+    // constraint still catches it either way, this just keeps the error
+    // message clean instead of leaking the raw SQL error.
+    if (error?.code === "23505") {
+      return NextResponse.json({ error: "A firm with this name already exists." }, { status: 400 });
+    }
     console.error("Failed to create firm:", error);
     return NextResponse.json({ error: `Failed to create firm: ${error.message || String(error)}` }, { status: 500 });
   }
