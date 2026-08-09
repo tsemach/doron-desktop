@@ -24,6 +24,9 @@ Companion to [`implementation_plan.md`](./implementation_plan.md), which phases 
    form a peer group with other flat users (rule 13).
 7. All of the above is manageable from a new **"Users and Roles"** section in the desktop app's
    Settings screen, available on every subscription tier.
+8. The backend API is usable by more than the desktop app — a browser-based SaaS surface (hosted in
+   `apps/backend` itself, same origin) is expected later. The API is designed for this from Phase 2
+   onward (see §5); the browser UI itself is deferred (§7).
 
 **Non-goals — explicitly out of scope for this issue**
 
@@ -37,6 +40,9 @@ Companion to [`implementation_plan.md`](./implementation_plan.md), which phases 
   writing this design.
 - **Tier gating.** Unlike `ai_features`/`voice_recording` (Pro-only, see `featureGating.ts`), this
   entire feature is available on Free and Pro alike. No new billing/plan work.
+- **A browser SaaS UI for this feature.** The backend API is built to support one from Phase 2 onward
+  (goal 8, §5) — same-origin cookie auth in `apps/backend`, no separate CORS/cross-origin work needed
+  when it's built — but the pages themselves are a later, separate phase. §7 has the detail.
 - **Office staff role changes.** Rule 11 scopes role changes to a firm's own admin; `apps/office`
   staff are not given a parallel "change any user's role" capability here.
 - **NextAuth OAuth-path soft-delete enforcement.** Flagged as a known gap (§6) rather than solved here
@@ -128,12 +134,19 @@ change takes effect on the next check, not after a 30-day token TTL).
 
 Backend API, two auth styles sharing one set of business-logic functions
 (`apps/backend/lib/org/{roster,invitations}.ts`) — mirroring how `desktop-login` and NextAuth's
-Credentials provider already share `verifyCredentials.ts`:
+Credentials provider already share `verifyCredentials.ts`. Neither is "the primary" surface; they're
+peers for two different callers that both need to exist (goal 8):
 
-- **Cookie-authenticated** (`apps/backend/app/api/v1/org/...`, `auth()`) — for any future web UI.
-- **Token-in-body** (`apps/backend/app/api/v1/org/desktop/...`) — the primary surface, called from
-  the desktop app's Rust layer, authenticated via a new `authorizeOrgRequest(token)` that extends
-  `lib/ai/auth.ts`'s existing `authorizeRequest` lookup to also select `role`/`firmId`.
+- **Cookie-authenticated** (`apps/backend/app/api/v1/org/...`, `auth()`) — for a browser calling
+  `apps/backend` directly (same origin, so the existing NextAuth session cookie just works, no CORS
+  or cross-site cookie handling needed). Re-fetches `role`/`firmId` fresh from `users` rather than
+  trusting the JWT, so this family works correctly even before the session-plumbing work in §5 lands.
+  No web UI calls it yet (§7) — Phase 2 builds the route, the page comes later.
+- **Token-in-body** (`apps/backend/app/api/v1/org/desktop/...`) — called from the desktop app's Rust
+  layer, authenticated via a new `authorizeOrgRequest(token)` that extends `lib/ai/auth.ts`'s existing
+  `authorizeRequest` lookup to also select `role`/`firmId`. Necessary because the Tauri webview can't
+  persist a browser cookie across restarts (same reason `desktop-login`/`verify_session` already work
+  this way).
 - **Public, unauthenticated** — `GET/POST /api/v1/org/invitations/[token]` (and its `/accept`), since
   the invitee has no account yet.
 
@@ -147,7 +160,7 @@ None of the existing `users` lookups (`verifyCredentials.ts`, `desktop-session/r
 part of this work, or a soft-deleted account keeps working. NextAuth's `DrizzleAdapter` OAuth sign-in
 path has the same blind spot and doesn't get a fix in this design — flagged as a follow-up.
 
-## 7. Desktop UI placement
+## 7. UI placement
 
 A new **"Users and Roles"** tab in `apps/desktop/src/components/Settings/`, following the screen's
 existing per-tab decomposition (`Setting*.tsx` main component + `Setting*Help.tsx` side panel, e.g.
@@ -156,3 +169,10 @@ admin/manager get a manageable roster (invite, change role, remove); `user`/`fla
 account/firm summary. Brand-new invitees set their password on a backend-hosted web page (opened via
 `openUrl()`, the same convention `AuthLanding.tsx` already uses for registration, since they have no
 desktop session yet); an already-signed-in admin/manager manages their roster natively in Settings.
+
+**Browser SaaS UI (goal 8) is explicitly deferred** — no `apps/backend` pages call the cookie-
+authenticated `org/*` routes yet. Building it is a later, separate phase/issue: equivalent screens
+(roster table, invite dialog, role/remove actions) hosted in `apps/backend` itself, reusing the same
+`lib/org/*.ts` business logic the desktop flow already exercises. Decided this way rather than
+building both now so the desktop flow — the only UI actually scoped into this plan — ships and is
+verified end to end first.

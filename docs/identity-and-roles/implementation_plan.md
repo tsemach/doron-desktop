@@ -19,6 +19,11 @@ compiling and the app shippable.
 | P3 | `role`/`firmId` flow through session (web + desktop) | P1 | Manual: sign in, inspect JWT/`Session` for the new fields |
 | P4 | `apps/office` → invite firm admin | P1, P2 | Manual: office invite creates `firms`+`invitations` rows, email logged |
 | P5 | `apps/desktop`: org Rust commands + "Users and Roles" Settings tab + accept-invite page | P2, P3, P4 | Manual end-to-end flow (see Verification) |
+| P6 *(not yet scheduled)* | `apps/backend` browser UI for the same roster/invite/role flows | P2 (+ P3 for client-side gating) | Manual: signed-in browser session manages a roster without the desktop app |
+
+P2's cookie-authenticated `org/*` route family (as opposed to `org/desktop/*`) exists specifically to
+make P6 a pure UI phase later — no backend changes anticipated when it's picked up. See design.md
+goal 8 / §5 / §7 for why the two route families exist and why P6 is split out rather than folded into P5.
 
 ---
 
@@ -116,6 +121,15 @@ Verify manually: sign in via desktop, confirm `get_session` (Tauri command) retu
 5. `accept-invite/page.tsx` on the backend: reads `?token=`, calls the public accept API, sets a
    password, then directs back to desktop login — opened via `openUrl()` exactly like
    `AuthLanding.tsx`'s registration flow, since the invitee has no session yet.
+
+## P6 — Browser SaaS UI *(not yet scheduled)*
+
+Equivalent to P5's desktop Settings tab, but as pages in `apps/backend` itself (e.g.
+`app/dashboard/users/page.tsx`) calling the already-existing cookie-authenticated `org/*` routes
+directly with `fetch` — no Rust layer, no token-in-body, same-origin cookie auth. Reuses the same
+`lib/org/*.ts` business logic P2 already built; this phase is UI-only. Deliberately not detailed
+further here until it's actually picked up — see design.md §7 for why it's split out rather than
+built alongside P5.
 
 ---
 
