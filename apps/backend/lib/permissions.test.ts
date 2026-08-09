@@ -110,6 +110,10 @@ describe("canDelete", () => {
     expect(canDelete(admin, { id: "t3", role: "user", firmId: "firm-2" })).toBe(false);
     expect(canDelete(manager, { id: "t4", role: "user", firmId: "firm-1" })).toBe(false);
   });
+
+  it("an admin cannot delete themself", () => {
+    expect(canDelete(admin, { id: admin.id, role: "admin", firmId: admin.firmId })).toBe(false);
+  });
 });
 
 describe("getVisibleMemberUserIds", () => {

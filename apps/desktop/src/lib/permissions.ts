@@ -22,10 +22,26 @@ export function useIsAdmin(): boolean {
   return useUserRole() === "admin";
 }
 
-// Rules 1/3 -- admin and manager are the only roles that can invite/manage
-// other accounts (a flat user's "add/join" is a narrower, separate action,
-// not general member management -- see docs/identity-and-roles/design.md).
+// Rule 11/12 -- role changes and removal are admin-only (see
+// docs/identity-and-roles/design.md); used to gate the Settings roster
+// table's per-row actions. Kept distinct from useCanInvite below, since
+// invite rights extend to manager and flat too, with narrower targets.
 export function useCanManageUsers(): boolean {
+  return useIsAdmin();
+}
+
+// Rules 1/3/13 -- admin invites manager|user, manager invites user, flat
+// invites flat (a narrower peer-group "add/join", not general roster
+// management). Plain "user" role cannot invite anyone. Mirrors
+// apps/backend/lib/permissions.ts's canInvite.
+export function useInvitableRoles(): Role[] {
   const role = useUserRole();
-  return role === "admin" || role === "manager";
+  if (role === "admin") return ["manager", "user"];
+  if (role === "manager") return ["user"];
+  if (role === "flat") return ["flat"];
+  return [];
+}
+
+export function useCanInvite(): boolean {
+  return useInvitableRoles().length > 0;
 }

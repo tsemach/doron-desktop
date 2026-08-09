@@ -21,6 +21,7 @@ pub mod tags;
 pub mod user_settings;
 pub mod search;
 pub mod fuzzy;
+pub mod org;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -262,7 +263,12 @@ pub fn run() {
             clipboard::read_clipboard,
             clipboard::write_clipboard,
             power::prevent_sleep,
-            power::allow_sleep
+            power::allow_sleep,
+            // org (ASC-142 -- "Users and Roles" Settings tab)
+            org::list_org_members,
+            org::invite_org_member,
+            org::change_org_member_role,
+            org::delete_org_member
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
