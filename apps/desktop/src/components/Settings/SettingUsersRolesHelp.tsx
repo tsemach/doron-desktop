@@ -22,13 +22,15 @@ export default function SettingUsersRolesHelp({ onClose }: SettingUsersRolesHelp
 
       <div className="text-xs text-muted-foreground space-y-3.5 leading-relaxed">
         <div className="space-y-1.5 border-b border-border/60 pb-3">
-          <p className="font-semibold text-foreground">The four roles</p>
+          <p className="font-semibold text-foreground">Roles</p>
           <ul className="list-disc pl-4 space-y-1">
             <li><strong>Admin</strong> — full access to everyone in the firm; can invite managers and users, change roles, and remove accounts.</li>
             <li><strong>Manager</strong> — can invite users into their own team(s), including a team made up of other managers.</li>
             <li><strong>User</strong> — a lawyer or attorney with no management access.</li>
-            <li><strong>Flat</strong> — a self-registered account with no firm, that can add or join other flat accounts as peers.</li>
           </ul>
+          <p className="pt-1">
+            A self-registered account belongs to no firm, but can add or join other self-registered accounts as peers.
+          </p>
         </div>
 
         <div className="space-y-1.5 border-b border-border/60 pb-3">

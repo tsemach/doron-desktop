@@ -59,7 +59,8 @@ export default function SettingUsersRolesTable({
                   {isSelf && <span className="ml-1.5 text-xs text-muted-foreground font-normal">(you)</span>}
                 </td>
                 <td className="py-2.5 px-2 text-muted-foreground">{member.email}</td>
-                <td className="py-2.5 px-2 capitalize text-foreground">{member.role}</td>
+                {/* "flat" is an internal term, never shown as a label. */}
+                <td className="py-2.5 px-2 capitalize text-foreground">{member.role === "flat" ? "—" : member.role}</td>
                 {canManage && (
                   <td className="py-2.5 px-2">
                     <div className="flex items-center justify-end gap-2">

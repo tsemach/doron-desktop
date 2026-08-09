@@ -105,8 +105,14 @@ export default function SettingUsersRoles({ onToggleHelp, activeHelp }: SettingU
       </div>
 
       <div className="text-xs text-muted-foreground -mt-4">
-        Signed in as <span className="font-semibold text-foreground">{session?.email}</span>, role{" "}
-        <span className="font-semibold text-foreground capitalize">{role}</span>
+        Signed in as <span className="font-semibold text-foreground">{session?.email}</span>
+        {/* "flat" is an internal term (self-registered, no firm) -- never
+            surfaced as a label anywhere in this UI, unlike admin/manager/user. */}
+        {role !== "flat" && (
+          <>
+            , role <span className="font-semibold text-foreground capitalize">{role}</span>
+          </>
+        )}
       </div>
 
       {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>}
@@ -132,7 +138,7 @@ export default function SettingUsersRoles({ onToggleHelp, activeHelp }: SettingU
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-primary hover:bg-primary/90 text-primary-foreground transition-all cursor-pointer shadow-md shadow-neutral-950/10 dark:shadow-none"
           >
             <UserPlus className="size-4" />
-            Invite {invitableRoles.length === 1 ? invitableRoles[0] : "someone"}
+            Invite {invitableRoles.length === 1 && invitableRoles[0] !== "flat" ? invitableRoles[0] : "someone"}
           </button>
         </div>
       )}
