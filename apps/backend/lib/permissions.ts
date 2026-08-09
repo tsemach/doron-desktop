@@ -50,10 +50,13 @@ export function canChangeRole(actor: Actor, target: Target): boolean {
 }
 
 // Rule 12 -- only an admin can delete a user or manager, only within their
-// own firm. The caller is responsible for performing a soft delete; this
-// function only says whether the action is allowed.
+// own firm, and never themself -- an admin soft-deleting their own account
+// would immediately lock them out (the deletedAt filter in verifyCredentials/
+// authorizeOrgRequest/etc. would reject their very next request), with no
+// other admin necessarily left to undo it. The caller is responsible for
+// performing a soft delete; this function only says whether it's allowed.
 export function canDelete(actor: Actor, target: Target): boolean {
-  return actor.role === "admin" && actor.firmId !== null && actor.firmId === target.firmId;
+  return actor.role === "admin" && actor.id !== target.id && actor.firmId !== null && actor.firmId === target.firmId;
 }
 
 // Rules 5-7 -- the member-visibility scope for the current actor: who this
