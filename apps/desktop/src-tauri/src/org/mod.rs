@@ -1,0 +1,80 @@
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tauri::AppHandle;
+
+use crate::auth;
+
+// ASC-142 -- "Users and Roles" Settings tab. Token-in-body calls to the
+// backend's org/desktop/* routes (apps/backend/app/api/v1/org/desktop/**),
+// same convention as auth::login_with_credentials/verify_session (the
+// desktop webview can't hold a browser cookie across restarts).
+//
+// Unlike login_with_credentials (which establishes the session itself and
+// needs its own typed response shape), these four commands are homogeneous
+// authenticated CRUD-ish calls against an already-established session, so
+// they share one small helper instead of repeating the reqwest+status+
+// error-unwrap dance four times.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OrgMember {
+    pub id: String,
+    pub name: Option<String>,
+    pub email: String,
+    pub role: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
+const GENERIC_ERROR: &str = "Something went wrong. Please try again.";
+
+/// POSTs `body` (with `token` merged in) to `{backend_url}{path}`, returning
+/// the parsed JSON body on 2xx or the server's `error` message otherwise.
+async fn call_org_desktop(app: &AppHandle, path: &str, mut body: Value) -> Result<Value, String> {
+    let backend_url = auth::get_backend_url(app).ok_or("Sign in to manage your organization.")?;
+    let token = auth::get_session_token(app).ok_or("Sign in to manage your organization.")?;
+
+    if let Value::Object(map) = &mut body {
+        map.insert("token".to_string(), Value::String(token));
+    }
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{backend_url}{path}"))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach the server: {e}"))?;
+
+    let status = response.status();
+    let json: Value = response.json().await.map_err(|_| GENERIC_ERROR.to_string())?;
+
+    if !status.is_success() {
+        let error = json.get("error").and_then(|v| v.as_str()).unwrap_or("Request failed").to_string();
+        return Err(error);
+    }
+
+    Ok(json)
+}
+
+#[tauri::command]
+pub async fn list_org_members(app: AppHandle) -> Result<Vec<OrgMember>, String> {
+    let json = call_org_desktop(&app, "/api/v1/org/desktop/members", json!({})).await?;
+    serde_json::from_value(json.get("members").cloned().unwrap_or(Value::Array(vec![]))).map_err(|_| GENERIC_ERROR.to_string())
+}
+
+#[tauri::command]
+pub async fn invite_org_member(app: AppHandle, email: String, role: String) -> Result<(), String> {
+    call_org_desktop(&app, "/api/v1/org/desktop/invitations", json!({ "email": email, "role": role })).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn change_org_member_role(app: AppHandle, user_id: String, role: String) -> Result<(), String> {
+    call_org_desktop(&app, "/api/v1/org/desktop/users/role", json!({ "userId": user_id, "role": role })).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_org_member(app: AppHandle, user_id: String) -> Result<(), String> {
+    call_org_desktop(&app, "/api/v1/org/desktop/users/delete", json!({ "userId": user_id })).await?;
+    Ok(())
+}

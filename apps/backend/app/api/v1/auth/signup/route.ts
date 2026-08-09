@@ -70,6 +70,10 @@ export async function POST(request: Request) {
         name: fullName,
         email: email,
         passwordHash: passwordHash,
+        // ASC-142 -- already the schema default, but explicit here to
+        // document intent: a self-registered account is always "flat"
+        // (full access, no firm) -- see docs/identity-and-roles/design.md.
+        role: "flat",
       })
       .returning({
         id: users.id,

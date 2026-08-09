@@ -8,7 +8,10 @@ export const firms = pgTable("firms", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
+  // Unique -- apps/office's "Create a firm" form has no other way to tell
+  // two firms apart, so two rows named identically would be indistinguishable
+  // (and a real bug: found by creating "Doron and sons" twice in testing).
+  name: text("name").notNull().unique(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

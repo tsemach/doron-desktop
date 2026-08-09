@@ -22,6 +22,8 @@ export async function POST(request: Request) {
         expiresAt: desktopSessions.expiresAt,
         email: users.email,
         tier: users.tier,
+        role: users.role,
+        firmId: users.firmId,
       })
       .from(desktopSessions)
       .innerJoin(users, eq(users.id, desktopSessions.userId))
@@ -38,6 +40,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       email: row.email,
       tier: row.tier,
+      role: row.role,
+      firmId: row.firmId,
       expiresAt: row.expiresAt.toISOString(),
     });
   } catch (error: any) {

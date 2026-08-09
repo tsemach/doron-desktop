@@ -18,6 +18,13 @@ pub struct Session {
     // field extraction, cloud transcribe -- can still reach the backend
     // for online-mode AI requests. See get_backend_url below.
     pub backend_url: String,
+    // ASC-142 -- mirrors the backend's users.role ("admin"|"manager"|
+    // "user"|"flat"); defaults to "flat" at the SQLite schema level
+    // (store::mod.rs) for pre-existing local sessions from before this
+    // column existed, refreshed to the real value on the next verify_session.
+    pub role: String,
+    // Mirrors users.firmId -- None for a flat user.
+    pub firm_id: Option<String>,
 }
 
 // Success and error responses from /api/v1/auth/desktop-login share no
@@ -31,6 +38,12 @@ struct DesktopLoginResponse {
     tier: Option<String>,
     #[serde(rename = "expiresAt")]
     expires_at: Option<String>,
+    role: Option<String>,
+    // Option<String> covers both "field absent" and "explicit JSON null"
+    // (a flat user's real firmId) -- both correctly deserialize to None,
+    // and both mean the same thing here: no firm.
+    #[serde(rename = "firmId")]
+    firm_id: Option<String>,
     error: Option<String>,
 }
 
@@ -42,6 +55,9 @@ struct DesktopSessionVerifyResponse {
     tier: Option<String>,
     #[serde(rename = "expiresAt")]
     expires_at: Option<String>,
+    role: Option<String>,
+    #[serde(rename = "firmId")]
+    firm_id: Option<String>,
 }
 
 /// Reads the local session, treating a past (or unparsable) `expires_at` as
@@ -51,7 +67,7 @@ struct DesktopSessionVerifyResponse {
 fn read_session_internal(app: &AppHandle) -> Result<Option<Session>, String> {
     let conn = store::open_db(app)?;
     let mut stmt = conn
-        .prepare("SELECT token, email, tier, expires_at, backend_url FROM auth_session LIMIT 1")
+        .prepare("SELECT token, email, tier, expires_at, backend_url, role, firm_id FROM auth_session LIMIT 1")
         .map_err(|e| e.to_string())?;
 
     let row = stmt.query_row([], |r| {
@@ -61,6 +77,8 @@ fn read_session_internal(app: &AppHandle) -> Result<Option<Session>, String> {
             tier: r.get(2)?,
             expires_at: r.get(3)?,
             backend_url: r.get(4)?,
+            role: r.get(5)?,
+            firm_id: r.get(6)?,
         })
     });
 
@@ -119,8 +137,16 @@ pub fn save_session_internal(app: &AppHandle, session: &Session) -> Result<(), S
     let conn = store::open_db(app)?;
     conn.execute("DELETE FROM auth_session", []).map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO auth_session (token, email, tier, expires_at, backend_url) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![session.token, session.email, session.tier, session.expires_at, session.backend_url],
+        "INSERT INTO auth_session (token, email, tier, expires_at, backend_url, role, firm_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            session.token,
+            session.email,
+            session.tier,
+            session.expires_at,
+            session.backend_url,
+            session.role,
+            session.firm_id,
+        ],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -141,13 +167,18 @@ pub fn complete_oauth_login(
     tier: Option<String>,
     expires_at: Option<String>,
     backend_url: Option<String>,
+    role: Option<String>,
+    // Legitimately absent from the deep link for a flat user (see
+    // desktop-complete/page.tsx) -- not part of the required-fields
+    // destructure below.
+    firm_id: Option<String>,
 ) -> Result<(), String> {
-    let (Some(token), Some(email), Some(tier), Some(expires_at), Some(backend_url)) =
-        (token, email, tier, expires_at, backend_url)
+    let (Some(token), Some(email), Some(tier), Some(expires_at), Some(backend_url), Some(role)) =
+        (token, email, tier, expires_at, backend_url, role)
     else {
         return Err("OAuth deep link was missing one or more required fields".to_string());
     };
-    save_session_internal(app, &Session { token, email, tier, expires_at, backend_url })
+    save_session_internal(app, &Session { token, email, tier, expires_at, backend_url, role, firm_id })
 }
 
 fn clear_session_internal(app: &AppHandle) -> Result<(), String> {
@@ -197,6 +228,8 @@ pub async fn login_with_credentials(app: AppHandle, backend_url: String, email: 
         tier: body.tier.ok_or(GENERIC_ERROR)?,
         expires_at: body.expires_at.ok_or(GENERIC_ERROR)?,
         backend_url,
+        role: body.role.ok_or(GENERIC_ERROR)?,
+        firm_id: body.firm_id,
     };
     save_session_internal(&app, &session)?;
     Ok(session)
@@ -252,6 +285,11 @@ pub async fn verify_session(app: AppHandle, backend_url: String) -> Result<Optio
         // rather than keeping the possibly-stale cached value -- the
         // frontend's VITE_BACKEND_URL is the single source of truth.
         backend_url,
+        role: body.role.unwrap_or(local_session.role),
+        // Not a fallback like the fields above -- the route always returns
+        // firmId (possibly null for a flat user) on success, so trust it
+        // outright rather than falling back to a possibly-stale cached value.
+        firm_id: body.firm_id,
     };
     save_session_internal(&app, &refreshed)?;
     Ok(Some(refreshed))
