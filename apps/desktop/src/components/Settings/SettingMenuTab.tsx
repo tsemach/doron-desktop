@@ -1,7 +1,7 @@
 import { User, Mail, Server, RefreshCw, Mic, Users } from "lucide-react";
 import SettingMenuTabItem from "./SettingMenuTabItem";
 
-export type TabType = "preferences" | "email" | "ai" | "voice" | "update" | "users_roles";
+export type TabType = "preferences" | "email" | "ai" | "voice" | "users_roles" | "update";
 
 function ProBadge() {
   return (
@@ -14,7 +14,7 @@ function ProBadge() {
 type SettingMenuTabProps = {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
-  setActiveHelp: (help: "email" | "ai" | "voice" | "users_roles" | null) => void;
+  setActiveHelp: (help: "email" | "ai" | "voice" | null) => void;
   setHealthCheckResult: (result: any) => void;
   t: (key: any) => string;
   aiMode: string;
@@ -78,13 +78,6 @@ export default function SettingMenuTab({
         label={t("email_integration") || "Email Integration"}
       />
       
-      <SettingMenuTabItem
-        isActive={activeTab === "update"}
-        onClick={() => handleTabChange("update")}
-        icon={RefreshCw}
-        label={t("software_updates") || "Software Updates"}
-      />
-
       {/* ASC-142 -- available to every role and every tier (unlike AI/Voice
           above), so no disabled state or ProBadge here. */}
       <SettingMenuTabItem
@@ -92,6 +85,13 @@ export default function SettingMenuTab({
         onClick={() => handleTabChange("users_roles")}
         icon={Users}
         label="Users and Roles"
+      />
+
+      <SettingMenuTabItem
+        isActive={activeTab === "update"}
+        onClick={() => handleTabChange("update")}
+        icon={RefreshCw}
+        label={t("software_updates") || "Software Updates"}
       />
     </div>
   );

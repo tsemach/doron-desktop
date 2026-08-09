@@ -268,7 +268,11 @@ pub fn run() {
             org::list_org_members,
             org::invite_org_member,
             org::change_org_member_role,
-            org::delete_org_member
+            org::delete_org_member,
+            org::list_teams,
+            org::create_team,
+            org::update_team,
+            org::delete_team
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -32,8 +32,24 @@ export async function createInvitation(actor: Actor, input: CreateInvitationInpu
     return { error: "Your account has no firm.", status: 400 };
   }
 
-  if (input.teamId) {
-    const [team] = await db.select().from(teams).where(eq(teams.id, input.teamId)).limit(1);
+  // A manager always invites into their own team -- never a UI choice (see
+  // SettingUsersRolesInviteDialog.tsx, which shows no team picker for a
+  // manager actor). An admin must explicitly pick one instead, since they
+  // could be targeting any team in the firm -- but only when inviting a
+  // "user": a "manager" invite is exempt, since a firm's first manager
+  // can't exist yet when zero teams do (a team requires a manager to
+  // create), and a manager doesn't need to belong to a team to exist.
+  let teamId = input.teamId;
+  if (actor.role === "manager" && !teamId) {
+    const [ownedTeam] = await db.select({ id: teams.id }).from(teams).where(eq(teams.managerId, actor.id)).limit(1);
+    teamId = ownedTeam?.id;
+  }
+  if (actor.role === "admin" && input.role === "user" && !teamId) {
+    return { error: "Select a team for this invitation.", status: 400 };
+  }
+
+  if (teamId) {
+    const [team] = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
     if (!team || team.firmId !== actor.firmId) {
       return { error: "Team not found.", status: 404 };
     }
@@ -60,7 +76,7 @@ export async function createInvitation(actor: Actor, input: CreateInvitationInpu
       email: input.email,
       role: input.role,
       firmId: input.role === "flat" ? null : actor.firmId,
-      teamId: input.teamId ?? null,
+      teamId: teamId ?? null,
       invitedByUserId: actor.id,
       token,
       expiresAt,

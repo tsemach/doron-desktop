@@ -21,7 +21,6 @@ import SettingAiProviderHelp from "./SettingAiProviderHelp";
 import SettingVoiceEngineHelp from "./SettingVoiceEngineHelp";
 import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
 import SettingUsersRoles from "./SettingUsersRoles";
-import SettingUsersRolesHelp from "./SettingUsersRolesHelp";
 import SettingBack from "./SettingBack";
 import SettingMenuTab, { TabType } from "./SettingMenuTab";
 
@@ -32,7 +31,7 @@ export default function Settings() {
   const { language, setLanguage, t } = useLanguage();
   const { font, setFont } = useFont();
   const [activeTab, setActiveTab] = useState<TabType>("preferences");
-  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | "users_roles" | null>(null);
+  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | null>(null);
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
   
   const [username, setUsername] = useState("");
@@ -484,6 +483,8 @@ export default function Settings() {
             }}
           />
         );
+      case "users_roles":
+        return <SettingUsersRoles />;
       case "update":
         return (
           <SettingSoftwareUpdate
@@ -494,13 +495,6 @@ export default function Settings() {
             onCheckForUpdates={handleCheckForUpdates}
             onInstallManual={handleInstallManual}
             t={t}
-          />
-        );
-      case "users_roles":
-        return (
-          <SettingUsersRoles
-            onToggleHelp={() => setActiveHelp(activeHelp === "users_roles" ? null : "users_roles")}
-            activeHelp={activeHelp}
           />
         );
       default:
@@ -536,11 +530,13 @@ export default function Settings() {
 
           {/* Right Content Area */}
           <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
-            <div className="w-full lg:w-[640px] lg:shrink-0">
+            {/* users_roles manages its own full-width layout (its own inline
+                help section, no external help pane) -- see SettingUsersRoles.tsx. */}
+            <div className={activeTab === "users_roles" ? "w-full" : "w-full lg:w-[640px] lg:shrink-0"}>
               {renderActiveTab()}
             </div>
-            
-            {(activeHelp || healthCheckResult) && (
+
+            {activeTab !== "users_roles" && (activeHelp || healthCheckResult) && (
               <div className="w-full flex-1 lg:max-w-3xl lg:border-l border-border lg:pl-8 pb-6 lg:pb-0 border-t lg:border-t-0 pt-6 lg:pt-0 relative min-h-[400px] lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pr-2">
                 {healthCheckResult ? (
                   <SettingAiHealthCheckResult
@@ -562,9 +558,6 @@ export default function Settings() {
                     )}
                     {activeHelp === "voice" && (
                       <SettingVoiceEngineHelp onClose={() => setActiveHelp(null)} />
-                    )}
-                    {activeHelp === "users_roles" && (
-                      <SettingUsersRolesHelp onClose={() => setActiveHelp(null)} />
                     )}
                   </>
                 )}

@@ -45,3 +45,12 @@ export function useInvitableRoles(): Role[] {
 export function useCanInvite(): boolean {
   return useInvitableRoles().length > 0;
 }
+
+// Team creation is admin-or-manager, unlike useCanManageUsers (admin-only,
+// gates the roster table's per-row actions) -- a distinct gate, not a reuse
+// of either existing helper. Mirrors apps/backend/lib/org/teams.ts's
+// createTeam role check.
+export function useCanCreateTeam(): boolean {
+  const role = useUserRole();
+  return role === "admin" || role === "manager";
+}
