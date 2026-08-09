@@ -22,10 +22,11 @@ export async function POST(request: Request) {
       token,
       email: user.email,
       tier: user.tier,
-      // ASC-142 -- verifyCredentials already selects the full `users` row,
-      // so role/firmId are free here, no extra query.
+      // ASC-142/ASC-143 -- verifyCredentials already selects the full
+      // `users` row, so role/firmId/name are free here, no extra query.
       role: user.role,
       firmId: user.firmId,
+      name: user.name,
       expiresAt: expiresAt.toISOString(),
     });
   } catch (error: any) {

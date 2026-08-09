@@ -24,6 +24,7 @@ export async function POST(request: Request) {
         tier: users.tier,
         role: users.role,
         firmId: users.firmId,
+        name: users.name,
       })
       .from(desktopSessions)
       .innerJoin(users, eq(users.id, desktopSessions.userId))
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       tier: row.tier,
       role: row.role,
       firmId: row.firmId,
+      name: row.name,
       expiresAt: row.expiresAt.toISOString(),
     });
   } catch (error: any) {

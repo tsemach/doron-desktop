@@ -35,7 +35,6 @@ export default function Settings() {
   const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | "users_roles" | null>(null);
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
   
-  const [username, setUsername] = useState("");
   const [saved, setSaved] = useState(false);
   const [tempLang, setTempLang] = useState<Language>(language);
   const [tempFont, setTempFont] = useState<AppFont>(font);
@@ -194,16 +193,6 @@ export default function Settings() {
   async function loadSettings() {
     setIsLoadingSettings(true);
     try {
-      // Load user settings (display name)
-      try {
-        const res = await invoke<any>("get_user_settings");
-        if (res) {
-          setUsername(res.username);
-        }
-      } catch (e) {
-        console.error("Failed to load user settings:", e);
-      }
-
       // Load email configurations
       try {
         const res = await invoke<any>("get_email_settings");
@@ -288,14 +277,6 @@ export default function Settings() {
     localStorage.setItem(API_KEY_STORAGE_KEY, providerApiKey.trim());
     setLanguage(tempLang);
     setFont(tempFont);
-
-    // Save user settings (display name)
-    try {
-      await invoke("save_user_settings", { settings: { username: username.trim() } });
-    } catch (e) {
-      console.error("Failed to save user settings:", e);
-      alert("Failed to save user settings: " + e);
-    }
 
     // Save Email Settings
     try {
@@ -389,8 +370,6 @@ export default function Settings() {
       case "preferences":
         return (
           <SettingPreferences
-            username={username}
-            setUsername={setUsername}
             tempLang={tempLang}
             setTempLang={setTempLang}
             tempFont={tempFont}

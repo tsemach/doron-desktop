@@ -12,6 +12,10 @@ export interface Session {
   // ASC-142 -- mirrors the Rust Session struct's role/firm_id (auth/mod.rs).
   role: string;
   firm_id: string | null;
+  // ASC-143 -- mirrors users.name. Single source of truth for the display
+  // name; there is no local override anymore (user_settings SQLite table
+  // removed in the same change).
+  name: string | null;
 }
 
 export const sessionAtom = atom<Session | null>(null);
