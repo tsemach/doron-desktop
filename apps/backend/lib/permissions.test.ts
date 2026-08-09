@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// getVisibleRosterUserIds issues a small, deterministic sequence of db
+// getVisibleMemberUserIds issues a small, deterministic sequence of db
 // calls per role branch (see the call-order comments on each test below).
 // Rather than modeling drizzle's actual query builder, this mock is a
 // single thenable chain (every method just returns itself) backed by a
@@ -40,7 +40,7 @@ import {
   canChangeRole,
   canDelete,
   canInvite,
-  getVisibleRosterUserIds,
+  getVisibleMemberUserIds,
   type Actor,
   type Target,
 } from "./permissions";
@@ -112,7 +112,7 @@ describe("canDelete", () => {
   });
 });
 
-describe("getVisibleRosterUserIds", () => {
+describe("getVisibleMemberUserIds", () => {
   beforeEach(() => {
     resetQueue();
   });
@@ -120,20 +120,20 @@ describe("getVisibleRosterUserIds", () => {
   it("admin sees every user in their firm (single users-by-firm query)", async () => {
     queueResult([{ id: "a" }, { id: "b" }, { id: "c" }]);
 
-    const ids = await getVisibleRosterUserIds(admin);
+    const ids = await getVisibleMemberUserIds(admin);
 
     expect(ids).toEqual(["a", "b", "c"]);
   });
 
   it("a plain user sees only themself (no db call)", async () => {
-    const ids = await getVisibleRosterUserIds(user);
+    const ids = await getVisibleMemberUserIds(user);
     expect(ids).toEqual(["user-1"]);
   });
 
   it("manager with no owned teams sees only themself", async () => {
     queueResult([]); // teams owned by manager-1
 
-    const ids = await getVisibleRosterUserIds(manager);
+    const ids = await getVisibleMemberUserIds(manager);
 
     expect(ids).toEqual(["manager-1"]);
   });
@@ -142,7 +142,7 @@ describe("getVisibleRosterUserIds", () => {
     queueResult([{ id: "team-a" }]); // teams owned by manager-1
     queueResult([{ userId: "u1", role: "user" }]); // teamMembers of team-a
 
-    const ids = await getVisibleRosterUserIds(manager);
+    const ids = await getVisibleMemberUserIds(manager);
 
     expect(ids).toEqual(["manager-1", "u1"]);
   });
@@ -153,7 +153,7 @@ describe("getVisibleRosterUserIds", () => {
     queueResult([{ id: "team-b" }]); // teams owned by manager-2
     queueResult([{ userId: "u2", role: "user" }]); // teamMembers of team-b
 
-    const ids = await getVisibleRosterUserIds(manager);
+    const ids = await getVisibleMemberUserIds(manager);
 
     expect(ids).toEqual(["manager-1", "manager-2", "u2"]);
   });
@@ -161,16 +161,16 @@ describe("getVisibleRosterUserIds", () => {
   it("flat user with no group sees only themself", async () => {
     queueResult([]); // flatGroupMembers row for flat-1
 
-    const ids = await getVisibleRosterUserIds(flat);
+    const ids = await getVisibleMemberUserIds(flat);
 
     expect(ids).toEqual(["flat-1"]);
   });
 
   it("flat user in a group sees every member of that group", async () => {
     queueResult([{ groupId: "g1" }]); // flat-1's own membership row
-    queueResult([{ userId: "flat-1" }, { userId: "flat-2" }, { userId: "flat-3" }]); // group roster
+    queueResult([{ userId: "flat-1" }, { userId: "flat-2" }, { userId: "flat-3" }]); // group members
 
-    const ids = await getVisibleRosterUserIds(flat);
+    const ids = await getVisibleMemberUserIds(flat);
 
     expect(ids).toEqual(["flat-1", "flat-2", "flat-3"]);
   });

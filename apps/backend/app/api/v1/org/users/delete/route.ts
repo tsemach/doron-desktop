@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeOrgSession } from "../../../../../../lib/org/auth";
-import { softDeleteUser } from "../../../../../../lib/org/roster";
+import { softDeleteUser } from "../../../../../../lib/org/members";
 
 export async function POST(request: Request) {
   const authorization = await authorizeOrgSession();

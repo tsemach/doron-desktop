@@ -1,9 +1,9 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../database";
 import { users } from "../../database/schema";
-import { canChangeRole, canDelete, getVisibleRosterUserIds, type Actor, type Role } from "../permissions";
+import { canChangeRole, canDelete, getVisibleMemberUserIds, type Actor, type Role } from "../permissions";
 
-export interface RosterEntry {
+export interface MemberEntry {
   id: string;
   name: string | null;
   email: string;
@@ -11,10 +11,10 @@ export interface RosterEntry {
   createdAt: Date;
 }
 
-// Rules 5-7 -- account roster only (name/email/role), never case/document
+// Rules 5-7 -- the member list only (name/email/role), never case/document
 // data. See docs/identity-and-roles/design.md's non-goals.
-export async function getRoster(actor: Actor): Promise<RosterEntry[]> {
-  const visibleIds = await getVisibleRosterUserIds(actor);
+export async function getMembers(actor: Actor): Promise<MemberEntry[]> {
+  const visibleIds = await getVisibleMemberUserIds(actor);
   if (visibleIds.length === 0) return [];
 
   return db

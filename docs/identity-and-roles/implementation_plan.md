@@ -19,7 +19,7 @@ compiling and the app shippable.
 | P3 | `role`/`firmId` flow through session (web + desktop) | P1 | Manual: sign in, inspect JWT/`Session` for the new fields |
 | P4 | `apps/office` → invite firm admin | P1, P2 | Manual: office invite creates `firms`+`invitations` rows, email logged |
 | P5 | `apps/desktop`: org Rust commands + "Users and Roles" Settings tab + accept-invite page | P2, P3, P4 | Manual end-to-end flow (see Verification) |
-| P6 *(not yet scheduled)* | `apps/backend` browser UI for the same roster/invite/role flows | P2 (+ P3 for client-side gating) | Manual: signed-in browser session manages a roster without the desktop app |
+| P6 *(not yet scheduled)* | `apps/backend` browser UI for the same member/invite/role flows | P2 (+ P3 for client-side gating) | Manual: signed-in browser session manages members without the desktop app |
 
 P2's cookie-authenticated `org/*` route family (as opposed to `org/desktop/*`) exists specifically to
 make P6 a pure UI phase later — no backend changes anticipated when it's picked up. See design.md
@@ -45,19 +45,19 @@ else can break.
 
 **Files:**
 - New `apps/backend/lib/permissions.ts` + `apps/backend/lib/permissions.test.ts`
-- New `apps/backend/lib/org/{roster,invitations,auth}.ts`
+- New `apps/backend/lib/org/{members,invitations,auth}.ts`
 - New `apps/backend/app/api/v1/org/**` (cookie-authenticated) and
   `apps/backend/app/api/v1/org/desktop/**` (token-in-body) route handlers
 - `apps/backend/lib/email/types.ts` (+ mock/resend impls) — add `sendInvitationEmail`
 - `apps/backend/lib/verifyCredentials.ts`, `apps/backend/app/api/v1/auth/desktop-session/route.ts` —
   add the `deletedAt is null` filter (design.md §6)
 
-1. Implement `canInvite`/`canChangeRole`/`canDelete`/`getVisibleRosterUserIds` in `permissions.ts`,
+1. Implement `canInvite`/`canChangeRole`/`canDelete`/`getVisibleMemberUserIds` in `permissions.ts`,
    with unit tests covering: non-admin inviting an admin (must fail), manager inviting a manager
-   (must fail), manager's recursive roster walk through a "team of managers."
+   (must fail), manager's recursive member walk through a "team of managers."
 2. Implement `authorizeOrgRequest` in `lib/org/auth.ts`, extending `lib/ai/auth.ts`'s
    `authorizeRequest` lookup to also select `role`/`firmId`.
-3. Implement the shared business logic (`lib/org/roster.ts`, `lib/org/invitations.ts`), then both
+3. Implement the shared business logic (`lib/org/members.ts`, `lib/org/invitations.ts`), then both
    route families as thin wrappers — cookie routes use `auth()`, desktop routes use
    `authorizeOrgRequest`.
 4. Invitation accept route: create the `users` row from the invitation payload, hash the submitted
@@ -65,7 +65,7 @@ else can break.
    keeps an audit trail, unlike `consumeEmailVerification`'s delete-on-use).
 5. Flat-role branch: `invitations.role === "flat"` acceptance creates/reuses the inviter's
    `flatGroups` row instead of setting `firmId`.
-6. Route tests mirroring `signup/route.test.ts`'s mock style: invite/accept/roster/role-change/delete,
+6. Route tests mirroring `signup/route.test.ts`'s mock style: invite/accept/members/role-change/delete,
    plus the soft-delete-blocks-login case for `verifyCredentials`/`desktop-session`.
 
 ## P3 — Session plumbing
@@ -109,13 +109,13 @@ Verify manually: sign in via desktop, confirm `get_session` (Tauri command) retu
 - New `apps/desktop/src/components/Settings/SettingUsersRoles{.tsx,Table.tsx,InviteDialog.tsx,Help.tsx}`
 - New `apps/backend/app/accept-invite/page.tsx`
 
-1. Rust commands (`list_roster`, `invite_user`, `change_user_role`, `delete_user`, team CRUD), each
+1. Rust commands (`list_members`, `invite_user`, `change_user_role`, `delete_user`, team CRUD), each
    shaped like `login_with_credentials` — reqwest POST to `/api/v1/org/desktop/...` with the stored
    session token, `Option`-field response structs, non-2xx mapped to `Err`.
 2. `SettingMenuTab.tsx`: extend `TabType` with `"users_roles"`, add the nav item (no Pro badge/
    disabled state — available to every tier and every role, content differs by role instead).
 3. `SettingUsersRoles.tsx` + children, following the existing `Setting*`/`Setting*Help` decomposition:
-   manage view (roster table, invite dialog, role-change/remove) for admin/manager; read-only account
+   manage view (member table, invite dialog, role-change/remove) for admin/manager; read-only account
    card for `user`/`flat`.
 4. Wire into `Settings.tsx`: `renderActiveTab()` case, `activeHelp` union extended.
 5. `accept-invite/page.tsx` on the backend: reads `?token=`, calls the public accept API, sets a
@@ -144,12 +144,12 @@ built alongside P5.
 1. Office `/firms/invite-admin` → mock `EmailProvider` logs the accept link to console.
 2. Open `accept-invite?token=...` in a browser, set a password.
 3. Desktop app: log in with that email/password → Settings → "Users and Roles" shows `role: admin`,
-   a firm roster of one.
+   a firm member list of one.
 4. From desktop, invite a manager → accept via the same email-link flow → log in as them.
 5. As the manager, invite a user → accept → log in as them.
-6. Confirm the admin's roster view shows everyone in the firm; the manager's roster view shows only
+6. Confirm the admin's member view shows everyone in the firm; the manager's member view shows only
    their own team.
 7. As admin, flip the user's role to `manager` and back — confirm it takes effect immediately (no
    re-login needed, per the always-re-fetch session pattern).
-8. As admin, soft-delete a user — confirm they disappear from the roster and can no longer
+8. As admin, soft-delete a user — confirm they disappear from the member list and can no longer
    `desktop-login` or pass `verify_session`.

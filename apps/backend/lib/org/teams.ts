@@ -39,7 +39,7 @@ export async function createTeam(actor: Actor, input: { name: string; managerId?
 }
 
 // Every team in the actor's firm -- team-level visibility (who manages
-// what) is not roster-scoped the way getRoster is; any firm member can see
+// what) is not member-scoped the way getMembers is; any firm member can see
 // the firm's team list, same as an org chart.
 export async function listTeams(actor: Actor): Promise<TeamEntry[]> {
   if (!actor.firmId) return [];

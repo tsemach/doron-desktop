@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeOrgRequest } from "../../../../../../lib/org/auth";
-import { getRoster } from "../../../../../../lib/org/roster";
+import { getMembers } from "../../../../../../lib/org/members";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -14,6 +14,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: authorization.error }, { status: authorization.status });
   }
 
-  const roster = await getRoster(authorization.actor);
-  return NextResponse.json({ roster, actor: authorization.actor });
+  const members = await getMembers(authorization.actor);
+  return NextResponse.json({ members, actor: authorization.actor });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeOrgSession } from "../../../../../../lib/org/auth";
-import { changeUserRole } from "../../../../../../lib/org/roster";
+import { changeUserRole } from "../../../../../../lib/org/members";
 
 // POST (not PATCH /users/[id]) -- avoids a dynamic route segment, matching
 // this repo's existing action-endpoint convention (desktop-login,

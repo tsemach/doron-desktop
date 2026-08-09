@@ -20,7 +20,7 @@ export interface Target {
   firmId: string | null;
 }
 
-// Total BFS iterations across getManagerRosterUserIds, not a depth count --
+// Total BFS iterations across getManagerMemberUserIds, not a depth count --
 // just a generous cap against an accidental manager-reports-to-manager
 // cycle (which shouldn't be possible to create, but this is cheap
 // insurance against an infinite loop if it ever is).
@@ -56,10 +56,10 @@ export function canDelete(actor: Actor, target: Target): boolean {
   return actor.role === "admin" && actor.firmId !== null && actor.firmId === target.firmId;
 }
 
-// Rules 5-7 -- the roster-visibility scope for the current actor. This is
-// account-roster visibility only (name/email/role), not case/document data
-// -- see docs/identity-and-roles/design.md's non-goals.
-export async function getVisibleRosterUserIds(actor: Actor): Promise<string[]> {
+// Rules 5-7 -- the member-visibility scope for the current actor: who this
+// actor can see/manage as an account, not case/document data -- see
+// docs/identity-and-roles/design.md's non-goals.
+export async function getVisibleMemberUserIds(actor: Actor): Promise<string[]> {
   if (actor.role === "admin") {
     if (!actor.firmId) return [actor.id];
     const rows = await db.select({ id: users.id }).from(users).where(eq(users.firmId, actor.firmId));
@@ -67,11 +67,11 @@ export async function getVisibleRosterUserIds(actor: Actor): Promise<string[]> {
   }
 
   if (actor.role === "manager") {
-    return getManagerRosterUserIds(actor.id);
+    return getManagerMemberUserIds(actor.id);
   }
 
   if (actor.role === "flat") {
-    return getFlatRosterUserIds(actor.id);
+    return getFlatMemberUserIds(actor.id);
   }
 
   // Plain "user" role -- no reports, sees only themself.
@@ -80,9 +80,9 @@ export async function getVisibleRosterUserIds(actor: Actor): Promise<string[]> {
 
 // BFS from the teams the manager directly owns, recursing into any member
 // who is themself a manager (their owned teams too) -- this is what "a
-// manager can manage a team of managers" (rule 6) means for roster
+// manager can manage a team of managers" (rule 6) means for member
 // visibility: everyone underneath, transitively.
-async function getManagerRosterUserIds(managerId: string): Promise<string[]> {
+async function getManagerMemberUserIds(managerId: string): Promise<string[]> {
   const visibleUserIds = new Set<string>([managerId]);
   const visitedManagers = new Set<string>();
   const managerQueue: string[] = [managerId];
@@ -118,7 +118,7 @@ async function getManagerRosterUserIds(managerId: string): Promise<string[]> {
 // Rule 13 -- a flat user's peers are whoever shares their flatGroupMembers
 // row (at most one group per flat user). No group yet -- e.g. never
 // invited/joined anyone -- means only themself is visible.
-async function getFlatRosterUserIds(actorId: string): Promise<string[]> {
+async function getFlatMemberUserIds(actorId: string): Promise<string[]> {
   const [membership] = await db
     .select({ groupId: flatGroupMembers.groupId })
     .from(flatGroupMembers)

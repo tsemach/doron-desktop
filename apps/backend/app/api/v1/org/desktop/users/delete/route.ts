@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeOrgRequest } from "../../../../../../../lib/org/auth";
-import { softDeleteUser } from "../../../../../../../lib/org/roster";
+import { softDeleteUser } from "../../../../../../../lib/org/members";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);

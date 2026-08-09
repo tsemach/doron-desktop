@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeOrgRequest } from "../../../../../../../lib/org/auth";
-import { changeUserRole } from "../../../../../../../lib/org/roster";
+import { changeUserRole } from "../../../../../../../lib/org/members";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);

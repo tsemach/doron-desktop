@@ -35,7 +35,7 @@ Companion to [`implementation_plan.md`](./implementation_plan.md), which phases 
   installation's local SQLite database (`apps/desktop/src-tauri/src/store/mod.rs`'s `cases` table has
   no owner/tenant column at all), with no cloud sync layer — a gap already flagged as out of scope in
   `PRD.md` §9 / `PLAN.md`. Building that sync layer is a separate, much larger effort. This design
-  implements rules 5–7 as **roster visibility** (who is on a manager's/admin's team, their name, email,
+  implements rules 5–7 as **member visibility** (who is on a manager's/admin's team, their name, email,
   and role) — not access to their actual cases or documents. Confirmed with the product owner before
   writing this design.
 - **Tier gating.** Unlike `ai_features`/`voice_recording` (Pro-only, see `featureGating.ts`), this
@@ -65,7 +65,7 @@ Companion to [`implementation_plan.md`](./implementation_plan.md), which phases 
 | **`role`/`firmId` on `users`** | ❌ | — |
 | **`firms`, `teams`, `invitations`, flat peer-group tables** | ❌ | — |
 | **Permission model (who can invite/edit-role/delete/list whom)** | ❌ | — |
-| **Roster-scoped API (org invitations/roster/role-change/delete)** | ❌ | — |
+| **Member-scoped API (org invitations/members/role-change/delete)** | ❌ | — |
 | **"Users and Roles" desktop Settings tab** | ❌ | — |
 | **Office → firm-admin invitation flow** | ❌ | — |
 
@@ -116,7 +116,7 @@ New `apps/backend/lib/permissions.ts` — pure, unit-testable functions (same st
   `flat`), same firm (rule 11).
 - `canDelete(actor, target)` — `admin` only, same firm; the caller performs a soft delete, never a
   hard delete (rule 12).
-- `getVisibleRosterUserIds(db, actor)` — the roster-scoping function behind rules 5–7:
+- `getVisibleMemberUserIds(db, actor)` — the member-scoping function behind rules 5–7:
   - `admin`: every user with `firmId === actor.firmId`.
   - `manager`: BFS from the teams they own (`teams.managerId === actor.id`) through `teamMembers`,
     recursing into any member who is themself a manager (their owned teams too), depth-capped to
@@ -133,7 +133,7 @@ JWT+session callbacks, the Rust `Session` struct (`apps/desktop/src-tauri/src/au
 change takes effect on the next check, not after a 30-day token TTL).
 
 Backend API, two auth styles sharing one set of business-logic functions
-(`apps/backend/lib/org/{roster,invitations}.ts`) — mirroring how `desktop-login` and NextAuth's
+(`apps/backend/lib/org/{members,invitations}.ts`) — mirroring how `desktop-login` and NextAuth's
 Credentials provider already share `verifyCredentials.ts`. Neither is "the primary" surface; they're
 peers for two different callers that both need to exist (goal 8):
 
@@ -165,14 +165,14 @@ path has the same blind spot and doesn't get a fix in this design — flagged as
 A new **"Users and Roles"** tab in `apps/desktop/src/components/Settings/`, following the screen's
 existing per-tab decomposition (`Setting*.tsx` main component + `Setting*Help.tsx` side panel, e.g.
 `SettingEmailIntegration.tsx`/`SettingEmailIntegrationHelp.tsx`). Content adapts to the viewer's role:
-admin/manager get a manageable roster (invite, change role, remove); `user`/`flat` get a read-only
+admin/manager get a manageable member list (invite, change role, remove); `user`/`flat` get a read-only
 account/firm summary. Brand-new invitees set their password on a backend-hosted web page (opened via
 `openUrl()`, the same convention `AuthLanding.tsx` already uses for registration, since they have no
-desktop session yet); an already-signed-in admin/manager manages their roster natively in Settings.
+desktop session yet); an already-signed-in admin/manager manages their members natively in Settings.
 
 **Browser SaaS UI (goal 8) is explicitly deferred** — no `apps/backend` pages call the cookie-
 authenticated `org/*` routes yet. Building it is a later, separate phase/issue: equivalent screens
-(roster table, invite dialog, role/remove actions) hosted in `apps/backend` itself, reusing the same
+(member table, invite dialog, role/remove actions) hosted in `apps/backend` itself, reusing the same
 `lib/org/*.ts` business logic the desktop flow already exercises. Decided this way rather than
 building both now so the desktop flow — the only UI actually scoped into this plan — ships and is
 verified end to end first.
