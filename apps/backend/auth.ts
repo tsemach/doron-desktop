@@ -3,7 +3,7 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Credentials from "next-auth/providers/credentials";
 import { db } from "./database";
 import { users, accounts, sessions, verificationTokens } from "./database/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import authConfig from "./auth.config";
 import { verifyCredentials } from "./lib/verifyCredentials";
 
@@ -18,19 +18,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     // authConfig.session (shared with middleware.ts's edge-runtime auth
-    // instance, which has no DB access) just copies the JWT's cached tier
-    // -- stale after a tier change (e.g. mock checkout) until the token
-    // rotates on next sign-in. Re-fetches fresh here instead, since this
-    // path only runs in the full Node.js runtime (route handlers, server
-    // components, /api/auth/session) which does have DB access. Middleware
-    // never reads session.user.tier -- only isLoggedIn -- so it doesn't
-    // need this and deliberately keeps using the cheaper JWT-only version.
+    // instance, which has no DB access) just copies the JWT's cached
+    // tier/role/firmId -- stale after a change (e.g. mock checkout, or an
+    // admin flipping a role -- ASC-142) until the token rotates on next
+    // sign-in. Re-fetches fresh here instead, since this path only runs in
+    // the full Node.js runtime (route handlers, server components,
+    // /api/auth/session) which does have DB access. Middleware never reads
+    // session.user.tier/role -- only isLoggedIn -- so it doesn't need this
+    // and deliberately keeps using the cheaper JWT-only version.
+    //
+    // isNull(deletedAt) means a soft-deleted user's web session is treated
+    // the same as a not-found row below -- signed out on their next request,
+    // not just their next token rotation.
     async session(params) {
       const session = await authConfig.callbacks!.session!(params);
       if (session.user?.id) {
-        const [row] = await db.select({ tier: users.tier }).from(users).where(eq(users.id, session.user.id)).limit(1);
+        const [row] = await db
+          .select({ tier: users.tier, role: users.role, firmId: users.firmId })
+          .from(users)
+          .where(and(eq(users.id, session.user.id), isNull(users.deletedAt)))
+          .limit(1);
         if (row) {
           (session.user as { tier?: string }).tier = row.tier;
+          (session.user as { role?: string }).role = row.role;
+          (session.user as { firmId?: string | null }).firmId = row.firmId;
         } else {
           session.user.id = "";
         }

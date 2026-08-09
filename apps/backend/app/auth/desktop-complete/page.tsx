@@ -48,6 +48,11 @@ export default function DesktopCompletePage() {
           // online-mode AI requests, without needing this threaded through
           // from the frontend at every call site.
           backend_url: window.location.origin,
+          // ASC-142 -- role always present; firm_id omitted (not appended)
+          // for a flat user rather than sent as the literal string "null",
+          // which URLSearchParams would otherwise produce from `data.firmId`.
+          role: data.role,
+          ...(data.firmId ? { firm_id: data.firmId } : {}),
         });
         const url = `doron-desktop://auth?${params.toString()}`;
         setDeepLink(url);

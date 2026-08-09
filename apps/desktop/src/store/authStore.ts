@@ -9,6 +9,9 @@ export interface Session {
   email: string;
   tier: string;
   expires_at: string;
+  // ASC-142 -- mirrors the Rust Session struct's role/firm_id (auth/mod.rs).
+  role: string;
+  firm_id: string | null;
 }
 
 export const sessionAtom = atom<Session | null>(null);

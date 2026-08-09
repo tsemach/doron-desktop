@@ -47,7 +47,7 @@ describe("POST /api/v1/auth/desktop-login", () => {
 
   it("returns a desktop session token on success", async () => {
     mockVerifyCredentials.mockResolvedValue({
-      user: { id: "1", email: "jane@example.com", tier: "free" },
+      user: { id: "1", email: "jane@example.com", tier: "free", role: "flat", firmId: null },
     });
     mockCreateDesktopSession.mockResolvedValue({
       token: "abc123",
@@ -62,6 +62,8 @@ describe("POST /api/v1/auth/desktop-login", () => {
       token: "abc123",
       email: "jane@example.com",
       tier: "free",
+      role: "flat",
+      firmId: null,
       expiresAt: "2026-08-19T00:00:00.000Z",
     });
     expect(mockCreateDesktopSession).toHaveBeenCalledWith("1");
