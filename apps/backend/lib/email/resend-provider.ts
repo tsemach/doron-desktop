@@ -29,4 +29,17 @@ export class ResendEmailProvider implements EmailProvider {
       throw new Error(`Failed to send verification email: ${error.message}`);
     }
   }
+
+  async sendInvitationEmail(email: string, acceptUrl: string, role: string): Promise<void> {
+    const { error } = await this.client.emails.send({
+      from: FROM_ADDRESS,
+      to: email,
+      subject: "You've been invited to Ascurix",
+      html: `<p>You've been invited to join Ascurix as a <strong>${role}</strong>.</p><p><a href="${acceptUrl}">${acceptUrl}</a></p><p>This link expires in 7 days.</p>`,
+    });
+
+    if (error) {
+      throw new Error(`Failed to send invitation email: ${error.message}`);
+    }
+  }
 }
