@@ -21,10 +21,15 @@ export default {
       if (user) {
         token.id = user.id;
         // `user` here is the full adapter row (DrizzleAdapter), not just
-        // NextAuth's narrow base User type -- planSelectedAt/tier exist on
-        // it at runtime even though the base type doesn't declare them.
+        // NextAuth's narrow base User type -- planSelectedAt/tier/role/
+        // firmId exist on it at runtime even though the base type doesn't
+        // declare them.
         token.planSelectedAt = (user as { planSelectedAt?: Date | null }).planSelectedAt ?? null;
         token.tier = (user as { tier?: string }).tier ?? "free";
+        // ASC-142 -- same "cache on the JWT, re-fetch fresh where it
+        // matters" pattern as tier (see auth.ts's session callback override).
+        token.role = (user as { role?: string }).role ?? "flat";
+        token.firmId = (user as { firmId?: string | null }).firmId ?? null;
       }
       return token;
     },
@@ -33,6 +38,8 @@ export default {
         session.user.id = token.id as string;
         (session.user as { planSelectedAt?: Date | null }).planSelectedAt = token.planSelectedAt as Date | null;
         (session.user as { tier?: string }).tier = (token.tier as string) ?? "free";
+        (session.user as { role?: string }).role = (token.role as string) ?? "flat";
+        (session.user as { firmId?: string | null }).firmId = (token.firmId as string | null) ?? null;
       }
       return session;
     },

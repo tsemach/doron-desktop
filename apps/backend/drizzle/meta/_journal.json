@@ -22,6 +22,20 @@
       "when": 1784794390010,
       "tag": "0002_even_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786218844867,
+      "tag": "0003_new_nomad",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786260642313,
+      "tag": "0004_zippy_zuras",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ export default function OfficeSidebar() {
   const isTemplatesActive = pathname.startsWith("/templates");
   const isUsersActive = pathname.startsWith("/users");
   const isAdminsActive = pathname.startsWith("/admins");
+  const isFirmsActive = pathname.startsWith("/firms");
 
   return (
     <aside className="w-40 shrink-0 flex flex-col py-4 px-3 border-r border-border">
@@ -44,7 +45,16 @@ export default function OfficeSidebar() {
             isAdminsActive ? "bg-accent font-semibold" : ""
           }`}
         >
-          Admins
+          Office admins
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/firms")}
+          className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal border border-border text-foreground ${
+            isFirmsActive ? "bg-accent font-semibold" : ""
+          }`}
+        >
+          Firms
         </Button>
       </div>
     </aside>

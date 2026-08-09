@@ -20,6 +20,8 @@ import SettingEmailIntegrationHelp from "./SettingEmailIntegrationHelp";
 import SettingAiProviderHelp from "./SettingAiProviderHelp";
 import SettingVoiceEngineHelp from "./SettingVoiceEngineHelp";
 import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
+import SettingUsersRoles from "./SettingUsersRoles";
+import SettingUsersRolesHelp from "./SettingUsersRolesHelp";
 import SettingBack from "./SettingBack";
 import SettingMenuTab, { TabType } from "./SettingMenuTab";
 
@@ -30,7 +32,7 @@ export default function Settings() {
   const { language, setLanguage, t } = useLanguage();
   const { font, setFont } = useFont();
   const [activeTab, setActiveTab] = useState<TabType>("preferences");
-  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | null>(null);
+  const [activeHelp, setActiveHelp] = useState<"email" | "ai" | "voice" | "users_roles" | null>(null);
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
   
   const [username, setUsername] = useState("");
@@ -494,6 +496,13 @@ export default function Settings() {
             t={t}
           />
         );
+      case "users_roles":
+        return (
+          <SettingUsersRoles
+            onToggleHelp={() => setActiveHelp(activeHelp === "users_roles" ? null : "users_roles")}
+            activeHelp={activeHelp}
+          />
+        );
       default:
         return null;
     }
@@ -553,6 +562,9 @@ export default function Settings() {
                     )}
                     {activeHelp === "voice" && (
                       <SettingVoiceEngineHelp onClose={() => setActiveHelp(null)} />
+                    )}
+                    {activeHelp === "users_roles" && (
+                      <SettingUsersRolesHelp onClose={() => setActiveHelp(null)} />
                     )}
                   </>
                 )}

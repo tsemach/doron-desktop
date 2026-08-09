@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../../../../database";
 import { desktopSessions, users } from "../../../../../database/schema";
 
@@ -22,14 +22,17 @@ export async function POST(request: Request) {
         expiresAt: desktopSessions.expiresAt,
         email: users.email,
         tier: users.tier,
+        role: users.role,
+        firmId: users.firmId,
       })
       .from(desktopSessions)
       .innerJoin(users, eq(users.id, desktopSessions.userId))
-      .where(eq(desktopSessions.token, token))
+      // ASC-142: a hard-deleted user still cascades the desktop_sessions
+      // row away (schema.ts's onDelete: "cascade"), but soft-deleted users
+      // (users.deletedAt set) don't -- filtered out explicitly here too.
+      .where(and(eq(desktopSessions.token, token), isNull(users.deletedAt)))
       .limit(1);
 
-    // Deleted user cascades the desktop_sessions row away (schema.ts's
-    // onDelete: "cascade"), so a deleted account naturally lands here too.
     if (!row || row.expiresAt.getTime() < Date.now()) {
       return NextResponse.json({ error: "Session no longer valid" }, { status: 401 });
     }
@@ -37,6 +40,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       email: row.email,
       tier: row.tier,
+      role: row.role,
+      firmId: row.firmId,
       expiresAt: row.expiresAt.toISOString(),
     });
   } catch (error: any) {

@@ -27,6 +27,8 @@ export async function POST() {
       token,
       email: user.email,
       tier: user.tier,
+      role: user.role,
+      firmId: user.firmId,
       expiresAt: expiresAt.toISOString(),
     });
   } catch (error: any) {

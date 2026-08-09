@@ -21,6 +21,7 @@ pub mod tags;
 pub mod user_settings;
 pub mod search;
 pub mod fuzzy;
+pub mod org;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -132,14 +133,16 @@ pub fn run() {
                     let param = |key: &str| {
                         url.query_pairs().find(|(k, _)| k == key).map(|(_, v)| v.to_string())
                     };
-                    let (token, email, tier, expires_at, backend_url) = (
+                    let (token, email, tier, expires_at, backend_url, role, firm_id) = (
                         param("token"),
                         param("email"),
                         param("tier"),
                         param("expires_at"),
                         param("backend_url"),
+                        param("role"),
+                        param("firm_id"),
                     );
-                    if let Err(e) = crate::auth::complete_oauth_login(&handle_deep_link, token, email, tier, expires_at, backend_url) {
+                    if let Err(e) = crate::auth::complete_oauth_login(&handle_deep_link, token, email, tier, expires_at, backend_url, role, firm_id) {
                         eprintln!("[Rust Backend] OAuth deep-link session save failed: {e}");
                     }
                 }
@@ -260,7 +263,12 @@ pub fn run() {
             clipboard::read_clipboard,
             clipboard::write_clipboard,
             power::prevent_sleep,
-            power::allow_sleep
+            power::allow_sleep,
+            // org (ASC-142 -- "Users and Roles" Settings tab)
+            org::list_org_members,
+            org::invite_org_member,
+            org::change_org_member_role,
+            org::delete_org_member
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -1,6 +1,4 @@
-import { eq } from "drizzle-orm";
-import { db } from "../../database";
-import { desktopSessions, users } from "../../database/schema";
+import { authorizeDesktopToken } from "../desktopAuth";
 
 export interface AuthorizedSession {
   userId: string;
@@ -11,27 +9,21 @@ export type AuthorizationResult = { session: AuthorizedSession } | { error: stri
 
 /**
  * Token-in-body auth shared by every backend-proxied AI route (/complete,
- * /transcribe, ...). Same lookup as desktop-session/route.ts, plus the
- * userId/tier these routes need for quota checks and usage recording that
- * desktop-session/route.ts doesn't select.
+ * /transcribe, ...). Builds on the shared desktopSessions lookup in
+ * lib/desktopAuth.ts (also used by the ASC-142 org API), adding the
+ * Pro-tier gate that's specific to AI usage -- the org API has no such gate.
  */
 export async function authorizeRequest(token: string): Promise<AuthorizationResult> {
-  const [row] = await db
-    .select({ userId: users.id, tier: users.tier, expiresAt: desktopSessions.expiresAt })
-    .from(desktopSessions)
-    .innerJoin(users, eq(users.id, desktopSessions.userId))
-    .where(eq(desktopSessions.token, token))
-    .limit(1);
-
-  if (!row || row.expiresAt.getTime() < Date.now()) {
-    return { error: "Session no longer valid", status: 401 };
+  const result = await authorizeDesktopToken(token);
+  if ("error" in result) {
+    return result;
   }
 
   // Server-side enforcement -- never trust the desktop's own is_pro_tier
   // gate alone; free tier must not be able to reach the Gateway at all.
-  if (row.tier !== "pro") {
+  if (result.identity.tier !== "pro") {
     return { error: "Cloud AI is a Pro feature.", status: 403 };
   }
 
-  return { session: { userId: row.userId, tier: row.tier } };
+  return { session: { userId: result.identity.userId, tier: result.identity.tier } };
 }
