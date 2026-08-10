@@ -1,69 +1,40 @@
-"use client";
-
-import React from "react";
-import { FolderGit2, Tags, Briefcase } from "lucide-react";
+import { Briefcase, FolderGit2, Tags } from "lucide-react";
+import FeatureBlock from "@/components/marketing/FeatureBlock";
+import FeatureRowList from "@/components/marketing/FeatureRowList";
 
 export default function KeyFeatureCaseManagementAndTraking() {
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="space-y-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50/80 border border-teal-150 text-teal-700 text-xs font-semibold w-fit backdrop-blur-xs">
-          <Briefcase className="w-3.5 h-3.5" />
-          Core Case Workspace
-        </div>
+    <div className="space-y-4">
+      <FeatureBlock
+        icon={Briefcase}
+        title="Case Management & Tracking"
+        description="Streamline the lifecycle of your client matters. Ascurix Desktop lets you organize folders, files, and correspondences under specific case files, making sure you always have contextual information at your fingertips."
+        bullets={[
+          "Case codes, client metadata, and notes in one structured file",
+          "Link documents, templates, and contracts to a case automatically",
+          "Track status workflows and priority tags at a glance",
+        ]}
+        mockup={{
+          type: "screenshot",
+          src: "/screenshot_followup_badge.png",
+          alt: "Active cases tracking and status badges",
+        }}
+      />
 
-        <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">
-          Case Management & Tracking
-        </h2>
-        
-        <p className="text-slate-600 text-base sm:text-lg max-w-4xl leading-relaxed">
-          Streamline the lifecycle of your client matters. Ascurix Desktop lets you organize folders, files, and correspondences under specific case files, making sure you always have contextual information at your fingertips.
-        </p>
-
-        {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          <div className="p-5 rounded-xl border border-slate-200/60 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mb-3">
-              <FolderGit2 className="w-5 h-5" />
-            </div>
-            <h4 className="font-bold text-slate-800 text-base mb-1.5">Structured Case Files</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              Define case codes, client metadata, and notes. Link multiple legal documents, templates, and contracts directly to a centralized file structure.
-            </p>
-          </div>
-
-          <div className="p-5 rounded-xl border border-slate-200/60 bg-slate-50/50 hover:bg-slate-50 transition-all duration-200">
-            <div className="w-10 h-10 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center mb-3">
-              <Tags className="w-5 h-5" />
-            </div>
-            <h4 className="font-bold text-slate-800 text-base mb-1.5">Actionable Status Badges</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              Track status workflows (e.g., Active, In Review, Closed) and assign custom priority tags to follow up on critical communications instantly.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Screenshot Display Card */}
-      <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Case Dashboard Preview
-          </h3>
-          <span className="text-xs text-slate-500 font-medium">
-            Case Status & Active Tags Tracker
-          </span>
-        </div>
-
-        {/* Screenshot Display */}
-        <div className="relative aspect-video rounded-lg overflow-hidden border border-slate-200 bg-slate-950 shadow-inner group">
-          <img
-            src="/screenshot_followup_badge.png"
-            alt="Active Cases Tracking & Status Badges"
-            className="w-full h-full object-cover opacity-95 group-hover:opacity-100 transition-opacity duration-300"
-          />
-        </div>
-      </div>
+      <FeatureRowList
+        items={[
+          {
+            icon: FolderGit2,
+            title: "Structured Case Files",
+            description: "Define case codes and client metadata, and link documents directly to a centralized file structure.",
+          },
+          {
+            icon: Tags,
+            title: "Actionable Status Badges",
+            description: "Track workflows (Active, In Review, Closed) and assign priority tags to follow up instantly.",
+          },
+        ]}
+      />
     </div>
   );
 }
