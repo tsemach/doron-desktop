@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import MainTopBar from "@/components/main/MainTopBar";
+import CtaBanner from "@/components/marketing/CtaBanner";
 
 interface Plan {
   name: string;
@@ -102,47 +103,47 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="dark min-h-screen flex flex-col bg-slate-950 text-slate-50 font-sans">
+    <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
       <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
       <main className="flex-grow w-full px-6 py-20">
         <div className="max-w-6xl mx-auto text-center mb-14">
-          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white mb-3">
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 mb-3">
             Plans for every practice
           </h1>
-          <p className="text-slate-400 text-base max-w-2xl mx-auto">
+          <p className="text-slate-500 text-base max-w-2xl mx-auto">
             Start free, upgrade for AI-powered case intelligence, or pay only for the AI you use.
           </p>
         </div>
 
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 items-stretch">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
               className={`flex flex-col rounded-2xl border p-6 ${
                 plan.highlighted
-                  ? "border-blue-500/50 bg-slate-900 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/30"
-                  : "border-slate-800 bg-slate-900"
+                  ? "border-brand-accent/50 bg-white shadow-lg shadow-brand-accent/10 ring-1 ring-brand-accent/30"
+                  : "border-slate-200 bg-white"
               }`}
             >
               {plan.highlighted && (
-                <span className="mb-3 inline-flex w-fit items-center rounded-full bg-blue-500/10 border border-blue-500/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                <span className="mb-3 inline-flex w-fit items-center rounded-full bg-brand-accent/10 border border-brand-accent/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-accent">
                   Most Popular
                 </span>
               )}
 
-              <h2 className="text-lg font-bold text-white">{plan.name}</h2>
-              <p className="mt-1 text-sm text-slate-400">{plan.tagline}</p>
+              <h2 className="text-lg font-bold text-slate-900">{plan.name}</h2>
+              <p className="mt-1 text-sm text-slate-500">{plan.tagline}</p>
 
               <div className="mt-4 mb-6">
-                <span className="text-3xl font-bold text-white">{plan.price}</span>
-                {plan.priceSuffix && <span className="text-sm text-slate-400">{plan.priceSuffix}</span>}
+                <span className="text-3xl font-bold text-slate-900">{plan.price}</span>
+                {plan.priceSuffix && <span className="text-sm text-slate-500">{plan.priceSuffix}</span>}
               </div>
 
               <ul className="flex-1 space-y-3 mb-6">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-sm text-slate-300">
-                    <Check className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
+                  <li key={feature} className="flex items-start gap-2 text-sm text-slate-600">
+                    <Check className="w-4 h-4 mt-0.5 shrink-0 text-brand-accent" />
                     <span>{feature}</span>
                   </li>
                 ))}
@@ -152,8 +153,8 @@ export default function PricingPage() {
                 <div
                   className={`w-full rounded-lg px-4 py-2.5 text-center text-sm font-semibold transition-colors cursor-pointer ${
                     plan.highlighted
-                      ? "bg-white text-slate-900 hover:bg-slate-100"
-                      : "border border-slate-700 text-slate-200 hover:bg-slate-800"
+                      ? "bg-brand-accent text-brand-accent-foreground hover:brightness-110"
+                      : "border border-slate-300 text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   {plan.cta}
@@ -163,9 +164,20 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <p className="text-center text-xs text-slate-500 mt-10">
+        <p className="text-center text-xs text-slate-500 mt-10 mb-16">
           You can switch plans anytime from your account.
         </p>
+
+        <div className="max-w-6xl mx-auto">
+          <CtaBanner
+            title="Questions about which plan fits your practice?"
+            subtitle="Reach out and we'll help you pick the right tier — or set up a custom quota."
+            primaryHref="/register"
+            primaryLabel="Get Started"
+            secondaryHref="/resources/key-features"
+            secondaryLabel="Compare Features"
+          />
+        </div>
       </main>
     </div>
   );

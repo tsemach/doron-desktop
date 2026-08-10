@@ -42,6 +42,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -77,6 +79,13 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+
+  /* Marketing-only brand accent (used by apps/backend/components/marketing/*).
+     Deliberately its own token, not a reuse of --chart-2, so retuning the
+     brand color never shifts data-visualization colors and vice versa.
+     Light-mode only -- the marketing pages don't render in dark mode. */
+  --brand-accent: oklch(0.62 0.14 170);
+  --brand-accent-foreground: oklch(0.99 0 0);
 }
 
 .dark {
