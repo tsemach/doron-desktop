@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../database";
-import { users } from "../../database/schema";
+import { teamMembers, teams, users } from "../../database/schema";
 import { canChangeRole, canDelete, getVisibleMemberUserIds, type Actor, type Role } from "../permissions";
 
 export interface MemberEntry {
@@ -68,6 +68,26 @@ export async function softDeleteUser(actor: Actor, targetUserId: string): Promis
 
   if (!canDelete(actor, target)) {
     return { error: "You don't have permission to delete this user.", status: 403 };
+  }
+
+  // Deleting someone who still manages or belongs to a team would leave a
+  // dangling teamMembers/teams.managerId row pointing at a soft-deleted
+  // user. Block it and name the team(s) rather than silently orphaning
+  // membership -- there's no self-service "remove from team" flow yet, so
+  // the only way out today is deleting the team itself or reassigning its
+  // manager first.
+  const [managedTeams, memberTeams] = await Promise.all([
+    db.select({ name: teams.name }).from(teams).where(eq(teams.managerId, targetUserId)),
+    db.select({ name: teams.name }).from(teamMembers).innerJoin(teams, eq(teams.id, teamMembers.teamId)).where(eq(teamMembers.userId, targetUserId)),
+  ]);
+  const teamNames = Array.from(new Set([...managedTeams, ...memberTeams].map((t) => t.name)));
+  if (teamNames.length > 0) {
+    const noun = teamNames.length === 1 ? "a team" : "teams";
+    const pronoun = teamNames.length === 1 ? "it" : "all of them";
+    return {
+      error: `This person still belongs to ${noun}: ${teamNames.join(", ")}. Remove them from ${pronoun} first.`,
+      status: 409,
+    };
   }
 
   await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, targetUserId));

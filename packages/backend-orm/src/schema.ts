@@ -123,6 +123,10 @@ export const teams = pgTable("teams", {
     .notNull()
     .references(() => users.id),
   name: text("name").notNull(),
+  // Hex string (e.g. "#3b82f6") picked from a fixed swatch palette in the
+  // create-team UI -- plain text, not a pgEnum, matching this file's
+  // existing convention for constrained-but-not-DB-enforced values.
+  color: text("color"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

@@ -65,15 +65,22 @@ export default function SettingUsersRolesTable({
                   <td className="py-2.5 px-2">
                     <div className="flex items-center justify-end gap-2">
                       {canChangeThisRole && (
-                        <select
-                          value={member.role}
-                          disabled={isBusy}
-                          onChange={(e) => onRoleChange(member.id, e.target.value)}
-                          className="text-xs border border-input bg-background/50 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
-                        >
-                          <option value="manager">manager</option>
-                          <option value="user">user</option>
-                        </select>
+                        <div className="relative">
+                          <select
+                            value={member.role}
+                            disabled={isBusy}
+                            onChange={(e) => onRoleChange(member.id, e.target.value)}
+                            className="text-xs border border-input bg-background rounded-lg pl-2 pr-6 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 appearance-none cursor-pointer"
+                          >
+                            <option value="manager">manager</option>
+                            <option value="user">user</option>
+                          </select>
+                          <div className="absolute inset-y-0 right-1.5 flex items-center pointer-events-none text-muted-foreground">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m6 9 6 6 6-6" />
+                            </svg>
+                          </div>
+                        </div>
                       )}
                       {canRemoveThisMember && (
                         <button
