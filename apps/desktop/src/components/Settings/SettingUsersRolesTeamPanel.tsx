@@ -54,6 +54,16 @@ export default function SettingUsersRolesTeamPanel({
   const [deleteError, setDeleteError] = useState("");
   const [busyTeamId, setBusyTeamId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(teamId: string) {
+    setExpandedTeamIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(teamId)) next.delete(teamId);
+      else next.add(teamId);
+      return next;
+    });
+  }
 
   const query = search.trim().toLowerCase();
   const filteredTeams = query ? teams.filter((t) => t.name.toLowerCase().includes(query)) : teams;
@@ -147,21 +157,49 @@ export default function SettingUsersRolesTeamPanel({
           {filteredTeams.map((team) => {
             const isBusy = busyTeamId === team.id;
             const canManage = canManageTeam(team);
-            const canDelete = canManage && team.members.length === 0;
+            // The manager is always a member too (createTeam/updateTeam add
+            // them), but they're already shown via "Managed by" above -- so
+            // the list below excludes them, both for display and for
+            // deciding whether the team still counts as "empty".
+            const otherMembers = team.members.filter((m) => m.id !== team.managerId);
+            const canDelete = canManage && otherMembers.length === 0;
+            const isExpanded = expandedTeamIds.has(team.id);
+            const hasMoreMembers = otherMembers.length > 3;
+            const visibleMembers = isExpanded ? otherMembers : otherMembers.slice(0, 3);
 
             return (
-              <div key={team.id} className="rounded-xl border border-border/60 p-4 space-y-3">
+              <div
+                key={team.id}
+                onClick={() => toggleExpanded(team.id)}
+                className="rounded-xl border border-border/60 p-4 space-y-3 cursor-pointer"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <h4 className="flex items-center gap-2 text-sm font-bold text-foreground">
                     <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: team.color || "#64748b" }} />
-                    {team.name}
+                    {canManage ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTeam(team);
+                        }}
+                        className="hover:text-primary hover:underline cursor-pointer"
+                      >
+                        {team.name}
+                      </button>
+                    ) : (
+                      team.name
+                    )}
                   </h4>
                   <div className="flex items-center gap-3">
                     {canManage && (
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setEditingTeam(team)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTeam(team);
+                          }}
                           disabled={isBusy}
                           title="Edit team"
                           className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
@@ -170,7 +208,10 @@ export default function SettingUsersRolesTeamPanel({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(team)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(team);
+                          }}
                           disabled={isBusy || !canDelete}
                           title={canDelete ? "Delete team" : "Remove all members before deleting this team"}
                           className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 disabled:hover:text-muted-foreground disabled:hover:bg-transparent"
@@ -184,17 +225,22 @@ export default function SettingUsersRolesTeamPanel({
                     </span>
                   </div>
                 </div>
-                {team.members.length === 0 ? (
+                {otherMembers.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No members yet.</p>
                 ) : (
-                  <ul className="space-y-1.5">
-                    {team.members.map((m) => (
-                      <li key={m.id} className="flex items-center justify-between text-xs">
-                        <span className="text-foreground font-medium">{m.name || m.email}</span>
-                        <span className="text-muted-foreground capitalize">{m.role}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="relative">
+                    <ul className="space-y-1.5">
+                      {visibleMembers.map((m) => (
+                        <li key={m.id} className="flex items-center justify-between text-xs">
+                          <span className="text-foreground font-medium">{m.name || m.email}</span>
+                          <span className="text-muted-foreground capitalize">{m.role}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {hasMoreMembers && !isExpanded && (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent" />
+                    )}
+                  </div>
                 )}
               </div>
             );

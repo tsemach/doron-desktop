@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { db } from "../../database";
 import { teamMembers, teams, users } from "../../database/schema";
 import type { Actor, Role } from "../permissions";
@@ -170,13 +170,16 @@ export async function deleteTeam(actor: Actor, teamId: string): Promise<DeleteTe
     return { error: "You don't have permission to delete this team.", status: 403 };
   }
 
-  const [anyMember] = await db
+  // The manager's own membership row (added by createTeam/updateTeam)
+  // doesn't count against "empty" -- it's always there by design, not
+  // someone who needs to be removed first.
+  const [anyOtherMember] = await db
     .select({ userId: teamMembers.userId })
     .from(teamMembers)
     .innerJoin(users, eq(users.id, teamMembers.userId))
-    .where(and(eq(teamMembers.teamId, teamId), isNull(users.deletedAt)))
+    .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.userId, existing.managerId), isNull(users.deletedAt)))
     .limit(1);
-  if (anyMember) {
+  if (anyOtherMember) {
     return { error: "Remove all members before deleting this team.", status: 400 };
   }
 
