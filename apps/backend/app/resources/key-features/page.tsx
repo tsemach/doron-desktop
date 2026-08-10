@@ -11,6 +11,8 @@ import KeyFeatureDocumentIndexing from "@/components/resources/key-features/KeyF
 import KeyFeatureFullTextSearch from "@/components/resources/key-features/KeyFeatureFullTextSearch";
 import KeyFeatureDocumentTagsAndNotes from "@/components/resources/key-features/KeyFeatureDocumentTagsAndNotes";
 import KeyFeatureEmailCorrespondencesSync from "@/components/resources/key-features/KeyFeatureEmailCorrespondencesSync";
+import KeyFeatureTaskManagement from "@/components/resources/key-features/KeyFeatureTaskManagement";
+import KeyFeatureTeamsAndRoles from "@/components/resources/key-features/KeyFeatureTeamsAndRoles";
 
 // Moved from apps/backend/app/page.tsx -- this was the entire home page's
 // content; "/" itself now just keeps the MainTopBar shell (see app/page.tsx).
@@ -21,6 +23,8 @@ const FEATURE_TABS: PillTab[] = [
   { id: "smart-full-text-search", label: "Full-Text Search" },
   { id: "document-tags-notes", label: "Tags & Notes" },
   { id: "email-correspondences-sync", label: "Email Sync" },
+  { id: "task-management", label: "Task Management" },
+  { id: "teams-and-roles", label: "Teams & Roles" },
 ];
 
 export default function KeyFeaturesPage() {
@@ -75,6 +79,8 @@ export default function KeyFeaturesPage() {
           {featureSelected === "smart-full-text-search" && <KeyFeatureFullTextSearch />}
           {featureSelected === "document-tags-notes" && <KeyFeatureDocumentTagsAndNotes />}
           {featureSelected === "email-correspondences-sync" && <KeyFeatureEmailCorrespondencesSync />}
+          {featureSelected === "task-management" && <KeyFeatureTaskManagement />}
+          {featureSelected === "teams-and-roles" && <KeyFeatureTeamsAndRoles />}
         </div>
       </main>
     </div>
