@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAtomValue } from "jotai";
 import { Building2, HelpCircle, UserPlus, Users } from "lucide-react";
@@ -41,7 +41,7 @@ export default function SettingUsersRoles() {
   const [teamsLoading, setTeamsLoading] = useState(true);
   const [teamsError, setTeamsError] = useState("");
   const [removeTarget, setRemoveTarget] = useState<OrgMember | null>(null);
-  const [removeError, setRemoveError] = useState("");
+  const [removeError, setRemoveError] = useState<ReactNode>("");
 
   async function loadMembers() {
     setLoading(true);
@@ -115,10 +115,20 @@ export default function SettingUsersRoles() {
 
     const blockingTeams = teams.filter((t) => t.managerId === userId || t.members.some((m) => m.id === userId));
     if (blockingTeams.length > 0) {
-      const names = blockingTeams.map((t) => t.name).join(", ");
       const noun = blockingTeams.length === 1 ? "a team" : "teams";
       const pronoun = blockingTeams.length === 1 ? "it" : "all of them";
-      setRemoveError(`This person still belongs to ${noun}: ${names}. Remove them from ${pronoun} first.`);
+      setRemoveError(
+        <>
+          This person still belongs to {noun}:{" "}
+          {blockingTeams.map((t, i) => (
+            <span key={t.id}>
+              {i > 0 && ", "}
+              <span className="font-bold text-foreground">{t.name}</span>
+            </span>
+          ))}
+          . Remove them from {pronoun} first.
+        </>
+      );
       return;
     }
 
