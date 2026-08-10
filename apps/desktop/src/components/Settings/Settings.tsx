@@ -482,7 +482,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-start items-stretch overflow-y-auto">
+    <div className="h-screen bg-background text-foreground flex flex-col justify-start items-stretch overflow-y-auto">
       
       {/* Navigation & Header (full-width border-b) */}
       <div className="border-b border-border/60 w-full px-8 md:px-12 py-5 shrink-0">
@@ -490,10 +490,10 @@ export default function Settings() {
       </div>
  
       {/* Main layout container (left-aligned w-full) */}
-      <div className="w-full flex-1 flex flex-col px-8 md:px-12 py-8 md:py-12 space-y-6">
-        
+      <div className="w-full flex-1 min-h-0 flex flex-col px-8 md:px-12 py-5 md:py-6 space-y-6">
+
         {/* Main Settings Two-Column Layout */}
-        <div className="flex flex-col md:flex-row gap-8 w-full items-stretch mt-4 flex-1">
+        <div className="flex flex-col md:flex-row gap-8 w-full items-stretch flex-1 min-h-0">
           
           {/* Left Navigation Menu */}
           <SettingMenuTab
@@ -508,10 +508,10 @@ export default function Settings() {
           />
 
           {/* Right Content Area */}
-          <div className="flex-1 flex flex-col lg:flex-row gap-8 items-stretch w-full">
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-8 items-stretch w-full">
             {/* users_roles manages its own full-width layout (its own inline
                 help section, no external help pane) -- see SettingUsersRoles.tsx. */}
-            <div className={activeTab === "users_roles" ? "w-full" : "w-full lg:w-[640px] lg:shrink-0"}>
+            <div className={activeTab === "users_roles" ? "w-full min-h-0" : "w-full lg:w-[640px] lg:shrink-0"}>
               {renderActiveTab()}
             </div>
 
