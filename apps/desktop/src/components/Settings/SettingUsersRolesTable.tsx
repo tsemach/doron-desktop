@@ -15,6 +15,7 @@ interface SettingUsersRolesTableProps {
   busyUserId: string | null;
   onRoleChange: (userId: string, role: string) => void;
   onRemove: (userId: string) => void;
+  onSelectMember: (member: OrgMember) => void;
 }
 
 // Rule 11 -- only manager/user roles are ever changeable (never admin/flat),
@@ -29,6 +30,7 @@ export default function SettingUsersRolesTable({
   busyUserId,
   onRoleChange,
   onRemove,
+  onSelectMember,
 }: SettingUsersRolesTableProps) {
   if (members.length === 0) {
     return <p className="text-sm text-muted-foreground py-6 text-center">No one to show yet.</p>;
@@ -54,8 +56,14 @@ export default function SettingUsersRolesTable({
 
             return (
               <tr key={member.id} className="border-b border-border/40 last:border-0">
-                <td className="py-2.5 px-2 font-medium text-foreground">
-                  {member.name || "—"}
+                <td className="py-2.5 px-2 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => onSelectMember(member)}
+                    className="text-foreground hover:text-primary hover:underline cursor-pointer"
+                  >
+                    {member.name || "—"}
+                  </button>
                   {isSelf && <span className="ml-1.5 text-xs text-muted-foreground font-normal">(you)</span>}
                 </td>
                 <td className="py-2.5 px-2 text-muted-foreground">{member.email}</td>
