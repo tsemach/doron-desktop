@@ -236,11 +236,6 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
             DELETE FROM tags WHERE scope_type = 'document' AND scope_value = REPLACE(old.file_path, '\', '/');
         END;
 
-        CREATE TABLE IF NOT EXISTS user_settings (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            username  TEXT NOT NULL
-        );
-
         CREATE TABLE IF NOT EXISTS auth_session (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             token       TEXT NOT NULL,
@@ -249,21 +244,28 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
             expires_at  TEXT NOT NULL,
             backend_url TEXT NOT NULL DEFAULT '',
             role        TEXT NOT NULL DEFAULT 'flat',
-            firm_id     TEXT
+            firm_id     TEXT,
+            name        TEXT
         );
+
+        -- ASC-143 -- the local-only username field this table held is gone;
+        -- the display name now comes one-way from the backend account
+        -- (auth_session.name below), not from local user input.
+        DROP TABLE IF EXISTS user_settings;
     ").map_err(|e| format!("[tags schema] {e}"))?;
 
-    // Ensure 'backend_url'/'role'/'firm_id' columns exist in 'auth_session'
-    // for pre-existing installs (base CREATE TABLE above only takes effect
-    // for fresh DBs). backend_url lets internal callers that only have an
-    // AppHandle -- indexer, query analysis, field extraction, cloud
-    // transcribe -- reach the backend for online-mode AI requests via
-    // auth::get_backend_url. role/firm_id (ASC-142) mirror the backend's
-    // users.role/firmId onto the locally cached session.
+    // Ensure 'backend_url'/'role'/'firm_id'/'name' columns exist in
+    // 'auth_session' for pre-existing installs (base CREATE TABLE above only
+    // takes effect for fresh DBs). backend_url lets internal callers that
+    // only have an AppHandle -- indexer, query analysis, field extraction,
+    // cloud transcribe -- reach the backend for online-mode AI requests via
+    // auth::get_backend_url. role/firm_id/name (ASC-142/ASC-143) mirror the
+    // backend's users.role/firmId/name onto the locally cached session.
     for (column, add_column_sql) in [
         ("backend_url", "ALTER TABLE auth_session ADD COLUMN backend_url TEXT NOT NULL DEFAULT '';"),
         ("role", "ALTER TABLE auth_session ADD COLUMN role TEXT NOT NULL DEFAULT 'flat';"),
         ("firm_id", "ALTER TABLE auth_session ADD COLUMN firm_id TEXT;"),
+        ("name", "ALTER TABLE auth_session ADD COLUMN name TEXT;"),
     ] {
         let column_exists: bool = conn.query_row(
             "SELECT COUNT(1) FROM pragma_table_info('auth_session') WHERE name=?1",

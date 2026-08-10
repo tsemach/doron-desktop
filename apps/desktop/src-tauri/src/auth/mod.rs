@@ -25,6 +25,10 @@ pub struct Session {
     pub role: String,
     // Mirrors users.firmId -- None for a flat user.
     pub firm_id: Option<String>,
+    // ASC-143 -- mirrors users.name (nullable in the backend schema). Single
+    // source of truth for the display name, replacing the old local-only
+    // user_settings SQLite table (removed in this same change).
+    pub name: Option<String>,
 }
 
 // Success and error responses from /api/v1/auth/desktop-login share no
@@ -44,6 +48,7 @@ struct DesktopLoginResponse {
     // and both mean the same thing here: no firm.
     #[serde(rename = "firmId")]
     firm_id: Option<String>,
+    name: Option<String>,
     error: Option<String>,
 }
 
@@ -58,6 +63,7 @@ struct DesktopSessionVerifyResponse {
     role: Option<String>,
     #[serde(rename = "firmId")]
     firm_id: Option<String>,
+    name: Option<String>,
 }
 
 /// Reads the local session, treating a past (or unparsable) `expires_at` as
@@ -67,7 +73,7 @@ struct DesktopSessionVerifyResponse {
 fn read_session_internal(app: &AppHandle) -> Result<Option<Session>, String> {
     let conn = store::open_db(app)?;
     let mut stmt = conn
-        .prepare("SELECT token, email, tier, expires_at, backend_url, role, firm_id FROM auth_session LIMIT 1")
+        .prepare("SELECT token, email, tier, expires_at, backend_url, role, firm_id, name FROM auth_session LIMIT 1")
         .map_err(|e| e.to_string())?;
 
     let row = stmt.query_row([], |r| {
@@ -79,6 +85,7 @@ fn read_session_internal(app: &AppHandle) -> Result<Option<Session>, String> {
             backend_url: r.get(4)?,
             role: r.get(5)?,
             firm_id: r.get(6)?,
+            name: r.get(7)?,
         })
     });
 
@@ -137,7 +144,7 @@ pub fn save_session_internal(app: &AppHandle, session: &Session) -> Result<(), S
     let conn = store::open_db(app)?;
     conn.execute("DELETE FROM auth_session", []).map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO auth_session (token, email, tier, expires_at, backend_url, role, firm_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO auth_session (token, email, tier, expires_at, backend_url, role, firm_id, name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             session.token,
             session.email,
@@ -146,6 +153,7 @@ pub fn save_session_internal(app: &AppHandle, session: &Session) -> Result<(), S
             session.backend_url,
             session.role,
             session.firm_id,
+            session.name,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -172,13 +180,15 @@ pub fn complete_oauth_login(
     // desktop-complete/page.tsx) -- not part of the required-fields
     // destructure below.
     firm_id: Option<String>,
+    // Also legitimately absent -- desktop-complete/page.tsx omits it when null.
+    name: Option<String>,
 ) -> Result<(), String> {
     let (Some(token), Some(email), Some(tier), Some(expires_at), Some(backend_url), Some(role)) =
         (token, email, tier, expires_at, backend_url, role)
     else {
         return Err("OAuth deep link was missing one or more required fields".to_string());
     };
-    save_session_internal(app, &Session { token, email, tier, expires_at, backend_url, role, firm_id })
+    save_session_internal(app, &Session { token, email, tier, expires_at, backend_url, role, firm_id, name })
 }
 
 fn clear_session_internal(app: &AppHandle) -> Result<(), String> {
@@ -230,6 +240,7 @@ pub async fn login_with_credentials(app: AppHandle, backend_url: String, email: 
         backend_url,
         role: body.role.ok_or(GENERIC_ERROR)?,
         firm_id: body.firm_id,
+        name: body.name,
     };
     save_session_internal(&app, &session)?;
     Ok(session)
@@ -287,9 +298,10 @@ pub async fn verify_session(app: AppHandle, backend_url: String) -> Result<Optio
         backend_url,
         role: body.role.unwrap_or(local_session.role),
         // Not a fallback like the fields above -- the route always returns
-        // firmId (possibly null for a flat user) on success, so trust it
-        // outright rather than falling back to a possibly-stale cached value.
+        // firmId/name (possibly null) on success, so trust them outright
+        // rather than falling back to a possibly-stale cached value.
         firm_id: body.firm_id,
+        name: body.name,
     };
     save_session_internal(&app, &refreshed)?;
     Ok(Some(refreshed))

@@ -18,7 +18,6 @@ pub mod documents;
 pub mod clipboard;
 pub mod power;
 pub mod tags;
-pub mod user_settings;
 pub mod search;
 pub mod fuzzy;
 pub mod org;
@@ -133,7 +132,7 @@ pub fn run() {
                     let param = |key: &str| {
                         url.query_pairs().find(|(k, _)| k == key).map(|(_, v)| v.to_string())
                     };
-                    let (token, email, tier, expires_at, backend_url, role, firm_id) = (
+                    let (token, email, tier, expires_at, backend_url, role, firm_id, name) = (
                         param("token"),
                         param("email"),
                         param("tier"),
@@ -141,8 +140,9 @@ pub fn run() {
                         param("backend_url"),
                         param("role"),
                         param("firm_id"),
+                        param("name"),
                     );
-                    if let Err(e) = crate::auth::complete_oauth_login(&handle_deep_link, token, email, tier, expires_at, backend_url, role, firm_id) {
+                    if let Err(e) = crate::auth::complete_oauth_login(&handle_deep_link, token, email, tier, expires_at, backend_url, role, firm_id, name) {
                         eprintln!("[Rust Backend] OAuth deep-link session save failed: {e}");
                     }
                 }
@@ -227,9 +227,6 @@ pub fn run() {
             tags::list_tags,
             tags::list_all_tag_names,
             tags::list_tag_values,
-            // user settings
-            user_settings::get_user_settings,
-            user_settings::save_user_settings,
             // auth
             auth::get_session,
             auth::save_session,

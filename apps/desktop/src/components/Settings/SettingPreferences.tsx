@@ -1,10 +1,10 @@
+import { useAtomValue } from "jotai";
 import { User, Check, Type } from "lucide-react";
+import { sessionAtom } from "@/store/authStore";
 import { Language, TranslationKey } from "../../locales/translations";
 import { AppFont, FONT_OPTIONS, buildFontStack } from "../../context/FontContext";
 
 interface SettingPreferencesProps {
-  username: string;
-  setUsername: (val: string) => void;
   tempLang: Language;
   setTempLang: (val: Language) => void;
   tempFont: AppFont;
@@ -16,8 +16,6 @@ interface SettingPreferencesProps {
 }
 
 export default function SettingPreferences({
-  username,
-  setUsername,
   tempLang,
   setTempLang,
   tempFont,
@@ -27,26 +25,20 @@ export default function SettingPreferences({
   setSaved,
   t,
 }: SettingPreferencesProps) {
+  const session = useAtomValue(sessionAtom);
+
   return (
     <div className="bg-card border border-border/80 shadow-lg rounded-2xl p-6 md:p-8 space-y-6 w-full animate-fade-in">
-      {/* User Name Preference */}
+      {/* User Name -- ASC-143: read-only, sourced from the backend account
+          (session.name), not a local setting. There's no self-service way
+          to change your own name yet; this just displays it. */}
       <div className="space-y-2">
-        <label className="text-sm font-semibold tracking-wide text-foreground flex items-center gap-1.5" htmlFor="username">
+        <label className="text-sm font-semibold tracking-wide text-foreground flex items-center gap-1.5">
           <User className="size-4 text-foreground" />
           {t("user_name")}
         </label>
-        <div className="relative">
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => {
-              setUsername(e.target.value);
-              setSaved(false);
-            }}
-            placeholder={t("enter_name")}
-            className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-          />
+        <div className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-input bg-muted/30 text-sm text-foreground">
+          {session?.name || session?.email || "—"}
         </div>
         <p className="text-xs text-muted-foreground">
           {t("username_desc")}

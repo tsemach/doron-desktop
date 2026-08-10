@@ -29,6 +29,7 @@ export async function POST() {
       tier: user.tier,
       role: user.role,
       firmId: user.firmId,
+      name: user.name,
       expiresAt: expiresAt.toISOString(),
     });
   } catch (error: any) {
