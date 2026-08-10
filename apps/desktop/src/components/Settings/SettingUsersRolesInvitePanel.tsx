@@ -95,7 +95,7 @@ export default function SettingUsersRolesInvitePanel({
           cascades through several nested levels turned out to be unreliable
           in practice, leaving the Invite button pushed off-screen with no
           scrollbar at all. */}
-      <div className="flex-1 min-h-0 max-h-[55vh] overflow-y-auto [scrollbar-gutter:stable]">
+      <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
         {loading ? (
           <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
         ) : filteredMembers.length === 0 && query ? (

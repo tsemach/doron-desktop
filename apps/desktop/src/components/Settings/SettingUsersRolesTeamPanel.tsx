@@ -192,10 +192,12 @@ export default function SettingUsersRolesTeamPanel({
         </div>
       )}
 
-      {/* max-height, same reasoning as SettingUsersRolesInvitePanel.tsx --
-          caps independently of the ancestor flex chain instead of relying
-          on flex-1's percentage height resolving correctly. */}
-      <div className="flex-1 min-h-0 max-h-[55vh] overflow-y-auto [scrollbar-gutter:stable]">
+      {/* flex-1 fills exactly the space left after the header row and the
+          Create team button, so the button stays pinned to the card's true
+          bottom instead of a fixed vh cap leaving a gap once the page has
+          more room; overflow-y-auto scrolls internally if content is
+          actually taller than that. */}
+      <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
       {loading ? (
         <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
       ) : filteredTeams.length === 0 ? (
