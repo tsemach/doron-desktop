@@ -147,3 +147,25 @@ pub async fn delete_team(app: AppHandle, team_id: String) -> Result<(), String> 
     call_org_desktop(&app, "/api/v1/org/desktop/teams/delete", json!({ "teamId": team_id })).await?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn remove_team_member(app: AppHandle, team_id: String, user_id: String) -> Result<(), String> {
+    call_org_desktop(
+        &app,
+        "/api/v1/org/desktop/teams/members/remove",
+        json!({ "teamId": team_id, "userId": user_id }),
+    )
+    .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn add_team_member(app: AppHandle, team_id: String, user_id: String) -> Result<(), String> {
+    call_org_desktop(
+        &app,
+        "/api/v1/org/desktop/teams/members/add",
+        json!({ "teamId": team_id, "userId": user_id }),
+    )
+    .await?;
+    Ok(())
+}

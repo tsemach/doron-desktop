@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import type { Role } from "@/lib/permissions";
 import type { OrgMember } from "./SettingUsersRolesTable";
-import type { TeamEntry } from "./SettingUsersRolesTeamPanel";
+import type { TeamEntry, TeamMemberEntry } from "./SettingUsersRolesTeamPanel";
 import { TEAM_COLORS } from "./SettingUsersRolesTeamCreateDialog";
 
 interface SettingUsersRolesTeamEditDialogProps {
@@ -12,12 +12,23 @@ interface SettingUsersRolesTeamEditDialogProps {
   team: TeamEntry;
   onSave: (name: string, managerId: string | undefined, color: string) => Promise<void>;
   onCancel: () => void;
+  onRemoveMemberClick: (member: TeamMemberEntry) => void;
 }
 
 // Same modal shape as SettingUsersRolesTeamCreateDialog.tsx, prefilled with
-// the team being edited. Member management (add/remove people from a team)
-// is deliberately not here yet -- planned for a later pass.
-export default function SettingUsersRolesTeamEditDialog({ role, managers, team, onSave, onCancel }: SettingUsersRolesTeamEditDialogProps) {
+// the team being edited.
+export default function SettingUsersRolesTeamEditDialog({
+  role,
+  managers,
+  team,
+  onSave,
+  onCancel,
+  onRemoveMemberClick,
+}: SettingUsersRolesTeamEditDialogProps) {
+  // Same exclusion as SettingUsersRolesTeamPanel.tsx: the manager is a
+  // member of their own team too (createTeam/updateTeam add that
+  // automatically), but they're already the "Manager" field below.
+  const otherMembers = team.members.filter((m) => m.id !== team.managerId);
   const [name, setName] = useState(team.name);
   const [managerId, setManagerId] = useState(managers.some((m) => m.id === team.managerId) ? team.managerId : managers[0]?.id ?? "");
   const [color, setColor] = useState(team.color ?? TEAM_COLORS[0]);
@@ -131,6 +142,32 @@ export default function SettingUsersRolesTeamEditDialog({ role, managers, team, 
             )}
           </div>
         )}
+
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-foreground">Members</label>
+          {otherMembers.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No members yet.</p>
+          ) : (
+            <ul className="space-y-1.5 max-h-32 overflow-y-auto">
+              {otherMembers.map((m) => (
+                <li key={m.id} className="flex items-center justify-between text-xs gap-2">
+                  <span className="text-foreground font-medium truncate">{m.name || m.email}</span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="text-muted-foreground capitalize">{m.role}</span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveMemberClick(m)}
+                      title="Remove from team"
+                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="flex justify-end gap-2.5 border-t border-border pt-4">
           <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={sending}>

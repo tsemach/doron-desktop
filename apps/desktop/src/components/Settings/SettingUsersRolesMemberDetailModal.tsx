@@ -16,7 +16,10 @@ interface SettingUsersRolesMemberDetailModalProps {
 // manager": whoever manages a team this person belongs to.
 export default function SettingUsersRolesMemberDetailModal({ member, teams, onClose }: SettingUsersRolesMemberDetailModalProps) {
   const managedTeams = teams.filter((t) => t.managerId === member.id);
-  const memberOfTeams = teams.filter((t) => t.members.some((m) => m.id === member.id));
+  // Excludes teams they manage themself -- being a member of your own team
+  // (createTeam/updateTeam add that automatically) doesn't answer "who's
+  // my manager", it would just show them managed by themself.
+  const memberOfTeams = teams.filter((t) => t.managerId !== member.id && t.members.some((m) => m.id === member.id));
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -42,16 +45,32 @@ export default function SettingUsersRolesMemberDetailModal({ member, teams, onCl
         </div>
 
         {managedTeams.length > 0 && (
-          <div className="space-y-1.5 border-t border-border/60 pt-3">
+          <div className="space-y-3 border-t border-border/60 pt-3">
             <p className="text-xs font-semibold text-foreground">Manages</p>
-            <ul className="space-y-1.5">
-              {managedTeams.map((t) => (
-                <li key={t.id} className="flex items-center gap-2 text-xs text-foreground">
-                  <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: t.color || "#64748b" }} />
-                  {t.name}
-                </li>
-              ))}
-            </ul>
+            {managedTeams.map((t) => {
+              // Same exclusion as SettingUsersRolesTeamPanel.tsx: the
+              // manager is a member of their own team too, but they're
+              // already the heading here, so leave them out of the list.
+              const teamMembers = t.members.filter((m) => m.id !== t.managerId);
+              return (
+                <div key={t.id} className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                    <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: t.color || "#64748b" }} />
+                    {t.name}
+                  </div>
+                  {teamMembers.length > 0 && (
+                    <ul className="space-y-1.5 pl-4">
+                      {teamMembers.map((m) => (
+                        <li key={m.id} className="flex items-center justify-between text-xs">
+                          <span className="text-foreground font-medium">{m.name || m.email}</span>
+                          <span className="text-muted-foreground capitalize">{m.role}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
