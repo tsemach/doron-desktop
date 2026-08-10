@@ -100,9 +100,8 @@ function canManageTeam(actor: Actor, team: { firmId: string; managerId: string }
 export type UpdateTeamResult = { team: TeamEntry } | { error: string; status: number };
 
 // Same 3 fields createTeam accepts (name/color/managerId), all optional
-// here since an edit may only touch one. Member management (add/remove
-// people from a team) is deliberately out of scope for now -- planned for
-// a later pass, not this one.
+// here since an edit may only touch one. Removing a member is a separate
+// action -- see removeTeamMember below.
 export async function updateTeam(
   actor: Actor,
   teamId: string,
@@ -184,6 +183,55 @@ export async function deleteTeam(actor: Actor, teamId: string): Promise<DeleteTe
   }
 
   await db.delete(teams).where(eq(teams.id, teamId));
+  return { success: true };
+}
+
+export type AddTeamMemberResult = { success: true } | { error: string; status: number };
+
+// Same permission scope as removeTeamMember. The target just needs to be
+// an active user in the same firm -- onConflictDoNothing covers someone
+// already on the team (e.g. a stale client re-submitting).
+export async function addTeamMember(actor: Actor, teamId: string, userId: string): Promise<AddTeamMemberResult> {
+  const [existing] = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+  if (!existing) {
+    return { error: "Team not found.", status: 404 };
+  }
+  if (!canManageTeam(actor, existing)) {
+    return { error: "You don't have permission to add members to this team.", status: 403 };
+  }
+
+  const [target] = await db
+    .select({ id: users.id, firmId: users.firmId })
+    .from(users)
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .limit(1);
+  if (!target || target.firmId !== existing.firmId) {
+    return { error: "Select an existing user in your firm.", status: 400 };
+  }
+
+  await db.insert(teamMembers).values({ teamId, userId }).onConflictDoNothing();
+  return { success: true };
+}
+
+export type RemoveTeamMemberResult = { success: true } | { error: string; status: number };
+
+// Same permission scope as updateTeam/deleteTeam. The manager can't be
+// removed through this path -- their teamMembers row is tied to being the
+// manager (createTeam/updateTeam add it automatically); reassign the
+// manager instead of removing them.
+export async function removeTeamMember(actor: Actor, teamId: string, userId: string): Promise<RemoveTeamMemberResult> {
+  const [existing] = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+  if (!existing) {
+    return { error: "Team not found.", status: 404 };
+  }
+  if (!canManageTeam(actor, existing)) {
+    return { error: "You don't have permission to remove members from this team.", status: 403 };
+  }
+  if (userId === existing.managerId) {
+    return { error: "Reassign the manager instead of removing them from the team.", status: 400 };
+  }
+
+  await db.delete(teamMembers).where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
   return { success: true };
 }
 

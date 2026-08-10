@@ -37,8 +37,21 @@ export default function SettingUsersRolesTable({
   }
 
   return (
-    <div className="overflow-x-auto -mx-2">
-      <table className="w-full text-left text-sm">
+    <div className="overflow-x-auto">
+      {/* table-fixed + colgroup (percentages summing to 100%) so the
+          browser can't hand extra leftover width to a short column (Role
+          was ending up with a wide gap before Actions under the default
+          auto layout), and can never exceed the container's width either
+          -- no min-w here on purpose, that was still causing a horizontal
+          scrollbar to show even at normal/wide sizes. Columns just get
+          tighter (name/email truncate) on a narrow window instead. */}
+      <table className="w-full text-left text-sm table-fixed">
+        <colgroup>
+          <col className={canManage ? "w-[24%]" : "w-[28%]"} />
+          <col className={canManage ? "w-[36%]" : "w-[50%]"} />
+          <col className={canManage ? "w-[14%]" : "w-[22%]"} />
+          {canManage && <col className="w-[26%]" />}
+        </colgroup>
         <thead>
           <tr className="text-xs text-muted-foreground border-b border-border/60">
             <th className="py-2 px-2 font-medium">Name</th>
@@ -56,7 +69,7 @@ export default function SettingUsersRolesTable({
 
             return (
               <tr key={member.id} className="border-b border-border/40 last:border-0">
-                <td className="py-2.5 px-2 font-medium">
+                <td className="py-2.5 px-2 font-medium truncate">
                   <button
                     type="button"
                     onClick={() => onSelectMember(member)}
@@ -66,19 +79,19 @@ export default function SettingUsersRolesTable({
                   </button>
                   {isSelf && <span className="ml-1.5 text-xs text-muted-foreground font-normal">(you)</span>}
                 </td>
-                <td className="py-2.5 px-2 text-muted-foreground">{member.email}</td>
+                <td className="py-2.5 px-2 text-muted-foreground truncate">{member.email}</td>
                 {/* "flat" is an internal term, never shown as a label. */}
                 <td className="py-2.5 px-2 capitalize text-foreground">{member.role === "flat" ? "—" : member.role}</td>
                 {canManage && (
                   <td className="py-2.5 px-2">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 min-w-0">
                       {canChangeThisRole && (
-                        <div className="relative">
+                        <div className="relative w-[92px] shrink-0">
                           <select
                             value={member.role}
                             disabled={isBusy}
                             onChange={(e) => onRoleChange(member.id, e.target.value)}
-                            className="text-xs border border-input bg-background rounded-lg pl-2 pr-6 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 appearance-none cursor-pointer"
+                            className="w-full text-xs border border-input bg-background rounded-lg pl-2 pr-6 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 appearance-none cursor-pointer"
                           >
                             <option value="manager">manager</option>
                             <option value="user">user</option>

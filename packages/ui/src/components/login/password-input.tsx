@@ -14,6 +14,13 @@ interface PasswordInputProps {
 
 export function PasswordInput({ value, onChange, placeholder, autoComplete, name }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
+  // Only for password-creation fields (register/accept-invite), never
+  // login -- opts out of LastPass/1Password/Bitwarden's icon overlay in
+  // the field. Doesn't touch Chrome's own built-in "suggest a strong
+  // password" bubble, which is intentionally tied to autocomplete=
+  // "new-password" and can't be suppressed without giving up that (correct)
+  // semantic.
+  const isNewPassword = autoComplete === "new-password";
 
   return (
     <div className="relative">
@@ -27,6 +34,10 @@ export function PasswordInput({ value, onChange, placeholder, autoComplete, name
         placeholder={placeholder}
         autoComplete={autoComplete}
         name={name}
+        data-lpignore={isNewPassword ? "true" : undefined}
+        data-1p-ignore={isNewPassword ? "true" : undefined}
+        data-bwignore={isNewPassword ? "true" : undefined}
+        data-form-type={isNewPassword ? "other" : undefined}
       />
       <button
         type="button"

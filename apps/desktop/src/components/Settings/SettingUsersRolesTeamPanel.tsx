@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Pencil, PlusCircle, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Pencil, Plus, PlusCircle, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useCanCreateTeam, type Role } from "@/lib/permissions";
 import type { OrgMember } from "./SettingUsersRolesTable";
 import SettingUsersRolesTeamCreateDialog from "./SettingUsersRolesTeamCreateDialog";
 import SettingUsersRolesTeamEditDialog from "./SettingUsersRolesTeamEditDialog";
+import SettingUsersRolesRemoveFromTeamModal from "./SettingUsersRolesRemoveFromTeamModal";
+import SettingUsersRolesTeamAddMemberDialog from "./SettingUsersRolesTeamAddMemberDialog";
 
 export interface TeamMemberEntry {
   id: string;
@@ -55,6 +57,10 @@ export default function SettingUsersRolesTeamPanel({
   const [busyTeamId, setBusyTeamId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
+  const [removeMemberTarget, setRemoveMemberTarget] = useState<{ team: TeamEntry; member: TeamMemberEntry } | null>(null);
+  const [removingMember, setRemovingMember] = useState(false);
+  const [removeMemberError, setRemoveMemberError] = useState("");
+  const [addMemberTeam, setAddMemberTeam] = useState<TeamEntry | null>(null);
 
   function toggleExpanded(teamId: string) {
     setExpandedTeamIds((prev) => {
@@ -64,6 +70,15 @@ export default function SettingUsersRolesTeamPanel({
       return next;
     });
   }
+
+  // Keeps the edit dialog's displayed member list current after a removal
+  // refreshes `teams` -- editingTeam is a snapshot passed in as a prop, not
+  // itself derived from `teams`, so it wouldn't otherwise update in place.
+  useEffect(() => {
+    if (!editingTeam) return;
+    const fresh = teams.find((t) => t.id === editingTeam.id);
+    if (fresh) setEditingTeam(fresh);
+  }, [teams]);
 
   const query = search.trim().toLowerCase();
   const filteredTeams = query ? teams.filter((t) => t.name.toLowerCase().includes(query)) : teams;
@@ -79,6 +94,28 @@ export default function SettingUsersRolesTeamPanel({
     await invoke("update_team", { teamId: editingTeam.id, name, managerId, color });
     setEditingTeam(null);
     await onRefresh();
+  }
+
+  async function handleAddMember(userId: string) {
+    if (!addMemberTeam) return;
+    await invoke("add_team_member", { teamId: addMemberTeam.id, userId });
+    setAddMemberTeam(null);
+    await onRefresh();
+  }
+
+  async function handleConfirmRemoveMember() {
+    if (!removeMemberTarget) return;
+    setRemoveMemberError("");
+    setRemovingMember(true);
+    try {
+      await invoke("remove_team_member", { teamId: removeMemberTarget.team.id, userId: removeMemberTarget.member.id });
+      setRemoveMemberTarget(null);
+      await onRefresh();
+    } catch (err: any) {
+      setRemoveMemberError(err?.message || String(err) || "Failed to remove member.");
+    } finally {
+      setRemovingMember(false);
+    }
   }
 
   async function handleDelete(team: TeamEntry) {
@@ -108,8 +145,8 @@ export default function SettingUsersRolesTeamPanel({
   const managers = members.filter((m) => m.role === "manager");
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col h-full gap-4">
+      <div className="flex items-center gap-2 shrink-0">
         <div className="relative w-1/2">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
           <input
@@ -141,11 +178,24 @@ export default function SettingUsersRolesTeamPanel({
         </button>
       </div>
 
-      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>}
+      {error && (
+        <div className="shrink-0 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
+      )}
       {deleteError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{deleteError}</div>
+        <div className="shrink-0 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {deleteError}
+        </div>
+      )}
+      {removeMemberError && (
+        <div className="shrink-0 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {removeMemberError}
+        </div>
       )}
 
+      {/* max-height, same reasoning as SettingUsersRolesInvitePanel.tsx --
+          caps independently of the ancestor flex chain instead of relying
+          on flex-1's percentage height resolving correctly. */}
+      <div className="flex-1 min-h-0 max-h-[55vh] overflow-y-auto [scrollbar-gutter:stable]">
       {loading ? (
         <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
       ) : filteredTeams.length === 0 ? (
@@ -173,8 +223,8 @@ export default function SettingUsersRolesTeamPanel({
                 onClick={() => toggleExpanded(team.id)}
                 className="rounded-xl border border-border/60 p-4 space-y-3 cursor-pointer"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="flex items-center gap-2 text-sm font-bold text-foreground">
+                <div className="flex items-center gap-3">
+                  <h4 className="flex items-center gap-2 text-sm font-bold text-foreground shrink-0">
                     <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: team.color || "#64748b" }} />
                     {canManage ? (
                       <button
@@ -190,40 +240,51 @@ export default function SettingUsersRolesTeamPanel({
                     ) : (
                       team.name
                     )}
+                    <span className="font-normal text-muted-foreground">({team.members.length})</span>
                   </h4>
-                  <div className="flex items-center gap-3">
-                    {canManage && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingTeam(team);
-                          }}
-                          disabled={isBusy}
-                          title="Edit team"
-                          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          <Pencil className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(team);
-                          }}
-                          disabled={isBusy || !canDelete}
-                          title={canDelete ? "Delete team" : "Remove all members before deleting this team"}
-                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 disabled:hover:text-muted-foreground disabled:hover:bg-transparent"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    )}
-                    <span className="text-xs text-muted-foreground text-right">
-                      Managed by <span className="font-semibold text-foreground">{team.managerName || team.managerEmail}</span>
-                    </span>
-                  </div>
+                  <span className="ml-auto shrink-0 w-56 text-left text-xs text-muted-foreground truncate">
+                    Managed by <span className="font-semibold text-foreground">{team.managerName || team.managerEmail}</span>
+                  </span>
+                  {canManage && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddMemberTeam(team);
+                        }}
+                        disabled={isBusy}
+                        title="Add member"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTeam(team);
+                        }}
+                        disabled={isBusy}
+                        title="Edit team"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(team);
+                        }}
+                        disabled={isBusy || !canDelete}
+                        title={canDelete ? "Delete team" : "Remove all members before deleting this team"}
+                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 disabled:hover:text-muted-foreground disabled:hover:bg-transparent"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {otherMembers.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No members yet.</p>
@@ -231,9 +292,24 @@ export default function SettingUsersRolesTeamPanel({
                   <div className="relative">
                     <ul className="space-y-1.5">
                       {visibleMembers.map((m) => (
-                        <li key={m.id} className="flex items-center justify-between text-xs">
-                          <span className="text-foreground font-medium">{m.name || m.email}</span>
-                          <span className="text-muted-foreground capitalize">{m.role}</span>
+                        <li key={m.id} className="flex items-center justify-between text-xs gap-2">
+                          <span className="text-foreground font-medium truncate">{m.name || m.email}</span>
+                          <span className="flex items-center gap-2 shrink-0">
+                            <span className="text-muted-foreground capitalize">{m.role}</span>
+                            {canManage && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRemoveMemberTarget({ team, member: m });
+                                }}
+                                title="Remove from team"
+                                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            )}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -247,9 +323,10 @@ export default function SettingUsersRolesTeamPanel({
           })}
         </div>
       )}
+      </div>
 
       {canCreateTeam && (
-        <div className="border-t border-border/60 pt-4 flex justify-end">
+        <div className="shrink-0 border-t border-border/60 pt-4 flex justify-end">
           <button
             type="button"
             onClick={() => setShowCreate(true)}
@@ -272,6 +349,26 @@ export default function SettingUsersRolesTeamPanel({
           team={editingTeam}
           onSave={handleUpdate}
           onCancel={() => setEditingTeam(null)}
+          onRemoveMemberClick={(member) => setRemoveMemberTarget({ team: editingTeam, member })}
+        />
+      )}
+
+      {removeMemberTarget && (
+        <SettingUsersRolesRemoveFromTeamModal
+          memberName={removeMemberTarget.member.name || removeMemberTarget.member.email}
+          teamName={removeMemberTarget.team.name}
+          removing={removingMember}
+          onConfirm={handleConfirmRemoveMember}
+          onCancel={() => setRemoveMemberTarget(null)}
+        />
+      )}
+
+      {addMemberTeam && (
+        <SettingUsersRolesTeamAddMemberDialog
+          team={addMemberTeam}
+          eligibleMembers={members.filter((m) => m.role !== "flat" && !addMemberTeam.members.some((tm) => tm.id === m.id))}
+          onAdd={handleAddMember}
+          onCancel={() => setAddMemberTeam(null)}
         />
       )}
     </div>

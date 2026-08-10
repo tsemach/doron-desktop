@@ -150,7 +150,7 @@ export default function SettingUsersRoles() {
   const currentUserId = members.find((m) => m.email === session?.email)?.id;
 
   return (
-    <div className="bg-card border border-border/80 shadow-lg rounded-2xl p-6 md:p-8 space-y-6 w-full h-full flex flex-col animate-fade-in">
+    <div className="bg-card border border-border/80 shadow-lg rounded-2xl overflow-hidden p-6 md:p-8 space-y-6 w-full h-full flex flex-col animate-fade-in">
       <h2 className="text-sm font-bold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5 pt-2">
         <Users className="size-4 text-foreground" />
         Users and Roles
@@ -189,7 +189,7 @@ export default function SettingUsersRoles() {
           />
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 min-h-0">
           {activeSection === "invite" && (
             <SettingUsersRolesInvitePanel
               members={members}
