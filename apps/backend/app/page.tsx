@@ -14,6 +14,8 @@ import {
   Search,
   Tags,
   Mail,
+  ListChecks,
+  Users,
 } from "lucide-react";
 import MainTopBar from "@/components/main/MainTopBar";
 import HeroSection from "@/components/marketing/HeroSection";
@@ -79,6 +81,16 @@ export default function Home() {
       icon: Mail,
       title: "Email Correspondence Sync",
       desc: "IMAP sync matches incoming mail and attachments to the right case automatically.",
+    },
+    {
+      icon: ListChecks,
+      title: "Task Management",
+      desc: "Templated checklists auto-generate case tasks, tracked on a cross-case dashboard.",
+    },
+    {
+      icon: Users,
+      title: "Teams & Roles",
+      desc: "Invite your firm, organize teams, and control access with role-based permissions.",
     },
   ] as const;
 
