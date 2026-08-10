@@ -3,6 +3,7 @@ import { RefreshCw, Search, UserPlus, X } from "lucide-react";
 import type { Role } from "@/lib/permissions";
 import SettingUsersRolesTable, { type OrgMember } from "./SettingUsersRolesTable";
 import SettingUsersRolesInviteDialog from "./SettingUsersRolesInviteDialog";
+import SettingUsersRolesMemberDetailModal from "./SettingUsersRolesMemberDetailModal";
 import type { TeamEntry } from "./SettingUsersRolesTeamPanel";
 
 interface SettingUsersRolesInvitePanelProps {
@@ -45,6 +46,7 @@ export default function SettingUsersRolesInvitePanel({
   onRefresh,
 }: SettingUsersRolesInvitePanelProps) {
   const [search, setSearch] = useState("");
+  const [selectedMember, setSelectedMember] = useState<OrgMember | null>(null);
   const query = search.trim().toLowerCase();
   const filteredMembers = query
     ? members.filter((m) => m.name?.toLowerCase().includes(query) || m.email.toLowerCase().includes(query))
@@ -98,6 +100,7 @@ export default function SettingUsersRolesInvitePanel({
           busyUserId={busyUserId}
           onRoleChange={onRoleChange}
           onRemove={onRemove}
+          onSelectMember={setSelectedMember}
         />
       )}
 
@@ -123,6 +126,8 @@ export default function SettingUsersRolesInvitePanel({
           onCancel={onCancelInvite}
         />
       )}
+
+      {selectedMember && <SettingUsersRolesMemberDetailModal member={selectedMember} teams={teams} onClose={() => setSelectedMember(null)} />}
     </div>
   );
 }

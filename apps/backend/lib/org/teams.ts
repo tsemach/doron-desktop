@@ -69,9 +69,23 @@ export async function createTeam(
     .values({ firmId: actor.firmId, managerId, name: input.name, color: input.color ?? DEFAULT_TEAM_COLOR })
     .returning({ id: teams.id, name: teams.name, color: teams.color, managerId: teams.managerId, createdAt: teams.createdAt });
 
+  // The manager is a member of their own team from the start -- managing a
+  // team (teams.managerId) and belonging to one (teamMembers) are separate
+  // relationships (see teamMembers' schema comment), and leaving this unset
+  // made "Team membership" confusingly show empty for someone who plainly
+  // manages the team.
+  await db.insert(teamMembers).values({ teamId: team.id, userId: managerId });
+
   const [manager] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, managerId)).limit(1);
 
-  return { team: { ...team, managerName: manager?.name ?? null, managerEmail: manager?.email ?? "", members: [] } };
+  return {
+    team: {
+      ...team,
+      managerName: manager?.name ?? null,
+      managerEmail: manager?.email ?? "",
+      members: [{ id: managerId, name: manager?.name ?? null, email: manager?.email ?? "", role: "manager" }],
+    },
+  };
 }
 
 // Admin can manage any team in their firm; a manager only the team(s) they
@@ -128,6 +142,13 @@ export async function updateTeam(
     .set({ name: input.name?.trim() || existing.name, color: input.color ?? existing.color, managerId })
     .where(eq(teams.id, teamId))
     .returning({ id: teams.id, name: teams.name, color: teams.color, managerId: teams.managerId, createdAt: teams.createdAt });
+
+  // Same as createTeam: whoever manages a team is a member of it. Only
+  // adds the new manager -- the old one's membership (if any) is left
+  // alone, since removing people from a team isn't built yet.
+  if (managerId !== existing.managerId) {
+    await db.insert(teamMembers).values({ teamId, userId: managerId }).onConflictDoNothing();
+  }
 
   const [manager] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, managerId)).limit(1);
 

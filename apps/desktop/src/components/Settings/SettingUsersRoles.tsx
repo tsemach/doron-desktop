@@ -173,7 +173,7 @@ export default function SettingUsersRoles() {
             isActive={activeSection === "invite"}
             onClick={() => setActiveSection("invite")}
             icon={UserPlus}
-            label="Invite"
+            label={t("users_roles_users")}
           />
           <SettingMenuTabItem
             isActive={activeSection === "team"}
