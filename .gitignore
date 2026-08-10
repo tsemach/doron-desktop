@@ -45,3 +45,6 @@ scratch/
 
 # Real-mail exports from `gmail_export.py` — actual client correspondence, never commit
 real_emails.json
+
+# Local git worktrees used for isolated implementation sessions
+.worktrees/
