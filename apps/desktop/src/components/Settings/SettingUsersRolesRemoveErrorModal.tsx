@@ -1,7 +1,7 @@
 import { Button } from "../ui/button";
 
 interface SettingUsersRolesRemoveErrorModalProps {
-  message: string;
+  message: React.ReactNode;
   onClose: () => void;
 }
 
