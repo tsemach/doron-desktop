@@ -40,12 +40,12 @@ describe("isValidPasswordLength", () => {
     expect(isValidPasswordLength("abc123")).toBe(true);
   });
 
-  it("accepts exactly 16 characters", () => {
-    expect(isValidPasswordLength("a".repeat(16))).toBe(true);
+  it("accepts exactly 48 characters", () => {
+    expect(isValidPasswordLength("a".repeat(48))).toBe(true);
   });
 
-  it("rejects longer than 16 characters", () => {
-    expect(isValidPasswordLength("a".repeat(17))).toBe(false);
+  it("rejects longer than 48 characters", () => {
+    expect(isValidPasswordLength("a".repeat(49))).toBe(false);
   });
 
   it("rejects an empty string", () => {

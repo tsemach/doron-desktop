@@ -65,7 +65,7 @@ function AcceptInviteContent() {
       return;
     }
     if (!isValidPasswordLength(password)) {
-      setError("Password must be between 6 and 16 characters long.");
+      setError("Password must be between 6 and 48 characters long.");
       return;
     }
     if (password !== confirmPassword) {
