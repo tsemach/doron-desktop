@@ -52,10 +52,10 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
 
       <Link
         href="/app"
-        className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-brand-accent hover:brightness-110 text-brand-accent-foreground shadow-sm transition-all cursor-pointer"
+        className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border border-brand-accent text-brand-accent hover:bg-brand-accent/10 transition-all cursor-pointer"
       >
         <LayoutDashboard className="w-3.5 h-3.5" />
-        Dashboard
+        Desktop
       </Link>
 
       <span className="text-sm font-semibold text-foreground select-none">
