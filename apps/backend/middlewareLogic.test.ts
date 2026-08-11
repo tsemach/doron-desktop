@@ -23,6 +23,12 @@ describe("resolveMiddlewareResponse", () => {
     expect(res.headers.get("location")).toBe("http://localhost:3000/login");
   });
 
+  it("redirects a nested /app path to /login when logged out", () => {
+    const res = resolveMiddlewareResponse(url("/app/cases"), false);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://localhost:3000/login");
+  });
+
   it("lets a logged-in visitor through to /app", () => {
     const res = resolveMiddlewareResponse(url("/app"), true);
     expect(res.headers.get("x-middleware-next")).toBe("1");

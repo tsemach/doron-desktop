@@ -21,7 +21,7 @@ export default function MainTopBar({ userName, tier, handleLogout }: Props) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-8">
-        <MainTopBarLogo />
+        <MainTopBarLogo href="/home" />
         <nav className="flex items-center gap-6">
           {NAV_LINKS.map(({ label, href }) => (
             <Link

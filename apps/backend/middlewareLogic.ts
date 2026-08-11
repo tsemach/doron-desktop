@@ -16,11 +16,13 @@ export function resolveMiddlewareResponse(nextUrl: URL, isLoggedIn: boolean): Ne
 
   if (pathname === "/") {
     return isLoggedIn
-      ? NextResponse.redirect(new URL("/app", nextUrl))
-      : NextResponse.rewrite(new URL("/home", nextUrl));
+      ? NextResponse.redirect(new URL(`/app${nextUrl.search}`, nextUrl))
+      : NextResponse.rewrite(new URL(`/home${nextUrl.search}`, nextUrl));
   }
 
-  const requiresAuth = AUTH_REQUIRED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  const requiresAuth = AUTH_REQUIRED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + "/")
+  );
   if (requiresAuth && !isLoggedIn) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
