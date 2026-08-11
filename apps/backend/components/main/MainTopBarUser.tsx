@@ -1,4 +1,4 @@
-import { LogOut, Settings, User } from "lucide-react";
+import { LayoutDashboard, LogOut, Settings, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -49,6 +49,14 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
 
   return (
     <div className="flex items-center gap-3">
+
+      <Link
+        href="/app"
+        className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-brand-accent hover:brightness-110 text-brand-accent-foreground shadow-sm transition-all cursor-pointer"
+      >
+        <LayoutDashboard className="w-3.5 h-3.5" />
+        Dashboard
+      </Link>
 
       <span className="text-sm font-semibold text-foreground select-none">
         {userName} <span className="text-muted-foreground">({tierLabel})</span>
