@@ -1,18 +1,14 @@
 // Shared client + server validation for auth forms (register/login), so the
 // rules can't drift between what the UI checks and what the API enforces.
 
+import { LOGIN_PASSWORD_LENGTH } from "@workspace/ui";
+
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// 16 is the actual signup password policy max (matches the "between 6 and
-// 16 characters" copy in register/page.tsx, accept-invite/page.tsx, and the
-// signup route's own error message) -- not to be confused with
-// @workspace/ui's LOGIN_PASSWORD_LENGTH (48), which is only the login
-// input's HTML maxLength, a generous UI truncation limit for typing/pasting
-// an existing password, not a policy bound for new ones.
 export function isValidPasswordLength(password: string): boolean {
-  return password.length >= 6 && password.length <= 16;
+  return password.length >= 6 && password.length <= LOGIN_PASSWORD_LENGTH;
 }
 
 // Allows letters from any script (this app is bilingual EN/HE, so Latin-only
