@@ -1,8 +1,8 @@
 import { Briefcase, CalendarClock, ListChecks, Mail, type LucideIcon } from "lucide-react";
-import type { StatTileData } from "../../../lib/dashboard/types";
+import type { StatTileData, StatTileIcon } from "../../../lib/dashboard/types";
 
 // Keys must match the `icon` values used in lib/dashboard/mockData.ts.
-const ICONS: Record<string, LucideIcon> = { Mail, CalendarClock, Briefcase, ListChecks };
+const ICONS: Record<StatTileIcon, LucideIcon> = { Mail, CalendarClock, Briefcase, ListChecks };
 
 type StatTileProps = {
   tile: StatTileData;

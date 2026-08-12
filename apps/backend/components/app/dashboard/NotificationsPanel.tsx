@@ -1,5 +1,6 @@
 import { Bell, Briefcase, FileText, Mail, type LucideIcon } from "lucide-react";
 import type { NotificationItem } from "../../../lib/dashboard/types";
+import { formatDashboardTimestamp } from "../../../lib/dashboard/formatDate";
 
 const TYPE_ICONS: Record<NotificationItem["type"], LucideIcon> = {
   email: Mail,
@@ -32,7 +33,7 @@ export default function NotificationsPanel({ notifications }: NotificationsPanel
                 <div className="min-w-0">
                   <p className="text-sm text-foreground">{n.message}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {new Date(n.timestamp).toLocaleString()}
+                    {formatDashboardTimestamp(n.timestamp)}
                   </p>
                 </div>
               </li>

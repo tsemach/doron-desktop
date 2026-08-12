@@ -2,9 +2,11 @@ import type { CaseStatus } from "../../../lib/dashboard/types";
 
 // Colors ported from apps/desktop/src/components/ui/CaseStatusBadge.tsx
 // (minus the "followup" variant and dark: classes -- see plan's Global
-// Constraints for why).
+// Constraints for why). "open" was changed from desktop's zinc to green,
+// since zinc read as visually indistinguishable from "closed" on this
+// dashboard's layout -- it's no longer a literal port for that entry.
 const STATUS_STYLES: Record<CaseStatus, string> = {
-  open: "bg-zinc-100 text-zinc-700",
+  open: "bg-green-100 text-green-700",
   waiting: "bg-yellow-100 text-yellow-700",
   closed: "bg-gray-100 text-gray-500",
 };

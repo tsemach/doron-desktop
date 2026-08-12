@@ -8,9 +8,11 @@ export interface CaseSummary {
   updatedAt: string; // ISO date; RecentCasesList sorts by this, most recent first
 }
 
+export type StatTileIcon = "Mail" | "CalendarClock" | "Briefcase" | "ListChecks";
+
 export interface StatTileData {
   id: string;
-  icon: string; // lucide-react icon name, must be a key in StatTile.tsx's ICONS map
+  icon: StatTileIcon; // lucide-react icon name, must be a key in StatTile.tsx's ICONS map
   primary: { count: number; label: string };
   secondary?: { count: number; label: string }; // e.g. "5 open cases" + "1 follow-up"
 }

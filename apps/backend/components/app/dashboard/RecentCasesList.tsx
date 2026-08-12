@@ -1,5 +1,6 @@
 import { Briefcase } from "lucide-react";
 import type { CaseSummary } from "../../../lib/dashboard/types";
+import { formatDashboardDate } from "../../../lib/dashboard/formatDate";
 import CaseStatusBadge from "@/components/app/dashboard/CaseStatusBadge";
 
 type RecentCasesListProps = {
@@ -35,7 +36,7 @@ export default function RecentCasesList({ cases }: RecentCasesListProps) {
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <CaseStatusBadge status={c.status} />
-                <span className="text-xs text-muted-foreground">{c.updatedAt}</span>
+                <span className="text-xs text-muted-foreground">{formatDashboardDate(c.updatedAt)}</span>
               </div>
             </li>
           ))}

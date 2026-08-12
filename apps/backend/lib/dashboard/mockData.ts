@@ -1,8 +1,9 @@
 import type { CaseSummary, NotificationItem, StatTileData } from "./types";
 
-// 6 entries, deliberately not pre-sorted -- RecentCasesList sorts by
-// updatedAt itself. case-6 is older than the other 5 on purpose, to prove
-// the "5 most recent" slice actually excludes something during manual QA.
+// 6 entries. RecentCasesList sorts by updatedAt itself and doesn't rely on
+// this array's order. case-6 is deliberately the oldest entry, so the "5
+// most recent" slice visibly excludes something during manual QA regardless
+// of the array's actual order.
 export const mockCases: CaseSummary[] = [
   { id: "case-1", subject: "תביעה בגין רשלנות", client: "צמח מזרחי", status: "open", updatedAt: "2026-08-10" },
   { id: "case-2", subject: "בדיקת ניהול משימות", client: "צמח מזרחי", status: "waiting", updatedAt: "2026-08-09" },
