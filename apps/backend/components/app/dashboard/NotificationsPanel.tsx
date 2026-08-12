@@ -9,6 +9,13 @@ const TYPE_ICONS: Record<NotificationItem["type"], LucideIcon> = {
   system: Bell,
 };
 
+const TYPE_ICON_STYLES: Record<NotificationItem["type"], string> = {
+  email: "bg-blue-100 text-blue-600",
+  document: "bg-purple-100 text-purple-600",
+  case: "bg-emerald-100 text-emerald-700",
+  system: "bg-amber-100 text-amber-700",
+};
+
 type NotificationsPanelProps = {
   notifications: NotificationItem[];
 };
@@ -27,7 +34,7 @@ export default function NotificationsPanel({ notifications }: NotificationsPanel
             const Icon = TYPE_ICONS[n.type];
             return (
               <li key={n.id} className="flex items-start gap-3 px-4 py-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${TYPE_ICON_STYLES[n.type]}`}>
                   <Icon className="h-3.5 w-3.5" />
                 </span>
                 <div className="min-w-0">

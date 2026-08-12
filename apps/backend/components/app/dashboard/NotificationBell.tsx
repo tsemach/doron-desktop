@@ -1,0 +1,51 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Bell } from "lucide-react";
+import type { NotificationItem } from "../../../lib/dashboard/types";
+import NotificationsPanel from "@/components/app/dashboard/NotificationsPanel";
+
+type NotificationBellProps = {
+  notifications: NotificationItem[];
+};
+
+export default function NotificationBell({ notifications }: NotificationBellProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const unreadCount = notifications.length;
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50" ref={containerRef}>
+      {open && (
+        <div className="absolute bottom-full right-0 mb-3 w-80">
+          <NotificationsPanel notifications={notifications} />
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="relative flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg hover:border-foreground/30 transition-all cursor-pointer"
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
