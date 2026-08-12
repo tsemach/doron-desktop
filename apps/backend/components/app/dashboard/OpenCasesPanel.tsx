@@ -22,7 +22,7 @@ function getEmailArrivedCases(cases: CaseSummary[]): CaseSummary[] {
 
 export default function OpenCasesPanel({ cases }: OpenCasesPanelProps) {
   return (
-    <div className="rounded-xl bg-card overflow-hidden shadow-xs max-w-sm">
+    <div className="rounded-2xl bg-card overflow-hidden shadow-2xl max-w-sm">
       <div className="px-5 py-4">
         <h2 className="text-lg font-bold text-foreground">Open Activities</h2>
       </div>

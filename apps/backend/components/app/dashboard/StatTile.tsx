@@ -12,7 +12,7 @@ export default function StatTile({ tile }: StatTileProps) {
   const Icon = ICONS[tile.icon];
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
+    <div className="rounded-xl border border-border bg-card p-3 shadow-lg">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className="h-4 w-4 shrink-0" />
         <span className="text-xs font-medium whitespace-nowrap">{tile.primary.label}</span>

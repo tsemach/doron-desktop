@@ -33,7 +33,7 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-white via-slate-50 to-indigo-50 text-slate-900 font-sans">
       <AppTopBar userName={userName} tier={tier} workspaceLabel={workspaceLabel} />
       <main className="flex-grow w-full">{children}</main>
       <NotificationBell notifications={mockNotifications} />

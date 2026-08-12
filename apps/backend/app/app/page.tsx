@@ -8,10 +8,10 @@ export default async function AppHomePage() {
   const userName = session?.user?.name || session?.user?.email || "there";
 
   return (
-    <div className="px-6 py-10">
+    <div className="px-6 pt-6 pb-10">
       <h1 className="text-2xl font-bold text-foreground">Welcome {userName}</h1>
 
-      <div className="mt-8 flex flex-col gap-6">
+      <div className="mt-6 flex flex-col gap-6">
         <StatTilesGrid tiles={mockStatTiles} />
         <OpenCasesPanel cases={mockCases} />
       </div>
