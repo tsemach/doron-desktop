@@ -5,7 +5,9 @@ export interface CaseSummary {
   subject: string; // bold line, e.g. "תביעה בגין רשלנות"
   client: string; // muted line below subject
   status: CaseStatus;
-  updatedAt: string; // ISO date; RecentCasesList sorts by this, most recent first
+  updatedAt: string; // ISO date; "Recent cases" group sorts by this, most recent first
+  dueDate?: string; // ISO date; "Follow up" group = dueDate in the past
+  hasPendingEmail?: boolean; // "Email arrived" group = true
 }
 
 export type StatTileIcon = "Mail" | "CalendarClock" | "Briefcase" | "ListChecks";
