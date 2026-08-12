@@ -1,4 +1,7 @@
-import { Bell, Briefcase, FileText, Mail, X, type LucideIcon } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Bell, Briefcase, ChevronDown, ChevronRight, FileText, Mail, X, type LucideIcon } from "lucide-react";
 import type { NotificationItem } from "../../../lib/dashboard/types";
 import { formatDashboardTimestamp } from "../../../lib/dashboard/formatDate";
 
@@ -28,41 +31,76 @@ type NotificationsPanelProps = {
   onDismiss: (id: string) => void;
 };
 
+// Same collapse-with-fade pattern as CaseGroup's "Follow up" group: show 3
+// by default with a bottom fade when there are more, expand/collapse on
+// click with the chevron flipping between ChevronRight and ChevronDown.
+const COLLAPSED_VISIBLE_COUNT = 3;
+const COLLAPSED_MAX_HEIGHT = "280px";
+
 export default function NotificationsPanel({ notifications, onDismiss }: NotificationsPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+  const hasOverflow = notifications.length > COLLAPSED_VISIBLE_COUNT;
+
   return (
     <div className="rounded-xl bg-card overflow-hidden shadow-xs">
-      <div className="px-4 py-3">
+      <button
+        type="button"
+        onClick={() => hasOverflow && setExpanded((prev) => !prev)}
+        disabled={!hasOverflow}
+        className="w-full flex items-center gap-2 px-4 py-3 border-b border-border text-left disabled:cursor-default"
+      >
+        {hasOverflow ? (
+          expanded ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          )
+        ) : (
+          <span className="w-3.5 shrink-0" />
+        )}
         <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
-      </div>
-      <ul className="flex flex-col gap-2 p-3">
-        {notifications.map((n) => {
-          const Icon = TYPE_ICONS[n.type];
-          return (
-            <li
-              key={n.id}
-              className={`relative flex items-start gap-3 rounded-xl p-3 pr-8 ${TYPE_CARD_STYLES[n.type]}`}
-            >
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${TYPE_ICON_STYLES[n.type]}`}>
-                <Icon className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm text-foreground">{n.message}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {formatDashboardTimestamp(n.timestamp)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onDismiss(n.id)}
-                aria-label="Dismiss notification"
-                className="absolute top-2 right-2 text-muted-foreground hover:text-foreground cursor-pointer"
+      </button>
+      <div className="relative">
+        <ul
+          className="flex flex-col gap-2 p-3 overflow-hidden transition-[max-height] duration-300 ease-in-out"
+          style={{ maxHeight: !hasOverflow || expanded ? "2000px" : COLLAPSED_MAX_HEIGHT }}
+        >
+          {notifications.map((n) => {
+            const Icon = TYPE_ICONS[n.type];
+            return (
+              <li
+                key={n.id}
+                className={`relative flex items-start gap-3 rounded-xl p-3 pr-8 ${TYPE_CARD_STYLES[n.type]}`}
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${TYPE_ICON_STYLES[n.type]}`}>
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground">{n.message}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {formatDashboardTimestamp(n.timestamp)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onDismiss(n.id)}
+                  aria-label="Dismiss notification"
+                  className="absolute top-2 right-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {hasOverflow && (
+          <div
+            className={`pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent transition-opacity duration-300 ${
+              expanded ? "opacity-0" : "opacity-100"
+            }`}
+          />
+        )}
+      </div>
     </div>
   );
 }

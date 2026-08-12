@@ -8,7 +8,7 @@ export default async function AppHomePage() {
   const userName = session?.user?.name || session?.user?.email || "there";
 
   return (
-    <div className="px-6 pt-6 pb-10">
+    <div className="px-6 pt-2 pb-10">
       <h1 className="text-2xl font-bold text-foreground">Welcome {userName}</h1>
 
       <div className="mt-6 flex flex-col gap-6">

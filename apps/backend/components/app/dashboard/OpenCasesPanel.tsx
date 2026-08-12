@@ -29,7 +29,7 @@ export default function OpenCasesPanel({ cases }: OpenCasesPanelProps) {
       <div className="flex flex-col gap-3 pb-2">
         <CaseGroup title="Recent cases" cases={getRecentCases(cases)} />
         <CaseGroup title="Follow up" cases={getFollowUpCases(cases)} />
-        <CaseGroup title="Email arrived" cases={getEmailArrivedCases(cases)} />
+        <CaseGroup title="Email arrived" cases={getEmailArrivedCases(cases)} collapsedVisibleCount={2} />
       </div>
     </div>
   );

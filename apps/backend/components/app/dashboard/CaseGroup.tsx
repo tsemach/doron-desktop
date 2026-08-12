@@ -8,17 +8,19 @@ import CaseRow from "@/components/app/dashboard/CaseRow";
 type CaseGroupProps = {
   title: string;
   cases: CaseSummary[];
+  collapsedVisibleCount?: number;
 };
 
-const COLLAPSED_VISIBLE_COUNT = 3;
-// Approximate height of 3 CaseRows (each ~56px with its px-4 py-3 padding
-// and two lines of text) -- just needs to visually cut off around the
-// 3rd row, not be pixel-exact, since this is mocked content.
-const COLLAPSED_MAX_HEIGHT = "168px";
+const DEFAULT_COLLAPSED_VISIBLE_COUNT = 3;
+// ~56px per CaseRow (its px-4 py-3 padding and two lines of text) -- just
+// needs to visually cut off after `collapsedVisibleCount` rows, not be
+// pixel-exact, since this is mocked content.
+const ROW_HEIGHT_PX = 56;
 
-export default function CaseGroup({ title, cases }: CaseGroupProps) {
+export default function CaseGroup({ title, cases, collapsedVisibleCount = DEFAULT_COLLAPSED_VISIBLE_COUNT }: CaseGroupProps) {
   const [expanded, setExpanded] = useState(false);
-  const hasOverflow = cases.length > COLLAPSED_VISIBLE_COUNT;
+  const hasOverflow = cases.length > collapsedVisibleCount;
+  const collapsedMaxHeight = `${collapsedVisibleCount * ROW_HEIGHT_PX}px`;
 
   return (
     <div>
@@ -47,7 +49,7 @@ export default function CaseGroup({ title, cases }: CaseGroupProps) {
         <div className="relative">
           <ul
             className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
-            style={{ maxHeight: !hasOverflow || expanded ? "2000px" : COLLAPSED_MAX_HEIGHT }}
+            style={{ maxHeight: !hasOverflow || expanded ? "2000px" : collapsedMaxHeight }}
           >
             {cases.map((caseItem) => (
               <CaseRow key={caseItem.id} caseItem={caseItem} />
