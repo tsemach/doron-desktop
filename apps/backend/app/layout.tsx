@@ -3,7 +3,7 @@ import { Fraunces } from "next/font/google";
 import "./globals.css";
 import AuthSessionProvider from "../components/AuthSessionProvider";
 import Providers from "./providers";
-import Footer from "@/components/marketing/Footer";
+import ConditionalFooter from "@/components/ConditionalFooter";
 
 // Elegant serif used sparingly for display headings (see --font-display in
 // globals.css) -- the body keeps the default sans stack.
@@ -29,7 +29,7 @@ export default function RootLayout({
         <Providers>
           <AuthSessionProvider>{children}</AuthSessionProvider>
         </Providers>
-        <Footer />
+        <ConditionalFooter />
       </body>
     </html>
   );

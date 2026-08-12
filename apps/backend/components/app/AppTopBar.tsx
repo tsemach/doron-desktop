@@ -18,6 +18,7 @@ export default function AppTopBar({ userName, tier, workspaceLabel }: AppTopBarP
   return (
     <TopBarShell
       logoHref="/home"
+      centerNav
       userName={userName}
       tier={tier}
       workspaceLabel={workspaceLabel}

@@ -22,14 +22,14 @@ function getEmailArrivedCases(cases: CaseSummary[]): CaseSummary[] {
 
 export default function OpenCasesPanel({ cases }: OpenCasesPanelProps) {
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
-      <div className="px-4 py-3 border-b border-border">
+    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs max-w-sm">
+      <div className="px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">Open cases</h2>
       </div>
-      <div className="divide-y divide-border">
-        <CaseGroup title="Recent cases" cases={getRecentCases(cases)} />
-        <CaseGroup title="Follow up" cases={getFollowUpCases(cases)} />
-        <CaseGroup title="Email arrived" cases={getEmailArrivedCases(cases)} />
+      <div className="flex flex-col">
+        <CaseGroup title="Recent cases" cases={getRecentCases(cases)} accentClassName="text-blue-600" />
+        <CaseGroup title="Follow up" cases={getFollowUpCases(cases)} accentClassName="text-amber-600" />
+        <CaseGroup title="Email arrived" cases={getEmailArrivedCases(cases)} accentClassName="text-purple-600" />
       </div>
     </div>
   );

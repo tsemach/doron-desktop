@@ -8,6 +8,7 @@ import CaseRow from "@/components/app/dashboard/CaseRow";
 type CaseGroupProps = {
   title: string;
   cases: CaseSummary[];
+  accentClassName: string;
 };
 
 const COLLAPSED_VISIBLE_COUNT = 3;
@@ -16,7 +17,7 @@ const COLLAPSED_VISIBLE_COUNT = 3;
 // 3rd row, not be pixel-exact, since this is mocked content.
 const COLLAPSED_MAX_HEIGHT = "168px";
 
-export default function CaseGroup({ title, cases }: CaseGroupProps) {
+export default function CaseGroup({ title, cases, accentClassName }: CaseGroupProps) {
   const [expanded, setExpanded] = useState(false);
   const hasOverflow = cases.length > COLLAPSED_VISIBLE_COUNT;
 
@@ -37,7 +38,7 @@ export default function CaseGroup({ title, cases }: CaseGroupProps) {
         ) : (
           <span className="w-3.5 shrink-0" />
         )}
-        <span className="text-xs font-semibold uppercase tracking-wide text-foreground">{title}</span>
+        <span className={`text-xs font-bold uppercase tracking-wide ${accentClassName}`}>{title}</span>
         <span className="text-xs text-muted-foreground">({cases.length})</span>
       </button>
 
@@ -46,7 +47,7 @@ export default function CaseGroup({ title, cases }: CaseGroupProps) {
       ) : (
         <div className="relative">
           <ul
-            className="divide-y divide-border overflow-hidden transition-[max-height] duration-300 ease-in-out"
+            className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
             style={{ maxHeight: !hasOverflow || expanded ? "2000px" : COLLAPSED_MAX_HEIGHT }}
           >
             {cases.map((caseItem) => (
