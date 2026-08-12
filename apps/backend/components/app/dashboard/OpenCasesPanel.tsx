@@ -23,8 +23,8 @@ function getEmailArrivedCases(cases: CaseSummary[]): CaseSummary[] {
 export default function OpenCasesPanel({ cases }: OpenCasesPanelProps) {
   return (
     <div className="rounded-xl bg-card overflow-hidden shadow-xs max-w-sm">
-      <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Open Activities</h2>
+      <div className="px-5 py-4">
+        <h2 className="text-lg font-bold text-foreground">Open Activities</h2>
       </div>
       <div className="flex flex-col gap-3 pb-2">
         <CaseGroup title="Recent cases" cases={getRecentCases(cases)} />

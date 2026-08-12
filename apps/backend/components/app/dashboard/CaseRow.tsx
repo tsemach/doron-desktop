@@ -9,7 +9,7 @@ type CaseRowProps = {
 
 export default function CaseRow({ caseItem }: CaseRowProps) {
   return (
-    <li className="flex items-center justify-between gap-4 px-4 py-3">
+    <li className="flex items-center justify-between gap-4 pl-8 pr-4 py-3">
       <div className="flex items-center gap-3 min-w-0">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
           <Briefcase className="h-4 w-4" />
