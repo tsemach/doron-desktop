@@ -35,8 +35,12 @@ export default function NotificationBell({ notifications }: NotificationBellProp
 
   return (
     <div className="fixed bottom-6 right-6 z-50" ref={containerRef}>
-      {open && visibleNotifications.length > 0 && (
-        <div className="absolute bottom-full right-0 mb-3 w-80">
+      {visibleNotifications.length > 0 && (
+        <div
+          className={`absolute bottom-full right-0 mb-3 w-80 transition-all duration-200 ease-out ${
+            open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-2 pointer-events-none"
+          }`}
+        >
           <NotificationsPanel notifications={visibleNotifications} onDismiss={handleDismiss} />
         </div>
       )}
@@ -45,13 +49,13 @@ export default function NotificationBell({ notifications }: NotificationBellProp
         onClick={() => setOpen((prev) => !prev)}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={open}
-        className="flex items-center gap-4 rounded-full bg-blue-600 hover:bg-blue-700 text-white pl-8 pr-7 py-2 shadow-lg transition-all cursor-pointer"
+        className="flex items-center gap-4 rounded-full bg-red-50 hover:bg-red-100 text-red-600 pl-8 pr-7 py-2 shadow-lg transition-all cursor-pointer"
       >
         <span className="text-base font-semibold">Notification</span>
         <span className="relative flex h-6 w-6 items-center justify-center shrink-0">
           <Bell className="h-6 w-6" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
               {unreadCount}
             </span>
           )}
