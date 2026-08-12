@@ -7,7 +7,7 @@ type StatTilesGridProps = {
 
 export default function StatTilesGrid({ tiles }: StatTilesGridProps) {
   return (
-    <div className="grid grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {tiles.map((tile) => (
         <StatTile key={tile.id} tile={tile} />
       ))}

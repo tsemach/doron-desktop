@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, CalendarClock, CreditCard, FileText, ListChecks, type LucideIcon } from "lucide-react";
+import {
+  Briefcase,
+  CalendarClock,
+  CreditCard,
+  FileText,
+  LayoutDashboard,
+  ListChecks,
+  type LucideIcon,
+} from "lucide-react";
 
 type NavItem = {
   label: string;
@@ -11,6 +19,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+  { label: "Home", href: "/app", icon: LayoutDashboard },
   { label: "Cases", href: "/app/cases", icon: Briefcase },
   { label: "Tasks", href: "/app/tasks", icon: ListChecks },
   { label: "Calendar", href: "/app/calendar", icon: CalendarClock },
@@ -24,7 +33,8 @@ export default function AppNavMenu() {
   return (
     <nav className="hidden md:flex items-center bg-muted/60 p-1 rounded-lg border border-border/40">
       {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`);
+        const active =
+          href === "/app" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (
           <Link
             key={href}

@@ -37,6 +37,8 @@ export default function NotificationBell({ notifications }: NotificationBellProp
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
+        aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+        aria-expanded={open}
         className="relative flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg hover:border-foreground/30 transition-all cursor-pointer"
       >
         <Bell className="h-5 w-5" />
