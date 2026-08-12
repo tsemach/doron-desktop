@@ -2,6 +2,10 @@ import { eq } from "drizzle-orm";
 import { auth } from "../../auth";
 import { db } from "../../database";
 import { firms } from "../../database/schema";
+import { mockCases, mockNotifications, mockStatTiles } from "../../lib/dashboard/mockData";
+import RecentCasesList from "@/components/app/dashboard/RecentCasesList";
+import StatTilesGrid from "@/components/app/dashboard/StatTilesGrid";
+import NotificationsPanel from "@/components/app/dashboard/NotificationsPanel";
 
 export default async function AppHomePage() {
   const session = await auth();
@@ -19,9 +23,19 @@ export default async function AppHomePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-16">
-      <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
-      <p className="text-sm text-slate-500 mt-2">{workspaceLabel}</p>
+    <div className="max-w-6xl mx-auto px-6 py-10">
+      <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
+      <p className="text-sm text-muted-foreground mt-1">{workspaceLabel}</p>
+
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          <RecentCasesList cases={mockCases} />
+          <StatTilesGrid tiles={mockStatTiles} />
+        </div>
+        <div>
+          <NotificationsPanel notifications={mockNotifications} />
+        </div>
+      </div>
     </div>
   );
 }
