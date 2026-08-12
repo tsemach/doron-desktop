@@ -11,9 +11,11 @@ export default async function AppHomePage() {
     <div className="px-6 pt-2 pb-10">
       <h1 className="text-2xl font-bold text-foreground">Welcome {userName}</h1>
 
-      <div className="mt-6 flex flex-col gap-6">
+      <div className="mt-6 flex flex-col">
         <StatTilesGrid tiles={mockStatTiles} />
-        <OpenCasesPanel cases={mockCases} />
+        <div className="mt-10">
+          <OpenCasesPanel cases={mockCases} />
+        </div>
       </div>
     </div>
   );
