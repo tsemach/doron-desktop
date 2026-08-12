@@ -25,3 +25,39 @@ export interface NotificationItem {
   timestamp: string; // ISO date
   type: "email" | "document" | "case" | "system";
 }
+
+export type TaskUrgency = "overdue" | "due-today" | "upcoming";
+
+export interface ImportantTask {
+  id: string;
+  title: string;
+  caseSubject: string;
+  dueAt: string; // ISO datetime
+  urgency: TaskUrgency; // overdue -> rose rail, due-today -> amber, upcoming -> slate
+}
+
+export type EmailMatchStatus = "matched" | "needs-review";
+
+export interface EmailArrival {
+  id: string;
+  sender: string;
+  subject: string;
+  matchedCaseSubject?: string; // present only when matchStatus is "matched"
+  receivedAt: string; // ISO datetime
+  matchStatus: EmailMatchStatus; // matched -> blue rail, needs-review -> amber rail
+}
+
+export interface BillingCaseProgress {
+  id: string;
+  caseSubject: string;
+  paidAmount: number; // ILS
+  totalAmount: number; // ILS
+  isOverdue: boolean; // true -> rose progress fill, false -> emerald
+}
+
+export interface BillingSummary {
+  outstandingAmount: number; // ILS
+  collectedThisMonth: number; // ILS
+  cases: BillingCaseProgress[];
+  pendingInvoiceLabel: string; // e.g. "Invoice #2026-0142 · pending payment"
+}
