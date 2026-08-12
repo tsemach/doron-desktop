@@ -49,13 +49,13 @@ export default function NotificationBell({ notifications }: NotificationBellProp
         onClick={() => setOpen((prev) => !prev)}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={open}
-        className="flex items-center gap-4 rounded-full bg-green-100 hover:bg-green-200 text-green-700 pl-8 pr-7 py-2 shadow-lg transition-all cursor-pointer"
+        className="flex items-center gap-4 rounded-full bg-[#87CEFA] hover:bg-[#6cc0f8] text-blue-900 pl-8 pr-7 py-2 shadow-lg transition-all cursor-pointer"
       >
         <span className="text-base font-semibold">Notification</span>
         <span className="relative flex h-6 w-6 items-center justify-center shrink-0">
           <Bell className="h-6 w-6" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-green-700 px-1 text-[10px] font-bold text-white">
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-900 px-1 text-[10px] font-bold text-white">
               {unreadCount}
             </span>
           )}
