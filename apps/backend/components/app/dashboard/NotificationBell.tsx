@@ -11,6 +11,7 @@ type NotificationBellProps = {
 
 export default function NotificationBell({ notifications }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,13 +26,18 @@ export default function NotificationBell({ notifications }: NotificationBellProp
     };
   }, []);
 
-  const unreadCount = notifications.length;
+  const visibleNotifications = notifications.filter((n) => !dismissedIds.includes(n.id));
+  const unreadCount = visibleNotifications.length;
+
+  function handleDismiss(id: string) {
+    setDismissedIds((prev) => [...prev, id]);
+  }
 
   return (
     <div className="fixed bottom-6 right-6 z-50" ref={containerRef}>
       {open && (
         <div className="absolute bottom-full right-0 mb-3 w-80">
-          <NotificationsPanel notifications={notifications} />
+          <NotificationsPanel notifications={visibleNotifications} onDismiss={handleDismiss} />
         </div>
       )}
       <button
@@ -39,15 +45,17 @@ export default function NotificationBell({ notifications }: NotificationBellProp
         onClick={() => setOpen((prev) => !prev)}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white pl-3.5 pr-4 py-2.5 shadow-lg transition-all cursor-pointer"
+        className="flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white pl-4 pr-3 py-2.5 shadow-lg transition-all cursor-pointer"
       >
-        <Bell className="h-5 w-5" />
         <span className="text-sm font-semibold">Notification</span>
-        {unreadCount > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
-            {unreadCount}
-          </span>
-        )}
+        <span className="relative flex h-5 w-5 items-center justify-center shrink-0">
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-0.5 text-[9px] font-bold text-blue-600">
+              {unreadCount}
+            </span>
+          )}
+        </span>
       </button>
     </div>
   );

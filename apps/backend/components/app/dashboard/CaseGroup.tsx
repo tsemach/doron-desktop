@@ -8,7 +8,6 @@ import CaseRow from "@/components/app/dashboard/CaseRow";
 type CaseGroupProps = {
   title: string;
   cases: CaseSummary[];
-  accentClassName: string;
 };
 
 const COLLAPSED_VISIBLE_COUNT = 3;
@@ -17,7 +16,7 @@ const COLLAPSED_VISIBLE_COUNT = 3;
 // 3rd row, not be pixel-exact, since this is mocked content.
 const COLLAPSED_MAX_HEIGHT = "168px";
 
-export default function CaseGroup({ title, cases, accentClassName }: CaseGroupProps) {
+export default function CaseGroup({ title, cases }: CaseGroupProps) {
   const [expanded, setExpanded] = useState(false);
   const hasOverflow = cases.length > COLLAPSED_VISIBLE_COUNT;
 
@@ -27,7 +26,7 @@ export default function CaseGroup({ title, cases, accentClassName }: CaseGroupPr
         type="button"
         onClick={() => hasOverflow && setExpanded((prev) => !prev)}
         disabled={!hasOverflow}
-        className="w-full flex items-center gap-2 px-4 py-2.5 bg-muted/40 text-left disabled:cursor-default"
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-left disabled:cursor-default"
       >
         {hasOverflow ? (
           expanded ? (
@@ -38,7 +37,7 @@ export default function CaseGroup({ title, cases, accentClassName }: CaseGroupPr
         ) : (
           <span className="w-3.5 shrink-0" />
         )}
-        <span className={`text-xs font-bold uppercase tracking-wide ${accentClassName}`}>{title}</span>
+        <span className="font-heading text-xs font-bold uppercase tracking-wide text-foreground">{title}</span>
         <span className="text-xs text-muted-foreground">({cases.length})</span>
       </button>
 

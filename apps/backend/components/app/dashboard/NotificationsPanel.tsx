@@ -1,4 +1,4 @@
-import { Bell, Briefcase, FileText, Mail, type LucideIcon } from "lucide-react";
+import { Bell, Briefcase, FileText, Mail, X, type LucideIcon } from "lucide-react";
 import type { NotificationItem } from "../../../lib/dashboard/types";
 import { formatDashboardTimestamp } from "../../../lib/dashboard/formatDate";
 
@@ -16,11 +16,19 @@ const TYPE_ICON_STYLES: Record<NotificationItem["type"], string> = {
   system: "bg-amber-100 text-amber-700",
 };
 
-type NotificationsPanelProps = {
-  notifications: NotificationItem[];
+const TYPE_CARD_STYLES: Record<NotificationItem["type"], string> = {
+  email: "bg-blue-50",
+  document: "bg-purple-50",
+  case: "bg-emerald-50",
+  system: "bg-amber-50",
 };
 
-export default function NotificationsPanel({ notifications }: NotificationsPanelProps) {
+type NotificationsPanelProps = {
+  notifications: NotificationItem[];
+  onDismiss: (id: string) => void;
+};
+
+export default function NotificationsPanel({ notifications, onDismiss }: NotificationsPanelProps) {
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
       <div className="px-4 py-3 border-b border-border">
@@ -29,11 +37,14 @@ export default function NotificationsPanel({ notifications }: NotificationsPanel
       {notifications.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-muted-foreground">No notifications</p>
       ) : (
-        <ul className="divide-y divide-border">
+        <ul className="flex flex-col gap-2 p-3">
           {notifications.map((n) => {
             const Icon = TYPE_ICONS[n.type];
             return (
-              <li key={n.id} className="flex items-start gap-3 px-4 py-3">
+              <li
+                key={n.id}
+                className={`relative flex items-start gap-3 rounded-xl p-3 pr-8 ${TYPE_CARD_STYLES[n.type]}`}
+              >
                 <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${TYPE_ICON_STYLES[n.type]}`}>
                   <Icon className="h-3.5 w-3.5" />
                 </span>
@@ -43,6 +54,14 @@ export default function NotificationsPanel({ notifications }: NotificationsPanel
                     {formatDashboardTimestamp(n.timestamp)}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => onDismiss(n.id)}
+                  aria-label="Dismiss notification"
+                  className="absolute top-2 right-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </li>
             );
           })}
