@@ -24,7 +24,7 @@ export default async function AppHomePage() {
         <StatTilesGrid tiles={mockStatTiles} />
         <div className="mt-10 flex flex-col lg:flex-row gap-6 items-start">
           <OpenCasesPanel cases={mockCases} />
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-[repeat(3,minmax(0,300px))] gap-8">
             <ImportantTasksCard tasks={mockImportantTasks} />
             <EmailsArrivedCard emails={mockEmailArrivals} />
             <BillingFinanceCard billing={mockBillingSummary} />
