@@ -18,7 +18,12 @@ export default function ImportantTasksCard({ tasks }: ImportantTasksCardProps) {
   const [spotlight, ...rest] = tasks;
 
   return (
-    <DashboardCard icon={ListChecks} title="Important Tasks" count={tasks.length}>
+    <DashboardCard
+      icon={<ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />}
+      title="Important Tasks"
+      count={tasks.length}
+      column={1}
+    >
       {spotlight && (
         <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Next up</p>

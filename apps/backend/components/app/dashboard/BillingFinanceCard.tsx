@@ -9,7 +9,11 @@ type BillingFinanceCardProps = {
 
 export default function BillingFinanceCard({ billing }: BillingFinanceCardProps) {
   return (
-    <DashboardCard icon={Wallet} title="Billing & Finance">
+    <DashboardCard
+      icon={<Wallet className="h-4 w-4 text-muted-foreground shrink-0" />}
+      title="Billing & Finance"
+      column={3}
+    >
       <div className="grid grid-cols-2 gap-3">
         <div>
           <p className="text-xs font-medium text-muted-foreground">Outstanding</p>

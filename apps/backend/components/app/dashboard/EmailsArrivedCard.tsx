@@ -11,7 +11,12 @@ export default function EmailsArrivedCard({ emails }: EmailsArrivedCardProps) {
   const [spotlight, ...rest] = emails;
 
   return (
-    <DashboardCard icon={Mail} title="Emails Arrived" count={emails.length}>
+    <DashboardCard
+      icon={<Mail className="h-4 w-4 text-muted-foreground shrink-0" />}
+      title="Emails Arrived"
+      count={emails.length}
+      column={2}
+    >
       {spotlight && (
         <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Next up</p>
