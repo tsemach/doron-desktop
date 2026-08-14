@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import MainTopBarUser from "./MainTopBarUser";
-import MainTopBarLogo from "./MainTopBarLogo";
+import TopBarShell from "./TopBarShell";
 import MainTopBarResourcesDropdown from "./MainTopBarResourcesDropdown";
 
 type Props = {
@@ -19,9 +18,12 @@ const NAV_LINKS = [
 
 export default function MainTopBar({ userName, tier, handleLogout }: Props) {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-8">
-        <MainTopBarLogo href="/home" />
+    <TopBarShell
+      logoHref="/home"
+      userName={userName}
+      tier={tier}
+      handleLogout={handleLogout}
+      nav={
         <nav className="flex items-center gap-6">
           {NAV_LINKS.map(({ label, href }) => (
             <Link
@@ -34,8 +36,7 @@ export default function MainTopBar({ userName, tier, handleLogout }: Props) {
           ))}
           <MainTopBarResourcesDropdown />
         </nav>
-      </div>
-      <MainTopBarUser userName={userName} tier={tier} handleLogout={handleLogout} />
-    </header>
+      }
+    />
   );
 }

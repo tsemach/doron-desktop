@@ -8,6 +8,7 @@ type MainTopBarUserProps = {
   // name/avatar/dropdown, since the portal no longer requires login to browse.
   userName: string | null;
   tier?: string | null;
+  workspaceLabel?: string | null;
   handleLogout: () => void;
 }
 
@@ -17,7 +18,7 @@ const TIER_LABELS: Record<string, string> = {
   ultra: "Ultra",
 };
 
-export default function MainTopBarUser({ userName, tier, handleLogout }: MainTopBarUserProps) {
+export default function MainTopBarUser({ userName, tier, workspaceLabel, handleLogout }: MainTopBarUserProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -63,9 +64,12 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
         </Link>
       )}
 
-      <span className="text-sm font-semibold text-foreground select-none">
-        {userName} <span className="text-muted-foreground">({tierLabel})</span>
-      </span>
+      <div className="flex flex-col leading-tight select-none">
+        <span className="text-sm font-semibold text-foreground">
+          {userName} <span className="text-muted-foreground">({tierLabel})</span>
+        </span>
+        {workspaceLabel && <span className="text-xs text-muted-foreground">{workspaceLabel}</span>}
+      </div>
 
       {isUpgradeable && (
         <Link

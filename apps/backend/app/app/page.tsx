@@ -1,27 +1,22 @@
-import { eq } from "drizzle-orm";
 import { auth } from "../../auth";
-import { db } from "../../database";
-import { firms } from "../../database/schema";
+import { mockCases, mockStatTiles } from "../../lib/dashboard/mockData";
+import OpenCasesPanel from "@/components/app/dashboard/OpenCasesPanel";
+import StatTilesGrid from "@/components/app/dashboard/StatTilesGrid";
 
 export default async function AppHomePage() {
   const session = await auth();
-  const firmId = (session?.user as { firmId?: string | null } | undefined)?.firmId ?? null;
-
-  // Self-registered ("flat") users have no firm (see packages/backend-orm's
-  // schema comment on users.firmId) -- fall back to a generic label instead
-  // of showing a blank/undefined firm name.
-  let workspaceLabel = "Personal workspace";
-  if (firmId) {
-    const [firm] = await db.select({ name: firms.name }).from(firms).where(eq(firms.id, firmId)).limit(1);
-    if (firm?.name) {
-      workspaceLabel = firm.name;
-    }
-  }
+  const userName = session?.user?.name || session?.user?.email || "there";
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-16">
-      <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
-      <p className="text-sm text-slate-500 mt-2">{workspaceLabel}</p>
+    <div className="px-6 pt-2 pb-10">
+      <h1 className="text-2xl font-bold text-foreground">Welcome {userName}</h1>
+
+      <div className="mt-6 flex flex-col">
+        <StatTilesGrid tiles={mockStatTiles} />
+        <div className="mt-10">
+          <OpenCasesPanel cases={mockCases} />
+        </div>
+      </div>
     </div>
   );
 }
