@@ -1,4 +1,4 @@
-import type { CaseSummary, NotificationItem, StatTileData } from "./types";
+import type { CaseSummary, NotificationItem, StatTileData, ImportantTask, EmailArrival, BillingSummary } from "./types";
 
 // 9 entries. "Recent cases" (top 5 by updatedAt) is unaffected by the 3
 // newest additions (case-7/8/9), since all three have older updatedAt
@@ -34,3 +34,28 @@ export const mockNotifications: NotificationItem[] = [
   { id: "notif-3", message: "Case status updated: מכירת דירה בנאמנות marked closed", timestamp: "2026-08-10T12:05:00Z", type: "case" },
   { id: "notif-4", message: "Scheduled maintenance completed successfully", timestamp: "2026-08-09T03:00:00Z", type: "system" },
 ];
+
+// First entry is the "spotlight" item each card highlights; the rest render
+// as plain status-rail rows. No sorting logic -- fixed mock order.
+export const mockImportantTasks: ImportantTask[] = [
+  { id: "task-1", title: "File response to plaintiff's motion", caseSubject: "תביעה בגין רשלנות", dueAt: "2026-08-11T17:00:00Z", urgency: "overdue" },
+  { id: "task-2", title: "Prepare witness list", caseSubject: "בדיקת ניהול משימות", dueAt: "2026-08-12T14:00:00Z", urgency: "due-today" },
+  { id: "task-3", title: "Client intake call", caseSubject: "Contract Review — Acme Corp", dueAt: "2026-08-13T10:00:00Z", urgency: "upcoming" },
+];
+
+export const mockEmailArrivals: EmailArrival[] = [
+  { id: "email-1", sender: "Tel Aviv District Court Clerk", subject: "Hearing rescheduled", matchedCaseSubject: "תביעה בגין רשלנות", receivedAt: "2026-08-12T09:30:00Z", matchStatus: "matched" },
+  { id: "email-2", sender: "צמח מזרחי", subject: "מסמכים נוספים לתיק", matchedCaseSubject: "בדיקת ניהול משימות", receivedAt: "2026-08-12T08:10:00Z", matchStatus: "matched" },
+  { id: "email-3", sender: "unknown@lawfirm-partner.com", subject: "Re: settlement terms", receivedAt: "2026-08-11T16:45:00Z", matchStatus: "needs-review" },
+];
+
+export const mockBillingSummary: BillingSummary = {
+  outstandingAmount: 23150,
+  collectedThisMonth: 86400,
+  cases: [
+    { id: "billing-1", caseSubject: "אברמוב נ' שלו", paidAmount: 12000, totalAmount: 18000, isOverdue: false },
+    { id: "billing-2", caseSubject: "עיזבון המנוח לוי", paidAmount: 9500, totalAmount: 9500, isOverdue: false },
+    { id: "billing-3", caseSubject: "חב' גל נ' מזרחי", paidAmount: 4000, totalAmount: 12650, isOverdue: true },
+  ],
+  pendingInvoiceLabel: "Invoice #2026-0142 · pending payment",
+};
