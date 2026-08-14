@@ -81,16 +81,16 @@ describe("POST /api/v1/auth/signup", () => {
     const res = await POST(makeRequest({ fullName: "Jane Doe", email: "jane@example.com", password: "ab1" }));
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toMatch(/6 and 16/i);
+    expect(data.error).toMatch(/6 and 48/i);
   });
 
   it("rejects a too-long password", async () => {
     const res = await POST(
-      makeRequest({ fullName: "Jane Doe", email: "jane@example.com", password: "a".repeat(17) })
+      makeRequest({ fullName: "Jane Doe", email: "jane@example.com", password: "a".repeat(49) })
     );
     expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.error).toMatch(/6 and 16/i);
+    expect(data.error).toMatch(/6 and 48/i);
   });
 
   it("rejects when the email is already registered", async () => {

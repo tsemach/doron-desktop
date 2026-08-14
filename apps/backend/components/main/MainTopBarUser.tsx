@@ -1,6 +1,7 @@
-import { LogOut, Settings, User } from "lucide-react";
+import { LayoutDashboard, LogOut, Settings, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 type MainTopBarUserProps = {
   // null = not signed in -- renders a "Log in" link instead of the
@@ -19,6 +20,8 @@ const TIER_LABELS: Record<string, string> = {
 export default function MainTopBarUser({ userName, tier, handleLogout }: MainTopBarUserProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const isInWorkspace = pathname === "/app" || pathname.startsWith("/app/");
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -49,6 +52,16 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
 
   return (
     <div className="flex items-center gap-3">
+
+      {!isInWorkspace && (
+        <Link
+          href="/app"
+          className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border border-brand-accent text-brand-accent hover:bg-brand-accent/10 transition-all cursor-pointer"
+        >
+          <LayoutDashboard className="w-3.5 h-3.5" />
+          Desktop
+        </Link>
+      )}
 
       <span className="text-sm font-semibold text-foreground select-none">
         {userName} <span className="text-muted-foreground">({tierLabel})</span>

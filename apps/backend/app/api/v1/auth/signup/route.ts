@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     if (!isValidPasswordLength(password)) {
       return NextResponse.json(
-        { error: "Password must be between 6 and 16 characters long." },
+        { error: "Password must be between 6 and 48 characters long." },
         { status: 400 }
       );
     }
