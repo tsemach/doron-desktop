@@ -2,7 +2,7 @@
 
 **Linear issue:** [ASC-105](https://linear.app/amicusx/issue/ASC-105/add-user-area-in-the-backend) — "Add user area in the backend"
 **Status:** Sub-project 3 of 6 (see [ASC-105 decomposition](#asc-105-decomposition) below)
-**Date:** 2026-08-13
+**Date:** 2026-08-13 (revised 2026-08-15)
 
 ## ASC-105 decomposition
 
@@ -67,133 +67,271 @@ exist and directly shape the answer:
   `apps/backend`. The dashboard already built for that goal (PR-2/PR-2.5)
   renders `Important Tasks`, `Emails Arrived`, `Billing & Finance`, and
   `Open Cases` panels in `apps/backend` today — 100% mock data, because
-  there is nothing real in Postgres to back it. Fixing that, without
-  breaking the stated privacy/offline constraints above, is what this
-  decision has to thread.
+  there is nothing real in Postgres to back it.
 
 ## Goals
 
-- Give a definitive answer to "where does case/document data live," so #4
-  (offline + two-way sync) has a concrete target to design against instead
-  of an open question.
-- Keep the existing local-first/privacy guarantee intact for anything a
-  client would reasonably expect to stay confidential (document contents,
-  email bodies, extracted text/embeddings).
-- Unblock the dashboard (#2) and any future firm-wide case visibility
-  (which ASC-142's team/role model was built to support) from being
-  permanently mock.
+- Give a definitive answer to "where does case/document data live" and,
+  specifically, whether/how it ever reaches the backend.
+- Keep the desktop as the unconditional, permanent source of truth — never
+  put a lawyer's only copy of their case files at risk to a sync bug.
+- Define a concrete, efficient algorithm for the one piece of case/document
+  data that *does* leave the desktop under this decision: an opt-in cloud
+  backup, detailed enough (schemas, parameters, command signatures) for a
+  future implementation PR to build directly against.
 
 ## Non-goals (explicitly deferred)
 
-- Any schema migration, Postgres table creation, or Drizzle changes — that
-  belongs to whichever PR implements #4.
-- Any desktop Rust changes (sync client, dirty-flag tracking, push logic).
-- The actual bidirectional sync/conflict-resolution mechanism — #4.
-- A final, binding schema for the "case summary" concept sketched below —
-  it's illustrative, to make the decision concrete, not a spec to build
-  against verbatim.
+- Any schema migration, Postgres table creation, Drizzle changes, or Rust
+  code — that belongs to whichever PR implements this design.
+- Restore / download-back of a backed-up file — explicitly out of scope for
+  ASC-105 entirely, not just this PR. Cloud backup is one-directional.
+- Any two-way sync or conflict resolution of case/document content.
+- Files over the size cap defined below (v1) — named as a fast-follow.
+- Multi-tenant/firm-wide visibility into backed-up files.
 
 ## Decision
 
-**Hybrid: full case/document content stays desktop-local. A thin, explicit
-"case summary" layer is pushed from desktop to backend Postgres.**
+**Desktop remains the sole source of truth, unconditionally — including
+full document content, not just metadata.** On top of that, an *opt-in*
+"Cloud Backup" feature (off by default, a Settings toggle) uploads files to
+backend-managed cloud storage in the background, one-directionally (desktop
+→ cloud). This directly satisfies `PRD.md`'s "must not *silently* start
+uploading case content": it's an explicit, visible, user-controlled toggle,
+not automatic behavior. No restore/download-back capability exists — that's
+a specific, separate operation explicitly out of scope for ASC-105.
 
-Three options were weighed:
+The engineering problem this decision has to solve is the one posed
+directly: once a user enables backup, how to do it efficiently — (1)
+identify which files need saving, (2) decide when and at what rate to
+upload them, without interfering with the user's foreground work.
 
-### Option A — Backend Postgres becomes the source of truth
+### Prior art already in this codebase (reused, not reinvented)
 
-Documents move to object storage, metadata moves to Postgres, and the
-desktop app becomes an offline-capable client syncing against the backend.
+- **`documents/versioning.rs`'s `start_case_watcher`/`poll_case_folder`** —
+  a `tokio::time::interval(3s)` polling loop (not the `notify` crate, which
+  isn't a dependency anywhere in this codebase) that tracks `FileState {
+  mtime, size, is_locked }` per file in memory, recognizes Office lock
+  files (`~$*`) to know a file is mid-edit, and only acts once a file
+  settles. It's UI-lifecycle-bound to the single currently-open case
+  (started/stopped from `CaseManagementOpenCasesDetails.tsx` via a global
+  singleton slot) — not usable as-is for an always-on, all-cases service,
+  but its *logic* (lock-file awareness, settle-before-acting) is exactly
+  the right prior art to extend, in preference to adding a new dependency.
+- **`poll_emails_background`** (`email/emails_ops.rs`) — the established
+  recurring-background-task shape: `tokio::time::interval` +
+  `MissedTickBehavior::Delay`, spawned once from `lib.rs`'s `.setup()`.
+  `MissedTickBehavior::Delay` is deliberate — it avoids a "catch-up burst"
+  after the app was asleep/offline, which would risk provider throttling;
+  the identical concern applies to a backup upload endpoint.
+- **`emails_settings.rs`/`llm_settings.rs`** — the established settings
+  pattern: a single-row SQLite table + `get_X_settings`/`save_X_settings`
+  Tauri commands + a non-command `get_X_settings_internal` for background
+  code to read the toggle without going through the command layer.
+- **`apps/office/app/api/templates/upload/route.ts`** — the reusable
+  backend upload shape: `put(blobPath, file, { access: "private", token })`
+  on Vercel Blob (already provisioned: `@vercel/blob`,
+  `BLOB_READ_WRITE_TOKEN` already in `apps/backend/.env`) → Drizzle insert
+  with the returned blob URL.
+- **`authorizeDesktopToken()`** (`apps/backend/lib/desktopAuth.ts`) — the
+  existing desktop→backend auth convention: an opaque token read from the
+  request **body** (not an `Authorization` header), used by existing routes
+  under `apps/backend/app/api/v1/org/desktop/*`.
 
-- Enables full multi-device access and real team collaboration on case
-  content — the most complete realization of the SaaS vision.
-- Directly conflicts with *"must not silently start uploading case
-  content"* — this is exactly that, by construction.
-- Requires the full two-way offline-sync design (#4) to already exist and
-  be trustworthy *before* it's safe to ship, since a lawyer's only copy of
-  their case files can never be silently lost to a sync bug.
-- Largest blast radius: touches nearly every desktop Rust module in
-  `case/`, `documents/`, `extractor/`, `embeddings/`.
+### Change detection — no new dependency, two mechanisms at two different frequencies
 
-### Option B — Stay 100% desktop-local, permanently
+A full recursive `walkdir` over *every* case folder is O(total files across
+every case) — cheap occasionally, wasteful as a tight everyday loop once a
+user's case corpus grows into the thousands of mostly-untouched files. So
+this uses two complementary mechanisms instead of one fixed-interval full
+walk:
 
-No case/document data ever reaches the backend. The dashboard (and any
-future firm-wide visibility) stays mock forever, or gets cut from scope.
+1. **Primary — extend the existing per-open-case watcher.** The 3-second
+   poll already described above already fires exactly when a file in the
+   *currently open* case has just settled. Backup queuing hooks into that
+   same settle event. This is the everyday path: fast (3s), and cheap
+   because it's scoped to one case (a handful of files), not the whole
+   corpus.
+2. **Safety net — infrequent full `walkdir` reconciliation**, using the
+   same traversal shape `index_folder` already uses, but run **hourly**
+   (not every few minutes) plus once at app startup and once immediately
+   when the user first enables the feature. This exists only to catch what
+   #1 structurally can't: files changed in a case that wasn't open in the
+   app (edited via Finder/Explorer, dropped in by another tool), and cases
+   that haven't been opened recently at all. Because it's rare, the O(all
+   files) cost is acceptable; because #1 handles the common case,
+   correctness doesn't depend on the hourly cadence being tight.
 
-- Zero migration risk, fully preserves the privacy guarantee as-is.
-- Permanently strands ASC-105's own stated direction — the SaaS "user area"
-  becomes UI-only shell around no real workspace data, and ASC-142's
-  team/role investment goes largely unused for the thing users actually do
-  (casework).
+Both mechanisms feed the same two-tier check before queuing a file: (a)
+cheap tier — compare current `(mtime, size)` against the last stored
+values for that path; unchanged → skip, no I/O beyond one `stat`; (b) hash
+tier — only if (a) changed, compute a SHA-256 content hash and compare
+against the last uploaded hash, filtering out touch-without-content-change
+false positives. SHA-256 is a deliberate choice, not a copy of
+`document_versions.md5_hash` (which uses MD5 for a different, lower-stakes,
+purely-local dedupe purpose) — this hash crosses a network/trust boundary,
+where MD5's weaker collision resistance is a worse fit.
 
-### Option C — Hybrid (recommended)
+**Settle rule** (avoids uploading a file mid-write): skip any file matching
+the Office lock-file pattern (`~$*`) or with a live lock file. For the
+watcher path (#1), this is already how `versioning.rs` detects "done
+editing." For the reconciliation path (#2), require `(mtime, size)` to be
+stable across two consecutive hourly scans before queuing — a file still
+mid-edit across two scans an hour apart is an edge case, not the common
+path (#1 already handles "just finished editing" at 3-second granularity).
 
-Anything a client would reasonably expect to stay confidential — document
-contents, email bodies, extracted text, embeddings, raw metadata — never
-leaves the desktop. A new, narrow **case summary** concept is explicitly and
-visibly pushed from desktop to backend: case name/subject/status, task
-titles + due dates, email subjects + arrival counts, billing amounts —
-exactly the shape the dashboard's existing mock data already assumes
-(`apps/backend/lib/dashboard/types.ts`'s `ImportantTask`, `EmailArrival`,
-`BillingSummary`, `CaseSummary` types).
+### Scheduling — one merged table, single-flight interval drain
 
-- Satisfies the "must not silently start uploading" constraint: it's a
-  distinct, visible, deliberately narrow sync, not bulk content upload —
-  the kind of thing that can be a clear opt-in setting per firm/user.
-- Gives the dashboard, and any future firm-wide case list, real data.
-- Only requires a **push-only** sync at first (desktop → backend), which
-  sidesteps the hard bidirectional conflict-resolution problem entirely for
-  v1 — #4 gets a much more tractable starting scope than Option A would
-  hand it.
-- Two sources of truth exist for the summary fields specifically (local is
-  authoritative; backend is a downstream copy) — a real but bounded
-  complexity, confined to a handful of fields rather than the whole data
-  model.
+One SQLite table (`document_backups`) is both the per-file "last known
+state" and the upload "queue" (via a status column) — a single table, not
+two tracking overlapping state, to avoid drift risk if a case is
+renamed/deleted mid-flight. One `tokio::time::interval` task, spawned once
+alongside the other background pollers in `lib.rs`'s `.setup()`:
 
-### Illustrative shape (not a schema to build against)
+- Hourly (+ startup + on-enable): rerun the full `walkdir` reconciliation
+  across all cases, enqueuing settled, changed files as `status = 'pending'`.
+- Every 15-second drain tick: attempt to upload **one** `pending` row
+  (oldest first), single-concurrency — the same "one thing at a time"
+  spirit as the email poller, so it never competes hard with foreground
+  disk/network I/O.
+- `MissedTickBehavior::Delay`, for the same anti-thundering-herd reason as
+  the email poller — a laptop waking from sleep with a large backlog
+  shouldn't burst-upload.
+- Gated on `backup_settings.enabled` via `get_backup_settings_internal`
+  (checked every tick, no-ops when off) — the loop always runs; it just
+  does nothing when the feature is off, rather than being dynamically
+  spawned/killed on toggle.
 
-A `case_summaries`-style Postgres table, to make the decision concrete:
+**Parameter defaults.** Two different clocks are involved, doing two
+different jobs — "how often do we look for changed files" (detection) vs.
+"how often do we upload a file that's already waiting" (draining the
+queue):
 
+| Parameter | Value | What it actually controls |
+|---|---|---|
+| Active-case watch interval | 3 seconds (existing, reused from `versioning.rs`) | How fast the *currently open* case's files are checked for a settled change — the everyday detection path. Already cheap since it's scoped to one case. |
+| Full reconciliation scan interval | 1 hour, + once at app startup, + once when the feature is first enabled | The rare, all-cases safety-net walk — catches changes the active-case watcher structurally can't see. Infrequent on purpose, since it's O(all files). |
+| Reconciliation settle requirement | 2 consecutive hourly scans stable | Only relevant to the safety-net path — the active-case watcher already handles "just finished editing" at 3-second granularity. |
+| Upload-queue drain tick | 15 seconds | Independent of both scan intervals above — "is there a file already queued and ready to upload?" Mirrors `POLL_INTERVAL` in `emails_ops.rs` exactly. Fast, because once a file *is* ready we don't want it to sit around — but concurrency is still capped at 1, so this never becomes a burst. |
+| Upload concurrency | 1 | Only one file uploads at a time, so the fast 15s check never turns into simultaneous uploads competing with the user's foreground network/CPU use. |
+| Max file size | 4 MB | Vercel's server functions hard-reject request bodies over 4.5 MB — this is a real ceiling, not a tunable preference. Oversized files get `status = 'skipped_too_large'`, surfaced in Settings rather than silently dropped; going beyond this cap is a named fast-follow (see Open risks below), not solved here. |
+| Retry backoff | exponential via `attempt_count` (wait `attempt_count * 15s` since `last_attempted_at` before retrying), cap ~10 attempts, then leave `status = 'failed'` (surfaced, not retried forever) | Stops one persistently-failing file (e.g. a case folder on a disconnected network drive) from monopolizing the single upload slot on every drain tick. |
+
+### Upload path
+
+New route `apps/backend/app/api/v1/org/desktop/case-documents/upload/route.ts`
+— multipart body carrying a `token` field (matching `authorizeDesktopToken`'s
+existing body-token convention) → authorize → reject files over the 4 MB
+cap with a distinguishable error the Rust side maps to `skipped_too_large`
+→ `put(blobPath, file, { access: "private" })` on Vercel Blob → upsert into
+a new Postgres table.
+
+### Schema (illustrative — a future implementation PR owns the literal
+migration; this is the shape to build against)
+
+Desktop SQLite:
+```sql
+CREATE TABLE IF NOT EXISTS document_backups (
+    file_path         TEXT PRIMARY KEY,
+    case_id           INTEGER NOT NULL,
+    content_hash      TEXT,              -- sha256 hex; NULL until first hash computed
+    last_seen_mtime   TEXT,              -- ISO8601, for the cheap tier-1 check
+    last_seen_size    INTEGER,
+    status            TEXT NOT NULL DEFAULT 'pending', -- pending|uploading|uploaded|failed|skipped_too_large|skipped_missing
+    queued_at         TEXT,
+    uploaded_at       TEXT,
+    attempt_count     INTEGER NOT NULL DEFAULT 0,
+    last_attempted_at TEXT,
+    last_error        TEXT,
+    FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_document_backups_status ON document_backups(status);
+
+CREATE TABLE IF NOT EXISTS backup_settings (
+    enabled INTEGER NOT NULL DEFAULT 0
+);
 ```
-case_summaries
-  id              uuid PK
-  local_case_id   text        -- desktop's own cases.id, opaque to backend
-  user_id         -> users.id
-  subject         text
-  status          text
-  updated_at      timestamptz -- last successful push
-  -- plus small denormalized rollups (open task count, next due date,
-  -- unread email count, outstanding/collected amounts) rather than
-  -- normalized child tables, since backend never needs to query into
-  -- individual tasks/emails/invoices -- only display what the desktop
-  -- already computed
+
+Backend Postgres (`packages/backend-orm/src/schema.ts`), one row per
+`(userId, filePath)` — a latest-snapshot table, not a version log (local
+`document_versions` already owns version history on the desktop; restore
+is out of scope, so the backend doesn't need one either):
+```ts
+export const caseDocumentBackups = pgTable("case_document_backups", (t) => ({
+  id: t.uuid("id").primaryKey().defaultRandom(),
+  userId: t.text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  localCaseId: t.integer("local_case_id").notNull(), // desktop's own cases.id, opaque here
+  filePath: t.text("file_path").notNull(),
+  fileName: t.text("file_name").notNull(),
+  contentHash: t.text("content_hash").notNull(),
+  fileSize: t.integer("file_size").notNull(),
+  url: t.text("url").notNull(),
+  createdAt: t.timestamp("created_at").defaultNow().notNull(),
+  updatedAt: t.timestamp("updated_at").defaultNow().notNull(),
+}), (table) => ({
+  uniqueUserFile: unique().on(table.userId, table.filePath),
+}));
 ```
+
+### Settings
+
+New `SettingCloudBackup.tsx`, wired into `Settings.tsx`'s existing
+`handleSave`, following `SettingEmailIntegration.tsx`'s exact shape. New
+Tauri commands `get_backup_settings`/`save_backup_settings` +
+`get_backup_settings_internal`, mechanically copied from
+`emails_settings.rs`. `BackupConfig { enabled: bool }` only — resist adding
+user-facing debounce/interval overrides in v1; those are the algorithm's
+job, not user-facing settings (matching how `POLL_INTERVAL` is a hardcoded
+`pub const` today, not configurable).
 
 ## Edge cases
 
-- **No summary pushed yet** (new user, sync never run, or a user who opts
-  out) — dashboard falls back to its current empty/mock-free state, not an
-  error. This is the same shape as today's mock data being absent for a
-  freshly signed-up account.
-- **Multiple desktop installs for one user** — last-write-wins on
-  `updated_at` is sufficient for a *summary* (unlike full case content,
-  where last-write-wins would be a real data-loss risk); this is exactly
-  why summaries are push-only and content stays local.
-- **A firm member viewing another member's cases** (future, once #5/team
-  visibility is wired up) — summaries carry `user_id`, so scoping to
-  "cases visible to me" is a permissions question for that future work, not
-  this decision.
+- **Huge backlog on first enable** — the on-enable reconciliation scan
+  could find thousands of pre-existing files across every case. The 15s,
+  single-concurrency drain tick naturally throttles this to a trickle; the
+  scan itself must run inside the same spawned background task (not
+  block the Settings toggle's calling thread), streaming enqueues rather
+  than inserting everything synchronously.
+- **Laptop sleep/wake** — no OS file-watch handles exist to go stale across
+  suspend (there's no `notify` watcher); the next scan/drain tick simply
+  re-derives state fresh. `MissedTickBehavior::Delay` prevents a burst of
+  catch-up ticks on wake.
+- **Case folder deleted or file removed mid-upload** — the drain worker
+  treats "path no longer exists" as a terminal, non-retriable state
+  (`status = 'skipped_missing'`), not an error to retry forever.
+- **Case folder renamed** — not resolved in-band; the next reconciliation
+  scan handles it naturally (old paths vanish, new paths under the new
+  folder get freshly enqueued), since scans rerun periodically, not just
+  once.
+- **File never gets backed up** (feature never enabled, or a file
+  permanently exceeds the size cap) — this is expected, visible behavior
+  (`skipped_too_large`, or `backup_settings.enabled = false`), not an
+  error state.
+
+## Open risks / follow-ups
+
+- **Files over 4 MB are not backed up in v1.** The correct fix is
+  implementing Vercel Blob's client-upload token flow (`@vercel/blob/client`'s
+  `handleUpload` protocol) from Rust — a short-lived signed token lets
+  `reqwest` PUT file bytes directly to Blob storage, bypassing the Next.js
+  function's body-size limit entirely. No precedent for this exists yet in
+  this codebase; it's real, additional work, named here as a deliberate v1
+  scope cut rather than an oversight.
+- **Retry/backoff tuning** should be revisited once real usage data exists
+  (how often does upload actually fail, and why).
+- **No telemetry on backlog size** is designed in yet — worth adding so a
+  user (or support) can see "N files pending, M failed" rather than the
+  feature being an opaque background process.
 
 ## What this unblocks
 
-- **#4 (offline + two-way sync)** gets a concrete, bounded starting scope:
-  design the push-summary sync mechanism and endpoint first (one-directional,
-  small field set), rather than the full bidirectional problem for all case
-  content.
-- **#5 (shared UI strategy)** can design data-bound components against the
-  case-summary shape sketched above.
-- **#2's dashboard** becomes wireable to real data once #4 ships the actual
-  push mechanism — no changes needed to the dashboard's existing component
-  shape (`ImportantTasksCard`, `EmailsArrivedCard`, `BillingFinanceCard`,
-  `OpenCasesPanel`), since it was already built against types matching this
-  summary shape.
+- A future implementation PR can build directly against the schemas,
+  parameters, and command signatures above.
+- **#5 (shared UI strategy)** gains a concrete example of what a
+  desktop-owned, backend-mirrored data shape looks like (distinct from the
+  identity/org data ASC-142 already centralized).
+- Confirms **#4 (offline + two-way sync)**, as originally scoped, is not
+  needed for case/document *content* — the desktop was never going to be an
+  offline-capable client of a cloud source of truth for that content. If a
+  future need for cross-device *access* to case content emerges, it would
+  be a new decision, not a continuation of #4.

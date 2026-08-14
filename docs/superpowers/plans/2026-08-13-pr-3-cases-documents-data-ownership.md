@@ -57,9 +57,9 @@ Expected: no hits (confirmed clean).
 **Files:**
 - Create: `docs/superpowers/specs/2026-08-13-pr-3-cases-documents-data-ownership-design.md`
 
-- [x] **Step 1: Write the doc**
+- [x] **Step 1: Write the doc (original version)**
 
-Content: header (Linear issue/status/date/decomposition position),
+Original content: header (Linear issue/status/date/decomposition position),
 Background (desktop/backend ground truth + the stated privacy/offline
 constraints + the tension with ASC-105's SaaS goal), Goals, Non-goals,
 Decision (Options A/B/C, recommending C — hybrid, full content stays local,
@@ -74,6 +74,24 @@ live on the not-yet-merged pr-2/pr-2.5 dashboard branch, not this one) —
 confirmed by reading that file directly in the pr-2 worktree rather than
 assuming the path/names.
 
+- [x] **Step 3: Revise the decision after new user direction (2026-08-15)**
+
+The user gave a more specific, different direction than the original
+case-summary hybrid: desktop stays sole source of truth including full
+document content; an opt-in Settings toggle enables one-directional
+background "Cloud Backup" to Postgres/Vercel Blob; restore is explicitly
+out of scope for ASC-105. Rewrote the doc's Decision section (and Goals/
+Non-goals) to cover: prior art already in this codebase to reuse
+(`versioning.rs`'s per-open-case watcher, the email poller's interval+
+`MissedTickBehavior::Delay` pattern, the settings-table pattern, the
+`apps/office` Blob-upload shape, `authorizeDesktopToken`'s body-token
+auth), a two-mechanism change-detection design (fast per-open-case watcher
++ rare all-cases safety-net scan — validated against a "isn't a full
+walkdir every few minutes wasteful?" question, which was correct and
+changed the scan cadence from every-5-minutes to hourly), a concrete
+parameter table, upload-path/schema/settings design, edge cases, and named
+open risks (>4MB files, retry tuning, telemetry).
+
 ---
 
 ### Task 3: Write this companion plan doc
@@ -87,40 +105,67 @@ assuming the path/names.
 
 ### Task 4: Commit, push, open PR
 
-- [ ] **Step 1: Stage and commit**
+- [x] **Step 1: Stage and commit**
 
 ```bash
 git add docs/superpowers
 git commit -m "Add PR-3 data-ownership decision doc, rename PR-1 spec/plan to include PR number"
 ```
 
-- [ ] **Step 2: Push**
+- [x] **Step 2: Push**
 
 ```bash
 git push -u origin tsemachmizrachi/asc-105-pr-3-cases-documents-data-ownership
 ```
 
-- [ ] **Step 3: Open the PR**
+- [x] **Step 3: Open the PR**
 
-Base: `tsemachmizrachi/asc-105-add-user-area-in-the-backend` (PR-1's branch,
-not `master` — same reasoning as the Global Constraints note above; once
-PR-1 merges, GitHub will retarget this PR's base automatically and the diff
-will shrink to just this PR's own two new files + the two renames).
-Title: `[ASC-105] Cases/documents data-ownership decision (PR-3)`, matching
-the `(PR-2.5)` suffix convention already used on PR #160.
+Opened as GitHub PR #161. Base: `tsemachmizrachi/asc-105-add-user-area-in-the-backend`
+(PR-1's branch, not `master` — same reasoning as the Global Constraints
+note above; once PR-1 merges, GitHub will retarget this PR's base
+automatically and the diff will shrink to just this PR's own new files +
+the two renames). Title: `[ASC-105] Cases/documents data-ownership decision
+(PR-3)`, matching the `(PR-2.5)` suffix convention already used on PR #160.
 
-- [ ] **Step 4: Confirm Linear auto-attachment**
+- [x] **Step 4: Confirm Linear auto-attachment**
 
-Branch name contains `asc-105`, so Linear's GitHub integration should
-auto-attach the PR to the ASC-105 issue, same as PRs #158/#159/#160. Verify
-with `gh pr view <number> --json url` and a quick Linear check (issue
-attachments list) after push — no manual Linear issue/comment needed.
+Confirmed via `mcp__linear-server__get_issue` — PR #161 appears in the
+ASC-105 issue's `attachments` list alongside #158/#159/#160, no manual
+Linear action needed.
+
+---
+
+### Task 5: Revise PR #161 in place with the new decision
+
+**Files:** same two files as Tasks 2/3, content replaced not renamed.
+
+- [ ] **Step 1: Rewrite the design doc's Decision section** (see Task 2,
+  Step 3 above for what changed) and update this plan doc.
+
+- [ ] **Step 2: Commit as a new commit on the same branch** (not an amend/
+  force-push, per this repo's git conventions)
+
+```bash
+git add docs/superpowers
+git commit -m "Revise PR-3 decision: desktop stays source of truth, opt-in one-way cloud backup"
+```
+
+- [ ] **Step 3: Push** (updates PR #161 in place, no new PR)
+
+```bash
+git push origin tsemachmizrachi/asc-105-pr-3-cases-documents-data-ownership
+```
+
+- [ ] **Step 4: Update PR #161's description** to reflect the revised
+  decision, via `gh api repos/tsemach/doron-desktop/pulls/161 -X PATCH -f
+  body=...` (the REST-API-not-`gh pr edit` workaround already established
+  in this repo for the GraphQL projects-classic error).
 
 ## Spec coverage check
 
 - Rename with PR numbers — Task 1.
-- Decision doc (Options A/B/C, recommendation, illustrative schema, edge
-  cases, what this unblocks) — Task 2.
+- Original decision doc (superseded) — Task 2.
 - Companion plan doc — Task 3.
 - Branch/PR workflow (base on PR-1's branch, correct title, Linear
   auto-attach) — Task 4.
+- Revised decision doc + updated PR description — Task 5.
