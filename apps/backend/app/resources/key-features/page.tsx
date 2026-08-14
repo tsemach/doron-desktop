@@ -14,8 +14,10 @@ import KeyFeatureEmailCorrespondencesSync from "@/components/resources/key-featu
 import KeyFeatureTaskManagement from "@/components/resources/key-features/KeyFeatureTaskManagement";
 import KeyFeatureTeamsAndRoles from "@/components/resources/key-features/KeyFeatureTeamsAndRoles";
 
-// Moved from apps/backend/app/page.tsx -- this was the entire home page's
-// content; "/" itself now just keeps the MainTopBar shell (see app/page.tsx).
+// Moved from apps/backend/app/page.tsx to apps/backend/app/home/page.tsx --
+// this was the entire home page's content; "/" itself has no page component
+// of its own anymore, it's pure middleware routing (redirect to /app when
+// logged in, rewrite to /home otherwise -- see middlewareLogic.ts).
 const FEATURE_TABS: PillTab[] = [
   { id: "central-working-space", label: "Working Space" },
   { id: "case-management-tracking", label: "Case Management" },

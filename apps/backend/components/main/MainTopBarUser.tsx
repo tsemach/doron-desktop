@@ -1,12 +1,14 @@
-import { LogOut, Settings, User } from "lucide-react";
+import { LayoutDashboard, LogOut, Settings, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 type MainTopBarUserProps = {
   // null = not signed in -- renders a "Log in" link instead of the
   // name/avatar/dropdown, since the portal no longer requires login to browse.
   userName: string | null;
   tier?: string | null;
+  workspaceLabel?: string | null;
   handleLogout: () => void;
 }
 
@@ -16,9 +18,11 @@ const TIER_LABELS: Record<string, string> = {
   ultra: "Ultra",
 };
 
-export default function MainTopBarUser({ userName, tier, handleLogout }: MainTopBarUserProps) {
+export default function MainTopBarUser({ userName, tier, workspaceLabel, handleLogout }: MainTopBarUserProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const isInWorkspace = pathname === "/app" || pathname.startsWith("/app/");
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -50,9 +54,22 @@ export default function MainTopBarUser({ userName, tier, handleLogout }: MainTop
   return (
     <div className="flex items-center gap-3">
 
-      <span className="text-sm font-semibold text-foreground select-none">
-        {userName} <span className="text-muted-foreground">({tierLabel})</span>
-      </span>
+      {!isInWorkspace && (
+        <Link
+          href="/app"
+          className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border border-brand-accent text-brand-accent hover:bg-brand-accent/10 transition-all cursor-pointer"
+        >
+          <LayoutDashboard className="w-3.5 h-3.5" />
+          Desktop
+        </Link>
+      )}
+
+      <div className="flex flex-col leading-tight select-none">
+        <span className="text-sm font-semibold text-foreground">
+          {userName} <span className="text-muted-foreground">({tierLabel})</span>
+        </span>
+        {workspaceLabel && <span className="text-xs text-muted-foreground">{workspaceLabel}</span>}
+      </div>
 
       {isUpgradeable && (
         <Link

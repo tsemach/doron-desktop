@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Full name contains invalid characters." }, { status: 400 });
   }
   if (!isValidPasswordLength(password)) {
-    return NextResponse.json({ error: "Password must be between 6 and 16 characters long." }, { status: 400 });
+    return NextResponse.json({ error: "Password must be between 6 and 48 characters long." }, { status: 400 });
   }
 
   const result = await acceptInvitation(token, { fullName, password });
