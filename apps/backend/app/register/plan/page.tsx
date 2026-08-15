@@ -4,8 +4,10 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { AuthCard, Button, errorClass } from "@workspace/ui";
+import { useLanguage } from "../../../context/LanguageContext";
 
 function PlanForm() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const platform = searchParams.get("platform");
@@ -54,11 +56,11 @@ function PlanForm() {
       }
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to select plan");
+        throw new Error(data.error || t("plan_select_failed"));
       }
       router.push(platform === "desktop" ? "/register/complete?platform=desktop" : "/");
     } catch (err: any) {
-      setError(err.message || "Something went wrong");
+      setError(err.message || t("plan_something_wrong"));
       setLoading(false);
     }
   }
@@ -78,14 +80,14 @@ function PlanForm() {
       }
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to start checkout");
+        throw new Error(data.error || t("plan_checkout_failed"));
       }
       // checkoutUrl may be relative (mock provider) or an absolute external
       // URL (a real provider's hosted checkout page) — a full navigation
       // handles both, unlike router.push which only works for the former.
       window.location.href = data.checkoutUrl;
     } catch (err: any) {
-      setError(err.message || "Something went wrong");
+      setError(err.message || t("plan_something_wrong"));
       setLoading(false);
     }
   }
@@ -95,7 +97,7 @@ function PlanForm() {
   }
 
   return (
-    <AuthCard title="Choose your plan" subtitle={session?.user?.email ?? undefined}>
+    <AuthCard title={t("plan_title")} subtitle={session?.user?.email ?? undefined}>
       {error && <div className={`${errorClass} mb-4`}>{error}</div>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -103,33 +105,29 @@ function PlanForm() {
           type="button"
           onClick={selectFree}
           disabled={loading}
-          className="rounded-lg border border-primary bg-background p-4 text-left transition-colors hover:bg-accent disabled:opacity-50"
+          className="rounded-lg border border-primary bg-background p-4 text-left rtl:text-right transition-colors hover:bg-accent disabled:opacity-50"
         >
-          <div className="text-sm font-semibold text-foreground">Free</div>
+          <div className="text-sm font-semibold text-foreground">{t("tier_free")}</div>
           <div className="mt-1 text-2xl font-bold text-foreground">$0</div>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Case management, document search, versioning, email — everything except AI features.
-          </div>
+          <div className="mt-2 text-xs text-muted-foreground">{t("plan_free_price_desc")}</div>
         </button>
 
         <button
           type="button"
           onClick={selectPro}
           disabled={loading}
-          className="rounded-lg border border-primary bg-background p-4 text-left transition-colors hover:bg-accent disabled:opacity-50"
+          className="rounded-lg border border-primary bg-background p-4 text-left rtl:text-right transition-colors hover:bg-accent disabled:opacity-50"
         >
-          <div className="text-sm font-semibold text-foreground">Pro</div>
+          <div className="text-sm font-semibold text-foreground">{t("tier_pro")}</div>
           <div className="mt-1 text-2xl font-bold text-foreground">
             $49<span className="text-xs font-normal text-muted-foreground">/mo</span>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Everything in Free, plus AI-powered features.
-          </div>
+          <div className="mt-2 text-xs text-muted-foreground">{t("plan_pro_price_desc")}</div>
         </button>
       </div>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        {loading ? "Setting up your account…" : "You can switch plans later from your account."}
+        {loading ? t("plan_setting_up") : t("plan_switch_later")}
       </p>
     </AuthCard>
   );

@@ -5,8 +5,10 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import MainTopBar from "@/components/main/MainTopBar";
 import HeroSection from "@/components/marketing/HeroSection";
+import { useLanguage } from "../../context/LanguageContext";
 
 export default function ProductsPage() {
+  const { t } = useLanguage();
   const [userName, setUserName] = useState<string | null>(null);
   const [tier, setTier] = useState<string | null>(null);
 
@@ -36,9 +38,9 @@ export default function ProductsPage() {
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
       <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
-      <HeroSection kicker="Products" title="Products" subtitle="Our full product lineup page is coming soon.">
+      <HeroSection kicker={t("products_title")} title={t("products_title")} subtitle={t("products_subtitle")}>
         <Link href="/" className="text-sm font-semibold text-brand-accent hover:brightness-90">
-          Back to home
+          {t("back_to_home")}
         </Link>
       </HeroSection>
     </div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { CaseSummary } from "../../../lib/dashboard/types";
 import CaseRow from "@/components/app/dashboard/CaseRow";
+import { useLanguage } from "../../../context/LanguageContext";
 
 type CaseGroupProps = {
   title: string;
@@ -18,6 +19,7 @@ const DEFAULT_COLLAPSED_VISIBLE_COUNT = 3;
 const ROW_HEIGHT_PX = 56;
 
 export default function CaseGroup({ title, cases, collapsedVisibleCount = DEFAULT_COLLAPSED_VISIBLE_COUNT }: CaseGroupProps) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const hasOverflow = cases.length > collapsedVisibleCount;
   const collapsedMaxHeight = `${collapsedVisibleCount * ROW_HEIGHT_PX}px`;
@@ -44,7 +46,7 @@ export default function CaseGroup({ title, cases, collapsedVisibleCount = DEFAUL
       </button>
 
       {cases.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-muted-foreground">No cases</p>
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground">{t("dashboard_no_cases")}</p>
       ) : (
         <div className="relative">
           <ul

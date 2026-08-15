@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Bell, Briefcase, ChevronDown, ChevronRight, FileText, Mail, X, type LucideIcon } from "lucide-react";
 import type { NotificationItem } from "../../../lib/dashboard/types";
 import { formatDashboardTimestamp } from "../../../lib/dashboard/formatDate";
+import { useLanguage } from "../../../context/LanguageContext";
 
 const TYPE_ICONS: Record<NotificationItem["type"], LucideIcon> = {
   email: Mail,
@@ -38,6 +39,7 @@ const COLLAPSED_VISIBLE_COUNT = 3;
 const COLLAPSED_MAX_HEIGHT = "280px";
 
 export default function NotificationsPanel({ notifications, onDismiss }: NotificationsPanelProps) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const hasOverflow = notifications.length > COLLAPSED_VISIBLE_COUNT;
 
@@ -58,7 +60,7 @@ export default function NotificationsPanel({ notifications, onDismiss }: Notific
         ) : (
           <span className="w-3.5 shrink-0" />
         )}
-        <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
+        <h2 className="text-sm font-semibold text-foreground">{t("notifications_title")}</h2>
       </button>
       <div className="relative">
         <ul
@@ -84,7 +86,7 @@ export default function NotificationsPanel({ notifications, onDismiss }: Notific
                 <button
                   type="button"
                   onClick={() => onDismiss(n.id)}
-                  aria-label="Dismiss notification"
+                  aria-label={t("notifications_dismiss")}
                   className="absolute top-2 right-2 text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />

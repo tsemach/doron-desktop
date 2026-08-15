@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthCard, Button, PasswordInput, errorClass, inputClass, labelClass } from "@workspace/ui";
 import { isValidFullName, isValidPasswordLength } from "../../lib/validation";
+import { useLanguage } from "../../context/LanguageContext";
 
 // ASC-142 -- lands here from the link in an invitation email (both the
 // office's admin invites and a firm admin/manager/flat user's invites, all
@@ -18,6 +19,7 @@ interface InvitationPreview {
 }
 
 function AcceptInviteContent() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -33,7 +35,7 @@ function AcceptInviteContent() {
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setError("This invitation link is missing its token.");
+      setError(t("accept_invite_missing_token"));
       return;
     }
     (async () => {
@@ -45,15 +47,16 @@ function AcceptInviteContent() {
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || "This invitation link is invalid.");
+          throw new Error(data.error || t("accept_invite_invalid"));
         }
         setPreview(data);
         setStatus("form");
       } catch (err: any) {
         setStatus("error");
-        setError(err.message || "Something went wrong");
+        setError(err.message || t("plan_something_wrong"));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,15 +64,15 @@ function AcceptInviteContent() {
     setError("");
 
     if (!isValidFullName(fullName)) {
-      setError("Full name contains invalid characters.");
+      setError(t("register_invalid_name"));
       return;
     }
     if (!isValidPasswordLength(password)) {
-      setError("Password must be between 6 and 48 characters long.");
+      setError(t("register_invalid_password_length"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("register_password_mismatch"));
       return;
     }
 
@@ -82,26 +85,26 @@ function AcceptInviteContent() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to accept invitation");
+        throw new Error(data.error || t("accept_invite_failed"));
       }
       setStatus("success");
     } catch (err: any) {
-      setError(err.message || "Something went wrong");
+      setError(err.message || t("plan_something_wrong"));
       setSubmitting(false);
     }
   }
 
   if (status === "loading") {
     return (
-      <AuthCard title="Loading your invitation">
-        <p className="text-center text-sm text-muted-foreground">One moment…</p>
+      <AuthCard title={t("accept_invite_loading_title")}>
+        <p className="text-center text-sm text-muted-foreground">{t("accept_invite_loading")}</p>
       </AuthCard>
     );
   }
 
   if (status === "error") {
     return (
-      <AuthCard title="Invitation link">
+      <AuthCard title={t("accept_invite_link_title")}>
         <div className={errorClass}>{error}</div>
       </AuthCard>
     );
@@ -109,10 +112,10 @@ function AcceptInviteContent() {
 
   if (status === "success") {
     return (
-      <AuthCard title="You're all set" subtitle="Open the Ascurix desktop app and sign in with your new password.">
+      <AuthCard title={t("complete_title")} subtitle={t("accept_invite_success_subtitle")}>
         <p className="mt-6 text-center text-xs text-muted-foreground">
           <a href="/login" className="font-medium text-foreground underline">
-            Or sign in from the browser
+            {t("accept_invite_success_browser_link")}
           </a>
         </p>
       </AuthCard>
@@ -121,16 +124,18 @@ function AcceptInviteContent() {
 
   const subtitle =
     preview?.role === "flat"
-      ? `Join Ascurix as ${preview.email}.`
-      : `Join ${preview?.firmName ?? "your firm"} as ${preview?.role} on Ascurix.`;
+      ? t("accept_invite_join_flat").replace("{email}", preview.email)
+      : t("accept_invite_join_firm")
+          .replace("{firm}", preview?.firmName ?? t("accept_invite_default_firm"))
+          .replace("{role}", preview?.role ?? "");
 
   return (
-    <AuthCard title="Set up your account" subtitle={subtitle}>
+    <AuthCard title={t("accept_invite_setup_title")} subtitle={subtitle}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error && <div className={errorClass}>{error}</div>}
 
         <div>
-          <label className={labelClass}>Full name</label>
+          <label className={labelClass}>{t("register_full_name")}</label>
           <input
             type="text"
             name="name"
@@ -144,12 +149,12 @@ function AcceptInviteContent() {
         </div>
 
         <div>
-          <label className={labelClass}>Password</label>
+          <label className={labelClass}>{t("login_password")}</label>
           <PasswordInput value={password} onChange={setPassword} placeholder="••••••••" autoComplete="new-password" name="new-password" />
         </div>
 
         <div>
-          <label className={labelClass}>Confirm password</label>
+          <label className={labelClass}>{t("register_confirm_password")}</label>
           <PasswordInput
             value={confirmPassword}
             onChange={setConfirmPassword}
@@ -160,7 +165,7 @@ function AcceptInviteContent() {
         </div>
 
         <Button type="submit" disabled={submitting} className="mt-2 w-full">
-          {submitting ? "Creating…" : "Create account"}
+          {submitting ? t("accept_invite_creating") : t("register_create_account")}
         </Button>
       </form>
     </AuthCard>

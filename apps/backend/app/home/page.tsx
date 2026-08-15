@@ -20,12 +20,14 @@ import {
 import MainTopBar from "@/components/main/MainTopBar";
 import HeroSection from "@/components/marketing/HeroSection";
 import CtaBanner from "@/components/marketing/CtaBanner";
+import { useLanguage } from "../../context/LanguageContext";
 
 // The full feature deep-dive lives at /resources/key-features
 // (see app/resources/key-features/page.tsx) -- this page is the
 // marketing-facing landing view that introduces Ascurix and links there.
 
 export default function Home() {
+  const { t } = useLanguage();
   const [userName, setUserName] = useState<string | null>(null);
   const [tier, setTier] = useState<string | null>(null);
 
@@ -52,47 +54,15 @@ export default function Home() {
   }, []);
 
   const features = [
-    {
-      icon: Layout,
-      title: "Central Working Space",
-      desc: "Cases, documents, search and email in one consolidated dashboard.",
-    },
-    {
-      icon: FolderKanban,
-      title: "Case Management & Tracking",
-      desc: "Organize every matter, client, and status without spreadsheets.",
-    },
-    {
-      icon: Sparkles,
-      title: "AI Document Indexing",
-      desc: "Auto-extract titles, summaries, and topics from Word, PDF, and Excel files.",
-    },
-    {
-      icon: Search,
-      title: "Smart Full-Text Search",
-      desc: "Find any clause, name, or figure across your entire archive in milliseconds.",
-    },
-    {
-      icon: Tags,
-      title: "Document Tags & Notes",
-      desc: "Annotate and flag files so nothing important gets buried.",
-    },
-    {
-      icon: Mail,
-      title: "Email Correspondence Sync",
-      desc: "IMAP sync matches incoming mail and attachments to the right case automatically.",
-    },
-    {
-      icon: ListChecks,
-      title: "Task Management",
-      desc: "Templated checklists auto-generate case tasks, tracked on a cross-case dashboard.",
-    },
-    {
-      icon: Users,
-      title: "Teams & Roles",
-      desc: "Invite your firm, organize teams, and control access with role-based permissions.",
-    },
-  ] as const;
+    { icon: Layout, title: t("home_feature_workspace_title"), desc: t("home_feature_workspace_desc") },
+    { icon: FolderKanban, title: t("home_feature_case_mgmt_title"), desc: t("home_feature_case_mgmt_desc") },
+    { icon: Sparkles, title: t("home_feature_ai_indexing_title"), desc: t("home_feature_ai_indexing_desc") },
+    { icon: Search, title: t("home_feature_search_title"), desc: t("home_feature_search_desc") },
+    { icon: Tags, title: t("home_feature_tags_title"), desc: t("home_feature_tags_desc") },
+    { icon: Mail, title: t("home_feature_email_title"), desc: t("home_feature_email_desc") },
+    { icon: ListChecks, title: t("home_feature_tasks_title"), desc: t("home_feature_tasks_desc") },
+    { icon: Users, title: t("home_feature_teams_title"), desc: t("home_feature_teams_desc") },
+  ];
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
@@ -101,9 +71,9 @@ export default function Home() {
       <main className="flex-grow w-full">
         {/* Hero */}
         <HeroSection
-          kicker="For Attorneys & Legal Teams"
+          kicker={t("home_kicker")}
           title="Ascurix"
-          subtitle="The local-first workspace built for attorneys — cases, documents, and correspondence in one place, indexed, searchable, and secured on your own machine. Stop hunting through folders and inboxes; start working from a single source of truth."
+          subtitle={t("home_subtitle")}
           decoration={
             <span
               aria-hidden
@@ -116,13 +86,13 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/download" className="group">
               <div className="bg-brand-accent hover:brightness-110 text-brand-accent-foreground font-semibold rounded-lg px-7 py-3.5 shadow-md flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer text-sm hover:shadow-lg">
-                <span>Download Desktop Installer</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                <span>{t("home_cta_download")}</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 rtl:rotate-180 transition-transform" />
               </div>
             </Link>
             <Link href="/resources/key-features">
               <div className="px-7 py-3.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center shadow-sm hover:border-slate-400">
-                Explore Key Features
+                {t("home_cta_explore_features")}
               </div>
             </Link>
           </div>
@@ -136,31 +106,22 @@ export default function Home() {
                 <div className="w-10 h-10 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent flex items-center justify-center mb-3">
                   <Zap className="w-5 h-5" />
                 </div>
-                <h4 className="font-bold text-slate-900 text-base mb-1.5">Work Faster</h4>
-                <p className="text-sm text-slate-500 leading-relaxed">
-                  AI-powered indexing and instant full-text search replace hours of manual document
-                  hunting with results in seconds.
-                </p>
+                <h4 className="font-bold text-slate-900 text-base mb-1.5">{t("home_work_faster_title")}</h4>
+                <p className="text-sm text-slate-500 leading-relaxed">{t("home_work_faster_desc")}</p>
               </div>
               <div className="p-6 rounded-xl border border-slate-200 bg-white">
                 <div className="w-10 h-10 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent flex items-center justify-center mb-3">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
-                <h4 className="font-bold text-slate-900 text-base mb-1.5">Stay in Control</h4>
-                <p className="text-sm text-slate-500 leading-relaxed">
-                  Local-first storage keeps case files and client data on your own disk, never a
-                  third-party cloud.
-                </p>
+                <h4 className="font-bold text-slate-900 text-base mb-1.5">{t("home_stay_control_title")}</h4>
+                <p className="text-sm text-slate-500 leading-relaxed">{t("home_stay_control_desc")}</p>
               </div>
               <div className="p-6 rounded-xl border border-slate-200 bg-white">
                 <div className="w-10 h-10 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent flex items-center justify-center mb-3">
                   <Scale className="w-5 h-5" />
                 </div>
-                <h4 className="font-bold text-slate-900 text-base mb-1.5">Built for the Practice of Law</h4>
-                <p className="text-sm text-slate-500 leading-relaxed">
-                  Matter tracking, templates, and email sync are designed around how attorneys and
-                  legal teams actually work.
-                </p>
+                <h4 className="font-bold text-slate-900 text-base mb-1.5">{t("home_built_for_practice_title")}</h4>
+                <p className="text-sm text-slate-500 leading-relaxed">{t("home_built_for_practice_desc")}</p>
               </div>
             </div>
           </div>
@@ -169,12 +130,8 @@ export default function Home() {
         {/* Key Features */}
         <section className="w-full">
           <div className="max-w-6xl mx-auto px-6 py-20">
-            <h2 className="font-display text-3xl font-semibold text-slate-900 mb-2">
-              Everything you need, in one workspace
-            </h2>
-            <p className="text-sm text-slate-500 mb-8">
-              A quick look at what Ascurix handles for you every day.
-            </p>
+            <h2 className="font-display text-3xl font-semibold text-slate-900 mb-2">{t("home_features_title")}</h2>
+            <p className="text-sm text-slate-500 mb-8">{t("home_features_subtitle")}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {features.map(({ icon: Icon, title, desc }) => (
                 <div
@@ -194,8 +151,8 @@ export default function Home() {
                 href="/resources/key-features"
                 className="text-sm font-semibold text-brand-accent hover:brightness-90 inline-flex items-center gap-1"
               >
-                See every feature in detail
-                <ArrowRight className="w-4 h-4" />
+                {t("home_see_all_features")}
+                <ArrowRight className="w-4 h-4 rtl:rotate-180" />
               </Link>
             </div>
           </div>
@@ -205,12 +162,12 @@ export default function Home() {
         <section className="w-full px-6 pb-20">
           <div className="max-w-6xl mx-auto">
             <CtaBanner
-              title="Ready to work from one source of truth?"
-              subtitle="Download the desktop app and get your first case indexed in minutes."
+              title={t("home_cta_title")}
+              subtitle={t("home_cta_subtitle")}
               primaryHref="/download"
-              primaryLabel="Download Desktop Installer"
+              primaryLabel={t("home_cta_download")}
               secondaryHref="/pricing"
-              secondaryLabel="View Pricing"
+              secondaryLabel={t("home_cta_secondary")}
             />
           </div>
         </section>

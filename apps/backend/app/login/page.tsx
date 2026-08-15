@@ -5,8 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { AuthCard, Button, PasswordInput, errorClass, inputClass, labelClass } from "@workspace/ui";
 import { isValidEmail } from "../../lib/validation";
+import { useLanguage } from "../../context/LanguageContext";
 
 function LoginForm() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const platform = searchParams.get("platform"); // "desktop" when opened from the Ascurix desktop app
   const autoProvider = searchParams.get("provider") as "google" | "facebook" | null;
@@ -34,7 +36,7 @@ function LoginForm() {
     setError("");
 
     if (!isValidEmail(email)) {
-      setError("Please enter a valid email address.");
+      setError(t("login_invalid_email"));
       return;
     }
 
@@ -42,7 +44,7 @@ function LoginForm() {
     try {
       const res = await signIn("credentials", { email, password, redirect: false });
       if (res?.error) {
-        setError("Invalid email or password");
+        setError(t("login_invalid_credentials"));
         setLoading(false);
         return;
       }
@@ -63,7 +65,7 @@ function LoginForm() {
           : "/register/plan"
         : "/";
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
+      setError(err.message || t("login_unexpected_error"));
       setLoading(false);
     }
   }
@@ -78,22 +80,24 @@ function LoginForm() {
         callbackUrl: platform === "desktop" ? "/auth/desktop-complete" : "/auth/oauth-complete",
       });
     } catch {
-      setError(`Failed to start ${provider} sign-in`);
+      setError(t("login_social_failed"));
       setLoading(false);
     }
   }
 
   return (
-    <AuthCard title="Sign in to Ascurix">
+    <AuthCard title={t("login_title")}>
       {platform === "desktop" && autoProvider ? (
-        <p className="text-center text-sm text-muted-foreground">Opening {autoProvider}…</p>
+        <p className="text-center text-sm text-muted-foreground">
+          {t("login_opening")} {autoProvider}…
+        </p>
       ) : (
         <>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             {error && <div className={errorClass}>{error}</div>}
 
             <div>
-              <label className={labelClass}>Email address</label>
+              <label className={labelClass}>{t("login_email")}</label>
               <input
                 type="email"
                 name="email"
@@ -107,7 +111,7 @@ function LoginForm() {
             </div>
 
             <div>
-              <label className={labelClass}>Password</label>
+              <label className={labelClass}>{t("login_password")}</label>
               <PasswordInput
                 value={password}
                 onChange={setPassword}
@@ -118,31 +122,31 @@ function LoginForm() {
             </div>
 
             <Button type="submit" disabled={loading} className="mt-2 w-full">
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? t("login_signing_in") : t("login_sign_in")}
             </Button>
           </form>
 
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Or continue with
+              {t("login_or_continue")}
             </span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Button variant="outline" type="button" disabled={loading} onClick={() => handleSocial("google")}>
-              Google
+              {t("login_google")}
             </Button>
             <Button variant="outline" type="button" disabled={loading} onClick={() => handleSocial("facebook")}>
-              Facebook
+              {t("login_facebook")}
             </Button>
           </div>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            Don&apos;t have an account?{" "}
+            {t("login_no_account")}{" "}
             <a href={platform === "desktop" ? "/register?platform=desktop" : "/register"} className="font-medium text-foreground underline">
-              Create one
+              {t("login_create_one")}
             </a>
           </p>
         </>

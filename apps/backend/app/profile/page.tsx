@@ -6,6 +6,8 @@ import Link from "next/link";
 import { ArrowLeft, BadgeCheck, CircleAlert, Loader2 } from "lucide-react";
 import MainTopBar from "@/components/main/MainTopBar";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ProfilePreferences from "@/components/ProfilePreferences";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface Profile {
   name: string | null;
@@ -16,6 +18,7 @@ interface Profile {
 }
 
 export default function ProfilePage() {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [planLoading, setPlanLoading] = useState(false);
@@ -96,56 +99,56 @@ export default function ProfilePage() {
 
       <main className="flex-grow w-full max-w-3xl mx-auto px-6 py-10 flex flex-col gap-8">
         <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-          <Link href="/" className="p-2 hover:bg-slate-200 rounded-full transition-colors" title="Back to Portal">
-            <ArrowLeft className="size-5 text-slate-600" />
+          <Link href="/" className="p-2 hover:bg-slate-200 rounded-full transition-colors" title={t("profile_back_title")}>
+            <ArrowLeft className="size-5 text-slate-600 rtl:scale-x-[-1]" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-800">Your Profile</h1>
-            <p className="text-sm text-slate-500">Account details and subscription.</p>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-800">{t("profile_title")}</h1>
+            <p className="text-sm text-slate-500">{t("profile_subtitle")}</p>
           </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
             <Loader2 className="size-6 animate-spin" />
-            <span className="text-sm">Loading profile...</span>
+            <span className="text-sm">{t("profile_loading")}</span>
           </div>
         ) : !profile ? (
           <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
-            Couldn't load your profile. Try refreshing, or{" "}
+            {t("profile_load_error")}{" "}
             <Link href="/login" className="text-teal-700 underline">
-              sign in
+              {t("profile_load_error_signin")}
             </Link>{" "}
-            again.
+            {t("profile_load_error_again")}
           </div>
         ) : (
           <>
             {/* Account details */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-              <h2 className="text-lg font-semibold text-slate-800">Account</h2>
+              <h2 className="text-lg font-semibold text-slate-800">{t("profile_account")}</h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Full name</p>
+                  <p className="text-xs font-medium text-slate-500">{t("profile_full_name")}</p>
                   <p className="text-sm font-semibold text-slate-800 mt-0.5">{profile.name || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Email address</p>
+                  <p className="text-xs font-medium text-slate-500">{t("profile_email")}</p>
                   <p className="text-sm font-semibold text-slate-800 mt-0.5 flex items-center gap-1.5">
                     {profile.email}
                     {profile.emailVerified ? (
-                      <BadgeCheck className="size-4 text-emerald-600" aria-label="Verified">
-                        <title>Verified</title>
+                      <BadgeCheck className="size-4 text-emerald-600" aria-label={t("profile_verified")}>
+                        <title>{t("profile_verified")}</title>
                       </BadgeCheck>
                     ) : (
-                      <CircleAlert className="size-4 text-amber-500" aria-label="Not verified">
-                        <title>Not verified</title>
+                      <CircleAlert className="size-4 text-amber-500" aria-label={t("profile_not_verified")}>
+                        <title>{t("profile_not_verified")}</title>
                       </CircleAlert>
                     )}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Member since</p>
+                  <p className="text-xs font-medium text-slate-500">{t("profile_member_since")}</p>
                   <p className="text-sm font-semibold text-slate-800 mt-0.5">
                     {new Date(profile.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
                   </p>
@@ -153,28 +156,29 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Preferences (ASC-157: language + interface font) */}
+            <ProfilePreferences />
+
             {/* Subscription */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">Subscription</h2>
+                <h2 className="text-lg font-semibold text-slate-800">{t("profile_subscription")}</h2>
                 <span
                   className={`text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
                     isPro ? "bg-teal-950 text-teal-200" : "bg-slate-100 text-slate-500"
                   }`}
                 >
-                  {isPro ? "Pro" : "Free"}
+                  {isPro ? t("tier_pro") : t("tier_free")}
                 </span>
               </div>
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">
-                    {isPro ? "Ascurix Pro" : "Ascurix Free"}
+                    {isPro ? t("profile_plan_pro_name") : t("profile_plan_free_name")}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {isPro
-                      ? "AI features, voice input, and email sync are enabled."
-                      : "Case management, document search, and templates -- no AI, voice, or email sync."}
+                    {isPro ? t("profile_plan_pro_desc") : t("profile_plan_free_desc")}
                   </p>
                 </div>
                 <span className="text-lg font-bold text-slate-800">
@@ -196,7 +200,7 @@ export default function ProfilePage() {
                     disabled={planLoading}
                     className="text-sm font-semibold text-slate-500 hover:text-red-600 disabled:opacity-50 transition-colors cursor-pointer"
                   >
-                    {planLoading ? "Updating..." : "Downgrade to Free"}
+                    {planLoading ? t("profile_downgrading") : t("profile_downgrade")}
                   </button>
                 ) : (
                   <button
@@ -204,7 +208,7 @@ export default function ProfilePage() {
                     disabled={planLoading}
                     className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-900 disabled:opacity-50 text-white font-semibold py-2 px-4 rounded-md transition-colors text-sm shadow-sm cursor-pointer"
                   >
-                    {planLoading ? "Starting checkout..." : "Upgrade to Pro"}
+                    {planLoading ? t("profile_upgrading") : t("profile_upgrade")}
                   </button>
                 )}
               </div>
@@ -215,9 +219,9 @@ export default function ProfilePage() {
 
       <ConfirmDialog
         open={confirmDowngradeOpen}
-        title="Switch to the Free plan?"
-        message="You'll lose Pro features (AI, voice input, email sync) immediately."
-        confirmLabel="Downgrade to Free"
+        title={t("profile_downgrade_confirm_title")}
+        message={t("profile_downgrade_confirm_message")}
+        confirmLabel={t("profile_downgrade")}
         danger
         onConfirm={handleDowngrade}
         onCancel={() => setConfirmDowngradeOpen(false)}

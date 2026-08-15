@@ -43,6 +43,13 @@
       "when": 1786291407685,
       "tag": "0005_curved_maximus",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786783847533,
+      "tag": "0006_mushy_polaris",
+      "breakpoints": true
     }
   ]
 }

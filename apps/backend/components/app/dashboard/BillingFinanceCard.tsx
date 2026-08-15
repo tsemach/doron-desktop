@@ -1,26 +1,31 @@
+"use client";
+
 import { Wallet } from "lucide-react";
 import type { BillingSummary } from "../../../lib/dashboard/types";
 import { formatILS } from "../../../lib/dashboard/formatCurrency";
 import DashboardCard from "@/components/app/dashboard/DashboardCard";
+import { useLanguage } from "../../../context/LanguageContext";
 
 type BillingFinanceCardProps = {
   billing: BillingSummary;
 };
 
 export default function BillingFinanceCard({ billing }: BillingFinanceCardProps) {
+  const { t } = useLanguage();
+
   return (
     <DashboardCard
       icon={<Wallet className="h-4 w-4 text-muted-foreground shrink-0" />}
-      title="Billing & Finance"
+      title={t("dashboard_billing_finance")}
       column={3}
     >
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">Outstanding</p>
+          <p className="text-xs font-medium text-muted-foreground">{t("dashboard_outstanding")}</p>
           <p className="mt-1 text-xl font-bold text-foreground">{formatILS(billing.outstandingAmount)}</p>
         </div>
         <div>
-          <p className="text-xs font-medium text-muted-foreground">Collected this month</p>
+          <p className="text-xs font-medium text-muted-foreground">{t("dashboard_collected_this_month")}</p>
           <p className="mt-1 text-xl font-bold text-emerald-600">{formatILS(billing.collectedThisMonth)}</p>
         </div>
       </div>
@@ -37,7 +42,7 @@ export default function BillingFinanceCard({ billing }: BillingFinanceCardProps)
                 />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {formatILS(c.paidAmount)} of {formatILS(c.totalAmount)}
+                {formatILS(c.paidAmount)} {t("dashboard_of")} {formatILS(c.totalAmount)}
               </p>
             </li>
           );

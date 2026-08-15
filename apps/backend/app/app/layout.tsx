@@ -6,6 +6,7 @@ import { firms } from "../../database/schema";
 import { mockNotifications } from "../../lib/dashboard/mockData";
 import AppTopBar from "@/components/app/AppTopBar";
 import NotificationBell from "@/components/app/dashboard/NotificationBell";
+import { translations, type Language } from "../../locales/translations";
 
 export default async function AppLayout({
   children,
@@ -20,11 +21,16 @@ export default async function AppLayout({
   const userName = session.user.name || session.user.email || null;
   const tier = (session.user as { tier?: string }).tier ?? "free";
   const firmId = (session.user as { firmId?: string | null }).firmId ?? null;
+  // Server Component -- no LanguageProvider/useLanguage() available here, so
+  // this reads the translation dictionary directly off the already-resolved
+  // session locale instead (same value app/layout.tsx used for <html lang>).
+  const locale: Language = (session.user as { locale?: string }).locale === "he" ? "he" : "en";
+  const t = translations[locale];
 
   // Self-registered ("flat") users have no firm (see packages/backend-orm's
   // schema comment on users.firmId) -- fall back to a generic label instead
   // of showing a blank/undefined firm name.
-  let workspaceLabel = "Personal workspace";
+  let workspaceLabel = t.personal_workspace;
   if (firmId) {
     const [firm] = await db.select({ name: firms.name }).from(firms).where(eq(firms.id, firmId)).limit(1);
     if (firm?.name) {

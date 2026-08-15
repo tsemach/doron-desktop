@@ -1,5 +1,5 @@
 import ComingSoon from "@/components/app/ComingSoon";
 
 export default function CalendarComingSoonPage() {
-  return <ComingSoon feature="Calendar" />;
+  return <ComingSoon featureKey="nav_calendar" />;
 }

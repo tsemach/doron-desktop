@@ -3,8 +3,10 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthCard, Button } from "@workspace/ui";
+import { useLanguage } from "../../../context/LanguageContext";
 
 function CompleteContent() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isDesktop = searchParams.get("platform") === "desktop";
@@ -20,16 +22,14 @@ function CompleteContent() {
   }
 
   return (
-    <AuthCard title="You're all set" subtitle="Your Ascurix account is ready.">
+    <AuthCard title={t("complete_title")} subtitle={t("complete_subtitle")}>
       <p className="text-center text-sm text-muted-foreground">
-        {isDesktop
-          ? "Return to the Ascurix desktop app and log in with your new account."
-          : "You can now sign in from the Ascurix desktop app."}
+        {isDesktop ? t("complete_desktop_note") : t("complete_browser_note")}
       </p>
 
       {isDesktop && (
         <Button type="button" onClick={handleOpenAscurix} className="mt-6 w-full">
-          Open Ascurix
+          {t("complete_open_ascurix")}
         </Button>
       )}
     </AuthCard>

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AuthCard } from "@workspace/ui";
+import { useLanguage } from "../../../context/LanguageContext";
 
 // Landing point for plain-web Google/Facebook sign-in, from either the
 // register or login page's social buttons -- OAuth doesn't distinguish
@@ -12,6 +13,7 @@ import { AuthCard } from "@workspace/ui";
 // is a fresh account (never chosen a plan -> /register/plan) or a returning
 // one (-> straight into the app), based on users.planSelectedAt.
 export default function OAuthCompletePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -22,8 +24,8 @@ export default function OAuthCompletePage() {
   }, [status, session, router]);
 
   return (
-    <AuthCard title="Signing you in">
-      <p className="text-center text-sm text-muted-foreground">One moment…</p>
+    <AuthCard title={t("signing_in_title")}>
+      <p className="text-center text-sm text-muted-foreground">{t("accept_invite_loading")}</p>
     </AuthCard>
   );
 }

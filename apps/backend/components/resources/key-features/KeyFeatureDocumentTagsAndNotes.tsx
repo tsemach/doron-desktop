@@ -1,38 +1,29 @@
 import { Tag, FileEdit, FolderHeart } from "lucide-react";
 import FeatureBlock from "@/components/marketing/FeatureBlock";
 import FeatureRowList from "@/components/marketing/FeatureRowList";
+import { useLanguage } from "../../../context/LanguageContext";
 
 export default function KeyFeatureDocumentTagsAndNotes() {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-4">
       <FeatureBlock
         icon={Tag}
-        title="Document Tags & Notes"
-        description="Enhance your files with custom taxonomy. Attach quick annotations, tags, notes, and priority marks directly to any document without modifying the underlying source files."
-        bullets={[
-          "Persistent case notes and draft summaries attached to files",
-          "Custom tags like “Contracts” or “Urgent Review” for instant filtering",
-          "Nothing important gets buried in the folder tree",
-        ]}
+        title={t("kf_tags_title")}
+        description={t("kf_tags_desc")}
+        bullets={[t("kf_tags_bullet_1"), t("kf_tags_bullet_2"), t("kf_tags_bullet_3")]}
         mockup={{
           type: "screenshot",
           src: "/screenshot_templates_hover.png",
-          alt: "Document preview and templates hover",
+          alt: t("kf_tags_alt"),
         }}
       />
 
       <FeatureRowList
         items={[
-          {
-            icon: FileEdit,
-            title: "Rich Annotations",
-            description: "Add persistent case notes, descriptions, and review items to log guidelines or reminders.",
-          },
-          {
-            icon: FolderHeart,
-            title: "Custom Categorization",
-            description: "Group cases or templates under shared tags for instant filtering.",
-          },
+          { icon: FileEdit, title: t("kf_tags_row1_title"), description: t("kf_tags_row1_desc") },
+          { icon: FolderHeart, title: t("kf_tags_row2_title"), description: t("kf_tags_row2_desc") },
         ]}
       />
     </div>
