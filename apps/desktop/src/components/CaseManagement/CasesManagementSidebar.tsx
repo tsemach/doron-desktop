@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import BackButton from "../ui/back-button";
-import { Button } from "../ui/button";
+import SidebarNavButton from "./SidebarNavButton";
+import SidebarProfileFooter from "./SidebarProfileFooter";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function CaseManagementSidebar() {
@@ -20,85 +21,44 @@ export default function CaseManagementSidebar() {
   const isTemplatesActive = pathname.startsWith("/case-management/templates");
   const isTaskTemplatesActive = pathname.startsWith("/case-management/task-templates");
 
-  const displayName = localStorage.getItem("user_name");
-
   return (
-    <aside className="w-40 shrink-0 flex flex-col py-4 px-3 border-r rtl:border-r-0 rtl:border-l border-border">       
-      <BackButton navigateTo={"/"} /> 
+    <aside className="w-28 shrink-0 flex flex-col py-4 px-2 border-r rtl:border-r-0 rtl:border-l border-border">
+      <BackButton navigateTo={"/"} />
 
-      <div className="border-t border-border -mx-3 mt-2" />
+      <div className="border-t border-border -mx-2 mt-2" />
 
       {/* Navigation Menu (Top-aligned) */}
       <div className="flex-1 flex flex-col mt-4">
         <div className="flex flex-col gap-3">
-          <Button
-            variant="ghost"
-            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
-              isOpenCasesActive ? "bg-muted text-foreground font-semibold" : ""
-            }`}
+          <SidebarNavButton
+            label={t("open_cases")}
+            active={isOpenCasesActive}
             onClick={() => navigate("/case-management")}
-          >
-            {t("open_cases").split(" ").map((word, i) => (
-              <span key={i} className="block">{word}</span>
-            ))}
-          </Button>
-          <Button
-            variant="ghost"
-            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
-              isNewCaseActive ? "bg-muted text-foreground font-semibold" : ""
-            }`}
+          />
+          <SidebarNavButton
+            label={t("new_case")}
+            active={isNewCaseActive}
             onClick={() => navigate("/case-management/new-case")}
-          >
-            {t("new_case").split(" ").map((word, i) => (
-              <span key={i} className="block">{word}</span>
-            ))}
-          </Button>
+          />
         </div>
 
-        <div className="border-t border-border -mx-3 my-4" />
+        <div className="border-t border-border -mx-2 my-4" />
 
         <div className="flex flex-col gap-3">
-          <Button
-            variant="ghost"
-            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
-              isTemplatesActive ? "bg-muted text-foreground font-semibold" : ""
-            }`}
+          <SidebarNavButton
+            label={t("template")}
+            active={isTemplatesActive}
             onClick={() => navigate("/case-management/templates")}
-          >
-            {t("template").split(" ").map((word, i) => (
-              <span key={i} className="block">{word}</span>
-            ))}
-          </Button>
-          <Button
-            variant="ghost"
-            className={`w-full h-24 flex flex-col items-center justify-center text-center whitespace-normal break-words px-4 font-normal ${
-              isTaskTemplatesActive ? "bg-muted text-foreground font-semibold" : ""
-            }`}
+          />
+          <SidebarNavButton
+            label={t("task_templates")}
+            active={isTaskTemplatesActive}
             onClick={() => navigate("/case-management/task-templates")}
-          >
-            {t("task_templates").split(" ").map((word, i) => (
-              <span key={i} className="block">{word}</span>
-            ))}
-          </Button>
+          />
         </div>
       </div>
 
-      {/* Footer Profile Section */}
-      <div>
-        <div className="border-t border-border -mx-3" />
-        <div className="flex items-center justify-center py-2">
-          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-            </svg>
-          </div>
-        </div>
-        <div className="border-t border-border -mx-3 mb-2" />
-        <div className="flex items-center justify-center pb-2 pt-2">
-          <span className="text-xs text-muted-foreground">{displayName}</span>
-        </div>
-      </div>
+      <SidebarProfileFooter />
     </aside>
   );
 }

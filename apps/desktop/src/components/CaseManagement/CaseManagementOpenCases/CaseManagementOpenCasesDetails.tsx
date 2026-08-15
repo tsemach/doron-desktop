@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useSplitPane } from "@/hooks/useSplitPane";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useOutletContext } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { CaseDetailOutletContext } from "../CaseDetailLayout";
 
 import OpenCasesDocumentAnnotationsModal from "./OpenCasesDocumentAnnotationsModal";
 import OpenCasesCaseAnnotationsModal from "./OpenCasesCaseAnnotationsModal";
@@ -37,8 +38,9 @@ export default function CaseManagementOpenCasesDetails() {
   const [docToDelete, setDocToDelete] = useState<CaseFile | null>(null);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ name: string; staged_path: string; size_kb: number } | null>(null);
 
-  // Right side panel tab state
-  const [activeRightTab, setActiveRightTab] = useState<"preview" | "emails" | "tasks">("preview");
+  // Right side panel tab state (shared with CaseDetailSidebar via CaseDetailLayout's Outlet context)
+  const { activeRightTab, setActiveRightTab, registerEditAnnotationsHandler } =
+    useOutletContext<CaseDetailOutletContext>();
   const [docSubTab, setDocSubTab] = useState<"preview" | "history" | "fields">("preview");
 
   // Document preview states
@@ -78,6 +80,14 @@ export default function CaseManagementOpenCasesDetails() {
       loadCase(caseId);
     }
   }, [caseId]);
+
+  // Let CaseDetailSidebar's "Tags & Notes" button open this page's annotations modal
+  useEffect(() => {
+    registerEditAnnotationsHandler(() => {
+      if (selectedCase) setEditingCaseAnnotations(selectedCase);
+    });
+    return () => registerEditAnnotationsHandler(null);
+  }, [selectedCase, registerEditAnnotationsHandler]);
 
   // Fetch documents and attachments when selected case changes
   useEffect(() => {
@@ -417,28 +427,8 @@ export default function CaseManagementOpenCasesDetails() {
         }
       `}</style>
 
-      {/* Header with back button */}
+      {/* Header */}
       <div className="flex items-center gap-3 mb-6 shrink-0">
-        <Link
-          to="/case-management"
-          className="p-2 hover:bg-muted rounded-lg transition-colors border border-border shrink-0"
-          title={t("back_to_open_cases")}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="rtl:rotate-180"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </Link>
         <div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{t("case_management")}</span>
