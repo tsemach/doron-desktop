@@ -1,8 +1,11 @@
+"use client";
+
 import { ListChecks } from "lucide-react";
 import type { ImportantTask, TaskUrgency } from "../../../lib/dashboard/types";
 import { formatDashboardTimestamp } from "../../../lib/dashboard/formatDate";
 import DashboardCard from "@/components/app/dashboard/DashboardCard";
 import StatusRail from "@/components/app/dashboard/StatusRail";
+import { useLanguage } from "../../../context/LanguageContext";
 
 const URGENCY_RAIL_COLOR: Record<TaskUrgency, "rose" | "amber" | "slate"> = {
   overdue: "rose",
@@ -15,18 +18,19 @@ type ImportantTasksCardProps = {
 };
 
 export default function ImportantTasksCard({ tasks }: ImportantTasksCardProps) {
+  const { t } = useLanguage();
   const [spotlight, ...rest] = tasks;
 
   return (
     <DashboardCard
       icon={<ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />}
-      title="Important Tasks"
+      title={t("dashboard_important_tasks")}
       count={tasks.length}
       column={1}
     >
       {spotlight && (
         <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Next up</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">{t("dashboard_next_up")}</p>
           <p className="mt-1 truncate text-sm font-semibold text-foreground">{spotlight.title}</p>
           <p className="truncate text-xs text-muted-foreground">{spotlight.caseSubject}</p>
           <p className="mt-1 text-xs text-indigo-700">{formatDashboardTimestamp(spotlight.dueAt)}</p>

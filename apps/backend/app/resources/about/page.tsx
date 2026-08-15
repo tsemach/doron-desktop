@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import MainTopBar from "@/components/main/MainTopBar";
+import { useLanguage } from "../../../context/LanguageContext";
 
 export default function AboutPage() {
+  const { t } = useLanguage();
   const [userName, setUserName] = useState<string | null>(null);
   const [tier, setTier] = useState<string | null>(null);
 
@@ -37,13 +39,11 @@ export default function AboutPage() {
 
       <main className="flex-grow w-full flex flex-col items-center justify-center px-6 py-24 text-center">
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 mb-3">
-          About
+          {t("about_title")}
         </h1>
-        <p className="text-slate-600 text-base max-w-lg mb-8">
-          More about Ascurix is coming soon.
-        </p>
+        <p className="text-slate-600 text-base max-w-lg mb-8">{t("about_subtitle")}</p>
         <Link href="/" className="text-sm font-semibold text-slate-700 hover:text-slate-900">
-          Back to home
+          {t("back_to_home")}
         </Link>
       </main>
     </div>

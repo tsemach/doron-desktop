@@ -1,6 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import { useLanguage } from "../context/LanguageContext";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -22,12 +23,13 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   danger = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useLanguage();
   if (!open) return null;
 
   return createPortal(
@@ -45,7 +47,7 @@ export default function ConfirmDialog({
             onClick={onCancel}
             className="text-sm font-semibold text-slate-500 hover:text-slate-800 px-4 py-2 rounded-md transition-colors cursor-pointer"
           >
-            {cancelLabel}
+            {cancelLabel ?? t("confirm_default_cancel")}
           </button>
           <button
             type="button"
@@ -54,7 +56,7 @@ export default function ConfirmDialog({
               danger ? "bg-red-600 hover:bg-red-700" : "bg-teal-800 hover:bg-teal-900"
             }`}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("confirm_default_confirm")}
           </button>
         </div>
       </div>

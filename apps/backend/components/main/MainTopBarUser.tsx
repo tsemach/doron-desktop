@@ -2,6 +2,8 @@ import { LayoutDashboard, LogOut, Settings, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLanguage } from "../../context/LanguageContext";
+import LanguageToggle from "./LanguageToggle";
 
 type MainTopBarUserProps = {
   // null = not signed in -- renders a "Log in" link instead of the
@@ -12,17 +14,18 @@ type MainTopBarUserProps = {
   handleLogout: () => void;
 }
 
-const TIER_LABELS: Record<string, string> = {
-  free: "Free",
-  pro: "Pro",
-  ultra: "Ultra",
-};
-
 export default function MainTopBarUser({ userName, tier, workspaceLabel, handleLogout }: MainTopBarUserProps) {
+  const { t } = useLanguage();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isInWorkspace = pathname === "/app" || pathname.startsWith("/app/");
+
+  const tierLabels: Record<string, string> = {
+    free: t("tier_free"),
+    pro: t("tier_pro"),
+    ultra: t("tier_ultra"),
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -39,16 +42,19 @@ export default function MainTopBarUser({ userName, tier, workspaceLabel, handleL
 
   if (!userName) {
     return (
-      <Link
-        href="/login"
-        className="text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
-      >
-        Log in
-      </Link>
+      <div className="flex items-center gap-3">
+        <LanguageToggle />
+        <Link
+          href="/login"
+          className="text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+        >
+          {t("nav_login")}
+        </Link>
+      </div>
     );
   }
 
-  const tierLabel = TIER_LABELS[tier ?? "free"] ?? "Free";
+  const tierLabel = tierLabels[tier ?? "free"] ?? t("tier_free");
   const isUpgradeable = tier !== "pro" && tier !== "ultra";
 
   return (
@@ -60,7 +66,7 @@ export default function MainTopBarUser({ userName, tier, workspaceLabel, handleL
           className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border border-brand-accent text-brand-accent hover:bg-brand-accent/10 transition-all cursor-pointer"
         >
           <LayoutDashboard className="w-3.5 h-3.5" />
-          Desktop
+          {t("nav_desktop")}
         </Link>
       )}
 
@@ -76,7 +82,7 @@ export default function MainTopBarUser({ userName, tier, workspaceLabel, handleL
           href="/register/plan"
           className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
         >
-          Upgrade
+          {t("nav_upgrade")}
         </Link>
       )}
 
@@ -89,32 +95,32 @@ export default function MainTopBarUser({ userName, tier, workspaceLabel, handleL
         </button>
 
         {dropdownOpen && (
-          <div className="absolute right-[-18px] mt-2 w-28 bg-popover border border-border rounded-lg shadow-lg py-1 z-50">
+          <div className="absolute right-[-18px] rtl:right-auto rtl:left-[-18px] mt-2 w-28 bg-popover border border-border rounded-lg shadow-lg py-1 z-50">
           <Link
             href="/profile"
             onClick={() => setDropdownOpen(false)}
-            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/60 flex items-center gap-2 cursor-pointer"
+            className="w-full text-left rtl:text-right px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/60 flex items-center gap-2 cursor-pointer"
           >
             <User className="w-3.5 h-3.5" />
-            Profile
+            {t("nav_profile")}
           </Link>
           <button
             onClick={() => {
               setDropdownOpen(false);
-              alert("Settings page coming soon!");
+              alert(t("nav_settings_coming_soon"));
             }}
-            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/60 flex items-center gap-2 cursor-pointer"
+            className="w-full text-left rtl:text-right px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/60 flex items-center gap-2 cursor-pointer"
           >
             <Settings className="w-3.5 h-3.5" />
-            Settings
+            {t("nav_settings")}
           </button>
           <div className="border-t border-border my-1"></div>
           <button
             onClick={handleLogout}
-            className="w-full text-left px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 flex items-center gap-2 cursor-pointer"
+            className="w-full text-left rtl:text-right px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 flex items-center gap-2 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            Logout
+            {t("nav_logout")}
           </button>
         </div>
         )}

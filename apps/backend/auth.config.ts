@@ -30,6 +30,9 @@ export default {
         // matters" pattern as tier (see auth.ts's session callback override).
         token.role = (user as { role?: string }).role ?? "flat";
         token.firmId = (user as { firmId?: string | null }).firmId ?? null;
+        // ASC-157 -- same cache-on-JWT pattern as tier/role above.
+        token.locale = (user as { locale?: string }).locale ?? "en";
+        token.interfaceFont = (user as { interfaceFont?: string }).interfaceFont ?? "plex";
       }
       return token;
     },
@@ -40,6 +43,8 @@ export default {
         (session.user as { tier?: string }).tier = (token.tier as string) ?? "free";
         (session.user as { role?: string }).role = (token.role as string) ?? "flat";
         (session.user as { firmId?: string | null }).firmId = (token.firmId as string | null) ?? null;
+        (session.user as { locale?: string }).locale = (token.locale as string) ?? "en";
+        (session.user as { interfaceFont?: string }).interfaceFont = (token.interfaceFont as string) ?? "plex";
       }
       return session;
     },

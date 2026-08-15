@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { AuthCard, Button, PasswordInput, errorClass, inputClass, labelClass } from "@workspace/ui";
 import { isValidEmail, isValidFullName, isValidPasswordLength } from "../../lib/validation";
+import { useLanguage } from "../../context/LanguageContext";
 
 function RegisterForm() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const platform = searchParams.get("platform"); // "desktop" when opened from the Ascurix desktop app
@@ -32,19 +34,19 @@ function RegisterForm() {
     // Client-side checks are only for immediate feedback -- the signup route
     // enforces the same rules server-side and is the actual source of truth.
     if (!isValidFullName(fullName)) {
-      setError("Full name contains invalid characters.");
+      setError(t("register_invalid_name"));
       return;
     }
     if (!isValidEmail(email)) {
-      setError("Please enter a valid email address.");
+      setError(t("login_invalid_email"));
       return;
     }
     if (!isValidPasswordLength(password)) {
-      setError("Password must be between 6 and 48 characters long.");
+      setError(t("register_invalid_password_length"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("register_password_mismatch"));
       return;
     }
 
@@ -57,7 +59,7 @@ function RegisterForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create account");
+        throw new Error(data.error || t("register_signup_failed"));
       }
 
       // No auto sign-in -- login is blocked until the email is verified
@@ -66,7 +68,7 @@ function RegisterForm() {
       if (platform === "desktop") params.set("platform", "desktop");
       router.push(`/register/check-email?${params.toString()}`);
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
+      setError(err.message || t("login_unexpected_error"));
       setLoading(false);
     }
   }
@@ -77,18 +79,18 @@ function RegisterForm() {
     try {
       await signIn(provider, { callbackUrl: oauthCallbackUrl });
     } catch {
-      setError(`Failed to start ${provider} sign-up`);
+      setError(t("register_social_failed"));
       setLoading(false);
     }
   }
 
   return (
-    <AuthCard title="Create your Ascurix account" subtitle="Set up your account, then choose a plan.">
+    <AuthCard title={t("register_title")} subtitle={t("register_subtitle")}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         {error && <div className={errorClass}>{error}</div>}
 
         <div>
-          <label className={labelClass}>Email address</label>
+          <label className={labelClass}>{t("login_email")}</label>
           <input
             type="email"
             name="email"
@@ -102,7 +104,7 @@ function RegisterForm() {
         </div>
 
         <div>
-          <label className={labelClass}>Full name</label>
+          <label className={labelClass}>{t("register_full_name")}</label>
           <input
             type="text"
             name="name"
@@ -116,7 +118,7 @@ function RegisterForm() {
         </div>
 
         <div>
-          <label className={labelClass}>Password</label>
+          <label className={labelClass}>{t("login_password")}</label>
           <PasswordInput
             value={password}
             onChange={setPassword}
@@ -127,7 +129,7 @@ function RegisterForm() {
         </div>
 
         <div>
-          <label className={labelClass}>Confirm password</label>
+          <label className={labelClass}>{t("register_confirm_password")}</label>
           <PasswordInput
             value={confirmPassword}
             onChange={setConfirmPassword}
@@ -138,31 +140,31 @@ function RegisterForm() {
         </div>
 
         <Button type="submit" disabled={loading} className="mt-2 w-full">
-          {loading ? "Creating account…" : "Create account"}
+          {loading ? t("register_creating") : t("register_create_account")}
         </Button>
       </form>
 
       <div className="my-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Or continue with
+          {t("login_or_continue")}
         </span>
         <div className="h-px flex-1 bg-border" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Button variant="outline" type="button" disabled={loading} onClick={() => handleSocial("google")}>
-          Google
+          {t("login_google")}
         </Button>
         <Button variant="outline" type="button" disabled={loading} onClick={() => handleSocial("facebook")}>
-          Facebook
+          {t("login_facebook")}
         </Button>
       </div>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Already have an account?{" "}
+        {t("register_already_have_account")}{" "}
         <a href={platform === "desktop" ? "/login?platform=desktop" : "/login"} className="font-medium text-foreground underline">
-          Sign in
+          {t("register_sign_in")}
         </a>
       </p>
     </AuthCard>

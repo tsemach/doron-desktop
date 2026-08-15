@@ -34,7 +34,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const session = await authConfig.callbacks!.session!(params);
       if (session.user?.id) {
         const [row] = await db
-          .select({ tier: users.tier, role: users.role, firmId: users.firmId })
+          .select({
+            tier: users.tier,
+            role: users.role,
+            firmId: users.firmId,
+            locale: users.locale,
+            interfaceFont: users.interfaceFont,
+          })
           .from(users)
           .where(and(eq(users.id, session.user.id), isNull(users.deletedAt)))
           .limit(1);
@@ -42,6 +48,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           (session.user as { tier?: string }).tier = row.tier;
           (session.user as { role?: string }).role = row.role;
           (session.user as { firmId?: string | null }).firmId = row.firmId;
+          (session.user as { locale?: string }).locale = row.locale;
+          (session.user as { interfaceFont?: string }).interfaceFont = row.interfaceFont;
         } else {
           session.user.id = "";
         }

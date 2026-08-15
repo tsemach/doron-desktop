@@ -1,40 +1,27 @@
 import { Users, UserPlus, ShieldCheck, Building2 } from "lucide-react";
 import FeatureBlock from "@/components/marketing/FeatureBlock";
 import FeatureRowList from "@/components/marketing/FeatureRowList";
+import { useLanguage } from "../../../context/LanguageContext";
 
 export default function KeyFeatureTeamsAndRoles() {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-4">
       <FeatureBlock
         icon={Users}
-        title="Teams & Roles"
-        description="Ascurix isn't just for solo practitioners. Bring your whole firm onto one account: invite teammates, organize them into teams, and control who can manage what with role-based permissions — while every case file and document stays local to each person's own machine."
-        bullets={[
-          "Invite teammates by email with a role and team assigned upfront",
-          "Role-based permissions (admin, manager, user) gate who can invite and manage",
-          "Organize your firm into teams, each with its own manager and roster",
-        ]}
-        mockup={{ type: "illustrated", label: "Settings — Users and Roles" }}
+        title={t("kf_teams_title")}
+        description={t("kf_teams_desc")}
+        bullets={[t("kf_teams_bullet_1"), t("kf_teams_bullet_2"), t("kf_teams_bullet_3")]}
+        mockup={{ type: "illustrated", label: t("kf_teams_mockup_label") }}
         side="right"
       />
 
       <FeatureRowList
         items={[
-          {
-            icon: UserPlus,
-            title: "Invite Teammates",
-            description: "Invite by email with a role and, optionally, a team assigned at invite time — they set their own password.",
-          },
-          {
-            icon: ShieldCheck,
-            title: "Role-Based Permissions",
-            description: "Admins manage the whole firm; managers manage their own teams; users get read-only firm visibility.",
-          },
-          {
-            icon: Building2,
-            title: "Firm-Level Accounts",
-            description: "A shared roster and team structure for your firm — case content itself never leaves each person's machine.",
-          },
+          { icon: UserPlus, title: t("kf_teams_row1_title"), description: t("kf_teams_row1_desc") },
+          { icon: ShieldCheck, title: t("kf_teams_row2_title"), description: t("kf_teams_row2_desc") },
+          { icon: Building2, title: t("kf_teams_row3_title"), description: t("kf_teams_row3_desc") },
         ]}
       />
     </div>

@@ -3,8 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthCard, errorClass } from "@workspace/ui";
+import { useLanguage } from "../../context/LanguageContext";
 
 function VerifyEmailContent() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const email = searchParams.get("email");
   const token = searchParams.get("token");
@@ -16,7 +18,7 @@ function VerifyEmailContent() {
   useEffect(() => {
     if (!email || !token) {
       setStatus("error");
-      setError("This verification link is missing required information.");
+      setError(t("verify_email_missing_info"));
       return;
     }
     (async () => {
@@ -28,14 +30,15 @@ function VerifyEmailContent() {
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || "Verification failed");
+          throw new Error(data.error || t("verify_email_failed"));
         }
         setStatus("success");
       } catch (err: any) {
         setStatus("error");
-        setError(err.message || "Something went wrong");
+        setError(err.message || t("plan_something_wrong"));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, token]);
 
   // A desktop-originated registration deep-links straight back into the
@@ -46,13 +49,13 @@ function VerifyEmailContent() {
   const loginUrl = isDesktop ? "doron-desktop://login" : "/login?justVerified=1";
 
   return (
-    <AuthCard title="Verify your email">
-      {status === "verifying" && <p className="text-center text-sm text-muted-foreground">Verifying…</p>}
+    <AuthCard title={t("verify_email_title")}>
+      {status === "verifying" && <p className="text-center text-sm text-muted-foreground">{t("verify_email_verifying")}</p>}
       {status === "success" && (
         <div className="text-center">
-          <p className="text-sm text-foreground">Your email is verified.</p>
+          <p className="text-sm text-foreground">{t("verify_email_success")}</p>
           <a href={loginUrl} className="mt-4 inline-block font-medium text-foreground underline">
-            {isDesktop ? "Return to the Ascurix app to sign in" : "Continue to sign in"}
+            {isDesktop ? t("verify_email_return_desktop") : t("verify_email_continue")}
           </a>
         </div>
       )}

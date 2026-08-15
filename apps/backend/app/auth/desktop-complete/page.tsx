@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AuthCard, errorClass } from "@workspace/ui";
+import { useLanguage } from "../../../context/LanguageContext";
 
 // Landing point for the OAuth branch of desktop *login* (0.9) — reached via
 // signIn(provider, { callbackUrl: "/auth/desktop-complete" }) from either
@@ -14,6 +15,7 @@ import { AuthCard, errorClass } from "@workspace/ui";
 // to /register/plan instead of straight into the desktop app, same as the
 // web equivalent (oauth-complete/page.tsx).
 export default function DesktopCompletePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { data: session, status } = useSession();
   const [deepLink, setDeepLink] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function DesktopCompletePage() {
         const res = await fetch("/api/v1/auth/desktop-token", { method: "POST" });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || "Failed to complete sign-in");
+          throw new Error(data.error || t("desktop_complete_failed"));
         }
         if (cancelled) return;
         const params = new URLSearchParams({
@@ -59,30 +61,31 @@ export default function DesktopCompletePage() {
         setDeepLink(url);
         window.location.href = url;
       } catch (err: any) {
-        if (!cancelled) setError(err.message || "Something went wrong");
+        if (!cancelled) setError(err.message || t("plan_something_wrong"));
       }
     })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session, router]);
 
   return (
-    <AuthCard title="Signing you in" subtitle="Completing your Ascurix desktop login.">
+    <AuthCard title={t("signing_in_title")} subtitle={t("desktop_complete_subtitle")}>
       {error ? (
         <div className={errorClass}>{error}</div>
       ) : (
         <p className="text-center text-sm text-muted-foreground">
           {deepLink ? (
             <>
-              If the app didn&apos;t open automatically,{" "}
+              {t("desktop_complete_not_opened")}{" "}
               <a href={deepLink} className="font-medium text-foreground underline">
-                click here
+                {t("desktop_complete_click_here")}
               </a>
               .
             </>
           ) : (
-            "One moment…"
+            t("accept_invite_loading")
           )}
         </p>
       )}

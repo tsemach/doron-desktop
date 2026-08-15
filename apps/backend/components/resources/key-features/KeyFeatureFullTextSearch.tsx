@@ -1,38 +1,29 @@
 import { Search, Zap, HelpCircle } from "lucide-react";
 import FeatureBlock from "@/components/marketing/FeatureBlock";
 import FeatureRowList from "@/components/marketing/FeatureRowList";
+import { useLanguage } from "../../../context/LanguageContext";
 
 export default function KeyFeatureFullTextSearch() {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-4">
       <FeatureBlock
         icon={Search}
-        title="Smart Full-Text Search"
-        description="Locate document segments, quotes, or metadata fields in milliseconds. Our dual FTS5 & vector-enabled search engine indexes full document content, matching natural language concepts as well as exact keyword patterns."
-        bullets={[
-          "Local SQLite FTS5 index scans millions of words instantly",
-          "Pinpoints exactly which pages and files match your query",
-          "AI-assisted query expansion for synonyms and legal terms",
-        ]}
+        title={t("kf_search_title")}
+        description={t("kf_search_desc")}
+        bullets={[t("kf_search_bullet_1"), t("kf_search_bullet_2"), t("kf_search_bullet_3")]}
         mockup={{
           type: "screenshot",
           src: "/screenshot_smart_search_results.png",
-          alt: "Smart search engine (FTS5 results)",
+          alt: t("kf_search_alt"),
         }}
       />
 
       <FeatureRowList
         items={[
-          {
-            icon: Zap,
-            title: "FTS5 Engine",
-            description: "Fully optimized local SQLite FTS5 index pinpoints exactly which pages and files match your terms.",
-          },
-          {
-            icon: HelpCircle,
-            title: "AI-Assisted Expansion",
-            description: "Parses synonyms, legal terms, and contextual themes to expand your queries automatically.",
-          },
+          { icon: Zap, title: t("kf_search_row1_title"), description: t("kf_search_row1_desc") },
+          { icon: HelpCircle, title: t("kf_search_row2_title"), description: t("kf_search_row2_desc") },
         ]}
       />
     </div>

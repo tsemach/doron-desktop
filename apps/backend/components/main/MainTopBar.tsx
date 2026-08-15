@@ -3,6 +3,8 @@
 import Link from "next/link";
 import TopBarShell from "./TopBarShell";
 import MainTopBarResourcesDropdown from "./MainTopBarResourcesDropdown";
+import { useLanguage } from "../../context/LanguageContext";
+import type { TranslationKey } from "../../locales/translations";
 
 type Props = {
   userName: string | null;
@@ -10,13 +12,15 @@ type Props = {
   handleLogout: () => void;
 }
 
-const NAV_LINKS = [
-  { label: "Products", href: "/products" },
-  { label: "Download", href: "/download" },
-  { label: "Pricing", href: "/pricing" },
+const NAV_LINKS: { labelKey: TranslationKey; href: string }[] = [
+  { labelKey: "nav_products", href: "/products" },
+  { labelKey: "nav_download", href: "/download" },
+  { labelKey: "nav_pricing", href: "/pricing" },
 ];
 
 export default function MainTopBar({ userName, tier, handleLogout }: Props) {
+  const { t } = useLanguage();
+
   return (
     <TopBarShell
       logoHref="/home"
@@ -25,13 +29,13 @@ export default function MainTopBar({ userName, tier, handleLogout }: Props) {
       handleLogout={handleLogout}
       nav={
         <nav className="flex items-center gap-6">
-          {NAV_LINKS.map(({ label, href }) => (
+          {NAV_LINKS.map(({ labelKey, href }) => (
             <Link
               key={href}
               href={href}
               className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
             >
-              {label}
+              {t(labelKey)}
             </Link>
           ))}
           <MainTopBarResourcesDropdown />

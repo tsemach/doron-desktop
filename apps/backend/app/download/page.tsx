@@ -6,10 +6,12 @@ import { Download, ShieldCheck, Laptop, Apple, ArrowLeft } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import MainTopBar from "@/components/main/MainTopBar";
+import { useLanguage } from "../../context/LanguageContext";
 
 const FALLBACK_URL = "https://github.com/tsemach/doron-desktop/releases/latest";
 
 export default function DownloadDashboard() {
+  const { t } = useLanguage();
   const [userName, setUserName] = React.useState<string | null>(null);
   const [tier, setTier] = React.useState<string | null>(null);
   const [windowsUrl, setWindowsUrl] = React.useState<string>(FALLBACK_URL);
@@ -83,9 +85,9 @@ export default function DownloadDashboard() {
 
           <Link
             href="/"
-            className="absolute top-6 left-6 text-slate-400 hover:text-slate-700 transition-colors"
+            className="absolute top-6 left-6 rtl:left-auto rtl:right-6 text-slate-400 hover:text-slate-700 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 rtl:scale-x-[-1]" />
           </Link>
 
           {/* Branding & Status */}
@@ -93,29 +95,21 @@ export default function DownloadDashboard() {
             <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-4">
               <ShieldCheck className="w-7 h-7 text-emerald-600" />
             </div>
-            <h1 className="text-2xl font-medium tracking-tight text-slate-900">
-              Secure Downloads
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Verified standalone installer and build assets
-            </p>
+            <h1 className="text-2xl font-medium tracking-tight text-slate-900">{t("download_title")}</h1>
+            <p className="text-sm text-slate-500 mt-1">{t("download_subtitle")}</p>
           </div>
 
           {/* Content */}
           <div className="border-t border-b border-border py-6 my-6 text-slate-600 space-y-3">
-            <p className="text-sm">
-              {userName
-                ? "Download the standalone client below."
-                : "No account needed to download -- you'll sign in from inside the app."}
-            </p>
+            <p className="text-sm">{userName ? t("download_authed_note") : t("download_anon_note")}</p>
             <div className="flex items-center justify-center gap-6 text-xs font-semibold text-slate-400">
               <span className="flex items-center gap-1">
                 <ShieldCheck className="w-4 h-4 text-slate-400" />
-                Signed Build
+                {t("download_signed_build")}
               </span>
               <span className="flex items-center gap-1">
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                SHA256 Verified
+                {t("download_sha_verified")}
               </span>
             </div>
           </div>
@@ -128,7 +122,7 @@ export default function DownloadDashboard() {
                 className="w-full h-11 gap-2 font-semibold cursor-pointer"
               >
                 <Laptop className="w-4 h-4" />
-                Windows
+                {t("download_windows")}
               </Button>
             </a>
             <a href={macUrl}>
@@ -137,7 +131,7 @@ export default function DownloadDashboard() {
                 className="w-full h-11 gap-2 font-semibold cursor-pointer"
               >
                 <Apple className="w-4 h-4" />
-                macOS
+                {t("download_macos")}
               </Button>
             </a>
           </div>
@@ -148,7 +142,7 @@ export default function DownloadDashboard() {
               className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
-              Also available for Linux (.AppImage)
+              {t("download_linux_note")}
             </a>
           )}
 

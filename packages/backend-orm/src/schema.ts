@@ -39,6 +39,17 @@ export const users = pgTable("users", {
   role: text("role", { enum: ["admin", "manager", "user", "flat"] }).default("flat").notNull(),
   // Null for flat users. Set from the accepted invitation for admin/manager/user.
   firmId: text("firm_id").references(() => firms.id, { onDelete: "cascade" }),
+  // ASC-157 -- interface language, same "en"/"he" values as the desktop
+  // app's LanguageContext. DB-backed (not just localStorage/cookie) so the
+  // preference follows the user across devices.
+  locale: text("locale", { enum: ["en", "he"] }).default("en").notNull(),
+  // ASC-157 -- interface font id, same option set as desktop's FontContext
+  // (apps/desktop/src/context/FontContext.tsx AppFont).
+  interfaceFont: text("interface_font", {
+    enum: ["plex", "assistant", "noto", "frank", "rubik", "heebo"],
+  })
+    .default("plex")
+    .notNull(),
   // Soft delete only (ASC-142 rule 12) -- every lookup used for
   // authentication (verifyCredentials, desktop-session, authorizeOrgRequest)
   // must filter this out; nothing here hard-deletes a user row.

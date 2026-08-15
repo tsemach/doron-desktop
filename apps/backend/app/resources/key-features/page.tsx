@@ -13,23 +13,26 @@ import KeyFeatureDocumentTagsAndNotes from "@/components/resources/key-features/
 import KeyFeatureEmailCorrespondencesSync from "@/components/resources/key-features/KeyFeatureEmailCorrespondencesSync";
 import KeyFeatureTaskManagement from "@/components/resources/key-features/KeyFeatureTaskManagement";
 import KeyFeatureTeamsAndRoles from "@/components/resources/key-features/KeyFeatureTeamsAndRoles";
+import { useLanguage } from "../../../context/LanguageContext";
+import type { TranslationKey } from "../../../locales/translations";
 
 // Moved from apps/backend/app/page.tsx to apps/backend/app/home/page.tsx --
 // this was the entire home page's content; "/" itself has no page component
 // of its own anymore, it's pure middleware routing (redirect to /app when
 // logged in, rewrite to /home otherwise -- see middlewareLogic.ts).
-const FEATURE_TABS: PillTab[] = [
-  { id: "central-working-space", label: "Working Space" },
-  { id: "case-management-tracking", label: "Case Management" },
-  { id: "ai-document-indexing", label: "AI Indexing" },
-  { id: "smart-full-text-search", label: "Full-Text Search" },
-  { id: "document-tags-notes", label: "Tags & Notes" },
-  { id: "email-correspondences-sync", label: "Email Sync" },
-  { id: "task-management", label: "Task Management" },
-  { id: "teams-and-roles", label: "Teams & Roles" },
+const FEATURE_TABS: { id: string; labelKey: TranslationKey }[] = [
+  { id: "central-working-space", labelKey: "kf_tab_working_space" },
+  { id: "case-management-tracking", labelKey: "kf_tab_case_management" },
+  { id: "ai-document-indexing", labelKey: "kf_tab_ai_indexing" },
+  { id: "smart-full-text-search", labelKey: "kf_tab_full_text_search" },
+  { id: "document-tags-notes", labelKey: "kf_tab_tags_notes" },
+  { id: "email-correspondences-sync", labelKey: "kf_tab_email_sync" },
+  { id: "task-management", labelKey: "kf_tab_task_management" },
+  { id: "teams-and-roles", labelKey: "kf_tab_teams_roles" },
 ];
 
 export default function KeyFeaturesPage() {
+  const { t } = useLanguage();
   const [userName, setUserName] = useState<string | null>(null);
   const [tier, setTier] = useState<string | null>(null);
   const [featureSelected, setFeatureSelected] = useState<string>("central-working-space");
@@ -61,19 +64,21 @@ export default function KeyFeaturesPage() {
     setFeatureSelected(featureId);
   };
 
+  const featureTabs: PillTab[] = FEATURE_TABS.map(({ id, labelKey }) => ({ id, label: t(labelKey) }));
+
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans">
       <MainTopBar userName={userName} tier={tier} handleLogout={handleLogout} />
 
       <HeroSection
-        kicker="Features"
-        title="Everything you need, in one workspace"
-        subtitle="A closer look at what Ascurix Desktop handles for you every day."
+        kicker={t("key_features_kicker")}
+        title={t("home_features_title")}
+        subtitle={t("key_features_subtitle")}
       />
 
       <main className="flex-grow w-full px-6 pb-16">
         <div className="max-w-5xl mx-auto space-y-10">
-          <PillTabs tabs={FEATURE_TABS} activeId={featureSelected} onSelect={onFeatureSelect} />
+          <PillTabs tabs={featureTabs} activeId={featureSelected} onSelect={onFeatureSelect} />
 
           {featureSelected === "central-working-space" && <KeyFeatureCentralWorkingSpace />}
           {featureSelected === "case-management-tracking" && <KeyFeatureCaseManagementAndTraking />}

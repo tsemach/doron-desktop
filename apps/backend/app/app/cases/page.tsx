@@ -1,5 +1,5 @@
 import ComingSoon from "@/components/app/ComingSoon";
 
 export default function CasesComingSoonPage() {
-  return <ComingSoon feature="Cases" />;
+  return <ComingSoon featureKey="nav_cases" />;
 }

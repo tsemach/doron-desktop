@@ -53,6 +53,10 @@
   --radius-4xl: calc(var(--radius) * 2.6);
   --font-display: var(--font-fraunces);
   --font-heading: var(--font-rubik);
+  /* ASC-157 -- interface font picker (Profile > Preferences). --app-font-sans
+     is set at runtime by context/FontContext.tsx; falls back to the default
+     picker option (IBM Plex Sans Hebrew) pre-hydration / with JS disabled. */
+  --font-sans: var(--app-font-sans, var(--font-plex, ui-sans-serif, system-ui, sans-serif));
 }
 
 :root {
@@ -120,6 +124,6 @@
     outline-color: var(--ring);
   }
   html, body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 }
