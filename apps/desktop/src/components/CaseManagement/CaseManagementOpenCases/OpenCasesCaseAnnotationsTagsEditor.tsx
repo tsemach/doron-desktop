@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import TagChip from "@/components/ui/TagChip";
-import CaseManagementCompanyField from "../CaseManagementCompanyField";
+import CaseManagementOrganizationField from "../CaseManagementOrganizationField";
 import type { Tag } from "../CaseManagementTypes";
 
 interface OpenCasesCaseAnnotationsTagsEditorProps {
@@ -23,10 +23,10 @@ export default function OpenCasesCaseAnnotationsTagsEditor({
   const [newTagValue, setNewTagValue] = useState("");
 
   const isTypingFollowup = newTagName.trim().toLowerCase() === "followup";
-  const isTypingCompany = newTagName.trim().toLowerCase() === "company";
+  const isTypingOrganization = newTagName.trim().toLowerCase() === "organization";
 
-  // Ensure "followup"/"waiting"/"company" are always offered, excluding already-added tags.
-  const filteredSuggestions = [...new Set(["followup", "waiting", "company", ...suggestedTags])].filter(
+  // Ensure "followup"/"waiting"/"organization" are always offered, excluding already-added tags.
+  const filteredSuggestions = [...new Set(["followup", "waiting", "organization", ...suggestedTags])].filter(
     (name) => !userTags.some((tg) => tg.name === name)
   );
 
@@ -71,11 +71,11 @@ export default function OpenCasesCaseAnnotationsTagsEditor({
       {/* Optional value for the tag currently being typed */}
       {newTagName.trim() && (
         <div className="flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
-          {isTypingCompany ? (
-            <CaseManagementCompanyField
+          {isTypingOrganization ? (
+            <CaseManagementOrganizationField
               value={newTagValue}
               onChange={setNewTagValue}
-              placeholder="Company name..."
+              placeholder="Organization name..."
               className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
             />
           ) : (

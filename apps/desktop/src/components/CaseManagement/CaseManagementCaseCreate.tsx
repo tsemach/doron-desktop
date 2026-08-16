@@ -32,7 +32,7 @@ export default function CaseManagementCaseCreate() {
   const {
     subject,
     name,
-    company,
+    organization,
     folder,
     selectedTemplateId,
     selectedTaskTemplateId,
@@ -432,12 +432,12 @@ export default function CaseManagementCaseCreate() {
         fieldValues,
       });
 
-      if (company.trim()) {
+      if (organization.trim()) {
         await invoke("add_tag", {
           scopeType: "case",
           scopeValue: String(createdCase.id),
-          name: "company",
-          value: company.trim(),
+          name: "organization",
+          value: organization.trim(),
           tagType: "user",
         });
       }
@@ -506,9 +506,9 @@ export default function CaseManagementCaseCreate() {
                 onNameChange={(value) =>
                   dispatch({ type: CaseCreateActionType.SET_NAME, payload: value })
                 }
-                company={company}
-                onCompanyChange={(value) =>
-                  dispatch({ type: CaseCreateActionType.SET_COMPANY, payload: value })
+                organization={organization}
+                onOrganizationChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_ORGANIZATION, payload: value })
                 }
                 folder={folder}
                 onFolderChange={(value) =>

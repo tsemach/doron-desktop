@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { CaseTemplate } from "./CaseManagementTypes";
 import { TaskTemplate } from "@/lib/task/types";
-import CaseManagementCompanyField from "./CaseManagementCompanyField";
+import CaseManagementOrganizationField from "./CaseManagementOrganizationField";
 import { EMPTY_TEMPLATE_ID } from "@/reducers/case-create.reducer";
 
 interface CaseManagementCaseCreateFormProps {
@@ -9,8 +9,8 @@ interface CaseManagementCaseCreateFormProps {
   onSubjectChange: (value: string) => void;
   name: string;
   onNameChange: (value: string) => void;
-  company: string;
-  onCompanyChange: (value: string) => void;
+  organization: string;
+  onOrganizationChange: (value: string) => void;
   folder: string;
   onFolderChange: (value: string) => void;
   onBrowse: () => void;
@@ -30,8 +30,8 @@ export default function CaseManagementCaseCreateForm({
   onSubjectChange,
   name,
   onNameChange,
-  company,
-  onCompanyChange,
+  organization,
+  onOrganizationChange,
   folder,
   onFolderChange,
   onBrowse,
@@ -79,14 +79,14 @@ export default function CaseManagementCaseCreateForm({
         />
       </div>
 
-      {/* Company (optional) */}
+      {/* Organization (optional) */}
       <div className="space-y-1">
-        <label htmlFor="company" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Company
+        <label htmlFor="organization" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Organization
         </label>
-        <CaseManagementCompanyField
-          value={company}
-          onChange={onCompanyChange}
+        <CaseManagementOrganizationField
+          value={organization}
+          onChange={onOrganizationChange}
           placeholder="e.g. Acme Corp (optional)"
           disabled={loading}
           className="w-full rounded-md border border-input bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all h-[36px]"

@@ -9,7 +9,7 @@ export const EMPTY_TEMPLATE_ID = "empty";
 export enum CaseCreateActionType {
   SET_SUBJECT = "SET_SUBJECT",
   SET_NAME = "SET_NAME",
-  SET_COMPANY = "SET_COMPANY",
+  SET_ORGANIZATION = "SET_ORGANIZATION",
   SET_FOLDER = "SET_FOLDER",
   SELECT_TEMPLATE = "SELECT_TEMPLATE",
   SELECT_TASK_TEMPLATE = "SELECT_TASK_TEMPLATE",
@@ -36,7 +36,7 @@ export interface CaseCreateState {
   // Main case details
   subject: string;
   name: string;
-  company: string;
+  organization: string;
   folder: string;
   selectedTemplateId: string;
   selectedTaskTemplateId: string;
@@ -76,7 +76,7 @@ export interface CaseCreateState {
 export type CaseCreateAction =
   | { type: CaseCreateActionType.SET_SUBJECT; payload: string }
   | { type: CaseCreateActionType.SET_NAME; payload: string }
-  | { type: CaseCreateActionType.SET_COMPANY; payload: string }
+  | { type: CaseCreateActionType.SET_ORGANIZATION; payload: string }
   | { type: CaseCreateActionType.SET_FOLDER; payload: string }
   | { type: CaseCreateActionType.SELECT_TEMPLATE; payload: string }
   | { type: CaseCreateActionType.SELECT_TASK_TEMPLATE; payload: string }
@@ -119,7 +119,7 @@ export function createInitialCaseCreateState(): CaseCreateState {
   return {
     subject: "",
     name: "",
-    company: "",
+    organization: "",
     folder: "",
     selectedTemplateId: EMPTY_TEMPLATE_ID,
     selectedTaskTemplateId: EMPTY_TEMPLATE_ID,
@@ -149,8 +149,8 @@ export function caseCreateReducer(state: CaseCreateState, action: CaseCreateActi
       return { ...state, subject: action.payload };
     case CaseCreateActionType.SET_NAME:
       return { ...state, name: action.payload };
-    case CaseCreateActionType.SET_COMPANY:
-      return { ...state, company: action.payload };
+    case CaseCreateActionType.SET_ORGANIZATION:
+      return { ...state, organization: action.payload };
     case CaseCreateActionType.SET_FOLDER:
       return { ...state, folder: action.payload };
 

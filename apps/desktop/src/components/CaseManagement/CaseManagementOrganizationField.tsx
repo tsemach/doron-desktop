@@ -1,8 +1,8 @@
 import { useState } from "react";
 import TagValueCombobox from "@/components/ui/TagValueCombobox";
-import CaseManagementAddCompanyModal from "./CaseManagementAddCompanyModal";
+import CaseManagementAddOrganizationModal from "./CaseManagementAddOrganizationModal";
 
-interface CaseManagementCompanyFieldProps {
+interface CaseManagementOrganizationFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -11,40 +11,40 @@ interface CaseManagementCompanyFieldProps {
 }
 
 /**
- * Company combobox + "add new company" modal, shared by the case creation form
+ * Organization combobox + "add new organization" modal, shared by the case creation form
  * and the case annotations tag editor so both pick-existing/create-new flows
  * stay identical.
  */
-export default function CaseManagementCompanyField({
+export default function CaseManagementOrganizationField({
   value,
   onChange,
   placeholder,
   disabled,
   className,
-}: CaseManagementCompanyFieldProps) {
-  const [pendingNewCompany, setPendingNewCompany] = useState<string | null>(null);
+}: CaseManagementOrganizationFieldProps) {
+  const [pendingNewOrganization, setPendingNewOrganization] = useState<string | null>(null);
 
   return (
     <>
       <TagValueCombobox
-        tagName="company"
+        tagName="organization"
         value={value}
         onChange={onChange}
         placeholder={placeholder}
         disabled={disabled}
         className={className}
         onValueCommitted={(v, isNew) => {
-          if (isNew) setPendingNewCompany(v);
+          if (isNew) setPendingNewOrganization(v);
         }}
       />
-      {pendingNewCompany && (
-        <CaseManagementAddCompanyModal
-          initialCompanyName={pendingNewCompany}
+      {pendingNewOrganization && (
+        <CaseManagementAddOrganizationModal
+          initialOrganizationName={pendingNewOrganization}
           onConfirm={(name) => {
             onChange(name);
-            setPendingNewCompany(null);
+            setPendingNewOrganization(null);
           }}
-          onCancel={() => setPendingNewCompany(null)}
+          onCancel={() => setPendingNewOrganization(null)}
         />
       )}
     </>

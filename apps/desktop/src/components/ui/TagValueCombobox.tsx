@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface TagValueComboboxProps {
-  /** Tag name whose existing values populate the suggestion list (e.g. "company"). */
+  /** Tag name whose existing values populate the suggestion list (e.g. "organization"). */
   tagName: string;
   value: string;
   onChange: (value: string) => void;
