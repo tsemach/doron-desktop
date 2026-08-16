@@ -159,7 +159,7 @@ export default function OpenCasesTagSearchBar({
           type="text"
           value={freeText}
           onChange={(e) => onFreeTextChange(e.target.value)}
-          placeholder="Search within this company..."
+          placeholder="Search within this organization..."
           className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none"
         />
       </div>
