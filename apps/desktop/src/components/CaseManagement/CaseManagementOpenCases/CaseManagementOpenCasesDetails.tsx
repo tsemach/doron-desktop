@@ -621,6 +621,7 @@ export default function CaseManagementOpenCasesDetails() {
                   selectedCase={selectedCase}
                   onViewTasks={() => setActiveRightTab("tasks")}
                   onViewEmails={() => setActiveRightTab("emails")}
+                  onEditNotesAndTags={() => setEditingCaseAnnotations(selectedCase)}
                 />
               ) : docSubTab === "history" && selectedDocument ? (
                 <OpenCasesDocumentHistory
