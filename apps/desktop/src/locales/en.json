@@ -136,5 +136,17 @@
   "recent_cases": "Recent Cases",
   "no_recent_cases": "No cases visited yet",
   "view_all_cases": "View all",
-  "search_documents_placeholder": "Search documents in Hebrew or English..."
+  "search_documents_placeholder": "Search documents in Hebrew or English...",
+  "case_type_label": "Case Type",
+  "case_type_select_placeholder": "Select case type...",
+  "case_type_litigation": "Litigation",
+  "case_type_commercial_corporate": "Commercial & Corporate Law",
+  "case_type_real_estate": "Real Estate & Property Law",
+  "case_type_labor_employment": "Labor & Employment Law",
+  "case_type_family_law": "Family Law",
+  "case_type_criminal_white_collar": "Criminal & White-Collar Law",
+  "case_type_torts_medical_malpractice": "Torts & Medical Malpractice",
+  "case_type_ip_hi_tech": "Intellectual Property & Hi-Tech",
+  "case_type_tax_law": "Tax Law",
+  "case_type_administrative_public": "Administrative & Public Law"
 }

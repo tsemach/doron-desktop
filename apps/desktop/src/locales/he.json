@@ -136,5 +136,17 @@
   "recent_cases": "תיקים אחרונים",
   "no_recent_cases": "עדיין לא נצפו תיקים",
   "view_all_cases": "הצג הכל",
-  "search_documents_placeholder": "חפש מסמכים בעברית או באנגלית..."
+  "search_documents_placeholder": "חפש מסמכים בעברית או באנגלית...",
+  "case_type_label": "תחום התמחות",
+  "case_type_select_placeholder": "בחר תחום התמחות...",
+  "case_type_litigation": "ליטיגציה",
+  "case_type_commercial_corporate": "מסחרי ותאגידים",
+  "case_type_real_estate": "מקרקעין ונדל\"ן",
+  "case_type_labor_employment": "דיני עבודה",
+  "case_type_family_law": "דיני משפחה ומעמד אישי",
+  "case_type_criminal_white_collar": "משפט פלילי וצווארון לבן",
+  "case_type_torts_medical_malpractice": "נזיקין ורשלנות רפואית",
+  "case_type_ip_hi_tech": "קניין רוחני והייטק",
+  "case_type_tax_law": "מיסים",
+  "case_type_administrative_public": "משפט מנהלי וציבורי"
 }

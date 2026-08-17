@@ -3,6 +3,8 @@ import { CaseTemplate } from "./CaseManagementTypes";
 import { TaskTemplate } from "@/lib/task/types";
 import CaseManagementOrganizationField from "./CaseManagementOrganizationField";
 import { EMPTY_TEMPLATE_ID } from "@/reducers/case-create.reducer";
+import { CASE_TYPE_OPTIONS } from "./caseTypeOptions";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface CaseManagementCaseCreateFormProps {
   subject: string;
@@ -11,6 +13,8 @@ interface CaseManagementCaseCreateFormProps {
   onNameChange: (value: string) => void;
   organization: string;
   onOrganizationChange: (value: string) => void;
+  caseType: string;
+  onCaseTypeChange: (value: string) => void;
   folder: string;
   onFolderChange: (value: string) => void;
   onBrowse: () => void;
@@ -32,6 +36,8 @@ export default function CaseManagementCaseCreateForm({
   onNameChange,
   organization,
   onOrganizationChange,
+  caseType,
+  onCaseTypeChange,
   folder,
   onFolderChange,
   onBrowse,
@@ -45,6 +51,8 @@ export default function CaseManagementCaseCreateForm({
   templateHelpOpen,
   onToggleTemplateHelp,
 }: CaseManagementCaseCreateFormProps) {
+  const { t } = useLanguage();
+
   return (
     <>
       {/* Subject */}
@@ -91,6 +99,34 @@ export default function CaseManagementCaseCreateForm({
           disabled={loading}
           className="w-full rounded-md border border-input bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all h-[36px]"
         />
+      </div>
+
+      {/* Case Type (optional) */}
+      <div className="space-y-1">
+        <label htmlFor="caseType" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {t("case_type_label")}
+        </label>
+        <div className="relative">
+          <select
+            id="caseType"
+            value={caseType}
+            onChange={(e) => onCaseTypeChange(e.target.value)}
+            className="w-full rounded-md border-0 bg-background pl-3.5 pr-10 rtl:pr-3.5 rtl:pl-10 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring h-[36px] shadow-[0_0_0_1px_var(--border)] appearance-none cursor-pointer"
+            disabled={loading}
+          >
+            <option value="">{t("case_type_select_placeholder")}</option>
+            {CASE_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-3.5 rtl:left-3.5 rtl:right-auto flex items-center pointer-events-none text-muted-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
       </div>
 
       {/* Folder Path */}
