@@ -58,6 +58,42 @@ export default function CaseOverviewPanel({
         </div>
 
         <div className="space-y-3">
+          {followupStatus && (
+            <div
+              className={`rounded-md border p-3 ${
+                followupStatus.type === "overdue"
+                  ? "bg-rose-50 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/60"
+                  : followupStatus.type === "due-today"
+                  ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/60"
+                  : "bg-blue-50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60"
+              }`}
+            >
+              <h4
+                className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                  followupStatus.type === "overdue"
+                    ? "text-rose-700 dark:text-rose-300"
+                    : followupStatus.type === "due-today"
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-blue-600 dark:text-blue-300"
+                }`}
+              >
+                {t("status_followup")}
+              </h4>
+              <div
+                className={`text-xs font-semibold flex items-center gap-1.5 ${
+                  followupStatus.type === "overdue"
+                    ? "text-rose-700 dark:text-rose-300"
+                    : followupStatus.type === "due-today"
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-blue-600 dark:text-blue-300"
+                }`}
+              >
+                <span>{followupStatus.type === "overdue" ? "⚠️" : followupStatus.type === "due-today" ? "⏰" : "📅"}</span>
+                {followupStatus.label}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-md border border-border bg-muted/20 p-3">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("notes")}</h4>
@@ -97,42 +133,6 @@ export default function CaseOverviewPanel({
               <p className="text-xs text-muted-foreground italic">{t("no_tags_for_case")}</p>
             )}
           </div>
-
-          {followupStatus && (
-            <div
-              className={`rounded-md border p-3 ${
-                followupStatus.type === "overdue"
-                  ? "bg-rose-50 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/60"
-                  : followupStatus.type === "due-today"
-                  ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/60"
-                  : "bg-blue-50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60"
-              }`}
-            >
-              <h4
-                className={`text-xs font-bold uppercase tracking-wider mb-1 ${
-                  followupStatus.type === "overdue"
-                    ? "text-rose-700 dark:text-rose-300"
-                    : followupStatus.type === "due-today"
-                    ? "text-amber-700 dark:text-amber-300"
-                    : "text-blue-600 dark:text-blue-300"
-                }`}
-              >
-                {t("status_followup")}
-              </h4>
-              <div
-                className={`text-xs font-semibold flex items-center gap-1.5 ${
-                  followupStatus.type === "overdue"
-                    ? "text-rose-700 dark:text-rose-300"
-                    : followupStatus.type === "due-today"
-                    ? "text-amber-700 dark:text-amber-300"
-                    : "text-blue-600 dark:text-blue-300"
-                }`}
-              >
-                <span>{followupStatus.type === "overdue" ? "⚠️" : followupStatus.type === "due-today" ? "⏰" : "📅"}</span>
-                {followupStatus.label}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
