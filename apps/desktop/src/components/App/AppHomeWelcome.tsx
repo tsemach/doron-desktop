@@ -17,8 +17,8 @@ export function AppHomeWelcome() {
   }
 
   return (
-    // Welcome Title & Input -- right-aligned, sits directly beside the user avatar
-    <div className="text-right space-y-1.5 shrink-0">
+    // Welcome Title & Input -- left-aligned, sits at the top-left of the page
+    <div className="text-left space-y-1.5 shrink-0">
       <h2 className="text-xl font-bold tracking-tight whitespace-nowrap">
         {username ? (
           <>
@@ -34,7 +34,7 @@ export function AppHomeWelcome() {
 
       {/* Show input below the heading if name doesn't exist */}
       {!username && (
-        <form onSubmit={handleSaveName} className="flex items-center justify-end gap-2 mt-2">
+        <form onSubmit={handleSaveName} className="flex items-center justify-start gap-2 mt-2">
           <input
             type="text"
             value={nameInput}
