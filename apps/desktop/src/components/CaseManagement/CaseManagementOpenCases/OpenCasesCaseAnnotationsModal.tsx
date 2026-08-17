@@ -83,6 +83,16 @@ export default function OpenCasesCaseAnnotationsModal({
     loadSuggestedTags();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
   async function loadSuggestedTags() {
     try {
       const allTags = await invoke<string[]>("list_all_tag_names", { tagType: "user" });
