@@ -22,12 +22,12 @@ export default function TaskStatusSelect({ value, onChange, disabled, size = "sm
   const sizeClasses =
     size === "sm"
       ? "pl-1.5 pr-5 py-1 text-xs rounded"
-      : "w-full pl-3 pr-9 py-2 text-sm rounded-md";
+      : "w-full pl-3 pr-9 py-1.5 text-sm rounded-md";
   const chevronPositionClass = size === "sm" ? "right-1.5" : "right-3";
   const chevronSize = size === "sm" ? 10 : 14;
 
   return (
-    <div className="relative inline-block">
+    <div className={`relative ${size === "md" ? "block w-full" : "inline-block"}`}>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as TaskStatus)}

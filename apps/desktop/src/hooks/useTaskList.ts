@@ -44,9 +44,20 @@ export function useTaskList<T extends Task = Task>(fetchTasks: () => Promise<T[]
   const changeStatus = useCallback(async (id: number, status: TaskStatus) => {
     try {
       await invoke("update_task_status", { id, status });
-      await reload();
+      dispatch({ type: TaskListActionType.UPDATE_TASK_STATUS, payload: { id, status } });
     } catch (err) {
       alert(`Error updating task status: ${err}`);
+    }
+  }, []);
+
+  const reorderTasks = useCallback(async (orderedIds: number[]) => {
+    dispatch({ type: TaskListActionType.REORDER_TASKS, payload: orderedIds });
+    try {
+      await invoke("reorder_tasks", { taskIds: orderedIds });
+    } catch (err) {
+      console.error(err);
+      alert(`Error reordering tasks: ${err}`);
+      await reload();
     }
   }, [reload]);
 
@@ -83,6 +94,7 @@ export function useTaskList<T extends Task = Task>(fetchTasks: () => Promise<T[]
     pendingDeleteId: state.pendingDeleteId,
     reload,
     changeStatus,
+    reorderTasks,
     removeTask,
     startCreate,
     startEdit,

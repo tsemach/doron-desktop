@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTaskList } from "@/hooks/useTaskList";
 import TaskList from "@/components/ui/TaskList";
+import TaskStatusOverview from "@/components/ui/TaskStatusOverview";
 import TaskForm, { TaskFormValues } from "@/components/ui/TaskForm";
 import { Task, TaskStatus } from "@/lib/task/types";
 
@@ -20,6 +21,7 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
     pendingDeleteId,
     reload,
     changeStatus,
+    reorderTasks,
     removeTask,
     startCreate,
     startEdit,
@@ -28,11 +30,35 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
   } = useTaskList(() => invoke<Task[]>("list_tasks_for_case", { caseId }), caseId);
 
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
   const filteredTasks = useMemo(
     () => (statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter)),
     [tasks, statusFilter]
   );
+
+  // Manual reordering (drag, or the move-up/down controls below) only applies
+  // to the unfiltered list -- a filtered subset doesn't map cleanly back to
+  // the case's full task order.
+  const canReorder = statusFilter === "all";
+
+  const handleSelectTask = useCallback((id: number) => {
+    setSelectedTaskId((current) => (current === id ? null : id));
+  }, []);
+
+  const selectedIndex = selectedTaskId === null ? -1 : filteredTasks.findIndex((t) => t.id === selectedTaskId);
+  const canMoveUp = canReorder && selectedIndex > 0;
+  const canMoveDown = canReorder && selectedIndex !== -1 && selectedIndex < filteredTasks.length - 1;
+
+  function handleMoveSelected(direction: -1 | 1) {
+    if (!canReorder || selectedTaskId === null) return;
+    const ids = filteredTasks.map((t) => t.id);
+    const index = ids.indexOf(selectedTaskId);
+    const targetIndex = index + direction;
+    if (index === -1 || targetIndex < 0 || targetIndex >= ids.length) return;
+    [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
+    reorderTasks(ids);
+  }
 
   async function handleSave(values: TaskFormValues) {
     try {
@@ -67,11 +93,44 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
 
   return (
     <div className="p-4 space-y-3">
+      <div className="max-w-2xl">
+        <TaskStatusOverview tasks={tasks} />
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Tasks ({filteredTasks.length})
         </h4>
         <div className="flex items-center gap-2">
+          {canReorder && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => handleMoveSelected(-1)}
+                disabled={!canMoveUp}
+                className="p-1.5 rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Move selected task up"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMoveSelected(1)}
+                disabled={!canMoveDown}
+                className="p-1.5 rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Move selected task down"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <polyline points="5 12 12 19 19 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           <div className="relative">
             <select
               value={statusFilter}
@@ -88,6 +147,7 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
               </svg>
             </div>
           </div>
+
           <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
             <button
               type="button"
@@ -113,13 +173,18 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
       {loading ? (
         <div className="text-xs text-muted-foreground">Loading tasks...</div>
       ) : (
-        <TaskList
-          tasks={filteredTasks}
-          onStatusChange={changeStatus}
-          onEdit={startEdit}
-          onDelete={setPendingDelete}
-          emptyMessage={statusFilter === "all" ? "No tasks for this case yet." : "No tasks match this filter."}
-        />
+        <div className="max-w-2xl">
+          <TaskList
+            tasks={filteredTasks}
+            onStatusChange={changeStatus}
+            onEdit={startEdit}
+            onDelete={setPendingDelete}
+            onReorder={canReorder ? reorderTasks : undefined}
+            selectedId={selectedTaskId}
+            onSelectTask={canReorder ? handleSelectTask : undefined}
+            emptyMessage={statusFilter === "all" ? "No tasks for this case yet." : "No tasks match this filter."}
+          />
+        </div>
       )}
 
       {editingTask && (

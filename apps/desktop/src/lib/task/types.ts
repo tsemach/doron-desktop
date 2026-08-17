@@ -54,6 +54,7 @@ export interface Task {
   task_template_item_id: number | null;
   created_at: string;
   updated_at: string | null;
+  sort_order: number;
 }
 
 // Mirrors Rust's TaskWithCaseRow ( #[serde(flatten)] task + case_subject/

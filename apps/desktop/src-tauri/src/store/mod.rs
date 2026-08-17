@@ -156,6 +156,30 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     conn.execute_batch(TASKS_SCHEMA).map_err(|e| format!("[tasks schema] {e}"))?;
 
+    // Ensure 'sort_order' column exists in 'tasks'; backfill from the previous
+    // due-date order so upgrading doesn't visibly reshuffle existing task lists.
+    let tasks_sort_order_exists: bool = conn.query_row(
+        "SELECT COUNT(1) FROM pragma_table_info('tasks') WHERE name='sort_order'",
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0) > 0;
+    if !tasks_sort_order_exists {
+        let _ = conn.execute("ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;", []);
+        let _ = conn.execute(
+            "UPDATE tasks SET sort_order = (
+                SELECT ranked.rn - 1 FROM (
+                    SELECT id, ROW_NUMBER() OVER (
+                        PARTITION BY case_id
+                        ORDER BY (due_date IS NULL), due_date ASC, id ASC
+                    ) AS rn
+                    FROM tasks
+                ) ranked
+                WHERE ranked.id = tasks.id
+            );",
+            [],
+        );
+    }
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -1026,6 +1050,7 @@ const TASKS_SCHEMA: &str = "
         task_template_item_id  INTEGER,
         created_at             TEXT    NOT NULL,
         updated_at             TEXT,
+        sort_order             INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
         FOREIGN KEY (task_template_item_id) REFERENCES task_template_items(id) ON DELETE SET NULL
     );
@@ -1069,13 +1094,13 @@ pub fn materialize_tasks_from_template(
 
     let now = chrono::Utc::now().to_rfc3339();
 
-    for (item_id, title, estimate_value, estimate_unit, description) in items {
+    for (idx, (item_id, title, estimate_value, estimate_unit, description)) in items.into_iter().enumerate() {
         let due_date = compute_due_date_from_estimate(case_created_at, estimate_value, &estimate_unit);
 
         conn.execute(
-            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at)
-             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
-            params![case_id, title, description, estimate_value, estimate_unit, due_date, item_id, now],
+            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, sort_order)
+             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![case_id, title, description, estimate_value, estimate_unit, due_date, item_id, now, idx as i64],
         )?;
     }
 
@@ -1106,16 +1131,16 @@ pub fn create_tasks_for_new_case(
 ) -> Result<(), rusqlite::Error> {
     let now = chrono::Utc::now().to_rfc3339();
 
-    for t in tasks {
+    for (idx, t) in tasks.iter().enumerate() {
         let due_date = match (t.estimate_value, t.estimate_unit.as_deref()) {
             (Some(value), Some(unit)) => Some(compute_due_date_from_estimate(case_created_at, value, unit)),
             _ => None,
         };
 
         conn.execute(
-            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at)
-             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
-            params![case_id, t.title, t.description, t.estimate_value, t.estimate_unit, due_date, t.template_item_id, now],
+            "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, sort_order)
+             VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![case_id, t.title, t.description, t.estimate_value, t.estimate_unit, due_date, t.template_item_id, now, idx as i64],
         )?;
     }
 
@@ -1135,6 +1160,7 @@ pub struct TaskRow {
     pub task_template_item_id: Option<i64>,
     pub created_at: String,
     pub updated_at: Option<String>,
+    pub sort_order: i64,
 }
 
 fn task_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<TaskRow> {
@@ -1150,13 +1176,14 @@ fn task_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<TaskRow> {
         task_template_item_id: row.get(8)?,
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
+        sort_order: row.get(11)?,
     })
 }
 
 pub fn list_tasks_for_case(conn: &Connection, case_id: i64) -> Result<Vec<TaskRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(
-        "SELECT id, case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, updated_at
-         FROM tasks WHERE case_id = ?1 ORDER BY (due_date IS NULL), due_date ASC, id ASC"
+        "SELECT id, case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, updated_at, sort_order
+         FROM tasks WHERE case_id = ?1 ORDER BY sort_order ASC, id ASC"
     )?;
     let rows = stmt.query_map(params![case_id], task_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
@@ -1172,10 +1199,15 @@ pub fn create_task(
     due_date: Option<&str>,
 ) -> Result<TaskRow, rusqlite::Error> {
     let created_at = chrono::Utc::now().to_rfc3339();
+    let next_sort_order: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tasks WHERE case_id = ?1",
+        params![case_id],
+        |row| row.get(0),
+    )?;
     conn.execute(
-        "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, created_at)
-         VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7)",
-        params![case_id, title, description, estimate_value, estimate_unit, due_date, created_at],
+        "INSERT INTO tasks (case_id, title, description, status, estimate_value, estimate_unit, due_date, created_at, sort_order)
+         VALUES (?1, ?2, ?3, 'Waiting', ?4, ?5, ?6, ?7, ?8)",
+        params![case_id, title, description, estimate_value, estimate_unit, due_date, created_at, next_sort_order],
     )?;
     let id = conn.last_insert_rowid();
     Ok(TaskRow {
@@ -1190,6 +1222,7 @@ pub fn create_task(
         task_template_item_id: None,
         created_at,
         updated_at: None,
+        sort_order: next_sort_order,
     })
 }
 
@@ -1226,6 +1259,18 @@ pub fn delete_task(conn: &Connection, id: i64) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
+/// Persists a user's drag-and-drop reorder of a case's task list: `task_ids`
+/// is the full list of task ids in their new display order, and each task's
+/// `sort_order` is set to its position in that list.
+pub fn reorder_tasks(conn: &Connection, task_ids: &[i64]) -> Result<(), rusqlite::Error> {
+    let tx = conn.unchecked_transaction()?;
+    for (idx, id) in task_ids.iter().enumerate() {
+        tx.execute("UPDATE tasks SET sort_order = ?1 WHERE id = ?2", params![idx as i64, id])?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 #[derive(Serialize, Clone)]
 pub struct TaskWithCaseRow {
     #[serde(flatten)]
@@ -1240,7 +1285,7 @@ pub struct TaskWithCaseRow {
 pub fn list_all_tasks(conn: &Connection) -> Result<Vec<TaskWithCaseRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(
         "SELECT t.id, t.case_id, t.title, t.description, t.status, t.estimate_value, t.estimate_unit,
-                t.due_date, t.task_template_item_id, t.created_at, t.updated_at, c.subject, c.name
+                t.due_date, t.task_template_item_id, t.created_at, t.updated_at, t.sort_order, c.subject, c.name
          FROM tasks t
          JOIN cases c ON t.case_id = c.id
          WHERE c.deleted = 0 OR c.deleted IS NULL
@@ -1260,9 +1305,10 @@ pub fn list_all_tasks(conn: &Connection) -> Result<Vec<TaskWithCaseRow>, rusqlit
                 task_template_item_id: row.get(8)?,
                 created_at: row.get(9)?,
                 updated_at: row.get(10)?,
+                sort_order: row.get(11)?,
             },
-            case_subject: row.get(11)?,
-            case_name: row.get(12)?,
+            case_subject: row.get(12)?,
+            case_name: row.get(13)?,
         })
     })?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
