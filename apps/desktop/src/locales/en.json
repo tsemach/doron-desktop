@@ -139,6 +139,7 @@
   "notes": "Notes",
   "tags": "Tags",
   "edit": "Edit",
+  "organization_label": "Organization",
   "no_notes_for_case": "No notes for this case yet.",
   "no_tags_for_case": "No tags for this case.",
   "needs_followup": "Needs Follow-up",
