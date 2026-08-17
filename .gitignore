@@ -48,3 +48,6 @@ real_emails.json
 
 # Local git worktrees used for isolated implementation sessions
 .worktrees/
+
+# Superpowers scratch state (brainstorm mockups, SDD ledgers/briefs)
+.superpowers/
