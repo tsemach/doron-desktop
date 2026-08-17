@@ -142,6 +142,8 @@
   "no_notes_for_case": "אין הערות לתיק זה.",
   "no_tags_for_case": "אין תגיות לתיק זה.",
   "needs_followup": "דורש מעקב",
+  "loading": "טוען...",
+  "no_tasks_for_case": "אין משימות לתיק זה עדיין.",
   "search_documents_placeholder": "חפש מסמכים בעברית או באנגלית...",
   "case_type_label": "תחום התמחות",
   "case_type_select_placeholder": "בחר תחום התמחות...",

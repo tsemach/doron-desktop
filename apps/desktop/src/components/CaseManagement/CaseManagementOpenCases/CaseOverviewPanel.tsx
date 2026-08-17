@@ -85,7 +85,7 @@ export default function CaseOverviewPanel({
               </button>
             </div>
             {selectedCase.notes ? (
-              <p className="text-xs text-muted-foreground italic whitespace-pre-line">{selectedCase.notes}</p>
+              <p className="text-xs text-muted-foreground italic whitespace-pre-line" dir="auto">{selectedCase.notes}</p>
             ) : (
               <p className="text-xs text-muted-foreground italic">{t("no_notes_for_case")}</p>
             )}

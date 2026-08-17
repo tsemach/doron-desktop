@@ -64,7 +64,7 @@ export default function CaseOverviewEmailsCard({ caseId, onViewAll }: CaseOvervi
       </div>
 
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading...</p>
+        <p className="text-xs text-muted-foreground">{t("loading")}</p>
       ) : error ? (
         <p className="text-xs text-destructive">{error}</p>
       ) : emails.length === 0 ? (
@@ -74,14 +74,14 @@ export default function CaseOverviewEmailsCard({ caseId, onViewAll }: CaseOvervi
           {emails.map((email) => (
             <div key={email.id} className="text-xs py-1 border-b border-border/50 last:border-b-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate font-medium text-foreground" title={email.subject}>
+                <span className="min-w-0 truncate font-medium text-foreground" title={email.subject} dir="auto">
                   {email.subject}
                 </span>
                 <span className="text-[10px] text-muted-foreground shrink-0">
                   {formatShortDate(email.received_at)}
                 </span>
               </div>
-              <div className="text-[10px] text-muted-foreground truncate" title={email.sender}>
+              <div className="text-[10px] text-muted-foreground truncate" title={email.sender} dir="auto">
                 {email.sender}
               </div>
             </div>

@@ -4,6 +4,7 @@ import KebabMenu from "@/components/ui/KebabMenu";
 import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "../../../context/LanguageContext";
 import { getFollowupStatus } from "@/lib/followupStatus";
+import { filterOverviewTags } from "@/lib/caseTags";
 import type { CaseDetailTab } from "../CaseDetailSidebar";
 
 import { Case } from "../CaseManagementTypes";
@@ -86,7 +87,9 @@ export default function OpenDocumentsPanelTopMenu({
         {/* Render tags with conditional followup badge */}
         {(() => {
           const allTags = selectedCase?.tags || [];
-          const visibleTags = allTags.filter((tag) => isDetailView || tag.name.toLowerCase() !== "followup");
+          const visibleTags = isDetailView
+            ? filterOverviewTags(allTags)
+            : allTags.filter((tag) => tag.name.toLowerCase() !== "followup");
           if (visibleTags.length === 0) return null;
 
           return (

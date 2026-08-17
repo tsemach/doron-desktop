@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTaskList } from "@/hooks/useTaskList";
 import { Task } from "@/lib/task/types";
 import { STATUS_OPTION_COLORS } from "@/lib/task/statusColors";
 import { formatShortDate } from "@/lib/formatShortDate";
@@ -12,28 +12,7 @@ interface CaseOverviewTasksCardProps {
 
 export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOverviewTasksCardProps) {
   const { t } = useLanguage();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(null);
-    invoke<Task[]>("list_tasks_for_case", { caseId })
-      .then((res) => {
-        if (active) setTasks(res);
-      })
-      .catch((err) => {
-        if (active) setError(String(err));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [caseId]);
+  const { tasks, loading, error } = useTaskList(() => invoke<Task[]>("list_tasks_for_case", { caseId }), caseId);
 
   return (
     <div className="rounded-md border border-border bg-muted/20 p-3">
@@ -51,11 +30,11 @@ export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOvervie
       </div>
 
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading tasks...</p>
+        <p className="text-xs text-muted-foreground">{t("loading")}</p>
       ) : error ? (
         <p className="text-xs text-destructive">{error}</p>
       ) : tasks.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">No tasks for this case yet.</p>
+        <p className="text-xs text-muted-foreground italic">{t("no_tasks_for_case")}</p>
       ) : (
         <div className="max-h-56 overflow-y-auto space-y-1">
           {tasks.map((task) => (
@@ -71,7 +50,7 @@ export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOvervie
                 }}
                 title={task.status}
               />
-              <span className="flex-1 min-w-0 truncate text-foreground" title={task.title}>
+              <span className="flex-1 min-w-0 truncate text-foreground" title={task.title} dir="auto">
                 {task.title}
               </span>
               {task.due_date && (
