@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Task, TaskStatus } from "@/lib/task/types";
 import { formatEstimateShorthand } from "@/lib/task/estimate";
 import { getTaskUrgency } from "@/lib/task/taskUrgency";
@@ -32,9 +32,23 @@ function formatDueDate(iso: string): string {
 
 function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }: TaskRowProps) {
   const urgency = getTaskUrgency(task.due_date, task.status);
+  const [expanded, setExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const descRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el || expanded) return;
+    setIsOverflowing(el.scrollWidth > el.clientWidth);
+  }, [task.description, expanded]);
 
   return (
-    <div className="flex items-start justify-between gap-3 p-3 rounded-md border border-border bg-muted/20">
+    <div
+      onClick={() => task.description && setExpanded((e) => !e)}
+      className={`flex items-start justify-between gap-3 p-3 rounded-md border border-border bg-muted/20 ${
+        task.description ? "cursor-pointer hover:bg-muted/40 transition-colors" : ""
+      }`}
+    >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-foreground truncate" title={task.title}>
@@ -58,11 +72,25 @@ function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }:
         )}
 
         {task.description && (
-          <p className="text-xs text-muted-foreground whitespace-pre-line">{task.description}</p>
+          <p
+            ref={descRef}
+            dir="auto"
+            className={`text-xs text-muted-foreground ${
+              expanded
+                ? "whitespace-pre-line"
+                : `whitespace-nowrap overflow-hidden ${
+                    isOverflowing
+                      ? "[mask-image:linear-gradient(to_left,black_85%,transparent_100%)] [&:dir(rtl)]:[mask-image:linear-gradient(to_right,black_85%,transparent_100%)]"
+                      : ""
+                  }`
+            }`}
+          >
+            {task.description}
+          </p>
         )}
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
         <TaskStatusSelect
           value={task.status}
           onChange={(status) => onStatusChange(task.id, status)}
