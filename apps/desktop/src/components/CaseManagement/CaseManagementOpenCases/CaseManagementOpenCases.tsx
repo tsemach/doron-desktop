@@ -47,7 +47,7 @@ export default function CaseManagementOpenCases() {
   // Split pane states
   const { percent: leftPercent, isDragging, startDragging } = useSplitPane({
     containerId: "case-management-split-container",
-    initialPercent: 50,
+    initialPercent: 35,
     minPercent: 20,
     maxPercent: 80,
   });
