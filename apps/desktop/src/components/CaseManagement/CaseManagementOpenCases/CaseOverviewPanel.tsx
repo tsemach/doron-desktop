@@ -31,19 +31,23 @@ export default function CaseOverviewPanel({
 
   return (
     <div className="p-4 space-y-3">
-      <div className="pb-3 border-b border-border/60 flex items-center gap-2 flex-wrap">
+      <div className="pb-3 border-b border-border/60 flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-lg font-bold text-foreground leading-snug">
           {selectedCase.subject || t("no_subject")}
         </h3>
-        {caseTypeOption && (
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary">
-            {t(caseTypeOption.labelKey)}
-          </span>
-        )}
-        {organization && (
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
-            {organization}
-          </span>
+        {(caseTypeOption || organization) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {caseTypeOption && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary">
+                {t(caseTypeOption.labelKey)}
+              </span>
+            )}
+            {organization && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                {organization}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
