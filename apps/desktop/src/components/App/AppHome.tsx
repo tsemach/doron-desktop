@@ -11,6 +11,7 @@ import AppHomeRecentCases from "./AppHomeRecentCases";
 import AppHomeDocumentsPanel from "./AppHomeDocumentsPanel";
 import { AppUserMenu } from "./AppUserMenu";
 import { AppHomeWelcome } from "./AppHomeWelcome";
+import { AppHomeOverview } from "./AppHomeOverview";
 
 // Same VITE_BACKEND_URL convention as Auth/AuthLanding.tsx.
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
@@ -69,7 +70,8 @@ export default function AppHome() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-background text-foreground px-10 py-10">
-      <div className="absolute top-6 right-6">
+      <div className="absolute top-4 right-4 flex items-center gap-4">
+        <AppHomeWelcome />
         <AppUserMenu
           handleSettings={handleSettings}
           handleUpgrade={handleUpgrade}
@@ -77,8 +79,8 @@ export default function AppHome() {
         />
       </div>
 
-      <div className="flex-1 flex items-center justify-center">       
-        <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 items-center gap-160 px-6">
+      <div className="flex-1 flex items-start justify-center mt-52">
+        <div className="w-full max-w-7xl mx-auto flex items-start justify-between gap-24 px-6">
 
           {/* Primary navigation wrapper - Aligns content strictly to the left edge */}
           <div className="flex flex-col gap-16 justify-self-start">
@@ -120,10 +122,7 @@ export default function AppHome() {
             </div>
           </div>
 
-          {/* Welcome Component Wrapper - Centered perfectly inside its own right column */}
-          <div className="justify-self-center">
-            <AppHomeWelcome />
-          </div>
+          <AppHomeOverview />
 
         </div>
       </div>

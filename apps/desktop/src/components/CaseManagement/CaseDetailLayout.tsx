@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useCallback, useRef, useState } from "react";
 import CaseDetailSidebar, { CaseDetailTab } from "./CaseDetailSidebar";
 
@@ -8,8 +8,16 @@ export interface CaseDetailOutletContext {
   registerEditAnnotationsHandler: (handler: (() => void) | null) => void;
 }
 
+// Callers that navigate here directly to a specific tab (e.g. the home
+// Overview panel's "jump to case" links) pass this via navigate()'s `state`.
+export interface CaseDetailNavigationState {
+  initialTab?: CaseDetailTab;
+}
+
 export default function CaseDetailLayout() {
-  const [activeRightTab, setActiveRightTab] = useState<CaseDetailTab>("overview");
+  const location = useLocation();
+  const initialTab = (location.state as CaseDetailNavigationState | null)?.initialTab;
+  const [activeRightTab, setActiveRightTab] = useState<CaseDetailTab>(initialTab ?? "overview");
   const editAnnotationsHandlerRef = useRef<(() => void) | null>(null);
 
   const registerEditAnnotationsHandler = useCallback((handler: (() => void) | null) => {
