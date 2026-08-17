@@ -37,6 +37,7 @@ export default function OpenCasesDocument({
 
       <OpenCasesDocumentControl
         doc={doc}
+        onOpenFile={onOpenFile}
         onEditAnnotations={onEditAnnotations}
         onRemoveDocument={onRemoveDocument}
       />

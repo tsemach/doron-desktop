@@ -58,6 +58,7 @@
   "no_files_found_desc": "Any Word, PDF, Excel or text documents placed in the directory will show up here.",
   "no_files_match": "No files match the filter query.",
   "no_files_match_desc": "Try clearing the search query or search for something else.",
+  "open_document": "Open",
   "edit_notes_tags": "Edit notes & tags",
   "open_external": "Open file in system default viewer",
   "remove_document": "Remove document from case",

@@ -17,9 +17,11 @@ interface KebabMenuProps {
   title?: string;
   /** Overrides the default 3-dot trigger icon (e.g. a User icon for an account menu). */
   triggerIcon?: ReactNode;
+  /** Overrides the default dropdown width (e.g. "w-64" for menus with longer labels). */
+  menuClassName?: string;
 }
 
-export default function KebabMenu({ items, triggerClassName, title, triggerIcon }: KebabMenuProps) {
+export default function KebabMenu({ items, triggerClassName, title, triggerIcon, menuClassName }: KebabMenuProps) {
   const [open, setOpen] = useState(false);
   const visibleItems = items.filter((item) => !item.hidden);
 
@@ -58,7 +60,7 @@ export default function KebabMenu({ items, triggerClassName, title, triggerIcon 
           {/* Invisible overlay to close dropdown on click outside */}
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
 
-          <div className="absolute right-0 mt-1.5 w-52 rounded-lg border border-border bg-card shadow-lg py-1 z-40 animate-in fade-in slide-in-from-top-1 duration-100">
+          <div className={`absolute right-0 mt-1.5 ${menuClassName ?? "w-52"} rounded-lg border border-border bg-card shadow-lg py-1 z-40 animate-in fade-in slide-in-from-top-1 duration-100`}>
             {visibleItems.map((item) => (
               <button
                 key={item.label}

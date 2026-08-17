@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSplitPane } from "@/hooks/useSplitPane";
-import { useParams, useOutletContext } from "react-router-dom";
+import { useParams, useOutletContext, Link } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { CaseDetailOutletContext } from "../CaseDetailLayout";
@@ -431,7 +431,9 @@ export default function CaseManagementOpenCasesDetails() {
       <div className="flex items-center gap-3 mb-6 shrink-0">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">{t("case_management")}</span>
+            <Link to="/case-management" className="text-sm text-muted-foreground hover:underline">
+              {t("case_management")}
+            </Link>
             <span className="text-muted-foreground/60 text-xs">/</span>
             <span className="text-sm font-medium text-foreground">{t("case_detail")}</span>
           </div>
