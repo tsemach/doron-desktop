@@ -4,6 +4,7 @@ import { getFollowupStatus } from "@/lib/followupStatus";
 import { findTagValue, filterOverviewTags } from "@/lib/caseTags";
 import { Case } from "../CaseManagementTypes";
 import CaseOverviewTasksCard from "./CaseOverviewTasksCard";
+import CaseOverviewEmailsCard from "./CaseOverviewEmailsCard";
 
 interface CaseOverviewPanelProps {
   caseId: number;
@@ -14,9 +15,6 @@ interface CaseOverviewPanelProps {
 
 export default function CaseOverviewPanel({ caseId, selectedCase, onViewTasks, onViewEmails }: CaseOverviewPanelProps) {
   const { t } = useLanguage();
-  // Not wired into JSX yet — CaseOverviewEmailsCard (Task 6) will consume this.
-  // Referenced here only to satisfy noUnusedParameters until then.
-  void onViewEmails;
 
   const followupStatus = getFollowupStatus(findTagValue(selectedCase.tags, "followup"));
   const overviewTags = filterOverviewTags(selectedCase.tags);
@@ -41,6 +39,7 @@ export default function CaseOverviewPanel({ caseId, selectedCase, onViewTasks, o
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="space-y-3">
           <CaseOverviewTasksCard caseId={caseId} onViewAll={onViewTasks} />
+          <CaseOverviewEmailsCard caseId={caseId} onViewAll={onViewEmails} />
         </div>
 
         <div className="space-y-3">
