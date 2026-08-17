@@ -50,6 +50,17 @@ export function useTaskList<T extends Task = Task>(fetchTasks: () => Promise<T[]
     }
   }, []);
 
+  const reorderTasks = useCallback(async (orderedIds: number[]) => {
+    dispatch({ type: TaskListActionType.REORDER_TASKS, payload: orderedIds });
+    try {
+      await invoke("reorder_tasks", { taskIds: orderedIds });
+    } catch (err) {
+      console.error(err);
+      alert(`Error reordering tasks: ${err}`);
+      await reload();
+    }
+  }, [reload]);
+
   const removeTask = useCallback(async (id: number) => {
     try {
       await invoke("delete_task", { id });
@@ -83,6 +94,7 @@ export function useTaskList<T extends Task = Task>(fetchTasks: () => Promise<T[]
     pendingDeleteId: state.pendingDeleteId,
     reload,
     changeStatus,
+    reorderTasks,
     removeTask,
     startCreate,
     startEdit,

@@ -21,6 +21,17 @@ interface TaskRowProps {
   // per design only reuses status-change/delete) -- the edit button hides.
   onEdit?: (task: Task) => void;
   onDelete: (id: number) => void;
+  // Omitted (default false) on views without manual reordering -- the drag
+  // handle hides and the row isn't a drop target.
+  draggable?: boolean;
+  isDragging?: boolean;
+  onDragStart?: (id: number) => void;
+  onDragEnd?: () => void;
+  onDrop?: (id: number) => void;
+  // Selection drives the move-up/down controls, which live outside this row
+  // (in the panel header) -- omitted on views without manual reordering.
+  isSelected?: boolean;
+  onSelect?: (id: number) => void;
 }
 
 function formatDueDate(iso: string): string {
@@ -31,11 +42,28 @@ function formatDueDate(iso: string): string {
   }
 }
 
-function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }: TaskRowProps) {
+function TaskRowComponent({
+  task,
+  caseLabel,
+  onStatusChange,
+  onEdit,
+  onDelete,
+  draggable = false,
+  isDragging = false,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  isSelected = false,
+  onSelect,
+}: TaskRowProps) {
   const urgency = getTaskUrgency(task.due_date, task.status);
   const [expanded, setExpanded] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const descRef = useRef<HTMLParagraphElement>(null);
+  // A drag gesture fires the same mousedown/mouseup sequence as a click, so
+  // the box being both a click target (expand toggle) and a drag source
+  // would otherwise also flip the description open on every drag attempt.
+  const didDragRef = useRef(false);
 
   useEffect(() => {
     const el = descRef.current;
@@ -44,7 +72,25 @@ function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }:
   }, [task.description, expanded]);
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className={`flex items-center gap-2 ${isDragging ? "opacity-40" : ""}`}
+      onDragOver={
+        draggable
+          ? (e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            }
+          : undefined
+      }
+      onDrop={
+        draggable
+          ? (e) => {
+              e.preventDefault();
+              onDrop?.(task.id);
+            }
+          : undefined
+      }
+    >
       <span
         className="size-2 rounded-full shrink-0"
         style={{
@@ -54,9 +100,30 @@ function TaskRowComponent({ task, caseLabel, onStatusChange, onEdit, onDelete }:
         title={task.status}
       />
       <div
-        onClick={() => task.description && setExpanded((e) => !e)}
-        className={`flex-1 min-w-0 flex items-start justify-between gap-3 p-3 rounded-md border border-border bg-muted/20 ${
-          task.description ? "cursor-pointer hover:bg-muted/40 transition-colors" : ""
+        draggable={draggable}
+        onDragStart={
+          draggable
+            ? (e) => {
+                didDragRef.current = true;
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(task.id));
+                onDragStart?.(task.id);
+              }
+            : undefined
+        }
+        onDragEnd={draggable ? () => onDragEnd?.() : undefined}
+        onClick={() => {
+          if (didDragRef.current) {
+            didDragRef.current = false;
+            return;
+          }
+          onSelect?.(task.id);
+          if (task.description) setExpanded((e) => !e);
+        }}
+        className={`flex-1 min-w-0 flex items-start justify-between gap-3 p-3 rounded-md border bg-muted/20 ${
+          isSelected ? "border-primary ring-2 ring-primary/40 bg-primary/5" : "border-border"
+        } ${task.description ? "cursor-pointer hover:bg-muted/40 transition-colors" : ""} ${
+          draggable ? "cursor-grab active:cursor-grabbing select-none" : ""
         }`}
       >
         <div className="min-w-0 flex-1 space-y-1">
