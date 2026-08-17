@@ -5,12 +5,14 @@ import { CaseFile } from "../CaseManagementTypes";
 
 interface OpenCasesDocumentPanelControlProps {
   doc: CaseFile;
+  onOpenFile: (filePath: string) => void;
   onEditAnnotations: (doc: CaseFile) => void;
   onRemoveDocument: (doc: CaseFile) => void;
 }
 
 export default function OpenCasesDocumentControl({
   doc,
+  onOpenFile,
   onEditAnnotations,
   onRemoveDocument,
 }: OpenCasesDocumentPanelControlProps) {
@@ -20,7 +22,30 @@ export default function OpenCasesDocumentControl({
     <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
       <KebabMenu
         title={t("more_options")}
+        menuClassName="w-64"
         items={[
+          {
+            label: t("open_document"),
+            onClick: () => onOpenFile(doc.path),
+            icon: (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-muted-foreground"
+              >
+                <path d="M15 3h6v6" />
+                <path d="M10 14 21 3" />
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              </svg>
+            ),
+          },
           {
             label: t("edit_notes_tags"),
             onClick: () => onEditAnnotations(doc),
