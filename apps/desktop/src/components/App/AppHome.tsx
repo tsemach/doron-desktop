@@ -70,8 +70,11 @@ export default function AppHome() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-background text-foreground px-10 py-10">
-      <div className="absolute top-4 right-4 flex items-center gap-4">
+      <div className="absolute top-4 left-4">
         <AppHomeWelcome />
+      </div>
+
+      <div className="absolute top-4 right-4">
         <AppUserMenu
           handleSettings={handleSettings}
           handleUpgrade={handleUpgrade}
