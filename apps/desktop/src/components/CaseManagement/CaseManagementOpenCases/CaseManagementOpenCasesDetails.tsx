@@ -490,11 +490,13 @@ export default function CaseManagementOpenCasesDetails() {
           {isLgScreen && (
             <div
               onMouseDown={startDragging}
-              className={`w-3 group cursor-col-resize flex items-center justify-center shrink-0 z-20 select-none ${isDragging ? "bg-primary/10" : "hover:bg-primary/5"
-                } transition-colors`}
+              className="w-3 group cursor-col-resize flex items-center justify-center shrink-0 z-20 select-none relative"
             >
-              {/* Grab handle indicator lines */}
-              <div className={`w-1 h-12 rounded-full ${isDragging ? "bg-primary" : "bg-border/60 group-hover:bg-primary/50"
+              {/* Thin divider line spanning the full height, visible only on hover/drag */}
+              <div className={`absolute inset-y-0 left-1/2 -translate-x-1/2 w-px ${isDragging ? "bg-primary" : "bg-transparent group-hover:bg-border"
+                } transition-colors`} />
+              {/* Grab handle thumb, visible only on hover/drag */}
+              <div className={`relative w-1 h-10 rounded-full ${isDragging ? "bg-primary" : "bg-transparent group-hover:bg-primary/60"
                 } transition-colors`} />
             </div>
           )}
