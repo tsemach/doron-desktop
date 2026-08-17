@@ -15,7 +15,10 @@ export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOvervie
   const { tasks, loading, error } = useTaskList(() => invoke<Task[]>("list_tasks_for_case", { caseId }), caseId);
 
   return (
-    <div className="rounded-md border border-border bg-muted/20 p-3">
+    <div
+      onClick={onViewAll}
+      className="rounded-md border border-border bg-muted/20 p-3 cursor-pointer hover:bg-muted/40 transition-colors"
+    >
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("tasks")}</h4>
         {tasks.length > 0 && (
