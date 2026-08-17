@@ -131,7 +131,10 @@ export default function OpenDocumentsPanelTopMenu({
         })()}
 
         {selectedCase?.notes && (
-          <p className="text-[10px] text-muted-foreground/80 mt-2 italic border-l-2 border-border/85 pl-1.5 bg-muted/20 py-0.5 rounded-r max-w-md line-clamp-2">
+          <p
+            dir="auto"
+            className="text-[10px] text-rose-700 dark:text-rose-300 mt-2 italic border-l-2 border-rose-300/60 dark:border-rose-800/60 pl-1.5 bg-rose-50 dark:bg-rose-950/20 py-0.5 rounded-r max-w-md line-clamp-2"
+          >
             "{selectedCase.notes}"
           </p>
         )}

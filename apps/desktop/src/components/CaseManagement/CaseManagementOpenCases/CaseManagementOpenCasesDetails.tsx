@@ -22,7 +22,6 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { rememberRecentCase } from "@/lib/case";
 import { findCaseTypeOption } from "../caseTypeOptions";
 import { findTagValue } from "@/lib/caseTags";
-import { getFollowupStatus } from "@/lib/followupStatus";
 
 import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
 
@@ -348,8 +347,6 @@ export default function CaseManagementOpenCasesDetails() {
   }
 
   const caseTypeOption = selectedCase ? findCaseTypeOption(findTagValue(selectedCase.tags, "type")) : undefined;
-  const followupStatus = selectedCase ? getFollowupStatus(findTagValue(selectedCase.tags, "followup")) : null;
-  const needsFollowupNow = followupStatus?.type === "overdue" || followupStatus?.type === "due-today";
 
   return (
     <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-full">
@@ -452,11 +449,6 @@ export default function CaseManagementOpenCasesDetails() {
             {caseTypeOption && (
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary">
                 {t(caseTypeOption.labelKey)}
-              </span>
-            )}
-            {needsFollowupNow && (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 flex items-center gap-1">
-                ⚠ {t("needs_followup")}
               </span>
             )}
           </div>

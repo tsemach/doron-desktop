@@ -51,21 +51,6 @@ export default function CaseOverviewPanel({
         )}
       </div>
 
-      {followupStatus && (
-        <div
-          className={`rounded-md border px-3 py-2 text-xs font-semibold flex items-center gap-1.5 ${
-            followupStatus.type === "overdue"
-              ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border-rose-200/50"
-              : followupStatus.type === "due-today"
-              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200/50"
-              : "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 border-blue-100/30"
-          }`}
-        >
-          <span>{followupStatus.type === "overdue" ? "⚠️" : followupStatus.type === "due-today" ? "⏰" : "📅"}</span>
-          {followupStatus.label}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="space-y-3">
           <CaseOverviewTasksCard caseId={caseId} onViewAll={onViewTasks} />
@@ -112,6 +97,42 @@ export default function CaseOverviewPanel({
               <p className="text-xs text-muted-foreground italic">{t("no_tags_for_case")}</p>
             )}
           </div>
+
+          {followupStatus && (
+            <div
+              className={`rounded-md border p-3 ${
+                followupStatus.type === "overdue"
+                  ? "bg-rose-50 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/60"
+                  : followupStatus.type === "due-today"
+                  ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/60"
+                  : "bg-blue-50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60"
+              }`}
+            >
+              <h4
+                className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                  followupStatus.type === "overdue"
+                    ? "text-rose-700 dark:text-rose-300"
+                    : followupStatus.type === "due-today"
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-blue-600 dark:text-blue-300"
+                }`}
+              >
+                {t("status_followup")}
+              </h4>
+              <div
+                className={`text-xs font-semibold flex items-center gap-1.5 ${
+                  followupStatus.type === "overdue"
+                    ? "text-rose-700 dark:text-rose-300"
+                    : followupStatus.type === "due-today"
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-blue-600 dark:text-blue-300"
+                }`}
+              >
+                <span>{followupStatus.type === "overdue" ? "⚠️" : followupStatus.type === "due-today" ? "⏰" : "📅"}</span>
+                {followupStatus.label}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

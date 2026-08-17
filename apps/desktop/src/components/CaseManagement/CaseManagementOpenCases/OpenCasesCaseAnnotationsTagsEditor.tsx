@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import TagChip from "@/components/ui/TagChip";
 import CaseManagementOrganizationField from "../CaseManagementOrganizationField";
+import { CASE_TYPE_OPTIONS } from "../caseTypeOptions";
+import { useLanguage } from "@/context/LanguageContext";
 import type { Tag } from "../CaseManagementTypes";
 
 interface OpenCasesCaseAnnotationsTagsEditorProps {
@@ -19,14 +21,16 @@ export default function OpenCasesCaseAnnotationsTagsEditor({
   onAddTag,
   onRemoveTag,
 }: OpenCasesCaseAnnotationsTagsEditorProps) {
+  const { t } = useLanguage();
   const [newTagName, setNewTagName] = useState("");
   const [newTagValue, setNewTagValue] = useState("");
 
   const isTypingFollowup = newTagName.trim().toLowerCase() === "followup";
   const isTypingOrganization = newTagName.trim().toLowerCase() === "organization";
+  const isTypingType = newTagName.trim().toLowerCase() === "type";
 
-  // Ensure "followup"/"waiting"/"organization" are always offered, excluding already-added tags.
-  const filteredSuggestions = [...new Set(["followup", "waiting", "organization", ...suggestedTags])].filter(
+  // Ensure "followup"/"waiting"/"organization"/"type" are always offered, excluding already-added tags.
+  const filteredSuggestions = [...new Set(["followup", "waiting", "organization", "type", ...suggestedTags])].filter(
     (name) => !userTags.some((tg) => tg.name === name)
   );
 
@@ -78,6 +82,19 @@ export default function OpenCasesCaseAnnotationsTagsEditor({
               placeholder="Organization name..."
               className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
             />
+          ) : isTypingType ? (
+            <select
+              value={newTagValue}
+              onChange={(e) => setNewTagValue(e.target.value)}
+              className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground cursor-pointer"
+            >
+              <option value="">{t("case_type_select_placeholder")}</option>
+              {CASE_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </option>
+              ))}
+            </select>
           ) : (
             <input
               type={isTypingFollowup ? "date" : "text"}
