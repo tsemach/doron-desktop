@@ -4,13 +4,15 @@ import KebabMenu from "@/components/ui/KebabMenu";
 import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "../../../context/LanguageContext";
 import { getFollowupStatus } from "@/lib/followupStatus";
+import { filterOverviewTags } from "@/lib/caseTags";
+import type { CaseDetailTab } from "../CaseDetailSidebar";
 
 import { Case } from "../CaseManagementTypes";
 
 interface OpenDocumentsPanelTopMenuProps {
   selectedCase: Case | null;
-  activeRightTab: "preview" | "emails" | "tasks";
-  onTabChange?: (tab: "preview" | "emails" | "tasks") => void;
+  activeRightTab: CaseDetailTab;
+  onTabChange?: (tab: CaseDetailTab) => void;
   onAddDocument: () => void;
   onEditCaseAnnotations?: () => void;
   isDetailView?: boolean;
@@ -85,7 +87,9 @@ export default function OpenDocumentsPanelTopMenu({
         {/* Render tags with conditional followup badge */}
         {(() => {
           const allTags = selectedCase?.tags || [];
-          const visibleTags = allTags.filter((tag) => isDetailView || tag.name.toLowerCase() !== "followup");
+          const visibleTags = isDetailView
+            ? filterOverviewTags(allTags)
+            : allTags.filter((tag) => tag.name.toLowerCase() !== "followup");
           if (visibleTags.length === 0) return null;
 
           return (
@@ -127,7 +131,10 @@ export default function OpenDocumentsPanelTopMenu({
         })()}
 
         {selectedCase?.notes && (
-          <p className="text-[10px] text-muted-foreground/80 mt-2 italic border-l-2 border-border/85 pl-1.5 bg-muted/20 py-0.5 rounded-r max-w-md line-clamp-2">
+          <p
+            dir="auto"
+            className="text-[10px] text-rose-700 dark:text-rose-300 mt-2 italic border-l-2 border-rose-300/60 dark:border-rose-800/60 pl-1.5 bg-rose-50 dark:bg-rose-950/20 py-0.5 rounded-r max-w-md line-clamp-2"
+          >
             "{selectedCase.notes}"
           </p>
         )}
@@ -185,7 +192,7 @@ export default function OpenDocumentsPanelTopMenu({
               label: t("emails"),
               hidden: !selectedCase || !onTabChange,
               active: activeRightTab === "emails",
-              onClick: () => onTabChange?.(activeRightTab === "emails" ? "preview" : "emails"),
+              onClick: () => onTabChange?.(activeRightTab === "emails" ? "overview" : "emails"),
               icon: (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -208,7 +215,7 @@ export default function OpenDocumentsPanelTopMenu({
               label: "Tasks",
               hidden: !selectedCase || !onTabChange,
               active: activeRightTab === "tasks",
-              onClick: () => onTabChange?.(activeRightTab === "tasks" ? "preview" : "tasks"),
+              onClick: () => onTabChange?.(activeRightTab === "tasks" ? "overview" : "tasks"),
               icon: (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

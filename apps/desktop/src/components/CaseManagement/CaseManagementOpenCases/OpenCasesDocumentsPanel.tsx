@@ -3,6 +3,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import CaseManagementSearch from "../CaseManagementSearch";
 import OpenCasesDocumentsPanelList from "./OpenCasesDocumentsPanelList";
 import OpenDocumentsPanelTopMenu from "./OpenCasesDocumentsPanelTopMenu";
+import type { CaseDetailTab } from "../CaseDetailSidebar";
 
 import { Case, CaseFile } from "../CaseManagementTypes";
 
@@ -20,8 +21,8 @@ interface OpenCasesDocumentsPanelProps {
   onAddDocument: () => void;
   onSelectDocument?: (doc: CaseFile) => void;
   selectedDocument?: CaseFile | null;
-  activeRightTab?: "preview" | "emails" | "tasks";
-  onTabChange?: (tab: "preview" | "emails" | "tasks") => void;
+  activeRightTab?: CaseDetailTab;
+  onTabChange?: (tab: CaseDetailTab) => void;
   attachments?: { name: string; staged_path: string; size_kb: number }[];
   onRemoveAttachment?: (att: { name: string; staged_path: string; size_kb: number }) => void;
   onCopyAttachmentToCase?: (att: { name: string; staged_path: string; size_kb: number }) => void;
@@ -42,7 +43,7 @@ export default function OpenCasesDocumentsPanel({
   onAddDocument,
   onSelectDocument,
   selectedDocument,
-  activeRightTab = "preview",
+  activeRightTab = "overview",
   onTabChange,
   attachments = [],
   onRemoveAttachment,

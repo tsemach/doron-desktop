@@ -3,7 +3,7 @@ import SidebarNavButton from "./SidebarNavButton";
 import SidebarProfileFooter from "./SidebarProfileFooter";
 import { useLanguage } from "../../context/LanguageContext";
 
-export type CaseDetailTab = "preview" | "emails" | "tasks";
+export type CaseDetailTab = "overview" | "preview" | "emails" | "tasks";
 
 interface CaseDetailSidebarProps {
   activeRightTab: CaseDetailTab;
@@ -24,8 +24,8 @@ export default function CaseDetailSidebar({ activeRightTab, onTabChange, onEditT
         <div className="flex flex-col gap-3">
           <SidebarNavButton
             label={t("overview")}
-            active={activeRightTab === "preview"}
-            onClick={() => onTabChange("preview")}
+            active={activeRightTab === "overview"}
+            onClick={() => onTabChange("overview")}
           />
           <SidebarNavButton
             label={t("emails")}

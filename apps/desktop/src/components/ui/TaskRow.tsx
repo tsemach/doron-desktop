@@ -3,6 +3,7 @@ import { Task, TaskStatus } from "@/lib/task/types";
 import { formatEstimateShorthand } from "@/lib/task/estimate";
 import { getTaskUrgency } from "@/lib/task/taskUrgency";
 import { STATUS_OPTION_COLORS } from "@/lib/task/statusColors";
+import { formatShortDate } from "@/lib/formatShortDate";
 import TaskStatusBadge from "./TaskStatusBadge";
 import TaskStatusSelect from "./TaskStatusSelect";
 
@@ -32,14 +33,6 @@ interface TaskRowProps {
   // (in the panel header) -- omitted on views without manual reordering.
   isSelected?: boolean;
   onSelect?: (id: number) => void;
-}
-
-function formatDueDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  } catch {
-    return iso.slice(0, 10);
-  }
 }
 
 function TaskRowComponent({
@@ -145,7 +138,7 @@ function TaskRowComponent({
           </div>
 
           {task.due_date && (
-            <p className={`text-xs ${DUE_DATE_STYLES[urgency]}`}>Due {formatDueDate(task.due_date)}</p>
+            <p className={`text-xs ${DUE_DATE_STYLES[urgency]}`}>Due {formatShortDate(task.due_date)}</p>
           )}
 
           {task.description && (

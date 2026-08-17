@@ -16,9 +16,12 @@ import OpenCasesDocumentPreview from "./OpenCasesDocumentPreview";
 import OpenCasesDocumentHistory from "./OpenCasesDocumentHistory";
 import OpenCasesDocumentFields from "./OpenCasesDocumentFields";
 import CaseTasksPanel from "./CaseTasksPanel";
+import CaseOverviewPanel from "./CaseOverviewPanel";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
 import { rememberRecentCase } from "@/lib/case";
+import { findCaseTypeOption } from "../caseTypeOptions";
+import { findTagValue } from "@/lib/caseTags";
 
 import { Case, CaseFile, CaseStatus } from "../CaseManagementTypes";
 
@@ -343,6 +346,9 @@ export default function CaseManagementOpenCasesDetails() {
     }
   }
 
+  const caseTypeOption = selectedCase ? findCaseTypeOption(findTagValue(selectedCase.tags, "type")) : undefined;
+  const organization = selectedCase ? findTagValue(selectedCase.tags, "organization") : undefined;
+
   return (
     <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-full">
       {/* Scope styles for the converted DOCX output */}
@@ -437,9 +443,21 @@ export default function CaseManagementOpenCasesDetails() {
             <span className="text-muted-foreground/60 text-xs">/</span>
             <span className="text-sm font-medium text-foreground">{t("case_detail")}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight mt-1">
-            {selectedCase?.subject || t("loading_case_details")}
-          </h1>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <h1 className="text-2xl font-bold tracking-tight">
+              {selectedCase?.subject || t("loading_case_details")}
+            </h1>
+            {caseTypeOption && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary">
+                {t(caseTypeOption.labelKey)}
+              </span>
+            )}
+            {organization && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                {organization}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -513,6 +531,8 @@ export default function CaseManagementOpenCasesDetails() {
                     ? (t("emails_exchange") || "Case Email Correspondence")
                     : activeRightTab === "tasks"
                     ? "Tasks"
+                    : activeRightTab === "overview"
+                    ? t("overview")
                     : (t("document_details") || "Document Details")}
                 </span>
                 {activeRightTab === "preview" && selectedDocument && (
@@ -593,6 +613,14 @@ export default function CaseManagementOpenCasesDetails() {
                 />
               ) : activeRightTab === "tasks" ? (
                 <CaseTasksPanel caseId={Number(selectedCase?.id || 0)} />
+              ) : activeRightTab === "overview" && selectedCase ? (
+                <CaseOverviewPanel
+                  caseId={Number(selectedCase.id)}
+                  selectedCase={selectedCase}
+                  onViewTasks={() => setActiveRightTab("tasks")}
+                  onViewEmails={() => setActiveRightTab("emails")}
+                  onEditNotesAndTags={() => setEditingCaseAnnotations(selectedCase)}
+                />
               ) : docSubTab === "history" && selectedDocument ? (
                 <OpenCasesDocumentHistory
                   selectedDocument={selectedDocument}
