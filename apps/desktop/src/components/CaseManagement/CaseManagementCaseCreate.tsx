@@ -33,6 +33,7 @@ export default function CaseManagementCaseCreate() {
     subject,
     name,
     organization,
+    caseType,
     folder,
     selectedTemplateId,
     selectedTaskTemplateId,
@@ -442,6 +443,16 @@ export default function CaseManagementCaseCreate() {
         });
       }
 
+      if (caseType) {
+        await invoke("add_tag", {
+          scopeType: "case",
+          scopeValue: String(createdCase.id),
+          name: "type",
+          value: caseType,
+          tagType: "user",
+        });
+      }
+
       // Redirect back to case list on success
       navigate("/case-management");
     } catch (err) {
@@ -509,6 +520,10 @@ export default function CaseManagementCaseCreate() {
                 organization={organization}
                 onOrganizationChange={(value) =>
                   dispatch({ type: CaseCreateActionType.SET_ORGANIZATION, payload: value })
+                }
+                caseType={caseType}
+                onCaseTypeChange={(value) =>
+                  dispatch({ type: CaseCreateActionType.SET_CASE_TYPE, payload: value })
                 }
                 folder={folder}
                 onFolderChange={(value) =>
