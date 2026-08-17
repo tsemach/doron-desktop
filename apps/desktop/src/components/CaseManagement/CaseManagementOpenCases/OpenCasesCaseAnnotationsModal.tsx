@@ -264,7 +264,7 @@ export default function OpenCasesCaseAnnotationsModal({
           {/* Form and content */}
           <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 p-6 space-y-4">
             {/* Scrollable Form Body */}
-            <div className="flex-grow flex flex-col gap-4 min-h-0 overflow-y-auto pr-1">
+            <div className="flex-grow flex flex-col gap-4 min-h-0 overflow-y-auto p-1">
               <OpenCasesCaseAnnotationsTagsEditor
                 userTags={userTags}
                 systemTags={systemTags}

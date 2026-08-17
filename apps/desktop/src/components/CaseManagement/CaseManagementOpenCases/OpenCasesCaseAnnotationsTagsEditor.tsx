@@ -55,7 +55,7 @@ export default function OpenCasesCaseAnnotationsTagsEditor({
       </label>
 
       {/* Render current tags (system tags shown read-only, user tags removable) */}
-      <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border border-input rounded-lg bg-background/50 focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all">
+      <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border border-input rounded-lg bg-background/50 focus-within:ring-1 focus-within:ring-ring transition-all">
         {systemTags.map((tag) => (
           <TagChip key={tag.name} tag={tag} />
         ))}
@@ -102,7 +102,7 @@ export default function OpenCasesCaseAnnotationsTagsEditor({
               value={newTagValue}
               onChange={(e) => setNewTagValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+              className="flex-1 rounded-lg border border-destructive px-3 py-1.5 text-xs text-foreground"
             />
           )}
           <Button
