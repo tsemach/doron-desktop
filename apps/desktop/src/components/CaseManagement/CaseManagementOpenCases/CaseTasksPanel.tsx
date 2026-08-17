@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTaskList } from "@/hooks/useTaskList";
 import TaskList from "@/components/ui/TaskList";
+import TaskStatusOverview from "@/components/ui/TaskStatusOverview";
 import TaskForm, { TaskFormValues } from "@/components/ui/TaskForm";
 import { Task, TaskStatus } from "@/lib/task/types";
 
@@ -92,6 +93,10 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
 
   return (
     <div className="p-4 space-y-3">
+      <div className="max-w-2xl">
+        <TaskStatusOverview tasks={tasks} />
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Tasks ({filteredTasks.length})
