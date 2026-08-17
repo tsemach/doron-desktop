@@ -4,7 +4,6 @@ import { useTaskList } from "@/hooks/useTaskList";
 import { Task } from "@/lib/task/types";
 import { STATUS_OPTION_COLORS } from "@/lib/task/statusColors";
 import { formatShortDate } from "@/lib/formatShortDate";
-import TaskStatusSelect from "@/components/ui/TaskStatusSelect";
 
 interface CaseOverviewTasksCardProps {
   caseId: number;
@@ -13,10 +12,7 @@ interface CaseOverviewTasksCardProps {
 
 export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOverviewTasksCardProps) {
   const { t } = useLanguage();
-  const { tasks, loading, error, changeStatus } = useTaskList(
-    () => invoke<Task[]>("list_tasks_for_case", { caseId }),
-    caseId
-  );
+  const { tasks, loading, error } = useTaskList(() => invoke<Task[]>("list_tasks_for_case", { caseId }), caseId);
 
   return (
     <div
@@ -57,13 +53,6 @@ export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOvervie
                 }}
                 title={task.status}
               />
-              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                <TaskStatusSelect
-                  value={task.status}
-                  onChange={(status) => changeStatus(task.id, status)}
-                  size="sm"
-                />
-              </div>
               <span className="flex-1 min-w-0 truncate text-foreground" title={task.title} dir="auto">
                 {task.title}
               </span>
