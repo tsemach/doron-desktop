@@ -17,9 +17,9 @@ export function AppHomeWelcome() {
   }
 
   return (
-    // Welcome Title & Input
-    <div className="text-center space-y-4 w-full">
-      <h2 className="text-3xl font-bold tracking-tight whitespace-nowrap">
+    // Welcome Title & Input -- right-aligned, sits directly beside the user avatar
+    <div className="text-right space-y-1.5 shrink-0">
+      <h2 className="text-xl font-bold tracking-tight whitespace-nowrap">
         {username ? (
           <>
             <span className="px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider align-middle bg-red-50 text-red-600 border border-red-200 mr-2">
@@ -34,13 +34,13 @@ export function AppHomeWelcome() {
 
       {/* Show input below the heading if name doesn't exist */}
       {!username && (
-        <form onSubmit={handleSaveName} className="flex items-center justify-center gap-2 mt-6">
+        <form onSubmit={handleSaveName} className="flex items-center justify-end gap-2 mt-2">
           <input
             type="text"
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
             placeholder={t("enter_name")}
-            className="border border-border/80 rounded-lg px-4 py-2 text-sm bg-background w-64 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-border/80 rounded-lg px-4 py-2 text-sm bg-background w-56 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
           <button
@@ -52,8 +52,7 @@ export function AppHomeWelcome() {
         </form>
       )}
 
-      {/* Added max-w-md and mx-auto here to keep the paragraph neat */}
-      <p className="text-muted-foreground text-sm max-w-md mx-auto">
+      <p className="text-muted-foreground text-xs max-w-xs">
         {t("home_desc")}
       </p>
     </div>
