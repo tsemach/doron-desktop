@@ -11,6 +11,19 @@ interface CaseTasksPanelProps {
   caseId: number;
 }
 
+// Waiting tasks sort after every other status; within each of those two
+// groups, tasks are ordered by due date (undated tasks last in their group).
+function compareTasks(a: Task, b: Task): number {
+  const aWaiting = a.status === "Waiting" ? 1 : 0;
+  const bWaiting = b.status === "Waiting" ? 1 : 0;
+  if (aWaiting !== bWaiting) return aWaiting - bWaiting;
+
+  if (!a.due_date && !b.due_date) return 0;
+  if (!a.due_date) return 1;
+  if (!b.due_date) return -1;
+  return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+}
+
 export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
   const {
     tasks,
@@ -30,7 +43,10 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
 
   const filteredTasks = useMemo(
-    () => (statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter)),
+    () =>
+      (statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter))
+        .slice()
+        .sort(compareTasks),
     [tasks, statusFilter]
   );
 

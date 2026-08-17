@@ -1,4 +1,4 @@
-import { Task } from "@/lib/task/types";
+import { Task, TaskStatus } from "@/lib/task/types";
 
 export enum TaskListActionType {
   LOAD_START = "LOAD_START",
@@ -6,6 +6,7 @@ export enum TaskListActionType {
   LOAD_FAILURE = "LOAD_FAILURE",
   SET_EDITING_TASK = "SET_EDITING_TASK",
   SET_PENDING_DELETE_ID = "SET_PENDING_DELETE_ID",
+  UPDATE_TASK_STATUS = "UPDATE_TASK_STATUS",
 }
 
 // editingTask: "new" opens the create form, a Task opens that task's edit
@@ -27,7 +28,8 @@ export type TaskListAction<T extends Task = Task> =
   | { type: TaskListActionType.LOAD_SUCCESS; payload: T[] }
   | { type: TaskListActionType.LOAD_FAILURE; payload: string }
   | { type: TaskListActionType.SET_EDITING_TASK; payload: T | "new" | null }
-  | { type: TaskListActionType.SET_PENDING_DELETE_ID; payload: number | null };
+  | { type: TaskListActionType.SET_PENDING_DELETE_ID; payload: number | null }
+  | { type: TaskListActionType.UPDATE_TASK_STATUS; payload: { id: number; status: TaskStatus } };
 
 export function createInitialTaskListState<T extends Task = Task>(): TaskListState<T> {
   return { tasks: [], loading: true, error: null, editingTask: null, pendingDeleteId: null };
@@ -48,6 +50,17 @@ export function taskListReducer<T extends Task = Task>(
       return { ...state, editingTask: action.payload };
     case TaskListActionType.SET_PENDING_DELETE_ID:
       return { ...state, pendingDeleteId: action.payload };
+
+    // Patches only the changed task in place -- unlike a reload(), every
+    // other task keeps its existing object reference, so memoized TaskRows
+    // for unaffected tasks skip re-rendering.
+    case TaskListActionType.UPDATE_TASK_STATUS:
+      return {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.id === action.payload.id ? { ...t, status: action.payload.status } : t
+        ),
+      };
     default:
       return state;
   }

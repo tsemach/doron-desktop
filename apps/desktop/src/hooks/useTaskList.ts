@@ -44,11 +44,11 @@ export function useTaskList<T extends Task = Task>(fetchTasks: () => Promise<T[]
   const changeStatus = useCallback(async (id: number, status: TaskStatus) => {
     try {
       await invoke("update_task_status", { id, status });
-      await reload();
+      dispatch({ type: TaskListActionType.UPDATE_TASK_STATUS, payload: { id, status } });
     } catch (err) {
       alert(`Error updating task status: ${err}`);
     }
-  }, [reload]);
+  }, []);
 
   const removeTask = useCallback(async (id: number) => {
     try {
