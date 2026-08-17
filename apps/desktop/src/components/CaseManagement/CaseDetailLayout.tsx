@@ -9,7 +9,7 @@ export interface CaseDetailOutletContext {
 }
 
 export default function CaseDetailLayout() {
-  const [activeRightTab, setActiveRightTab] = useState<CaseDetailTab>("preview");
+  const [activeRightTab, setActiveRightTab] = useState<CaseDetailTab>("overview");
   const editAnnotationsHandlerRef = useRef<(() => void) | null>(null);
 
   const registerEditAnnotationsHandler = useCallback((handler: (() => void) | null) => {

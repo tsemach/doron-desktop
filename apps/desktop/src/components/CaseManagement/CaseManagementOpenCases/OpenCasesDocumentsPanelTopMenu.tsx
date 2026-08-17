@@ -4,13 +4,14 @@ import KebabMenu from "@/components/ui/KebabMenu";
 import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "../../../context/LanguageContext";
 import { getFollowupStatus } from "@/lib/followupStatus";
+import type { CaseDetailTab } from "../CaseDetailSidebar";
 
 import { Case } from "../CaseManagementTypes";
 
 interface OpenDocumentsPanelTopMenuProps {
   selectedCase: Case | null;
-  activeRightTab: "preview" | "emails" | "tasks";
-  onTabChange?: (tab: "preview" | "emails" | "tasks") => void;
+  activeRightTab: CaseDetailTab;
+  onTabChange?: (tab: CaseDetailTab) => void;
   onAddDocument: () => void;
   onEditCaseAnnotations?: () => void;
   isDetailView?: boolean;
@@ -185,7 +186,7 @@ export default function OpenDocumentsPanelTopMenu({
               label: t("emails"),
               hidden: !selectedCase || !onTabChange,
               active: activeRightTab === "emails",
-              onClick: () => onTabChange?.(activeRightTab === "emails" ? "preview" : "emails"),
+              onClick: () => onTabChange?.(activeRightTab === "emails" ? "overview" : "emails"),
               icon: (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -208,7 +209,7 @@ export default function OpenDocumentsPanelTopMenu({
               label: "Tasks",
               hidden: !selectedCase || !onTabChange,
               active: activeRightTab === "tasks",
-              onClick: () => onTabChange?.(activeRightTab === "tasks" ? "preview" : "tasks"),
+              onClick: () => onTabChange?.(activeRightTab === "tasks" ? "overview" : "tasks"),
               icon: (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

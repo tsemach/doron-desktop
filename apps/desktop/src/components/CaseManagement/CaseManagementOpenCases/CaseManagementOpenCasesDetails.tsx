@@ -16,6 +16,7 @@ import OpenCasesDocumentPreview from "./OpenCasesDocumentPreview";
 import OpenCasesDocumentHistory from "./OpenCasesDocumentHistory";
 import OpenCasesDocumentFields from "./OpenCasesDocumentFields";
 import CaseTasksPanel from "./CaseTasksPanel";
+import CaseOverviewPanel from "./CaseOverviewPanel";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
 import { rememberRecentCase } from "@/lib/case";
@@ -513,6 +514,8 @@ export default function CaseManagementOpenCasesDetails() {
                     ? (t("emails_exchange") || "Case Email Correspondence")
                     : activeRightTab === "tasks"
                     ? "Tasks"
+                    : activeRightTab === "overview"
+                    ? t("overview")
                     : (t("document_details") || "Document Details")}
                 </span>
                 {activeRightTab === "preview" && selectedDocument && (
@@ -593,6 +596,12 @@ export default function CaseManagementOpenCasesDetails() {
                 />
               ) : activeRightTab === "tasks" ? (
                 <CaseTasksPanel caseId={Number(selectedCase?.id || 0)} />
+              ) : activeRightTab === "overview" && selectedCase ? (
+                <CaseOverviewPanel
+                  selectedCase={selectedCase}
+                  onViewTasks={() => setActiveRightTab("tasks")}
+                  onViewEmails={() => setActiveRightTab("emails")}
+                />
               ) : docSubTab === "history" && selectedDocument ? (
                 <OpenCasesDocumentHistory
                   selectedDocument={selectedDocument}
