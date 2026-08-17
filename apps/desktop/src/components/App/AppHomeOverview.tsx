@@ -112,7 +112,7 @@ export function AppHomeOverview() {
             {openTasks.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">{t("home_no_open_tasks")}</p>
             ) : (
-              <div className="max-h-56 overflow-y-auto space-y-2">
+              <div className="max-h-56 overflow-y-auto space-y-2 p-1">
                 {Array.from(openTasksByCase.entries()).map(([caseId, group]) => (
                   <div key={caseId} className="rounded border border-border/60 bg-background/40 p-2">
                     <button

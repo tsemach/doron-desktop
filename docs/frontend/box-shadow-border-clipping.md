@@ -72,6 +72,8 @@ missing, this is very likely why.
 - `apps/desktop/src/components/CaseManagement/CaseManagementCaseCreateTemplateFields.tsx`
   (~line 118, the "Template Fields" grid on the Create Case screen): `overflow-y-auto pr-1`
   → `overflow-y-auto p-1`.
+- `apps/desktop/src/components/App/AppHomeOverview.tsx` (~line 115, the "Open Tasks" card
+  on the home page Overview): `max-h-56 overflow-y-auto space-y-2` → `max-h-56 overflow-y-auto space-y-2 p-1`.
 
 ## Issue 2: native `<select>` corners ignore `rounded-*` (all four corners look square)
 
