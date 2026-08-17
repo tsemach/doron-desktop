@@ -3,18 +3,19 @@ import TagChip from "@/components/ui/TagChip";
 import { getFollowupStatus } from "@/lib/followupStatus";
 import { findTagValue, filterOverviewTags } from "@/lib/caseTags";
 import { Case } from "../CaseManagementTypes";
+import CaseOverviewTasksCard from "./CaseOverviewTasksCard";
 
 interface CaseOverviewPanelProps {
+  caseId: number;
   selectedCase: Case;
   onViewTasks: () => void;
   onViewEmails: () => void;
 }
 
-export default function CaseOverviewPanel({ selectedCase, onViewTasks, onViewEmails }: CaseOverviewPanelProps) {
+export default function CaseOverviewPanel({ caseId, selectedCase, onViewTasks, onViewEmails }: CaseOverviewPanelProps) {
   const { t } = useLanguage();
-  // Not wired into JSX yet — CaseOverviewTasksCard (Task 5) and CaseOverviewEmailsCard (Task 6)
-  // will consume these. Referenced here only to satisfy noUnusedParameters until then.
-  void onViewTasks;
+  // Not wired into JSX yet — CaseOverviewEmailsCard (Task 6) will consume this.
+  // Referenced here only to satisfy noUnusedParameters until then.
   void onViewEmails;
 
   const followupStatus = getFollowupStatus(findTagValue(selectedCase.tags, "followup"));
@@ -39,7 +40,7 @@ export default function CaseOverviewPanel({ selectedCase, onViewTasks, onViewEma
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="space-y-3">
-          {/* CaseOverviewTasksCard slots in here (Task 5); CaseOverviewEmailsCard below it (Task 6) */}
+          <CaseOverviewTasksCard caseId={caseId} onViewAll={onViewTasks} />
         </div>
 
         <div className="space-y-3">

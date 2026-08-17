@@ -598,6 +598,7 @@ export default function CaseManagementOpenCasesDetails() {
                 <CaseTasksPanel caseId={Number(selectedCase?.id || 0)} />
               ) : activeRightTab === "overview" && selectedCase ? (
                 <CaseOverviewPanel
+                  caseId={Number(selectedCase.id)}
                   selectedCase={selectedCase}
                   onViewTasks={() => setActiveRightTab("tasks")}
                   onViewEmails={() => setActiveRightTab("emails")}
