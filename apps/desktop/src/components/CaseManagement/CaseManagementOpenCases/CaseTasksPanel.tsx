@@ -113,13 +113,15 @@ export default function CaseTasksPanel({ caseId }: CaseTasksPanelProps) {
       {loading ? (
         <div className="text-xs text-muted-foreground">Loading tasks...</div>
       ) : (
-        <TaskList
-          tasks={filteredTasks}
-          onStatusChange={changeStatus}
-          onEdit={startEdit}
-          onDelete={setPendingDelete}
-          emptyMessage={statusFilter === "all" ? "No tasks for this case yet." : "No tasks match this filter."}
-        />
+        <div className="max-w-2xl">
+          <TaskList
+            tasks={filteredTasks}
+            onStatusChange={changeStatus}
+            onEdit={startEdit}
+            onDelete={setPendingDelete}
+            emptyMessage={statusFilter === "all" ? "No tasks for this case yet." : "No tasks match this filter."}
+          />
+        </div>
       )}
 
       {editingTask && (
