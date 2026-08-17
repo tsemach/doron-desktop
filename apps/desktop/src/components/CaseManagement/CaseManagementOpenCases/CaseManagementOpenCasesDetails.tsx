@@ -347,6 +347,7 @@ export default function CaseManagementOpenCasesDetails() {
   }
 
   const caseTypeOption = selectedCase ? findCaseTypeOption(findTagValue(selectedCase.tags, "type")) : undefined;
+  const organization = selectedCase ? findTagValue(selectedCase.tags, "organization") : undefined;
 
   return (
     <main className="flex-1 overflow-hidden p-6 bg-background flex flex-col h-full">
@@ -449,6 +450,11 @@ export default function CaseManagementOpenCasesDetails() {
             {caseTypeOption && (
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary">
                 {t(caseTypeOption.labelKey)}
+              </span>
+            )}
+            {organization && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                {organization}
               </span>
             )}
           </div>
