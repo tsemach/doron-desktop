@@ -19,3 +19,7 @@ export const CASE_TYPE_OPTIONS: CaseTypeOption[] = [
   { value: "tax_law", labelKey: "case_type_tax_law" },
   { value: "administrative_public", labelKey: "case_type_administrative_public" },
 ];
+
+export function findCaseTypeOption(value: string | undefined): CaseTypeOption | undefined {
+  return value ? CASE_TYPE_OPTIONS.find((o) => o.value === value) : undefined;
+}
