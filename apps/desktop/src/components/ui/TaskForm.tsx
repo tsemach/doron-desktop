@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./button";
 import { Task, TaskStatus, EstimateUnit } from "@/lib/task/types";
 import { parseEstimateShorthand, formatEstimateShorthand } from "@/lib/task/estimate";
@@ -42,6 +42,16 @@ export default function TaskForm({ mode, initialTask, onSave, onCancel }: TaskFo
   const [titleError, setTitleError] = useState<string | null>(null);
   const [estimateError, setEstimateError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

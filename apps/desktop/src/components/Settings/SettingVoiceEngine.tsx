@@ -183,7 +183,7 @@ export default function SettingVoiceEngine({
             <select
               value={voiceCloudProvider}
               onChange={(e) => handleVoiceCloudProviderChange(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
             >
               {AUDIO_CAPABLE_PROVIDERS.map((p) => (
                 <option key={p} value={p}>
@@ -198,7 +198,7 @@ export default function SettingVoiceEngine({
             <select
               value={voiceCloudModel}
               onChange={(e) => setVoiceCloudModel(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
             >
               {(VOICE_CLOUD_MODELS[voiceCloudProvider] ?? []).map((m) => (
                 <option key={m.value} value={m.value}>

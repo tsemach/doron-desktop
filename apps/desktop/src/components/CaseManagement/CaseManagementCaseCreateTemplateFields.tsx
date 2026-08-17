@@ -115,7 +115,7 @@ export default function CaseManagementCaseCreateTemplateFields({
             No template fields match your search/filter query.
           </div>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto p-1">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-2 pb-2">
               {filteredTemplateFields.map((field) => (
                 <CaseManagementCaseCreateField
