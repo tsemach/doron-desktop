@@ -60,7 +60,7 @@ export default function CaseMeetingsPanel({ caseId }: CaseMeetingsPanelProps) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-3xl">
           {meetings.map((meeting) => (
-            <MeetingBox key={meeting.id} meeting={meeting} onClick={() => startEdit(meeting)} />
+            <MeetingBox key={meeting.id} meeting={meeting} onClick={() => startEdit(meeting)} showCaseLink={false} />
           ))}
         </div>
       )}
