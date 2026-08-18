@@ -98,7 +98,7 @@ export default function AppHome() {
               <AppHomeRecentCases />
             </div>
 
-            <div className="flex items-start gap-20">
+            <div className="flex items-end gap-20">
               <button type="button" onClick={handleDocsManagement} className={NAV_TILE_CLASS}>
                 <div className="flex flex-col items-center gap-2">
                   <FileText className="size-8" />
