@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Briefcase, FileText } from "lucide-react";
+import { Briefcase, CalendarDays, FileText } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "../../store/indexStore";
@@ -46,8 +46,8 @@ export default function AppHome() {
     navigate("/docs-management");
   }
 
-  function handleTaskManagement() {
-    navigate("/task-management");
+  function handleCalendar() {
+    navigate("/calendar");
   }
 
   function handleSettings() {
@@ -122,6 +122,15 @@ export default function AppHome() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div className="flex items-start gap-20">
+              <button type="button" onClick={handleCalendar} className={NAV_TILE_CLASS}>
+                <div className="flex flex-col items-center gap-2">
+                  <CalendarDays className="size-8" />
+                  <span className="text-2xl font-medium text-foreground/80">{t("calendar")}</span>
+                </div>
+              </button>
             </div>
           </div>
 
