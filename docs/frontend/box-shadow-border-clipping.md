@@ -74,6 +74,10 @@ missing, this is very likely why.
   → `overflow-y-auto p-1`.
 - `apps/desktop/src/components/App/AppHomeOverview.tsx` (~line 115, the "Open Tasks" card
   on the home page Overview): `max-h-56 overflow-y-auto space-y-2` → `max-h-56 overflow-y-auto space-y-2 p-1`.
+- `apps/desktop/src/components/App/AppHomeOverview.tsx` (~line 120, the "Today's Meetings"
+  card, ASC-163): `max-h-56 overflow-y-auto space-y-1.5` → `max-h-56 overflow-y-auto space-y-1.5 p-1`.
+  Its `MeetingBox` children have `rounded-md border`, same shape as the Open Tasks card two
+  blocks below it that already had this fix — missed when the card was first added.
 
 ## Issue 2: native `<select>` corners ignore `rounded-*` (all four corners look square)
 
@@ -135,3 +139,7 @@ Any `<select>` with a `rounded-*` class but no `appearance-none` nearby is a can
 
 - `apps/desktop/src/components/Settings/SettingVoiceEngine.tsx` (~lines 186, 201, the
   Provider/Model selects).
+- `apps/desktop/src/components/Calendar/MeetingForm.tsx` (~line 158, the "Linked Case"
+  select, ASC-163) — built without `appearance-none` in the first pass, caught during
+  manual testing (all four corners square, not just one edge — the tell for this issue
+  vs. issue 1).

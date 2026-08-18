@@ -2,6 +2,42 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
+    // Loads apps/desktop/.env explicitly (dotenvy::from_path, NOT the
+    // default dotenvy::dotenv() -- that walks up from CWD and would find
+    // apps/desktop/src-tauri/.env first instead, a separate, stale/unused
+    // file left over from when a local ANTHROPIC_API_KEY was read directly;
+    // that lookup moved server-side). apps/desktop/.env is the file Vite
+    // already reads for its VITE_* vars -- lets GOOGLE_CALENDAR_CLIENT_ID/
+    // _SECRET be set there like every other local dev value, instead of
+    // requiring a manual shell export every session. No-op (.ok(), error
+    // ignored) if the file doesn't exist -- true in CI, where the real
+    // values come directly from GitHub Actions secrets instead.
+    let _ = dotenvy::from_path("../.env");
+    // Cargo's own rerun-if-env-changed (below) only tracks the *real*
+    // process environment, not dotenv's in-process effect on it -- without
+    // this, editing an existing value in .env (with no shell export
+    // involved at all) wouldn't be noticed and a stale cargo:rustc-env
+    // value from a previous build would silently stick around.
+    println!("cargo:rerun-if-changed=../.env");
+
+    // Without these, rust-cache (used in release.yml/deploy-desktop.yml) can
+    // silently reuse a cached build compiled before these secrets existed --
+    // option_env!/env! don't trigger a rebuild on their own when only an env
+    // var's value changes, they need this explicit opt-in (calendar/oauth.rs).
+    println!("cargo:rerun-if-env-changed=GOOGLE_CALENDAR_CLIENT_ID");
+    println!("cargo:rerun-if-env-changed=GOOGLE_CALENDAR_CLIENT_SECRET");
+
+    // Forwards a value now present in this process's environment (whether it
+    // came from a real shell export or from the .env load above) into the
+    // *compile-time* environment calendar/oauth.rs's option_env! reads --
+    // rerun-if-env-changed only controls whether build.rs re-runs, this is
+    // what actually makes a .env-sourced value reach the compiled binary.
+    for key in ["GOOGLE_CALENDAR_CLIENT_ID", "GOOGLE_CALENDAR_CLIENT_SECRET"] {
+        if let Ok(value) = std::env::var(key) {
+            println!("cargo:rustc-env={key}={value}");
+        }
+    }
+
     // Check if sidecar binaries are present for the current target, download if missing
     if let Err(e) = ensure_sidecar_binary("llama-server", llama_release_url, &["libllama.so", "libllama.so.0"], "libllama-server-impl.dylib") {
         println!(

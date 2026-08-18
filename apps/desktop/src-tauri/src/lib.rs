@@ -3,6 +3,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 
 pub mod store;
 pub mod auth;
+pub mod calendar;
 pub mod extractor;
 pub mod llm;
 pub mod indexer;
@@ -76,6 +77,18 @@ pub fn run() {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 crate::email::poll_emails_background(handle).await;
+            });
+            // Start background Google Calendar sync poller (ASC-163) -- no-op
+            // ticks whenever no account is connected, see poll_calendar_background.
+            let handle_calendar_sync = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::calendar::sync::poll_calendar_background(handle_calendar_sync).await;
+            });
+            // Independent loop from the sync poller above -- a slow/failing
+            // Google API call must never delay a time-sensitive reminder.
+            let handle_calendar_reminder = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::calendar::reminder::remind_upcoming_meetings_background(handle_calendar_reminder).await;
             });
             // Spawn local AI sidecar on startup if configured
             let handle_sidecar = app.handle().clone();
@@ -155,6 +168,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_mic_recorder::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             store::get_db_path,
@@ -272,7 +286,17 @@ pub fn run() {
             org::update_team,
             org::delete_team,
             org::remove_team_member,
-            org::add_team_member
+            org::add_team_member,
+            // calendar (ASC-163)
+            calendar::connect_google_calendar,
+            calendar::disconnect_google_calendar,
+            calendar::get_google_calendar_status,
+            calendar::create_meeting,
+            calendar::update_meeting,
+            calendar::delete_meeting,
+            calendar::list_meetings_for_range,
+            calendar::list_meetings_for_case,
+            calendar::list_todays_meetings
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
