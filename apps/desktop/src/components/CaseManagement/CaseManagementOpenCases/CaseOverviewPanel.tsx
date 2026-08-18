@@ -6,12 +6,14 @@ import { findCaseTypeOption } from "../caseTypeOptions";
 import { Case } from "../CaseManagementTypes";
 import CaseOverviewTasksCard from "./CaseOverviewTasksCard";
 import CaseOverviewEmailsCard from "./CaseOverviewEmailsCard";
+import CaseOverviewMeetingsCard from "./CaseOverviewMeetingsCard";
 
 interface CaseOverviewPanelProps {
   caseId: number;
   selectedCase: Case;
   onViewTasks: () => void;
   onViewEmails: () => void;
+  onViewMeetings: () => void;
   onEditNotesAndTags: () => void;
 }
 
@@ -20,6 +22,7 @@ export default function CaseOverviewPanel({
   selectedCase,
   onViewTasks,
   onViewEmails,
+  onViewMeetings,
   onEditNotesAndTags,
 }: CaseOverviewPanelProps) {
   const { t } = useLanguage();
@@ -69,6 +72,7 @@ export default function CaseOverviewPanel({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="space-y-3">
           <CaseOverviewTasksCard caseId={caseId} onViewAll={onViewTasks} />
+          <CaseOverviewMeetingsCard caseId={caseId} onViewAll={onViewMeetings} />
           <CaseOverviewEmailsCard caseId={caseId} onViewAll={onViewEmails} />
         </div>
 
