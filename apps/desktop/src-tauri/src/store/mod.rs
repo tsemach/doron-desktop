@@ -180,6 +180,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
         );
     }
 
+    conn.execute_batch(CALENDAR_SCHEMA).map_err(|e| format!("[calendar schema] {e}"))?;
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -1057,6 +1059,44 @@ const TASKS_SCHEMA: &str = "
     CREATE INDEX IF NOT EXISTS idx_tasks_case_id  ON tasks(case_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+";
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+// ASC-163. google_calendar_accounts is a single-row settings table (same
+// DELETE+INSERT convention as auth_session/ai_configurations) -- its
+// read/write functions live in calendar/oauth.rs, not here, mirroring where
+// auth_session's live (auth/mod.rs). meetings' full column set (including
+// case_link_source, only consumed starting PR-2) is created now so no later
+// calendar branch needs another schema pass.
+const CALENDAR_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS google_calendar_accounts (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        google_email      TEXT    NOT NULL,
+        access_token      TEXT    NOT NULL,
+        refresh_token     TEXT    NOT NULL,
+        token_expires_at  TEXT    NOT NULL,
+        sync_token        TEXT,
+        connected_at      TEXT    NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS meetings (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        google_event_id   TEXT    NOT NULL UNIQUE,
+        case_id           INTEGER,
+        title             TEXT    NOT NULL,
+        description       TEXT,
+        location          TEXT,
+        start_time        TEXT    NOT NULL,
+        end_time          TEXT    NOT NULL,
+        status            TEXT    NOT NULL DEFAULT 'confirmed'
+                                  CHECK (status IN ('confirmed','tentative','cancelled')),
+        case_link_source  TEXT    NOT NULL DEFAULT 'none'
+                                  CHECK (case_link_source IN ('none','phrase_match','manual')),
+        created_at        TEXT    NOT NULL,
+        updated_at        TEXT,
+        FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_meetings_case_id    ON meetings(case_id);
+    CREATE INDEX IF NOT EXISTS idx_meetings_start_time ON meetings(start_time);
 ";
 
 /// Computes a due_date timestamp from a base (usually the case's created_at)

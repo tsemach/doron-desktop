@@ -3,6 +3,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 
 pub mod store;
 pub mod auth;
+pub mod calendar;
 pub mod extractor;
 pub mod llm;
 pub mod indexer;
@@ -272,7 +273,11 @@ pub fn run() {
             org::update_team,
             org::delete_team,
             org::remove_team_member,
-            org::add_team_member
+            org::add_team_member,
+            // calendar (ASC-163)
+            calendar::connect_google_calendar,
+            calendar::disconnect_google_calendar,
+            calendar::get_google_calendar_status
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
