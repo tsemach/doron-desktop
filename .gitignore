@@ -51,3 +51,5 @@ real_emails.json
 
 # Superpowers scratch state (brainstorm mockups, SDD ledgers/briefs)
 .superpowers/
+credentials.json
+token.json

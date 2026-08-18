@@ -70,7 +70,7 @@ export default function AppHome() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-background text-foreground px-10 py-10">
-      <div className="absolute top-4 left-4">
+      <div className="absolute top-8 left-1/2 -translate-x-1/2">
         <AppHomeWelcome />
       </div>
 
