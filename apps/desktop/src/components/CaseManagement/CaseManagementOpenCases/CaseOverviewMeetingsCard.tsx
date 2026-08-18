@@ -8,8 +8,17 @@ interface CaseOverviewMeetingsCardProps {
   onViewAll: () => void;
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+function formatDateRange(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const dateStr = start.toLocaleDateString([], { month: "short", day: "numeric" });
+  const startTime = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const endTime = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (start.toDateString() === end.toDateString()) {
+    return `${dateStr}, ${startTime} – ${endTime}`;
+  }
+  const endDateStr = end.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${dateStr} ${startTime} – ${endDateStr} ${endTime}`;
 }
 
 export default function CaseOverviewMeetingsCard({ caseId, onViewAll }: CaseOverviewMeetingsCardProps) {
@@ -21,7 +30,7 @@ export default function CaseOverviewMeetingsCard({ caseId, onViewAll }: CaseOver
   return (
     <div
       onClick={onViewAll}
-      className="rounded-md border border-border bg-muted/20 p-3 cursor-pointer hover:bg-muted/40 transition-colors"
+      className="rounded-md border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/20 p-3 cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
     >
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("calendar")}</h4>
@@ -45,11 +54,11 @@ export default function CaseOverviewMeetingsCard({ caseId, onViewAll }: CaseOver
       ) : (
         <div className="max-h-56 overflow-y-auto space-y-1">
           {upcoming.map((meeting) => (
-            <div key={meeting.id} className="flex items-center gap-2 text-xs py-1 border-b border-border/50 last:border-b-0">
-              <span className="flex-1 min-w-0 truncate text-foreground" title={meeting.title} dir="auto">
+            <div key={meeting.id} className="flex items-center gap-2 text-xs py-1 border-b border-rose-200/40 dark:border-rose-800/40 last:border-b-0">
+              <span className="flex-1 min-w-0 truncate text-rose-700 dark:text-rose-300" title={meeting.title} dir="auto">
                 {meeting.title}
               </span>
-              <span className="text-[10px] text-muted-foreground shrink-0">{formatDateTime(meeting.start_time)}</span>
+              <span className="text-[10px] text-rose-600/80 dark:text-rose-400/80 shrink-0">{formatDateRange(meeting.start_time, meeting.end_time)}</span>
             </div>
           ))}
         </div>
