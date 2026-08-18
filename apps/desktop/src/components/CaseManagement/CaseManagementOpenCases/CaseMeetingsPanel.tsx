@@ -2,16 +2,29 @@ import { invoke } from "@tauri-apps/api/core";
 import { useLanguage } from "@/context/LanguageContext";
 import { useMeetingList, MeetingFormValues } from "@/hooks/useMeetingList";
 import { Meeting } from "@/lib/calendar/types";
-import MeetingBox from "@/components/Calendar/MeetingBox";
 import MeetingForm from "@/components/Calendar/MeetingForm";
 
 interface CaseMeetingsPanelProps {
   caseId: number;
 }
 
-// "boxes view" (ASC-163 R7/R8) -- a grid of MeetingBox cards, not the
-// day/week/month grid views from the main Calendar tab. Same-panel switch
-// via activeRightTab, not a modal (brainstorm.md §7).
+const DATE_FMT: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+const TIME_FMT: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
+
+function formatDateRange(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const startTime = start.toLocaleTimeString([], TIME_FMT);
+  const endTime = end.toLocaleTimeString([], TIME_FMT);
+  if (start.toDateString() === end.toDateString()) {
+    return `${start.toLocaleDateString([], DATE_FMT)} · ${startTime} – ${endTime}`;
+  }
+  return `${start.toLocaleDateString([], DATE_FMT)} ${startTime} – ${end.toLocaleDateString([], DATE_FMT)} ${endTime}`;
+}
+
+// "boxes view" (ASC-163 R7/R8), rendered as a list (most recent first), not
+// the day/week/month grid views from the main Calendar tab. Same-panel
+// switch via activeRightTab, not a modal (brainstorm.md §7).
 export default function CaseMeetingsPanel({ caseId }: CaseMeetingsPanelProps) {
   const { t } = useLanguage();
   const { meetings, loading, error, editingMeeting, createMeeting, updateMeeting, startCreate, startEdit, closeForm } = useMeetingList(
@@ -27,6 +40,8 @@ export default function CaseMeetingsPanel({ caseId }: CaseMeetingsPanelProps) {
     }
     closeForm();
   }
+
+  const sortedMeetings = [...meetings].sort((a, b) => b.start_time.localeCompare(a.start_time));
 
   return (
     <div className="p-4 space-y-3">
@@ -58,9 +73,26 @@ export default function CaseMeetingsPanel({ caseId }: CaseMeetingsPanelProps) {
       ) : meetings.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">{t("calendar_no_meetings")}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-3xl">
-          {meetings.map((meeting) => (
-            <MeetingBox key={meeting.id} meeting={meeting} onClick={() => startEdit(meeting)} showCaseLink={false} />
+        <div className="flex flex-col gap-2 max-w-3xl">
+          {sortedMeetings.map((meeting) => (
+            <button
+              key={meeting.id}
+              type="button"
+              onClick={() => startEdit(meeting)}
+              className="w-full text-left rounded-md border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:border-rose-300 dark:hover:border-rose-700 transition-colors p-3 cursor-pointer"
+            >
+              <div className="text-[11px] font-semibold text-rose-600/80 dark:text-rose-400/80 uppercase tracking-wider">
+                {formatDateRange(meeting.start_time, meeting.end_time)}
+              </div>
+              <div className="text-sm font-semibold text-rose-700 dark:text-rose-300 mt-1" dir="auto">
+                {meeting.title}
+              </div>
+              {meeting.description && (
+                <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-1 whitespace-pre-line" dir="auto">
+                  {meeting.description}
+                </p>
+              )}
+            </button>
           ))}
         </div>
       )}
