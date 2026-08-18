@@ -95,7 +95,10 @@ export default function CaseMeetingsPanel({ caseId }: CaseMeetingsPanelProps) {
       ) : (
         <div className="flex flex-col gap-2 max-w-3xl">
           {sortedMeetings.map((meeting) => {
-            const { rest, caseLine } = splitCaseLine(meeting.description);
+            // caseLine is discarded, not rendered -- we're already inside
+            // this case, so every meeting here is implicitly its meeting;
+            // repeating the case link back is redundant.
+            const { rest } = splitCaseLine(meeting.description);
             return (
               <button
                 key={meeting.id}
@@ -103,24 +106,16 @@ export default function CaseMeetingsPanel({ caseId }: CaseMeetingsPanelProps) {
                 onClick={() => startEdit(meeting)}
                 className="w-full text-left rounded-md border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:border-rose-300 dark:hover:border-rose-700 transition-colors p-3 cursor-pointer"
               >
-                <div className="text-[11px] font-semibold text-rose-600/80 dark:text-rose-400/80 uppercase tracking-wider">
+                <div className="block w-full rounded-full border border-gray-400 dark:border-gray-500 bg-gray-300 dark:bg-gray-600 px-2.5 py-0.5 text-[11px] font-semibold text-black uppercase tracking-wider">
                   {formatDateRange(meeting.start_time, meeting.end_time)}
                 </div>
-                <div className="text-sm font-semibold text-rose-700 dark:text-rose-300 mt-1" dir="auto">
+                <div className="text-sm font-semibold text-rose-700 dark:text-rose-300 mt-1.5" dir="auto">
                   {meeting.title}
                 </div>
                 {rest && (
                   <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-1 whitespace-pre-line" dir="auto">
                     {rest}
                   </p>
-                )}
-                {caseLine && (
-                  <span
-                    className="inline-block mt-1.5 rounded-full border border-gray-400 dark:border-gray-500 bg-gray-300 dark:bg-gray-600 px-2 py-0.5 text-[10px] font-medium text-black"
-                    dir="auto"
-                  >
-                    {caseLine}
-                  </span>
                 )}
               </button>
             );
