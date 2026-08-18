@@ -19,6 +19,7 @@
     "updater:default",
     "process:allow-restart",
     "mic-recorder:default",
-    "deep-link:default"
+    "deep-link:default",
+    "notification:default"
   ]
 }
