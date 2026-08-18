@@ -17,7 +17,7 @@ export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOvervie
   return (
     <div
       onClick={onViewAll}
-      className="rounded-md border border-blue-200/60 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/20 p-3 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+      className="rounded-md border border-blue-200/60 dark:border-blue-800/60 bg-[#D4EDF8] dark:bg-blue-950/20 p-3 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
     >
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">{t("tasks")}</h4>
