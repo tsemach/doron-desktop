@@ -30,10 +30,6 @@ function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function formatStartTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
 interface LaidOutMeeting {
   meeting: Meeting;
   column: number;
@@ -171,8 +167,8 @@ export default function TimeGrid({ days, meetings, onSelectMeeting }: TimeGridPr
                       }}
                       title={meeting.title}
                     >
-                      <div className="text-xs font-semibold text-rose-700 dark:text-rose-300 truncate w-full" dir="auto">
-                        {formatStartTime(meeting.start_time)} {meeting.title}
+                      <div className="text-xs font-semibold text-rose-700 dark:text-rose-300 truncate" dir="auto">
+                        {meeting.title}
                       </div>
                       {meeting.case_id != null && (
                         <button
