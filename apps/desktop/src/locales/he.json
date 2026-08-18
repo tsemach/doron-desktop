@@ -156,6 +156,7 @@
   "calendar_today": "היום",
   "calendar_new_meeting": "פגישה חדשה",
   "calendar_no_meetings": "אין פגישות",
+  "calendar_todays_meetings": "פגישות היום",
   "calendar_more_meetings": "עוד {count}",
   "calendar_view_day": "יום",
   "calendar_view_week": "שבוע",

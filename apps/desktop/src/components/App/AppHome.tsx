@@ -9,6 +9,7 @@ import { isProcessingAtom } from "../../store/indexStore";
 import { clearSession } from "../../store/authStore";
 import AppHomeRecentCases from "./AppHomeRecentCases";
 import AppHomeDocumentsPanel from "./AppHomeDocumentsPanel";
+import AppHomeTodaysMeetings from "./AppHomeTodaysMeetings";
 import { AppUserMenu } from "./AppUserMenu";
 import { AppHomeWelcome } from "./AppHomeWelcome";
 import { AppHomeOverview } from "./AppHomeOverview";
@@ -82,11 +83,11 @@ export default function AppHome() {
         />
       </div>
 
-      <div className="flex-1 flex items-start justify-center mt-52">
+      <div className="flex-1 flex items-start justify-center mt-28">
         <div className="w-full max-w-7xl mx-auto flex items-start justify-between gap-24 px-6">
 
           {/* Primary navigation wrapper - Aligns content strictly to the left edge */}
-          <div className="flex flex-col gap-16 justify-self-start">
+          <div className="flex flex-col gap-8 justify-self-start">
             <div className="flex items-start gap-20">
               <button type="button" onClick={handleCaseMagement} className={NAV_TILE_CLASS}>
                 <div className="flex flex-col items-center gap-2">
@@ -131,6 +132,7 @@ export default function AppHome() {
                   <span className="text-2xl font-medium text-foreground/80">{t("calendar")}</span>
                 </div>
               </button>
+              <AppHomeTodaysMeetings />
             </div>
           </div>
 
