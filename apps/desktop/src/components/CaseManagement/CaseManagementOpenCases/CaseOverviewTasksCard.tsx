@@ -17,10 +17,10 @@ export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOvervie
   return (
     <div
       onClick={onViewAll}
-      className="rounded-md border border-border bg-muted/20 p-3 cursor-pointer hover:bg-muted/40 transition-colors"
+      className="rounded-md border border-blue-200/60 dark:border-blue-800/60 bg-[#D1F5FB] dark:bg-blue-950/20 p-3 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
     >
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("tasks")}</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">{t("tasks")}</h4>
         {tasks.length > 0 && (
           <button
             type="button"
