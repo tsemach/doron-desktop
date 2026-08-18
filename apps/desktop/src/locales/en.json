@@ -156,6 +156,7 @@
   "calendar_today": "Today",
   "calendar_new_meeting": "New Meeting",
   "calendar_no_meetings": "No meetings",
+  "calendar_todays_meetings": "Today's Meetings",
   "calendar_more_meetings": "+{count} more",
   "calendar_view_day": "Day",
   "calendar_view_week": "Week",

@@ -433,6 +433,10 @@ export default function CaseManagementOpenCasesDetails() {
       <div className="flex items-center gap-3 mb-6 shrink-0">
         <div>
           <div className="flex items-center gap-2">
+            <Link to="/" className="text-sm text-muted-foreground hover:underline">
+              {t("back_to_main")}
+            </Link>
+            <span className="text-muted-foreground/60 text-xs">/</span>
             <Link to="/case-management" className="text-sm text-muted-foreground hover:underline">
               {t("case_management")}
             </Link>
