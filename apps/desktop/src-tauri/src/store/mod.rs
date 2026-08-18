@@ -180,6 +180,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
         );
     }
 
+    conn.execute_batch(CALENDAR_SCHEMA).map_err(|e| format!("[calendar schema] {e}"))?;
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -1058,6 +1060,204 @@ const TASKS_SCHEMA: &str = "
     CREATE INDEX IF NOT EXISTS idx_tasks_status   ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 ";
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+// ASC-163. google_calendar_accounts is a single-row settings table (same
+// DELETE+INSERT convention as auth_session/ai_configurations) -- its
+// read/write functions live in calendar/oauth.rs, not here, mirroring where
+// auth_session's live (auth/mod.rs). meetings' full column set (including
+// case_link_source, only consumed starting PR-2) is created now so no later
+// calendar branch needs another schema pass.
+const CALENDAR_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS google_calendar_accounts (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        google_email      TEXT    NOT NULL,
+        access_token      TEXT    NOT NULL,
+        refresh_token     TEXT    NOT NULL,
+        token_expires_at  TEXT    NOT NULL,
+        sync_token        TEXT,
+        connected_at      TEXT    NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS meetings (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        google_event_id   TEXT    NOT NULL UNIQUE,
+        case_id           INTEGER,
+        title             TEXT    NOT NULL,
+        description       TEXT,
+        location          TEXT,
+        start_time        TEXT    NOT NULL,
+        end_time          TEXT    NOT NULL,
+        status            TEXT    NOT NULL DEFAULT 'confirmed'
+                                  CHECK (status IN ('confirmed','tentative','cancelled')),
+        case_link_source  TEXT    NOT NULL DEFAULT 'none'
+                                  CHECK (case_link_source IN ('none','phrase_match','manual')),
+        created_at        TEXT    NOT NULL,
+        updated_at        TEXT,
+        FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_meetings_case_id    ON meetings(case_id);
+    CREATE INDEX IF NOT EXISTS idx_meetings_start_time ON meetings(start_time);
+";
+
+#[derive(Serialize, Debug, Clone)]
+pub struct MeetingRow {
+    pub id: i64,
+    pub google_event_id: String,
+    pub case_id: Option<i64>,
+    pub title: String,
+    pub description: Option<String>,
+    pub location: Option<String>,
+    pub start_time: String,
+    pub end_time: String,
+    pub status: String,
+    pub case_link_source: String,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+const MEETING_COLUMNS: &str = "id, google_event_id, case_id, title, description, location, start_time, end_time, status, case_link_source, created_at, updated_at";
+
+fn meeting_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<MeetingRow> {
+    Ok(MeetingRow {
+        id: row.get(0)?,
+        google_event_id: row.get(1)?,
+        case_id: row.get(2)?,
+        title: row.get(3)?,
+        description: row.get(4)?,
+        location: row.get(5)?,
+        start_time: row.get(6)?,
+        end_time: row.get(7)?,
+        status: row.get(8)?,
+        case_link_source: row.get(9)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
+    })
+}
+
+pub fn get_meeting(conn: &Connection, id: i64) -> Result<Option<MeetingRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(&format!("SELECT {MEETING_COLUMNS} FROM meetings WHERE id = ?1"))?;
+    match stmt.query_row(params![id], meeting_row_from_sql) {
+        Ok(row) => Ok(Some(row)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn get_meeting_by_google_event_id(conn: &Connection, google_event_id: &str) -> Result<Option<MeetingRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(&format!("SELECT {MEETING_COLUMNS} FROM meetings WHERE google_event_id = ?1"))?;
+    match stmt.query_row(params![google_event_id], meeting_row_from_sql) {
+        Ok(row) => Ok(Some(row)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Overlap query, not a strict `start_time BETWEEN` -- a meeting that started
+/// before `range_start` but is still ongoing when it begins must still show
+/// up in that range's view.
+pub fn list_meetings_for_range(conn: &Connection, range_start: &str, range_end: &str) -> Result<Vec<MeetingRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {MEETING_COLUMNS} FROM meetings WHERE start_time < ?2 AND end_time > ?1 ORDER BY start_time ASC"
+    ))?;
+    let rows = stmt.query_map(params![range_start, range_end], meeting_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub fn list_meetings_for_case(conn: &Connection, case_id: i64) -> Result<Vec<MeetingRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(&format!("SELECT {MEETING_COLUMNS} FROM meetings WHERE case_id = ?1 ORDER BY start_time ASC"))?;
+    let rows = stmt.query_map(params![case_id], meeting_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// "Today" in UTC, matching how every other timestamp in this table is
+/// stored (RFC3339, always UTC per chrono::Utc::now()) -- see design.md §15
+/// on timezone handling being an open risk beyond this.
+pub fn list_todays_meetings(conn: &Connection) -> Result<Vec<MeetingRow>, rusqlite::Error> {
+    let today = chrono::Utc::now().date_naive();
+    let start = today.and_hms_opt(0, 0, 0).unwrap().and_utc().to_rfc3339();
+    let end = (today + chrono::Duration::days(1)).and_hms_opt(0, 0, 0).unwrap().and_utc().to_rfc3339();
+    list_meetings_for_range(conn, &start, &end)
+}
+
+pub struct UpsertMeetingInput<'a> {
+    pub google_event_id: &'a str,
+    pub case_id: Option<i64>,
+    pub case_link_source: &'a str,
+    pub title: &'a str,
+    pub description: Option<&'a str>,
+    pub location: Option<&'a str>,
+    pub start_time: &'a str,
+    pub end_time: &'a str,
+    pub status: &'a str,
+}
+
+/// Insert-or-update keyed on `google_event_id`, the mirror's natural key
+/// (design.md §5). `created_at` is deliberately absent from the `DO UPDATE
+/// SET` clause below so a re-sync never overwrites the original insert time.
+pub fn upsert_meeting(conn: &Connection, input: UpsertMeetingInput) -> Result<MeetingRow, rusqlite::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO meetings (google_event_id, case_id, case_link_source, title, description, location, start_time, end_time, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL)
+         ON CONFLICT(google_event_id) DO UPDATE SET
+            case_id = excluded.case_id,
+            case_link_source = excluded.case_link_source,
+            title = excluded.title,
+            description = excluded.description,
+            location = excluded.location,
+            start_time = excluded.start_time,
+            end_time = excluded.end_time,
+            status = excluded.status,
+            updated_at = ?10",
+        params![
+            input.google_event_id,
+            input.case_id,
+            input.case_link_source,
+            input.title,
+            input.description,
+            input.location,
+            input.start_time,
+            input.end_time,
+            input.status,
+            now,
+        ],
+    )?;
+    get_meeting_by_google_event_id(conn, input.google_event_id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn update_meeting_row(
+    conn: &Connection,
+    id: i64,
+    title: &str,
+    description: Option<&str>,
+    location: Option<&str>,
+    start_time: &str,
+    end_time: &str,
+    case_id: Option<i64>,
+    case_link_source: &str,
+) -> Result<MeetingRow, rusqlite::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE meetings SET title = ?1, description = ?2, location = ?3, start_time = ?4, end_time = ?5, case_id = ?6, case_link_source = ?7, updated_at = ?8
+         WHERE id = ?9",
+        params![title, description, location, start_time, end_time, case_id, case_link_source, now, id],
+    )?;
+    get_meeting(conn, id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
+}
+
+pub fn delete_meeting_row(conn: &Connection, id: i64) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM meetings WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+/// Used when a synced Google event's status is "cancelled" -- a cancelled
+/// event carries no useful remaining data, so the local row is dropped
+/// rather than kept in a "cancelled" state (design.md §5).
+pub fn delete_meeting_by_google_event_id(conn: &Connection, google_event_id: &str) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM meetings WHERE google_event_id = ?1", params![google_event_id])?;
+    Ok(())
+}
 
 /// Computes a due_date timestamp from a base (usually the case's created_at)
 /// plus an estimate, converted to minutes (a "day" estimate is treated as
