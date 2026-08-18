@@ -98,7 +98,7 @@ export default function AppHome() {
               <AppHomeRecentCases />
             </div>
 
-            <div className="flex items-end gap-20">
+            <div className="flex items-start gap-20">
               <button type="button" onClick={handleDocsManagement} className={NAV_TILE_CLASS}>
                 <div className="flex flex-col items-center gap-2">
                   <FileText className="size-8" />
@@ -111,7 +111,16 @@ export default function AppHome() {
                   </span>
                 )}
               </button>
-              <AppHomeDocumentsPanel />
+              {/* min-h-48 matches the tile's own size-48 (192px) -- keeps
+                  this row's total height equal to the tile's regardless of
+                  the panel's own (shorter) content height, so items-start
+                  both lines "Documents Management" up with the tile's top
+                  AND keeps this row's height consistent with the others for
+                  equal inter-row gaps (no dead space left over to inflate
+                  the gap below, the way items-end previously worked around). */}
+              <div className="min-h-48">
+                <AppHomeDocumentsPanel />
+              </div>
             </div>
 
             <div className="flex items-end gap-20">
