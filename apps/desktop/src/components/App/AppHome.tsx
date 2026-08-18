@@ -2,13 +2,14 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Briefcase, FileText } from "lucide-react";
+import { Briefcase, CalendarDays, FileText } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "../../store/indexStore";
 import { clearSession } from "../../store/authStore";
 import AppHomeRecentCases from "./AppHomeRecentCases";
 import AppHomeDocumentsPanel from "./AppHomeDocumentsPanel";
+import AppHomeTodaysMeetings from "./AppHomeTodaysMeetings";
 import { AppUserMenu } from "./AppUserMenu";
 import { AppHomeWelcome } from "./AppHomeWelcome";
 import { AppHomeOverview } from "./AppHomeOverview";
@@ -46,8 +47,8 @@ export default function AppHome() {
     navigate("/docs-management");
   }
 
-  function handleTaskManagement() {
-    navigate("/task-management");
+  function handleCalendar() {
+    navigate("/calendar");
   }
 
   function handleSettings() {
@@ -82,12 +83,12 @@ export default function AppHome() {
         />
       </div>
 
-      <div className="flex-1 flex items-start justify-center mt-52">
+      <div className="flex-1 flex items-start justify-center mt-28">
         <div className="w-full max-w-7xl mx-auto flex items-start justify-between gap-24 px-6">
 
           {/* Primary navigation wrapper - Aligns content strictly to the left edge */}
-          <div className="flex flex-col gap-16 justify-self-start">
-            <div className="flex items-start gap-20">
+          <div className="flex flex-col gap-8 justify-self-start">
+            <div className="flex items-end gap-20">
               <button type="button" onClick={handleCaseMagement} className={NAV_TILE_CLASS}>
                 <div className="flex flex-col items-center gap-2">
                   <Briefcase className="size-8" />
@@ -110,18 +111,36 @@ export default function AppHome() {
                   </span>
                 )}
               </button>
-              <div className="flex flex-col items-end gap-2 w-96">
+              {/* min-h-48 matches the tile's own size-48 (192px) -- keeps
+                  this row's total height equal to the tile's regardless of
+                  the panel's own (shorter) content height, so items-start
+                  both lines "Documents Management" up with the tile's top
+                  AND keeps this row's height consistent with the others for
+                  equal inter-row gaps (no dead space left over to inflate
+                  the gap below, the way items-end previously worked around). */}
+              <div className="min-h-48">
                 <AppHomeDocumentsPanel />
-                <div className="flex items-center gap-4 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleSettings}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    {t("settings_footer")}
-                  </button>
-                </div>
               </div>
+            </div>
+
+            <div className="flex items-end gap-20">
+              <button type="button" onClick={handleCalendar} className={NAV_TILE_CLASS}>
+                <div className="flex flex-col items-center gap-2">
+                  <CalendarDays className="size-8" />
+                  <span className="text-2xl font-medium text-foreground/80">{t("calendar")}</span>
+                </div>
+              </button>
+              <AppHomeTodaysMeetings />
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleSettings}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 flex items-center gap-1.5 cursor-pointer"
+              >
+                {t("settings_footer")}
+              </button>
             </div>
           </div>
 
