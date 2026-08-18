@@ -118,7 +118,7 @@ export default function CaseOverviewPanel({
             className="rounded-md border border-border bg-muted/20 p-3 cursor-pointer hover:bg-muted/40 transition-colors"
           >
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("notes")}</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">{t("notes")}</h4>
               <button
                 type="button"
                 onClick={onEditNotesAndTags}
@@ -139,7 +139,7 @@ export default function CaseOverviewPanel({
             className="rounded-md border border-border bg-muted/20 p-3 cursor-pointer hover:bg-muted/40 transition-colors"
           >
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("tags")}</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">{t("tags")}</h4>
               <button
                 type="button"
                 onClick={onEditNotesAndTags}

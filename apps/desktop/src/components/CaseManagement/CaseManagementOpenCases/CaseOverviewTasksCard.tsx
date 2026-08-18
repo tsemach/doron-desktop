@@ -20,7 +20,7 @@ export default function CaseOverviewTasksCard({ caseId, onViewAll }: CaseOvervie
       className="rounded-md border border-border bg-muted/20 p-3 cursor-pointer hover:bg-muted/40 transition-colors"
     >
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("tasks")}</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">{t("tasks")}</h4>
         {tasks.length > 0 && (
           <button
             type="button"
