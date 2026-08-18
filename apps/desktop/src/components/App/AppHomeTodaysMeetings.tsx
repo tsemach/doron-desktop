@@ -4,8 +4,10 @@ import { useLanguage } from "@/context/LanguageContext";
 import type { Meeting } from "@/lib/calendar/types";
 import MeetingBox from "../Calendar/MeetingBox";
 
-const CARD_CLASS = "rounded-md border border-border bg-muted/20 p-3";
-const CARD_HEADER_CLASS = "text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2";
+// h-48 matches the Calendar nav tile's own size-48 (192px) so the two sit
+// flush at the same height in their row (AppHome.tsx's items-end).
+const CARD_CLASS = "rounded-md border border-border bg-muted/20 p-3 h-48 flex flex-col";
+const CARD_HEADER_CLASS = "text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 shrink-0";
 
 // Self-contained (own fetch, not the AppHomeOverview stack's shared
 // Promise.all) so it can sit next to the Calendar nav tile instead of in the
@@ -44,7 +46,7 @@ export default function AppHomeTodaysMeetings() {
         ) : meetings.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">{t("calendar_no_meetings")}</p>
         ) : (
-          <div className="max-h-56 overflow-y-auto space-y-1.5 p-1">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 p-1">
             {[...meetings]
               .sort((a, b) => a.start_time.localeCompare(b.start_time))
               .map((meeting) => (

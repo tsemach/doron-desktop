@@ -125,7 +125,7 @@ export default function AppHome() {
               </div>
             </div>
 
-            <div className="flex items-start gap-20">
+            <div className="flex items-end gap-20">
               <button type="button" onClick={handleCalendar} className={NAV_TILE_CLASS}>
                 <div className="flex flex-col items-center gap-2">
                   <CalendarDays className="size-8" />
