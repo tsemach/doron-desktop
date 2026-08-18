@@ -120,9 +120,14 @@ export default function CalendarView() {
       </div>
 
       <div className="flex-1 min-h-0">
-        {loading ? (
+        {/* Only the true first load (nothing fetched yet) blanks the grid --
+            a refresh (the RefreshCw button above, already spinning while
+            loading) keeps the grid mounted and just updates its meetings
+            prop in place, so it doesn't unmount/remount (losing TimeGrid's
+            scroll position) on every reload. */}
+        {loading && meetings.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t("loading")}</p>
-        ) : error ? (
+        ) : error && meetings.length === 0 ? (
           <p className="text-xs text-destructive">{error}</p>
         ) : (
           <>
