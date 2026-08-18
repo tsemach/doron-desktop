@@ -88,7 +88,7 @@ export default function AppHome() {
 
           {/* Primary navigation wrapper - Aligns content strictly to the left edge */}
           <div className="flex flex-col gap-8 justify-self-start">
-            <div className="flex items-start gap-20">
+            <div className="flex items-end gap-20">
               <button type="button" onClick={handleCaseMagement} className={NAV_TILE_CLASS}>
                 <div className="flex flex-col items-center gap-2">
                   <Briefcase className="size-8" />
@@ -111,18 +111,7 @@ export default function AppHome() {
                   </span>
                 )}
               </button>
-              <div className="flex flex-col items-end gap-2 w-96">
-                <AppHomeDocumentsPanel />
-                <div className="flex items-center gap-4 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleSettings}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    {t("settings_footer")}
-                  </button>
-                </div>
-              </div>
+              <AppHomeDocumentsPanel />
             </div>
 
             <div className="flex items-end gap-20">
@@ -133,6 +122,16 @@ export default function AppHome() {
                 </div>
               </button>
               <AppHomeTodaysMeetings />
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleSettings}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 flex items-center gap-1.5 cursor-pointer"
+              >
+                {t("settings_footer")}
+              </button>
             </div>
           </div>
 
