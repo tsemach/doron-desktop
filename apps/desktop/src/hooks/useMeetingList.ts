@@ -17,7 +17,7 @@ export interface MeetingFormValues {
 /// with a different `fetchMeetings`/`dependencyKey`, mirroring useTaskList's
 /// shape. `fetchMeetings` is read through a ref so it doesn't need
 /// referential stability across renders.
-export function useMeetingList(fetchMeetings: () => Promise<Meeting[]>, dependencyKey: string) {
+export function useMeetingList(fetchMeetings: () => Promise<Meeting[]>, dependencyKey: string | number) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

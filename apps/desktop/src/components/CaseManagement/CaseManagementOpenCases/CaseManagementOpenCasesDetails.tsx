@@ -16,6 +16,7 @@ import OpenCasesDocumentPreview from "./OpenCasesDocumentPreview";
 import OpenCasesDocumentHistory from "./OpenCasesDocumentHistory";
 import OpenCasesDocumentFields from "./OpenCasesDocumentFields";
 import CaseTasksPanel from "./CaseTasksPanel";
+import CaseMeetingsPanel from "./CaseMeetingsPanel";
 import CaseOverviewPanel from "./CaseOverviewPanel";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -514,6 +515,8 @@ export default function CaseManagementOpenCasesDetails() {
                     ? (t("emails_exchange") || "Case Email Correspondence")
                     : activeRightTab === "tasks"
                     ? "Tasks"
+                    : activeRightTab === "meetings"
+                    ? t("calendar")
                     : activeRightTab === "overview"
                     ? t("overview")
                     : (t("document_details") || "Document Details")}
@@ -596,12 +599,15 @@ export default function CaseManagementOpenCasesDetails() {
                 />
               ) : activeRightTab === "tasks" ? (
                 <CaseTasksPanel caseId={Number(selectedCase?.id || 0)} />
+              ) : activeRightTab === "meetings" ? (
+                <CaseMeetingsPanel caseId={Number(selectedCase?.id || 0)} />
               ) : activeRightTab === "overview" && selectedCase ? (
                 <CaseOverviewPanel
                   caseId={Number(selectedCase.id)}
                   selectedCase={selectedCase}
                   onViewTasks={() => setActiveRightTab("tasks")}
                   onViewEmails={() => setActiveRightTab("emails")}
+                  onViewMeetings={() => setActiveRightTab("meetings")}
                   onEditNotesAndTags={() => setEditingCaseAnnotations(selectedCase)}
                 />
               ) : docSubTab === "history" && selectedDocument ? (

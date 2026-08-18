@@ -3,7 +3,7 @@ import SidebarNavButton from "./SidebarNavButton";
 import SidebarProfileFooter from "./SidebarProfileFooter";
 import { useLanguage } from "../../context/LanguageContext";
 
-export type CaseDetailTab = "overview" | "preview" | "emails" | "tasks";
+export type CaseDetailTab = "overview" | "preview" | "emails" | "tasks" | "meetings";
 
 interface CaseDetailSidebarProps {
   activeRightTab: CaseDetailTab;
@@ -36,6 +36,11 @@ export default function CaseDetailSidebar({ activeRightTab, onTabChange, onEditT
             label={t("tasks")}
             active={activeRightTab === "tasks"}
             onClick={() => onTabChange("tasks")}
+          />
+          <SidebarNavButton
+            label={t("calendar")}
+            active={activeRightTab === "meetings"}
+            onClick={() => onTabChange("meetings")}
           />
         </div>
 
