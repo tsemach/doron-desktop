@@ -33,7 +33,7 @@ export default function CaseOverviewMeetingsCard({ caseId, onViewAll }: CaseOver
       className="rounded-md border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/20 p-3 cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
     >
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("calendar")}</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">{t("calendar")}</h4>
         {upcoming.length > 0 && (
           <button
             type="button"

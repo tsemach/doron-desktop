@@ -54,7 +54,7 @@ export default function CaseOverviewEmailsCard({ caseId, onViewAll }: CaseOvervi
       className="rounded-md border border-border bg-muted/20 p-3 cursor-pointer hover:bg-muted/40 transition-colors"
     >
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("emails")}</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">{t("emails")}</h4>
         {emails.length > 0 && (
           <button
             type="button"
