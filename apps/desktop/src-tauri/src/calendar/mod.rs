@@ -1,6 +1,7 @@
 pub mod case_link;
 pub mod google_events;
 pub mod oauth;
+pub mod reminder;
 pub mod sync;
 
 use tauri::AppHandle;

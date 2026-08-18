@@ -84,6 +84,12 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 crate::calendar::sync::poll_calendar_background(handle_calendar_sync).await;
             });
+            // Independent loop from the sync poller above -- a slow/failing
+            // Google API call must never delay a time-sensitive reminder.
+            let handle_calendar_reminder = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::calendar::reminder::remind_upcoming_meetings_background(handle_calendar_reminder).await;
+            });
             // Spawn local AI sidecar on startup if configured
             let handle_sidecar = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -162,6 +168,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_mic_recorder::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             store::get_db_path,
