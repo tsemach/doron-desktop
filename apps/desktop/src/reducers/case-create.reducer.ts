@@ -10,6 +10,7 @@ export enum CaseCreateActionType {
   SET_SUBJECT = "SET_SUBJECT",
   SET_NAME = "SET_NAME",
   SET_ORGANIZATION = "SET_ORGANIZATION",
+  SET_CONTACT_EMAILS = "SET_CONTACT_EMAILS",
   SET_CASE_TYPE = "SET_CASE_TYPE",
   SET_FOLDER = "SET_FOLDER",
   SELECT_TEMPLATE = "SELECT_TEMPLATE",
@@ -38,6 +39,7 @@ export interface CaseCreateState {
   subject: string;
   name: string;
   organization: string;
+  contactEmails: string[];
   caseType: string;
   folder: string;
   selectedTemplateId: string;
@@ -79,6 +81,7 @@ export type CaseCreateAction =
   | { type: CaseCreateActionType.SET_SUBJECT; payload: string }
   | { type: CaseCreateActionType.SET_NAME; payload: string }
   | { type: CaseCreateActionType.SET_ORGANIZATION; payload: string }
+  | { type: CaseCreateActionType.SET_CONTACT_EMAILS; payload: string[] }
   | { type: CaseCreateActionType.SET_CASE_TYPE; payload: string }
   | { type: CaseCreateActionType.SET_FOLDER; payload: string }
   | { type: CaseCreateActionType.SELECT_TEMPLATE; payload: string }
@@ -123,6 +126,7 @@ export function createInitialCaseCreateState(): CaseCreateState {
     subject: "",
     name: "",
     organization: "",
+    contactEmails: [],
     caseType: "",
     folder: "",
     selectedTemplateId: EMPTY_TEMPLATE_ID,
@@ -155,6 +159,8 @@ export function caseCreateReducer(state: CaseCreateState, action: CaseCreateActi
       return { ...state, name: action.payload };
     case CaseCreateActionType.SET_ORGANIZATION:
       return { ...state, organization: action.payload };
+    case CaseCreateActionType.SET_CONTACT_EMAILS:
+      return { ...state, contactEmails: action.payload };
     case CaseCreateActionType.SET_CASE_TYPE:
       return { ...state, caseType: action.payload };
     case CaseCreateActionType.SET_FOLDER:

@@ -494,7 +494,7 @@ pub fn rebuild_all_case_identifiers(conn: &Connection) -> Result<usize, String> 
 /// forwarded message. Observed on a real profile: the configured account had been learned
 /// onto one case and a second alias onto three, which then pulled unrelated mail towards
 /// them for months. An address that identifies every case identifies none.
-fn is_own_address(conn: &Connection, normalized: &str) -> bool {
+pub(crate) fn is_own_address(conn: &Connection, normalized: &str) -> bool {
     let mut stmt = match conn.prepare("SELECT username FROM email_configurations") {
         Ok(stmt) => stmt,
         // No configuration table or row is normal in tests; nothing to exclude.

@@ -5,6 +5,8 @@ use rusqlite::{Connection, OpenFlags, params};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
+use crate::contact::schema as contact_schema;
+
 // ── DB connection ─────────────────────────────────────────────────────────────
 
 pub fn db_path(app: &AppHandle) -> std::path::PathBuf {
@@ -501,6 +503,9 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
     // `case_emails` and `pending_email_alerts`, all of which are created above.
     matcher_schema::init_matcher_schema(&conn)
         .map_err(|e| format!("[case matcher schema] {e}"))?;
+
+    contact_schema::init_contact_schema(&conn)
+        .map_err(|e| format!("[contact schema] {e}"))?;
 
     Ok(conn)
 }
