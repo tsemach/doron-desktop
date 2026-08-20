@@ -92,7 +92,19 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showGoogleImport, setShowGoogleImport] = useState(false);
 
+  // Filters the already-linked contacts list below -- distinct from
+  // searchQuery, which filters candidates in the "Add existing" panel.
+  const [contactsFilter, setContactsFilter] = useState("");
+
   const linkedIds = useMemo(() => new Set(contacts.map((c) => c.id)), [contacts]);
+
+  const filteredContacts = useMemo(() => {
+    const query = contactsFilter.trim().toLowerCase();
+    if (!query) return contacts;
+    return contacts.filter((c) =>
+      [c.name, c.email, c.phone, c.organization].some((field) => (field || "").toLowerCase().includes(query))
+    );
+  }, [contacts, contactsFilter]);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -126,10 +138,19 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {t("contacts")} ({contacts.length})
-        </h4>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 max-w-2xl flex-1 pr-6">
+          <input
+            type="text"
+            value={contactsFilter}
+            onChange={(e) => setContactsFilter(e.target.value)}
+            placeholder={t("contact_search_placeholder")}
+            className={`${inputClass} max-w-xs`}
+          />
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">
+            {t("contacts")} ({contacts.length})
+          </h4>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setShowAddExisting((v) => !v)}
@@ -210,9 +231,11 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
         <div className="text-xs text-muted-foreground">Loading contacts...</div>
       ) : contacts.length === 0 ? (
         <div className="text-xs text-muted-foreground">{t("contact_no_contacts")}</div>
+      ) : filteredContacts.length === 0 ? (
+        <div className="text-xs text-muted-foreground">{t("contact_no_search_matches")}</div>
       ) : (
         <div className="max-w-2xl space-y-2">
-          {contacts.map((contact) => {
+          {filteredContacts.map((contact) => {
             return (
               <div key={contact.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
                 <div
