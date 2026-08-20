@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CaseTemplate } from "./CaseManagementTypes";
 import { TaskTemplate } from "@/lib/task/types";
@@ -6,6 +7,91 @@ import { EMPTY_TEMPLATE_ID } from "@/reducers/case-create.reducer";
 import { CASE_TYPE_OPTIONS } from "./caseTypeOptions";
 import { useLanguage } from "@/context/LanguageContext";
 
+// Basic email-shape check only (contains "@") -- per docs/contact/design.md §8, no
+// existing multi-email chip input was found anywhere in packages/ui or this codebase,
+// so this is a small single-call-site input built just for this field.
+function isValidEmailShape(value: string): boolean {
+  return value.includes("@");
+}
+
+interface ContactEmailsFieldProps {
+  emails: string[];
+  onChange: (emails: string[]) => void;
+  disabled?: boolean;
+}
+
+function ContactEmailsField({ emails, onChange, disabled }: ContactEmailsFieldProps) {
+  const [draft, setDraft] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  function commitDraft() {
+    const value = draft.trim().replace(/,+$/, "");
+    if (!value) {
+      setDraft("");
+      return;
+    }
+    if (!isValidEmailShape(value)) {
+      setEmailError(`"${value}" doesn't look like a valid email address.`);
+      return;
+    }
+    if (!emails.includes(value)) {
+      onChange([...emails, value]);
+    }
+    setDraft("");
+    setEmailError(null);
+  }
+
+  function removeEmail(email: string) {
+    onChange(emails.filter((e) => e !== email));
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm flex flex-wrap items-center gap-1.5 focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all min-h-[36px]">
+        {emails.map((email) => (
+          <span
+            key={email}
+            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-foreground"
+          >
+            {email}
+            <button
+              type="button"
+              onClick={() => removeEmail(email)}
+              disabled={disabled}
+              className="text-muted-foreground hover:text-foreground cursor-pointer"
+              aria-label={`Remove ${email}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          id="contactEmails"
+          type="text"
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (emailError) setEmailError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              commitDraft();
+            } else if (e.key === "Backspace" && draft === "" && emails.length > 0) {
+              removeEmail(emails[emails.length - 1]);
+            }
+          }}
+          onBlur={commitDraft}
+          placeholder={emails.length === 0 ? "e.g. client@example.com (Enter or comma to add)" : ""}
+          className="flex-1 min-w-[140px] bg-transparent text-sm focus:outline-none"
+          disabled={disabled}
+        />
+      </div>
+      {emailError && <p className="text-xs text-destructive">{emailError}</p>}
+    </div>
+  );
+}
+
 interface CaseManagementCaseCreateFormProps {
   subject: string;
   onSubjectChange: (value: string) => void;
@@ -13,6 +99,8 @@ interface CaseManagementCaseCreateFormProps {
   onNameChange: (value: string) => void;
   organization: string;
   onOrganizationChange: (value: string) => void;
+  contactEmails: string[];
+  onContactEmailsChange: (emails: string[]) => void;
   caseType: string;
   onCaseTypeChange: (value: string) => void;
   folder: string;
@@ -36,6 +124,8 @@ export default function CaseManagementCaseCreateForm({
   onNameChange,
   organization,
   onOrganizationChange,
+  contactEmails,
+  onContactEmailsChange,
   caseType,
   onCaseTypeChange,
   folder,
@@ -99,6 +189,14 @@ export default function CaseManagementCaseCreateForm({
           disabled={loading}
           className="w-full rounded-md border border-input bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all h-[36px]"
         />
+      </div>
+
+      {/* Client Email(s) (optional) */}
+      <div className="space-y-1">
+        <label htmlFor="contactEmails" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Client Email(s)
+        </label>
+        <ContactEmailsField emails={contactEmails} onChange={onContactEmailsChange} disabled={loading} />
       </div>
 
       {/* Case Type (optional) */}

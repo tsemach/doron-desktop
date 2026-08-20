@@ -18,6 +18,7 @@ import OpenCasesDocumentFields from "./OpenCasesDocumentFields";
 import CaseTasksPanel from "./CaseTasksPanel";
 import CaseMeetingsPanel from "./CaseMeetingsPanel";
 import CaseOverviewPanel from "./CaseOverviewPanel";
+import CaseContactsPanel from "./CaseContactsPanel";
 import mammoth from "mammoth";
 import { useLanguage } from "../../../context/LanguageContext";
 import { rememberRecentCase } from "@/lib/case";
@@ -521,6 +522,8 @@ export default function CaseManagementOpenCasesDetails() {
                     ? "Tasks"
                     : activeRightTab === "meetings"
                     ? t("calendar")
+                    : activeRightTab === "contacts"
+                    ? t("contacts")
                     : activeRightTab === "overview"
                     ? t("overview")
                     : (t("document_details") || "Document Details")}
@@ -605,6 +608,8 @@ export default function CaseManagementOpenCasesDetails() {
                 <CaseTasksPanel caseId={Number(selectedCase?.id || 0)} />
               ) : activeRightTab === "meetings" ? (
                 <CaseMeetingsPanel caseId={Number(selectedCase?.id || 0)} />
+              ) : activeRightTab === "contacts" ? (
+                <CaseContactsPanel caseId={Number(selectedCase?.id || 0)} />
               ) : activeRightTab === "overview" && selectedCase ? (
                 <CaseOverviewPanel
                   caseId={Number(selectedCase.id)}
