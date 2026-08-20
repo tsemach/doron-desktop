@@ -140,6 +140,8 @@
   "google_contacts_import_selected": "הוסף נבחרים",
   "google_contacts_importing": "מוסיף...",
   "google_contacts_import_error": "ייבוא חלק מאנשי הקשר נכשל. יש לנסות שוב.",
+  "google_contacts_rescope_description": "יש לחבר מחדש את חשבון ה-Google שלך כדי לאפשר ייבוא אנשי קשר.",
+  "google_contacts_reconnect_button": "חיבור מחדש לחשבון Google",
   "tags_notes": "תגיות והערות",
   "refresh": "רענן",
   "show_more": "קרא עוד",

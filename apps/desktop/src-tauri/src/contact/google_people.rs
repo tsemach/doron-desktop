@@ -74,12 +74,42 @@ struct GoogleApiErrorEnvelope {
 #[derive(Debug, Deserialize)]
 struct GoogleApiErrorBody {
     message: String,
+    #[serde(default)]
+    status: Option<String>,
 }
+
+/// Sentinel error string `list_google_contacts` returns instead of Google's
+/// raw error message when the failure is specifically an insufficient-scope
+/// rejection -- i.e. someone connected Google Calendar *before* this PR
+/// added `contacts.readonly` to `GOOGLE_CALENDAR_SCOPE` (see oauth.rs), so
+/// their stored refresh token was issued under the old 2-scope grant. Google
+/// doesn't retroactively add newly-requested scopes to an existing grant;
+/// re-consenting (disconnect/reconnect, or just calling
+/// `connect_google_calendar` again -- it always sends `prompt=consent`)
+/// picks up the new scope. Exported so the frontend can match on this exact
+/// string and show a "reconnect" affordance instead of Google's raw message.
+pub const INSUFFICIENT_SCOPE_ERROR: &str = "google_people_insufficient_scope";
 
 async fn google_error_message(response: reqwest::Response) -> String {
     let status = response.status();
     match response.json::<GoogleApiErrorEnvelope>().await {
-        Ok(body) => body.error.message,
+        Ok(body) => {
+            // Google's actual shape for this case: HTTP 403,
+            // error.status = "PERMISSION_DENIED", error.message = "Request
+            // had insufficient authentication scopes." -- checking the HTTP
+            // status, error.status, *and* the message content (rather than
+            // any one alone) avoids misclassifying an unrelated 403 (e.g.
+            // the People API being disabled on the Cloud project) as a
+            // scope problem.
+            let is_insufficient_scope = status == reqwest::StatusCode::FORBIDDEN
+                && body.error.status.as_deref() == Some("PERMISSION_DENIED")
+                && body.error.message.to_lowercase().contains("insufficient")
+                && body.error.message.to_lowercase().contains("scope");
+            if is_insufficient_scope {
+                return INSUFFICIENT_SCOPE_ERROR.to_string();
+            }
+            body.error.message
+        }
         Err(_) => format!("Google People request failed ({status})"),
     }
 }

@@ -5,6 +5,15 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Contact, GoogleContact } from "@/lib/contact/types";
 import { GoogleCalendarStatus } from "@/lib/calendar/types";
 
+// Mirrors contact::google_people::INSUFFICIENT_SCOPE_ERROR
+// (apps/desktop/src-tauri/src/contact/google_people.rs) exactly -- the
+// sentinel `list_google_contacts` rejects with when someone connected
+// Google Calendar before ASC-176 added contacts.readonly to the OAuth
+// scope, so their stored token predates that grant. Kept as a literal
+// (not generated) since Tauri command errors cross the Rust/JS boundary as
+// plain strings.
+const INSUFFICIENT_SCOPE_ERROR = "google_people_insufficient_scope";
+
 interface GoogleContactsImportDialogProps {
   caseId: number;
   // Called once after a (partially or fully) successful import so the
@@ -27,6 +36,8 @@ export default function GoogleContactsImportDialog({ caseId, onImported, onCance
   const [googleContacts, setGoogleContacts] = useState<GoogleContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [needsRescope, setNeedsRescope] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
 
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -46,26 +57,57 @@ export default function GoogleContactsImportDialog({ caseId, onImported, onCance
     loadStatus();
   }, [loadStatus]);
 
-  useEffect(() => {
-    if (status === "loading" || status === null) return;
+  const loadContacts = useCallback(() => {
     setLoadingContacts(true);
     setLoadError(null);
+    setNeedsRescope(false);
     invoke<GoogleContact[]>("list_google_contacts")
       .then(setGoogleContacts)
       .catch((err) => {
         console.error("Failed to load Google Contacts:", err);
-        setLoadError(String(err));
+        // Someone connected Google Calendar before this scope was added --
+        // their token predates contacts.readonly, so Google rejects the
+        // People API call outright. Google doesn't retroactively add scopes
+        // to an existing grant, so the raw error ("insufficient
+        // authentication scopes") is meaningless to a user -- surface a
+        // "reconnect" affordance instead (handleReconnect below).
+        if (String(err) === INSUFFICIENT_SCOPE_ERROR) {
+          setNeedsRescope(true);
+        } else {
+          setLoadError(String(err));
+        }
       })
       .finally(() => setLoadingContacts(false));
-  }, [status]);
+  }, []);
+
+  useEffect(() => {
+    if (status === "loading" || status === null) return;
+    loadContacts();
+  }, [status, loadContacts]);
+
+  async function handleReconnect() {
+    setReconnecting(true);
+    setLoadError(null);
+    try {
+      // Re-consenting always sends prompt=consent (oauth.rs's connect()), so
+      // this picks up contacts.readonly even though the account is already
+      // connected -- no disconnect step needed first.
+      await invoke("connect_google_calendar");
+      loadContacts();
+    } catch (err) {
+      setLoadError(String(err));
+    } finally {
+      setReconnecting(false);
+    }
+  }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !importing && !connecting) onCancel();
+      if (e.key === "Escape" && !importing && !connecting && !reconnecting) onCancel();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [importing, connecting, onCancel]);
+  }, [importing, connecting, reconnecting, onCancel]);
 
   async function handleConnect() {
     setConnecting(true);
@@ -112,6 +154,10 @@ export default function GoogleContactsImportDialog({ caseId, onImported, onCance
           phone: contact.phone || null,
           organization: contact.organization || null,
           googleContactId: contact.resource_name,
+          // The contact's own source (design.md §3.1) -- distinct from
+          // case_contacts.source below, which records how it was linked to
+          // *this case*, not how the contact itself was first created.
+          source: "google",
         });
         await invoke("add_contact_to_case", { caseId, backendContactId: created.id, source: "google" });
       } catch (err) {
@@ -132,7 +178,7 @@ export default function GoogleContactsImportDialog({ caseId, onImported, onCance
     }
   }
 
-  const busy = connecting || importing;
+  const busy = connecting || importing || reconnecting;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -156,7 +202,14 @@ export default function GoogleContactsImportDialog({ caseId, onImported, onCance
             {importError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{importError}</div>}
             {loadError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{loadError}</div>}
 
-            {loadingContacts ? (
+            {needsRescope ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground leading-normal">{t("google_contacts_rescope_description")}</p>
+                <Button onClick={handleReconnect} disabled={reconnecting}>
+                  {reconnecting ? t("calendar_connecting") : t("google_contacts_reconnect_button")}
+                </Button>
+              </div>
+            ) : loadingContacts ? (
               <p className="text-xs text-muted-foreground">{t("google_contacts_loading")}</p>
             ) : googleContacts.length === 0 ? (
               <p className="text-xs text-muted-foreground">{t("google_contacts_empty")}</p>
@@ -205,7 +258,7 @@ export default function GoogleContactsImportDialog({ caseId, onImported, onCance
           <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={busy}>
             {t("cancel")}
           </Button>
-          {status && status !== "loading" && (
+          {status && status !== "loading" && !needsRescope && (
             <Button type="button" size="sm" className="min-w-[96px]" onClick={handleImport} disabled={busy || selected.size === 0}>
               {importing ? t("google_contacts_importing") : t("google_contacts_import_selected")}
             </Button>

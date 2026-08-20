@@ -140,6 +140,8 @@
   "google_contacts_import_selected": "Add selected",
   "google_contacts_importing": "Adding...",
   "google_contacts_import_error": "Failed to import some contacts. Please try again.",
+  "google_contacts_rescope_description": "Your Google account needs to be reconnected to enable Contacts import.",
+  "google_contacts_reconnect_button": "Reconnect Google account",
   "tags_notes": "Tags & Notes",
   "refresh": "Refresh",
   "show_more": "Show More",
