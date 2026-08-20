@@ -1,4 +1,5 @@
 import { pgTable, text, integer, timestamp, primaryKey, uuid, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 // ASC-142 -- a firm is created only when its first admin is invited from
@@ -279,4 +280,58 @@ export const aiRequests = pgTable("ai_requests", {
   }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+// ASC-172 -- contact records for a case. Ownership/visibility rule (see
+// docs/contact/design.md §5): flat users share one global pool
+// (accountType='flat'); firm users' contacts are private to userId by
+// default, shared via contactShares below. accountType is denormalized
+// from users.role at write time solely so the two partial unique indexes
+// below can enforce email dedupe without a join.
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    accountType: text("account_type", { enum: ["flat", "firm"] }).notNull(),
+    name: text("name"),
+    email: text("email").notNull(),
+    emailNorm: text("email_norm").notNull(),
+    phone: text("phone"),
+    organization: text("organization"),
+    source: text("source", { enum: ["manual", "email", "case_creation", "google"] }).notNull(),
+    googleContactId: text("google_contact_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    // Attribution for edits -- editing is not owner-only (design.md §5), so
+    // this records whoever made the most recent change, owner or share recipient.
+    updatedByUserId: text("updated_by_user_id").references(() => users.id),
+  },
+  (t) => [
+    // Flat users share one global pool: an email can exist only once
+    // across ALL flat contacts.
+    uniqueIndex("contacts_email_flat_uniq")
+      .on(t.emailNorm)
+      .where(sql`account_type = 'flat'`),
+    // Firm users each have a private list: an email can exist once per
+    // owning user.
+    uniqueIndex("contacts_email_firm_uniq")
+      .on(t.userId, t.emailNorm)
+      .where(sql`account_type = 'firm'`),
+  ]
+);
+
+// Sharing is a reference, not a copy: a row here grants sharedWithUserId
+// read/edit/link access to contactId without duplicating any of its fields.
+// Editing the contact is instantly visible to everyone it's shared with;
+// deleting this row (or the contact) revokes access immediately.
+export const contactShares = pgTable(
+  "contact_shares",
+  {
+    contactId: uuid("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+    sharedWithUserId: text("shared_with_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    sharedByUserId: text("shared_by_user_id").notNull().references(() => users.id),
+    sharedAt: timestamp("shared_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.contactId, t.sharedWithUserId] })]
+);
 

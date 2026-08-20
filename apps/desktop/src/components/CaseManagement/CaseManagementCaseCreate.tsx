@@ -2,7 +2,19 @@ import { useEffect, useMemo, useCallback, useReducer, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Case, CaseTemplate, DocTemplate } from "./CaseManagementTypes";
+import { Button } from "@/components/ui/button";
+import { CaseTemplate, DocTemplate } from "./CaseManagementTypes";
+
+// `create_new_case`'s actual wire response (apps/desktop/src-tauri/src/case/mod.rs's
+// `CreateCaseResult`): the `Case` struct's fields `#[serde(flatten)]`ed at the top level,
+// snake_case, no serde rename -- distinct from the `Case` TS type above (camelCase
+// createdAt/updatedAt), which this response does NOT match field-for-field. Only the
+// fields this call site actually reads are declared here; `contact_warnings` is additive
+// (design.md §4.4/§7) and always an array, never undefined, per case/mod.rs.
+interface CreateCaseResponse {
+  id: number;
+  contact_warnings: string[];
+}
 import { TaskTemplate } from "@/lib/task/types";
 import { parseEstimateShorthand } from "@/lib/task/estimate";
 import mammoth from "mammoth";
@@ -28,11 +40,19 @@ export default function CaseManagementCaseCreate() {
   const [state, dispatch] = useReducer(caseCreateReducer, undefined, createInitialCaseCreateState);
   const [templateHelpOpen, setTemplateHelpOpen] = useState(false);
   const [activeRightView, setActiveRightView] = useState<"help" | "caseTemplate" | "taskTemplate" | null>(null);
+  // Non-blocking notice for per-email contact-link failures (design.md §7) -- this repo
+  // has no toast system (checked: no toast/Toast/sonner import anywhere in apps/desktop/src),
+  // so this is a dismissible banner matching the existing `error` banner's styling below.
+  // Case creation always navigates away on success regardless of this, so it's set right
+  // before navigate() fires and never actually gets to render here -- kept for the (currently
+  // theoretical) case a future change delays or skips the redirect.
+  const [contactWarnings, setContactWarnings] = useState<string[]>([]);
 
   const {
     subject,
     name,
     organization,
+    contactEmails,
     caseType,
     folder,
     selectedTemplateId,
@@ -423,7 +443,7 @@ export default function CaseManagementCaseCreate() {
       }
 
       // Call Rust backend command
-      const createdCase = await invoke<Case>("create_new_case", {
+      const createdCase = await invoke<CreateCaseResponse>("create_new_case", {
         subject: subject.trim(),
         name: name.trim(),
         folder: folder.trim(),
@@ -431,6 +451,7 @@ export default function CaseManagementCaseCreate() {
         taskTemplateId: taskTemplateIdNum,
         tasks: taskInputs,
         fieldValues,
+        contactEmails: contactEmails.length > 0 ? contactEmails : null,
       });
 
       if (organization.trim()) {
@@ -453,7 +474,16 @@ export default function CaseManagementCaseCreate() {
         });
       }
 
-      // Redirect back to case list on success
+      // Case creation always succeeds independently of per-email contact linking
+      // (design.md §7) -- warnings are informational only. If there are any, show
+      // them and let the user acknowledge before navigating away; otherwise redirect
+      // immediately, same as before this field existed.
+      if (createdCase.contact_warnings.length > 0) {
+        setContactWarnings(createdCase.contact_warnings);
+        dispatch({ type: CaseCreateActionType.SET_LOADING, payload: false });
+        return;
+      }
+
       navigate("/case-management");
     } catch (err) {
       console.error("Case creation failed:", err);
@@ -479,6 +509,22 @@ export default function CaseManagementCaseCreate() {
         {error && (
           <div className="rounded-md border border-destructive bg-destructive/10 px-4 py-2 text-sm text-destructive">
             {error}
+          </div>
+        )}
+
+        {contactWarnings.length > 0 && (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400 space-y-2">
+            <p className="font-medium">The case was created, but some client emails could not be linked as contacts:</p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              {contactWarnings.map((warning, i) => (
+                <li key={i}>{warning}</li>
+              ))}
+            </ul>
+            <div className="pt-1">
+              <Button type="button" size="sm" onClick={() => navigate("/case-management")}>
+                Continue
+              </Button>
+            </div>
           </div>
         )}
 
@@ -520,6 +566,10 @@ export default function CaseManagementCaseCreate() {
                 organization={organization}
                 onOrganizationChange={(value) =>
                   dispatch({ type: CaseCreateActionType.SET_ORGANIZATION, payload: value })
+                }
+                contactEmails={contactEmails}
+                onContactEmailsChange={(emails) =>
+                  dispatch({ type: CaseCreateActionType.SET_CONTACT_EMAILS, payload: emails })
                 }
                 caseType={caseType}
                 onCaseTypeChange={(value) =>
