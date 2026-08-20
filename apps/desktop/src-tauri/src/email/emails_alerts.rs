@@ -387,7 +387,7 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
     if let Some(email) = bare_address {
         let normalized = crate::email::normalize_email(&email);
         if !normalized.is_empty() && !crate::case::identifiers::is_own_address(&conn, &normalized) {
-            match crate::contact::create_contact(app.clone(), display_name, email, None, None).await {
+            match crate::contact::create_contact(app.clone(), display_name, email, None, None, None, None).await {
                 Ok(contact) => {
                     if let Err(e) =
                         crate::contact::add_contact_to_case(app.clone(), case_id, contact.id, "email".to_string())

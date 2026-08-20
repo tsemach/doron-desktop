@@ -4,6 +4,7 @@
 //! `contacts` table. The local `case_contacts` link table (`schema.rs`) only
 //! points at a backend contact id per case.
 
+pub mod google_people;
 pub mod schema;
 
 use rusqlite::params;
@@ -111,11 +112,18 @@ pub async fn create_contact(
     email: String,
     phone: Option<String>,
     organization: Option<String>,
+    google_contact_id: Option<String>,
+    // How this contact was first created (design.md §3.1 -- distinct from
+    // case_contacts.source, which records how it was *linked to this case*).
+    // Optional and omitted by every pre-existing caller (case-creation,
+    // email-confirmation auto-contacts) -- the backend defaults to "manual"
+    // when absent. Only the Google Contacts import dialog passes "google".
+    source: Option<String>,
 ) -> Result<Contact, String> {
     let json = call_contacts_desktop(
         &app,
         "/api/v1/contacts/desktop",
-        json!({ "name": name, "email": email, "phone": phone, "organization": organization }),
+        json!({ "name": name, "email": email, "phone": phone, "organization": organization, "googleContactId": google_contact_id, "source": source }),
     )
     .await?;
     let contact: Contact =
