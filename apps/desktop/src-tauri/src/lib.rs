@@ -298,6 +298,7 @@ pub fn run() {
             contact::add_contact_to_case,
             contact::remove_contact_from_case,
             contact::list_contacts_for_case,
+            contact::google_people::list_google_contacts,
             // calendar (ASC-163)
             calendar::connect_google_calendar,
             calendar::disconnect_google_calendar,

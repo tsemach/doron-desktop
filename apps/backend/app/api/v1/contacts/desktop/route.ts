@@ -26,8 +26,9 @@ export async function POST(request: Request) {
   const name = typeof body?.name === "string" ? body.name : undefined;
   const phone = typeof body?.phone === "string" ? body.phone : undefined;
   const organization = typeof body?.organization === "string" ? body.organization : undefined;
+  const googleContactId = typeof body?.googleContactId === "string" ? body.googleContactId : undefined;
 
-  const result = await createContact(authorization.actor, { name, email, phone, organization });
+  const result = await createContact(authorization.actor, { name, email, phone, organization, googleContactId });
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

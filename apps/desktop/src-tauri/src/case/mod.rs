@@ -306,7 +306,7 @@ pub async fn create_new_case(
         if email.is_empty() {
             continue;
         }
-        match crate::contact::create_contact(app.clone(), None, email.to_string(), None, None).await {
+        match crate::contact::create_contact(app.clone(), None, email.to_string(), None, None, None).await {
             Ok(contact) => {
                 if let Err(e) =
                     crate::contact::add_contact_to_case(app.clone(), id, contact.id, "case_creation".to_string())

@@ -14,7 +14,14 @@ const GOOGLE_USERINFO_URL: &str = "https://www.googleapis.com/oauth2/v2/userinfo
 // alone authorizes Calendar API access but not identity lookups, confirmed
 // by hitting exactly this failure during manual testing ("Google did not
 // return an email address").
-const GOOGLE_CALENDAR_SCOPE: &str = "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email";
+//
+// contacts.readonly (ASC-176) reuses this same connection rather than a
+// second OAuth module/account table (docs/contact/design.md §4.7/§8,
+// decided) -- the existing "Connect Google Calendar" consent screen now also
+// grants read access to Google Contacts, consumed by
+// contact::google_people::list_google_contacts via the same
+// get_valid_access_token(app) below.
+const GOOGLE_CALENDAR_SCOPE: &str = "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/contacts.readonly";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GoogleCalendarAccount {

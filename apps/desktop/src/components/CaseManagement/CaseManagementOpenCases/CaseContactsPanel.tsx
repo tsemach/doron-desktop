@@ -8,6 +8,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Contact, ContactFields } from "@/lib/contact/types";
 import type { OrgMember } from "@/components/Settings/SettingUsersRolesTable";
 import ContactSharePickerDialog from "./ContactSharePickerDialog";
+import GoogleContactsImportDialog from "./GoogleContactsImportDialog";
 
 interface CaseContactsPanelProps {
   caseId: number;
@@ -35,6 +36,7 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
     updateContact,
     shareContact,
     unshareContact,
+    reloadAll,
   } = useContactList(caseId);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
 
   const [showAddExisting, setShowAddExisting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showGoogleImport, setShowGoogleImport] = useState(false);
 
   const [showNewContact, setShowNewContact] = useState(false);
   const [newContactDraft, setNewContactDraft] = useState<ContactFields>(EMPTY_DRAFT);
@@ -166,14 +169,23 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
 
       {showAddExisting && (
         <div className="max-w-2xl rounded-lg border border-border bg-card p-3 space-y-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("contact_search_placeholder")}
-            className={inputClass}
-            autoFocus
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("contact_search_placeholder")}
+              className={`${inputClass} flex-1`}
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => setShowGoogleImport(true)}
+              className="shrink-0 rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background text-xs text-foreground hover:bg-accent transition-all cursor-pointer px-2.5 py-1"
+            >
+              {t("contact_import_google")}
+            </button>
+          </div>
           <div className="max-h-48 overflow-y-auto divide-y divide-border">
             {searchResults.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">No matching contacts.</p>
@@ -398,6 +410,14 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
             {shareCandidatesError}
           </div>
         </div>
+      )}
+
+      {showGoogleImport && (
+        <GoogleContactsImportDialog
+          caseId={caseId}
+          onImported={reloadAll}
+          onCancel={() => setShowGoogleImport(false)}
+        />
       )}
     </div>
   );
