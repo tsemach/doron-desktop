@@ -375,6 +375,33 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
         eprintln!("[case matcher] could not learn from confirmed email: {e}");
     }
 
+    // Also create/link a contact for this sender (design.md §4.3). Best-effort and
+    // non-blocking, exactly like the identifier-learning call above -- approving an email
+    // must succeed even with zero network connectivity (design.md §7), and
+    // `contact::create_contact` makes an HTTP call that can fail for reasons entirely
+    // unrelated to this confirmation. The mailbox owner's own address is skipped for the
+    // same reason `learn_from_confirmed_email` skips it: it appears on every outgoing/
+    // reply message, so creating a contact for it here would create a "contact" for the
+    // user themselves on every approval.
+    let (display_name, bare_address) = crate::email::parse_sender(&alert.sender);
+    if let Some(email) = bare_address {
+        let normalized = crate::email::normalize_email(&email);
+        if !normalized.is_empty() && !crate::case::identifiers::is_own_address(&conn, &normalized) {
+            match crate::contact::create_contact(app.clone(), display_name, email, None, None).await {
+                Ok(contact) => {
+                    if let Err(e) =
+                        crate::contact::add_contact_to_case(app.clone(), case_id, contact.id, "email".to_string())
+                    {
+                        eprintln!("[contacts] could not link email-derived contact to case {case_id}: {e}");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[contacts] could not create contact from confirmed email: {e}");
+                }
+            }
+        }
+    }
+
     // 5. Clean up pending alert & staged directory
     conn.execute("DELETE FROM pending_email_alerts WHERE id = ?1", params![alert_id]).map_err(|e| e.to_string())?;
     

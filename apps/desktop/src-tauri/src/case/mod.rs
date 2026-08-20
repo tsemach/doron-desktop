@@ -44,6 +44,15 @@ pub struct Case {
     pub tags: Vec<Tag>,
 }
 
+/// Returned by `create_new_case`. Case creation itself never depends on the outcome of
+/// linking `contact_emails` (design.md §7) -- any per-email failure is collected here as a
+/// human-readable warning instead of failing the whole command.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateCaseResult {
+    pub case: Case,
+    pub contact_warnings: Vec<String>,
+}
+
 #[tauri::command]
 pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
     let conn = store::open_db(&app)?;
@@ -119,7 +128,8 @@ pub async fn create_new_case(
     task_template_id: Option<i64>,
     tasks: Option<Vec<store::NewTaskInput>>,
     field_values: std::collections::HashMap<String, String>,
-) -> Result<Case, String> {
+    contact_emails: Vec<String>,
+) -> Result<CreateCaseResult, String> {
     // 1. Open DB first and verify that this folder path is not already in use by another active case
     let conn = store::open_db(&app)?;
     let folder_exists: bool = conn.query_row(
@@ -274,16 +284,44 @@ pub async fn create_new_case(
         }
     }
 
-    Ok(Case {
-        id,
-        subject: Some(subject),
-        status: "open".to_string(),
-        name,
-        created_at,
-        updated_at: None,
-        folder: Some(folder),
-        notes: None,
-        tags: vec![case_id_tag],
+    // Create/link a contact for each supplied client email (design.md §4.4). Case creation
+    // itself has already succeeded above and must never roll back over this -- each failure
+    // (create or link) is collected as a warning instead of propagated with `?`. Empty/
+    // whitespace-only entries are skipped silently: the frontend caller is expected to have
+    // already trimmed/filtered, but this is a public command surface, so defend here too.
+    let mut contact_warnings = Vec::new();
+    for email in &contact_emails {
+        let email = email.trim();
+        if email.is_empty() {
+            continue;
+        }
+        match crate::contact::create_contact(app.clone(), None, email.to_string(), None, None).await {
+            Ok(contact) => {
+                if let Err(e) =
+                    crate::contact::add_contact_to_case(app.clone(), id, contact.id, "case_creation".to_string())
+                {
+                    contact_warnings.push(format!("Could not add contact for {email}: {e}"));
+                }
+            }
+            Err(e) => {
+                contact_warnings.push(format!("Could not add contact for {email}: {e}"));
+            }
+        }
+    }
+
+    Ok(CreateCaseResult {
+        case: Case {
+            id,
+            subject: Some(subject),
+            status: "open".to_string(),
+            name,
+            created_at,
+            updated_at: None,
+            folder: Some(folder),
+            notes: None,
+            tags: vec![case_id_tag],
+        },
+        contact_warnings,
     })
 }
 
