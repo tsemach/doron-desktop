@@ -107,7 +107,7 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
       console.error(err);
       setShareCandidatesError("Failed to load your firm's members.");
     }
-  }, []);
+  }, [session?.email]);
 
   async function handleCreateContact(e: React.FormEvent) {
     e.preventDefault();
