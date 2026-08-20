@@ -47,8 +47,15 @@ pub struct Case {
 /// Returned by `create_new_case`. Case creation itself never depends on the outcome of
 /// linking `contact_emails` (design.md §7) -- any per-email failure is collected here as a
 /// human-readable warning instead of failing the whole command.
+///
+/// `case` is `#[serde(flatten)]`ed so the JSON response still has `id`/`subject`/`name`/etc.
+/// at the top level, with `contact_warnings` as an additional sibling key -- this keeps the
+/// existing frontend caller (`CaseManagementCaseCreate.tsx`, not yet updated for this new
+/// wrapper) working unchanged: it reads `createdCase.id` etc. directly and simply ignores
+/// the unfamiliar extra `contact_warnings` key until a later PR starts reading it.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreateCaseResult {
+    #[serde(flatten)]
     pub case: Case,
     pub contact_warnings: Vec<String>,
 }
@@ -128,8 +135,12 @@ pub async fn create_new_case(
     task_template_id: Option<i64>,
     tasks: Option<Vec<store::NewTaskInput>>,
     field_values: std::collections::HashMap<String, String>,
-    contact_emails: Vec<String>,
+    contact_emails: Option<Vec<String>>,
 ) -> Result<CreateCaseResult, String> {
+    // `Option` (not a bare `Vec`) so Tauri defaults a missing `contactEmails` IPC key to
+    // `None` instead of erroring -- required so the existing frontend caller, which does not
+    // yet send this key, keeps working unchanged until a later PR wires it up.
+    let contact_emails = contact_emails.unwrap_or_default();
     // 1. Open DB first and verify that this folder path is not already in use by another active case
     let conn = store::open_db(&app)?;
     let folder_exists: bool = conn.query_row(
@@ -900,6 +911,49 @@ pub async fn save_case_document_fields(
     let _ = app.emit("case-files-changed", ());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod create_case_result_tests {
+    use super::*;
+
+    /// The existing frontend caller (`CaseManagementCaseCreate.tsx`, not yet updated for
+    /// `CreateCaseResult`) reads `createdCase.id`/`.name`/etc. directly off the top-level
+    /// IPC response. `#[serde(flatten)]` on `CreateCaseResult::case` must keep those keys at
+    /// the top level -- not nested under a `case` key -- or that existing read breaks at
+    /// runtime the moment this PR merges, even though it never changed.
+    #[test]
+    fn create_case_result_flattens_case_fields_to_top_level() {
+        let result = CreateCaseResult {
+            case: Case {
+                id: 1,
+                subject: Some("s".to_string()),
+                status: "open".to_string(),
+                name: "n".to_string(),
+                created_at: "2026-01-01T00:00:00+00:00".to_string(),
+                updated_at: None,
+                folder: Some("/tmp/x".to_string()),
+                notes: None,
+                tags: vec![],
+            },
+            contact_warnings: vec!["warn".to_string()],
+        };
+
+        let json = serde_json::to_value(&result).unwrap();
+
+        assert_eq!(json.get("id").and_then(|v| v.as_i64()), Some(1));
+        assert_eq!(json.get("name").and_then(|v| v.as_str()), Some("n"));
+        assert_eq!(json.get("status").and_then(|v| v.as_str()), Some("open"));
+        assert!(
+            json.get("case").is_none(),
+            "Case fields must be flattened to the top level, not nested under a `case` key"
+        );
+        assert_eq!(
+            json.get("contact_warnings").and_then(|v| v.as_array()).map(|a| a.len()),
+            Some(1),
+            "contact_warnings must still be present as a sibling key"
+        );
+    }
 }
 
 
