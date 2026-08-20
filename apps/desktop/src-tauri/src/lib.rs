@@ -22,6 +22,7 @@ pub mod tags;
 pub mod search;
 pub mod fuzzy;
 pub mod org;
+pub mod contact;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -287,6 +288,16 @@ pub fn run() {
             org::delete_team,
             org::remove_team_member,
             org::add_team_member,
+            // contacts (ASC-173)
+            contact::list_contacts,
+            contact::create_contact,
+            contact::update_contact,
+            contact::delete_contact,
+            contact::share_contact,
+            contact::unshare_contact,
+            contact::add_contact_to_case,
+            contact::remove_contact_from_case,
+            contact::list_contacts_for_case,
             // calendar (ASC-163)
             calendar::connect_google_calendar,
             calendar::disconnect_google_calendar,
