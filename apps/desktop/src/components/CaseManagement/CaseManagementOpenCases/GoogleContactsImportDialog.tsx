@@ -182,79 +182,87 @@ export default function GoogleContactsImportDialog({ caseId, onImported, onCance
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-card border border-border rounded-lg shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-200">
-        <div className="space-y-1.5">
+      {/* resize + overflow-auto make this a natively user-resizeable panel (drag the
+          bottom-right corner grip) -- w/h (not max-w) give the resize handle an explicit
+          starting box, min-w/min-h keep it from being shrunk below something usable, and
+          max-w/max-h cap it to the viewport so it can't be dragged off-screen. */}
+      <div className="w-[36rem] h-[32rem] min-w-[24rem] min-h-[20rem] max-w-[95vw] max-h-[90vh] resize overflow-auto bg-card border border-border rounded-lg shadow-2xl p-6 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+        <div className="space-y-1.5 shrink-0">
           <h3 className="text-lg font-bold text-foreground">{t("google_contacts_import_title")}</h3>
         </div>
 
-        {status === "loading" ? (
-          <p className="text-xs text-muted-foreground">{t("loading")}</p>
-        ) : status === null ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground leading-normal">{t("google_contacts_not_connected_description")}</p>
-            {connectError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{connectError}</div>}
-            <Button onClick={handleConnect} disabled={connecting}>
-              {connecting ? t("calendar_connecting") : t("calendar_connect_button")}
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {importError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{importError}</div>}
-            {loadError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{loadError}</div>}
+        <div className="flex-1 min-h-0 flex flex-col gap-3">
+          {status === "loading" ? (
+            <p className="text-xs text-muted-foreground">{t("loading")}</p>
+          ) : status === null ? (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground leading-normal">{t("google_contacts_not_connected_description")}</p>
+              {connectError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{connectError}</div>}
+              <Button onClick={handleConnect} disabled={connecting}>
+                {connecting ? t("calendar_connecting") : t("calendar_connect_button")}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 flex flex-col gap-3">
+              {importError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive shrink-0">{importError}</div>}
+              {loadError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive shrink-0">{loadError}</div>}
 
-            {needsRescope ? (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground leading-normal">{t("google_contacts_rescope_description")}</p>
-                <Button onClick={handleReconnect} disabled={reconnecting}>
-                  {reconnecting ? t("calendar_connecting") : t("google_contacts_reconnect_button")}
-                </Button>
-              </div>
-            ) : loadingContacts ? (
-              <p className="text-xs text-muted-foreground">{t("google_contacts_loading")}</p>
-            ) : googleContacts.length === 0 ? (
-              <p className="text-xs text-muted-foreground">{t("google_contacts_empty")}</p>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("contact_search_placeholder")}
-                  className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-                  autoFocus
-                />
-                <div className="max-h-72 overflow-y-auto divide-y divide-border rounded-md border border-border">
-                  {filtered.length === 0 ? (
-                    <p className="text-xs text-muted-foreground p-3">{t("google_contacts_no_matches")}</p>
-                  ) : (
-                    filtered.map((c) => (
-                      <label key={c.resource_name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(c.resource_name)}
-                          onChange={() => toggle(c.resource_name)}
-                          className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">{c.name || c.email}</p>
-                          {c.name && <p className="text-[11px] text-muted-foreground truncate">{c.email}</p>}
-                          {(c.phone || c.organization) && (
-                            <p className="text-[11px] text-muted-foreground truncate">{[c.phone, c.organization].filter(Boolean).join(" · ")}</p>
-                          )}
-                        </div>
-                      </label>
-                    ))
-                  )}
+              {needsRescope ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground leading-normal">{t("google_contacts_rescope_description")}</p>
+                  <Button onClick={handleReconnect} disabled={reconnecting}>
+                    {reconnecting ? t("calendar_connecting") : t("google_contacts_reconnect_button")}
+                  </Button>
                 </div>
-                {selected.size > 0 && (
-                  <p className="text-[11px] text-muted-foreground">{t("google_contacts_selected_count").replace("{count}", String(selected.size))}</p>
-                )}
-              </>
-            )}
-          </div>
-        )}
+              ) : loadingContacts ? (
+                <p className="text-xs text-muted-foreground">{t("google_contacts_loading")}</p>
+              ) : googleContacts.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("google_contacts_empty")}</p>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t("contact_search_placeholder")}
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all shrink-0"
+                    autoFocus
+                  />
+                  <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border rounded-md border border-border">
+                    {filtered.length === 0 ? (
+                      <p className="text-xs text-muted-foreground p-3">{t("google_contacts_no_matches")}</p>
+                    ) : (
+                      filtered.map((c) => (
+                        <label key={c.resource_name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(c.resource_name)}
+                            onChange={() => toggle(c.resource_name)}
+                            className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-foreground truncate">{c.name || c.email}</p>
+                            {c.name && <p className="text-[11px] text-muted-foreground truncate">{c.email}</p>}
+                            {(c.phone || c.organization) && (
+                              <p className="text-[11px] text-muted-foreground truncate">{[c.phone, c.organization].filter(Boolean).join(" · ")}</p>
+                            )}
+                          </div>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {selected.size > 0 && (
+                    <p className="text-[11px] text-muted-foreground shrink-0">
+                      {t("google_contacts_selected_count").replace("{count}", String(selected.size))}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
-        <div className="flex justify-end gap-2.5 border-t border-border pt-4">
+        <div className="flex justify-end gap-2.5 border-t border-border pt-4 shrink-0">
           <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={busy}>
             {t("cancel")}
           </Button>

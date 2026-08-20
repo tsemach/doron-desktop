@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAtomValue } from "jotai";
 import { useContactList } from "@/hooks/useContactList";
@@ -9,6 +9,7 @@ import { Contact, ContactFields } from "@/lib/contact/types";
 import type { OrgMember } from "@/components/Settings/SettingUsersRolesTable";
 import ContactSharePickerDialog from "./ContactSharePickerDialog";
 import GoogleContactsImportDialog from "./GoogleContactsImportDialog";
+import ContactFormDialog from "./ContactFormDialog";
 
 interface CaseContactsPanelProps {
   caseId: number;
@@ -18,6 +19,43 @@ const inputClass =
   "w-full rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all";
 
 const EMPTY_DRAFT: ContactFields = { name: "", email: "", phone: "", organization: "" };
+
+// Same copy-then-reset-after-a-beat pattern as
+// DocsManagementTemplatesForm.tsx's FormFieldItem -- write_clipboard is the
+// existing Tauri command for this, no new backend needed.
+function CopyEmailButton({ email }: { email: string }) {
+  const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation();
+    invoke("write_clipboard", { text: email }).catch((err) => console.error("Failed to copy email:", err));
+    setCopied(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={copied ? t("contact_email_copied") : t("contact_copy_email")}
+      className="shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
+    >
+      {copied ? (
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
+    </button>
+  );
+}
 
 export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
   const { t } = useLanguage();
@@ -39,8 +77,11 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
     reloadAll,
   } = useContactList(caseId);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<ContactFields>(EMPTY_DRAFT);
+  // One shared modal for both "New contact" and "Edit contact" -- null means
+  // closed, otherwise its mode drives the dialog's title/behavior (see
+  // ContactFormDialog.tsx). Replaces the old separate inline-form/inline-edit
+  // UI entirely.
+  const [formDialog, setFormDialog] = useState<{ mode: "new" } | { mode: "edit"; contact: Contact } | null>(null);
 
   const [expandedSharesId, setExpandedSharesId] = useState<string | null>(null);
   const [sharePickerContact, setSharePickerContact] = useState<Contact | null>(null);
@@ -50,9 +91,6 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
   const [showAddExisting, setShowAddExisting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showGoogleImport, setShowGoogleImport] = useState(false);
-
-  const [showNewContact, setShowNewContact] = useState(false);
-  const [newContactDraft, setNewContactDraft] = useState<ContactFields>(EMPTY_DRAFT);
 
   const linkedIds = useMemo(() => new Set(contacts.map((c) => c.id)), [contacts]);
 
@@ -66,33 +104,6 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
       })
       .slice(0, 25);
   }, [searchableContacts, linkedIds, searchQuery]);
-
-  function startEdit(contact: Contact) {
-    setEditingId(contact.id);
-    setEditDraft({
-      name: contact.name || "",
-      email: contact.email,
-      phone: contact.phone || "",
-      organization: contact.organization || "",
-    });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setEditDraft(EMPTY_DRAFT);
-  }
-
-  async function saveEdit(id: string) {
-    // Backend treats a missing/null field as "keep existing" (not "clear"), so
-    // sending trimmed values back for every editable field is safe here --
-    // update_contact never takes email (immutable per docs/contact/design.md §6).
-    await updateContact(id, {
-      name: editDraft.name?.trim() || "",
-      phone: editDraft.phone?.trim() || "",
-      organization: editDraft.organization?.trim() || "",
-    });
-    cancelEdit();
-  }
 
   const openSharePicker = useCallback(async (contact: Contact) => {
     setSharePickerContact(contact);
@@ -112,19 +123,6 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
     }
   }, [session?.email]);
 
-  async function handleCreateContact(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newContactDraft.email.trim() || !newContactDraft.email.includes("@")) return;
-    await createAndLink({
-      name: newContactDraft.name?.trim() || undefined,
-      email: newContactDraft.email.trim(),
-      phone: newContactDraft.phone?.trim() || undefined,
-      organization: newContactDraft.organization?.trim() || undefined,
-    });
-    setNewContactDraft(EMPTY_DRAFT);
-    setShowNewContact(false);
-  }
-
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -134,10 +132,7 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setShowAddExisting((v) => !v);
-              setShowNewContact(false);
-            }}
+            onClick={() => setShowAddExisting((v) => !v)}
             className="p-1.5 rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background text-xs text-foreground hover:bg-accent transition-all cursor-pointer px-2.5"
           >
             {t("contact_add_existing")}
@@ -145,10 +140,7 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
           <div className="rounded-lg bg-primary h-7 px-2.5 inline-flex items-center">
             <button
               type="button"
-              onClick={() => {
-                setShowNewContact((v) => !v);
-                setShowAddExisting(false);
-              }}
+              onClick={() => setFormDialog({ mode: "new" })}
               className="inline-flex items-center gap-0.5 text-xs text-primary-foreground hover:underline hover:text-primary-foreground/80 font-medium"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline">
@@ -181,7 +173,7 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
             <button
               type="button"
               onClick={() => setShowGoogleImport(true)}
-              className="shrink-0 rounded-md border-0 shadow-[0_0_0_1px_var(--border)] bg-background text-xs text-foreground hover:bg-accent transition-all cursor-pointer px-2.5 py-1"
+              className="shrink-0 rounded-md bg-primary text-xs text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer px-2.5 py-1"
             >
               {t("contact_import_google")}
             </button>
@@ -199,8 +191,12 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
                   <button
                     type="button"
                     onClick={() => linkExisting(c.id)}
-                    className="shrink-0 text-xs text-primary hover:underline font-medium cursor-pointer"
+                    className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-foreground px-2 py-1 rounded-md border border-blue-200/60 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
                   >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14" />
+                      <path d="M12 5v14" />
+                    </svg>
                     {t("contact_add")}
                   </button>
                 </div>
@@ -210,57 +206,6 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
         </div>
       )}
 
-      {showNewContact && (
-        <form onSubmit={handleCreateContact} className="max-w-2xl rounded-lg border border-border bg-card p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              value={newContactDraft.name}
-              onChange={(e) => setNewContactDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder={t("contact_name_placeholder")}
-              className={inputClass}
-            />
-            <input
-              type="email"
-              value={newContactDraft.email}
-              onChange={(e) => setNewContactDraft((d) => ({ ...d, email: e.target.value }))}
-              placeholder={t("contact_email_placeholder")}
-              className={inputClass}
-              required
-            />
-            <input
-              type="text"
-              value={newContactDraft.phone}
-              onChange={(e) => setNewContactDraft((d) => ({ ...d, phone: e.target.value }))}
-              placeholder={t("contact_phone_placeholder")}
-              className={inputClass}
-            />
-            <input
-              type="text"
-              value={newContactDraft.organization}
-              onChange={(e) => setNewContactDraft((d) => ({ ...d, organization: e.target.value }))}
-              placeholder={t("contact_organization_placeholder")}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowNewContact(false)}
-              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer"
-            >
-              {t("contact_add")}
-            </button>
-          </div>
-        </form>
-      )}
-
       {loading ? (
         <div className="text-xs text-muted-foreground">Loading contacts...</div>
       ) : contacts.length === 0 ? (
@@ -268,86 +213,59 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
       ) : (
         <div className="max-w-2xl space-y-2">
           {contacts.map((contact) => {
-            const isEditing = editingId === contact.id;
             return (
               <div key={contact.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
-                {isEditing ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={editDraft.name}
-                      onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
-                      placeholder={t("contact_name_placeholder")}
-                      className={inputClass}
-                    />
-                    <input
-                      type="text"
-                      value={editDraft.email}
-                      disabled
-                      className={`${inputClass} opacity-60 cursor-not-allowed`}
-                    />
-                    <input
-                      type="text"
-                      value={editDraft.phone}
-                      onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
-                      placeholder={t("contact_phone_placeholder")}
-                      className={inputClass}
-                    />
-                    <input
-                      type="text"
-                      value={editDraft.organization}
-                      onChange={(e) => setEditDraft((d) => ({ ...d, organization: e.target.value }))}
-                      placeholder={t("contact_organization_placeholder")}
-                      className={inputClass}
-                    />
-                  </div>
-                ) : (
-                  <div className="min-w-0">
+                <div
+                  className={`min-w-0 ${contact.canEdit ? "cursor-pointer" : ""}`}
+                  onClick={contact.canEdit ? () => setFormDialog({ mode: "edit", contact }) : undefined}
+                  title={contact.canEdit ? t("contact_edit_contact") : undefined}
+                >
+                  <div className="flex items-center gap-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{contact.name || contact.email}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {[contact.name ? contact.email : null, contact.phone, contact.organization]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
+                    {!contact.name && <CopyEmailButton email={contact.email} />}
                   </div>
-                )}
+                  <div className="flex items-center gap-1 min-w-0">
+                    {contact.name && (
+                      <>
+                        <p className="text-xs text-muted-foreground truncate">{contact.email}</p>
+                        <CopyEmailButton email={contact.email} />
+                      </>
+                    )}
+                    {(contact.phone || contact.organization) && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {contact.name && "· "}
+                        {[contact.phone, contact.organization].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
-                    {contact.canEdit &&
-                      (isEditing ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => saveEdit(contact.id)}
-                            className="text-xs text-primary hover:underline font-medium cursor-pointer"
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={cancelEdit}
-                            className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEdit(contact)}
-                          className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                        >
-                          Edit
-                        </button>
-                      ))}
+                    {contact.canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setFormDialog({ mode: "edit", contact })}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-foreground px-2 py-1 rounded-md border border-blue-200/60 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        </svg>
+                        {t("contact_edit_contact")}
+                      </button>
+                    )}
 
                     {!isFlat && contact.ownedByMe && (
                       <button
                         type="button"
                         onClick={() => openSharePicker(contact)}
-                        className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-foreground px-2 py-1 rounded-md border border-blue-200/60 dark:border-blue-800/60 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
                       >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+                          <path d="M16 6l-4-4-4 4" />
+                          <path d="M12 2v13" />
+                        </svg>
                         {t("contact_share")}
                       </button>
                     )}
@@ -392,6 +310,46 @@ export default function CaseContactsPanel({ caseId }: CaseContactsPanelProps) {
             );
           })}
         </div>
+      )}
+
+      {formDialog && (
+        <ContactFormDialog
+          mode={formDialog.mode}
+          initialValues={
+            formDialog.mode === "new"
+              ? EMPTY_DRAFT
+              : {
+                  name: formDialog.contact.name || "",
+                  email: formDialog.contact.email,
+                  phone: formDialog.contact.phone || "",
+                  organization: formDialog.contact.organization || "",
+                }
+          }
+          onSubmit={async (fields) => {
+            if (formDialog.mode === "new") {
+              // Omit empty optional fields on create -- matches the old inline
+              // "New contact" form's behavior.
+              await createAndLink({
+                name: fields.name || undefined,
+                email: fields.email,
+                phone: fields.phone || undefined,
+                organization: fields.organization || undefined,
+              });
+            } else {
+              // Send explicit "" (not omitted) on edit -- the backend treats a
+              // missing/undefined field as "keep existing", not "clear", so an
+              // intentionally-emptied field must be sent as "" to actually clear
+              // it. update_contact never takes email (immutable, design.md §6).
+              await updateContact(formDialog.contact.id, {
+                name: fields.name || "",
+                phone: fields.phone || "",
+                organization: fields.organization || "",
+              });
+            }
+            setFormDialog(null);
+          }}
+          onCancel={() => setFormDialog(null)}
+        />
       )}
 
       {sharePickerContact && (
