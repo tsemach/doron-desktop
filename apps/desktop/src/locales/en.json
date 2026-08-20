@@ -135,6 +135,7 @@
   "contact_save": "Save",
   "contact_copy_email": "Copy email address",
   "contact_email_copied": "Copied!",
+  "contact_no_search_matches": "No contacts match your search.",
   "google_contacts_import_title": "Import from Google Contacts",
   "google_contacts_not_connected_description": "Connect your Google account to import contacts. This uses the same connection as the Calendar tab.",
   "google_contacts_loading": "Loading your Google Contacts...",
