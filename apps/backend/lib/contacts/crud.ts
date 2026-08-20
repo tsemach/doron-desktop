@@ -291,18 +291,26 @@ export type ShareContactResult = { contact: ContactEntry } | { error: string; st
 // (design.md §5 step 2) -- the one hard role/firm check in this whole
 // feature. onConflictDoNothing so re-sharing with someone already shared
 // with is a no-op, not an error.
+//
+// Ownership is checked via getVisibleContactRows rather than an unfiltered
+// select-by-id, same as deleteContact -- an unfiltered lookup would leak
+// whether a given contact UUID exists at all to any authenticated caller
+// (e.g. a different firm entirely), which violates this app's "no
+// cross-firm data, ever" guarantee (see firms' doc comment in
+// packages/backend-orm/src/schema.ts) even for a 403 error response.
 export async function shareContact(actor: ContactActor, contactId: string, recipientUserId: string): Promise<ShareContactResult> {
   if (actor.accountType === "flat") {
     return { error: "Sharing is not available for flat accounts", status: 400 };
   }
 
-  const [existing] = await db.select().from(contacts).where(eq(contacts.id, contactId)).limit(1);
-  if (!existing) {
+  const [access] = await getVisibleContactRows(actor, [contactId]);
+  if (!access) {
     return { error: "Not found", status: 404 };
   }
-  if (existing.userId !== actor.id) {
+  if (!access.ownedByMe) {
     return { error: "Only the owner can share this contact", status: 403 };
   }
+  const existing = access.row;
 
   const [recipient] = await db
     .select({ id: users.id, firmId: users.firmId })
@@ -324,13 +332,14 @@ export async function shareContact(actor: ContactActor, contactId: string, recip
 export type UnshareContactResult = { success: true } | { error: string; status: number };
 
 // Owner-only, deletes the contact_shares row -- revokes the recipient's
-// access immediately.
+// access immediately. Same visibility-first ownership check as
+// deleteContact/shareContact -- see shareContact's comment above.
 export async function unshareContact(actor: ContactActor, contactId: string, recipientUserId: string): Promise<UnshareContactResult> {
-  const [existing] = await db.select().from(contacts).where(eq(contacts.id, contactId)).limit(1);
-  if (!existing) {
+  const [access] = await getVisibleContactRows(actor, [contactId]);
+  if (!access) {
     return { error: "Not found", status: 404 };
   }
-  if (existing.userId !== actor.id) {
+  if (!access.ownedByMe) {
     return { error: "Only the owner can manage sharing for this contact", status: 403 };
   }
 
