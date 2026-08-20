@@ -161,6 +161,12 @@ export interface CreateContactFields {
   email: string;
   phone?: string;
   organization?: string;
+  // ASC-176: set when this create/re-import came from the Google Contacts
+  // picker (source='google'); left undefined for every other source. On a
+  // re-import upsert, COALESCE below keeps whatever value the row already
+  // had if this call doesn't pass one, so a manual edit/re-create of the
+  // same email never clobbers a previously-recorded google_contact_id.
+  googleContactId?: string;
 }
 
 export type CreateContactResult = { contact: ContactEntry } | { error: string; status: number };
@@ -190,6 +196,7 @@ export async function createContact(
     phone: fields.phone ?? null,
     organization: fields.organization ?? null,
     source,
+    googleContactId: fields.googleContactId ?? null,
   };
 
   const updateOnConflict = {
@@ -197,6 +204,10 @@ export async function createContact(
     email: insertValues.email,
     phone: insertValues.phone,
     organization: insertValues.organization,
+    // COALESCE, not a plain overwrite -- see CreateContactFields.googleContactId's
+    // comment: a non-Google create/update of an already-imported email must
+    // not null out the existing google_contact_id.
+    googleContactId: sql`COALESCE(excluded.google_contact_id, contacts.google_contact_id)`,
     updatedByUserId: actor.id,
     updatedAt: new Date(),
   };

@@ -26,3 +26,15 @@ export interface ContactFields {
   phone?: string;
   organization?: string;
 }
+
+// Mirrors the Rust `GoogleContact` struct's wire shape exactly (snake_case --
+// apps/desktop/src-tauri/src/contact/google_people.rs), returned by
+// list_google_contacts (ASC-176). Contacts with no email are already
+// filtered out on the Rust side before this shape is ever produced.
+export interface GoogleContact {
+  resource_name: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  organization: string | null;
+}

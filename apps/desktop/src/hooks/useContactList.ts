@@ -163,6 +163,7 @@ export function useContactList(caseId: number) {
     searchableError,
     reload,
     reloadSearchable,
+    reloadAll,
     linkExisting,
     createAndLink,
     unlink,
