@@ -357,13 +357,25 @@
 
   "nav_home": "Home",
   "nav_cases": "Cases",
-  "nav_tasks": "Tasks",
   "nav_calendar": "Calendar",
   "nav_billing": "Billing",
   "nav_documents": "Documents",
 
   "coming_soon_suffix": "is coming soon",
   "coming_soon_desc": "This part of Ascurix is still being built. Check back soon.",
+
+  "cases_name_placeholder": "Case name",
+  "cases_subject_placeholder": "Subject (optional)",
+  "cases_create_button": "Create case",
+  "cases_create_error": "Couldn't create the case. Please try again.",
+  "cases_empty_state": "No cases yet. Create your first one above.",
+  "cases_back_to_list": "← Back to cases",
+  "cases_save_button": "Save",
+  "cases_save_error": "Couldn't save changes. Please try again.",
+  "cases_delete_button": "Delete case",
+  "cases_delete_error": "Couldn't delete the case. Please try again.",
+  "cases_status_label": "Status",
+  "cases_tabs_coming_soon": "Tasks, meetings, and documents for this case are coming soon.",
 
   "dashboard_welcome": "Welcome",
   "personal_workspace": "Personal workspace",

@@ -357,13 +357,25 @@
 
   "nav_home": "בית",
   "nav_cases": "תיקים",
-  "nav_tasks": "משימות",
   "nav_calendar": "יומן",
   "nav_billing": "חיוב",
   "nav_documents": "מסמכים",
 
   "coming_soon_suffix": "יגיע בקרוב",
   "coming_soon_desc": "חלק זה של Ascurix עדיין בבנייה. חִזרו בקרוב.",
+
+  "cases_name_placeholder": "שם התיק",
+  "cases_subject_placeholder": "נושא (אופציונלי)",
+  "cases_create_button": "צור תיק",
+  "cases_create_error": "לא ניתן היה ליצור את התיק. נסו שוב.",
+  "cases_empty_state": "אין עדיין תיקים. צרו את התיק הראשון למעלה.",
+  "cases_back_to_list": "→ חזרה לתיקים",
+  "cases_save_button": "שמור",
+  "cases_save_error": "לא ניתן היה לשמור את השינויים. נסו שוב.",
+  "cases_delete_button": "מחק תיק",
+  "cases_delete_error": "לא ניתן היה למחוק את התיק. נסו שוב.",
+  "cases_status_label": "סטטוס",
+  "cases_tabs_coming_soon": "משימות, פגישות ומסמכים עבור תיק זה יגיעו בקרוב.",
 
   "dashboard_welcome": "ברוכים הבאים",
   "personal_workspace": "סביבת עבודה אישית",
