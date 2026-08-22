@@ -16,17 +16,18 @@ cmd_init() {
     esac
   done
 
-  local root ip label
+  local root ip label branch
   root="$(worktree_root)"
   ip="$(allocate_ip "$explicit_ip")"
   label="$(worktree_label)"
+  branch="$(worktree_branch)"
 
   warn_if_non_loopback "$ip"
 
   write_backend_env "$root" "$ip"
   write_office_env "$root" "$ip"
   write_desktop_env "$root" "$ip"
-  write_tauri_override "$root" "$ip"
+  write_tauri_override "$root" "$ip" "$branch"
   write_compose_override "$root" "$ip" "$label"
   start_postgres "$root"
 
@@ -34,7 +35,7 @@ cmd_init() {
 ascurix: worktree '$label' ready on $ip
   backend  -> http://${ip}:3000
   office   -> http://${ip}:3001
-  desktop  -> http://${ip}:1420
+  desktop  -> http://${ip}:1420 (window title: "Ascurix (${branch})")
   postgres -> ${ip}:5432 (container postgres-${label})
 
 Run 'pnpm dev' from $root to start everything.
@@ -83,8 +84,10 @@ cmd_examples() {
   cat <<'EOF'
 ascurix local init
     Set up this worktree: allocate a loopback IP, write backend/office/
-    desktop .env.local, generate the desktop devUrl + postgres overrides,
-    and start this worktree's postgres container.
+    desktop .env.local, generate the desktop devUrl + postgres overrides
+    (the desktop window is also titled "Ascurix (<branch>)" instead of
+    plain "Ascurix", so you can tell instances apart), and start this
+    worktree's postgres container.
 
 ascurix local init --ip 127.0.0.42
     Same, but pin a specific IP instead of the deterministic default

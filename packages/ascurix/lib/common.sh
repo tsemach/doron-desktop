@@ -18,6 +18,19 @@ worktree_label() {
   basename "$(worktree_root)" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed 's/-\+/-/g; s/^-//; s/-$//'
 }
 
+# Current branch of this worktree, e.g.
+# "tsemachmizrachi/asc-178-enable-running-multiple-local-instances". Falls
+# back to the worktree label if HEAD is detached (no current branch).
+worktree_branch() {
+  local branch
+  branch="$(git -C "$(worktree_root)" branch --show-current)"
+  if [ -z "$branch" ]; then
+    worktree_label
+  else
+    echo "$branch"
+  fi
+}
+
 # set_env_var <file> <key> <value> -- create/update a KEY=value line in an
 # env file, preserving every other line. Never truncates or clobbers
 # unrelated content a developer may have added by hand.

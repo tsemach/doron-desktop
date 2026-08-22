@@ -1,3 +1,10 @@
+# Explicit project name -- Compose otherwise defaults to the current
+# directory's basename ("backend"), which every git worktree of this repo
+# shares (each has its own apps/backend). Without this, two worktrees'
+# `docker compose` invocations resolve to the SAME project identity and
+# silently share containers/volumes/networks instead of being isolated
+# (see ASC-178, packages/ascurix -- this was hit for real once).
+name: ascurix-backend
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,4 +24,7 @@ services:
 
 volumes:
   postgres_data:
+    # Pinned so a project-name change (or a worktree override changing it
+    # further) never silently forks onto a new, empty volume.
+    name: backend_postgres_data
     driver: local

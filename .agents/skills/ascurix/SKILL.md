@@ -36,7 +36,15 @@ cd apps/backend && docker compose down && docker compose up -d
 Verify with `docker ps --filter name=ascurix-postgres --format "{{.Ports}}"` — should show `127.0.0.1:5432->5432/tcp`, not `0.0.0.0:...`.
 
 ### 2. Setting up a new worktree
-From inside the worktree:
+Create the worktree branched from the **current** branch, not from `master` — omit the start-point argument and `git worktree add -b <branch> <path>` defaults to `HEAD` (the branch checked out where you run it):
+```bash
+git worktree add -b <new-branch-name> .worktrees/<label>
+```
+(`<label>` follows this repo's existing convention, e.g. `.worktrees/tsemachmizrachi/<slug>` for ticket work.)
+
+Note: `ascurix` itself only exists once `packages/ascurix` has actually been *committed* — a worktree branched from a commit that only has it as uncommitted working-tree changes elsewhere won't have `pnpm ascurix` available at all (`pnpm install` will succeed, but running `pnpm ascurix ...` fails with `Command "ascurix" not found`).
+
+Then from inside the worktree:
 ```bash
 pnpm install        # links the ascurix bin into this worktree's node_modules/.bin
 pnpm ascurix local init
@@ -45,7 +53,7 @@ This allocates a deterministic IP (`127.0.0.<2 + hash(abs worktree path) % 253>`
 - upserts (never truncates) `HOST`/`PORT`/`DATABASE_URL`/`ALLOWED_DESKTOP_ORIGIN` into `apps/backend/.env.local`
 - upserts `HOST`/`PORT`/`OFFICE_DATABASE_URL`/`BACKEND_DATABASE_URL`/`BACKEND_APP_URL` into `apps/office/.env.local`
 - upserts `TAURI_DEV_HOST`/`VITE_BACKEND_URL` into `apps/desktop/.env.local`
-- generates (gitignored) `apps/desktop/src-tauri/tauri.conf.local.json` with the worktree's `devUrl`
+- generates (gitignored) `apps/desktop/src-tauri/tauri.conf.local.json` with the worktree's `devUrl` and a window title of `Ascurix (<branch>)` (repeats the base config's other window fields too, since Tauri merges config layers via JSON Merge Patch / RFC 7396, which replaces array values like `windows` wholesale rather than merging elements — confirmed by reading the installed `tauri-utils` crate source, not assumed)
 - generates (gitignored) `apps/backend/docker-compose.override.yml` with a `container_name` and `ports: !override` bind to this worktree's IP — the `!override` Compose merge tag is required, since Compose concatenates `ports` lists by default rather than replacing them
 - starts that container
 
