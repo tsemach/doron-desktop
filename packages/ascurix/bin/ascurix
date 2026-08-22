@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# ascurix -- repo-local developer tooling. See ASC-178.
+#   local  multi-instance dev setup (own loopback IP, own Postgres, own
+#          desktop devUrl) so multiple worktrees can run `pnpm dev` at once.
+#   eval   document search evaluation (wraps the Rust eval CLI).
+#   email  email classification evaluation (wraps the Rust eval CLI).
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/../lib"
+
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
+# shellcheck source=../lib/local/ip.sh
+source "$LIB_DIR/local/ip.sh"
+# shellcheck source=../lib/local/env.sh
+source "$LIB_DIR/local/env.sh"
+# shellcheck source=../lib/local/tauri.sh
+source "$LIB_DIR/local/tauri.sh"
+# shellcheck source=../lib/local/postgres.sh
+source "$LIB_DIR/local/postgres.sh"
+# shellcheck source=../lib/local/commands.sh
+source "$LIB_DIR/local/commands.sh"
+# shellcheck source=../lib/eval/commands.sh
+source "$LIB_DIR/eval/commands.sh"
+# shellcheck source=../lib/email/commands.sh
+source "$LIB_DIR/email/commands.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: ascurix <command> [options]
+
+Commands:
+  local <cmd>   Multi-instance local dev setup. See 'ascurix local help'.
+  eval <args>   Document search evaluation (wraps the Rust eval CLI).
+  email <args>  Email classification evaluation (wraps the Rust eval CLI).
+  help          Show this message.
+EOF
+}
+
+usage_local() {
+  cat <<'EOF'
+Usage: ascurix local <command> [options]
+
+Commands:
+  init [--ip <address>]   Allocate a local IP for this git worktree and
+                           generate all local dev config (backend/office
+                           env, desktop env + tauri devUrl override,
+                           postgres docker-compose override), then start
+                           this worktree's postgres container.
+  status                   Show this worktree's assigned IP.
+  list                     Show every worktree's assigned IP.
+  rm                       Stop this worktree's postgres container and
+                           delete its generated (CLI-owned) local config.
+  examples                 Show usage examples for every local command.
+  help                     Show this message.
+
+After 'ascurix local init', run 'pnpm dev' as usual.
+EOF
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  local)
+    sub="${1:-help}"
+    shift || true
+    case "$sub" in
+      init) cmd_init "$@" ;;
+      status) cmd_status "$@" ;;
+      list) cmd_list "$@" ;;
+      rm) cmd_rm "$@" ;;
+      examples) cmd_examples "$@" ;;
+      help | -h | --help) usage_local ;;
+      *)
+        echo "ascurix local: unknown command '$sub'" >&2
+        usage_local >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  eval) cmd_eval "$@" ;;
+  email) cmd_email "$@" ;;
+  help | -h | --help) usage ;;
+  *)
+    echo "ascurix: unknown command '$cmd'" >&2
+    usage >&2
+    exit 1
+    ;;
+esac

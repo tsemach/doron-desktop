@@ -8,6 +8,11 @@ const ALLOWED_ORIGINS = [
   "http://localhost:1420",
   "tauri://localhost",
   "http://tauri.localhost",
+  // Set by `pnpm ascurix init` for a desktop instance running on a
+  // non-default loopback alias (see ASC-178). Never active outside dev.
+  ...(process.env.NODE_ENV === "development" && process.env.ALLOWED_DESKTOP_ORIGIN
+    ? [process.env.ALLOWED_DESKTOP_ORIGIN]
+    : []),
 ];
 
 function setCorsHeaders(request: Request, response: NextResponse) {

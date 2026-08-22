@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
-    "start:dev": "next dev --port 3000",
+    "dev": "next dev --port ${PORT:-3000} ${HOST:+-H $HOST}",
+    "start:dev": "next dev --port ${PORT:-3000} ${HOST:+-H $HOST}",
     "build": "next build",
     "start": "next start",
     "db:generate": "drizzle-kit generate",
