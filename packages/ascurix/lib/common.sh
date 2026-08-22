@@ -44,6 +44,13 @@ set_env_var() {
   fi
 }
 
+# env_var_value <file> <key> -- read back a value set by set_env_var, so
+# callers don't have to reconstruct a URL/value a second time.
+env_var_value() {
+  local file="$1" key="$2"
+  grep "^${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2-
+}
+
 # run_eval_binary <top-level-subcommand> [args...] -- shared by `ascurix
 # eval` (document evaluation) and `ascurix email` (email evaluation), both
 # thin wrappers around the same Rust CLI

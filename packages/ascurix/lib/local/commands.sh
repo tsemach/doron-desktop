@@ -30,16 +30,35 @@ cmd_init() {
   write_tauri_override "$root" "$ip" "$branch"
   write_compose_override "$root" "$ip" "$label"
   start_postgres "$root"
+  wait_for_postgres "postgres-${label}"
+  ensure_database "postgres-${label}" "ascurix-backend"
+  ensure_database "postgres-${label}" "ascurix-office"
+  push_schemas "$root"
 
   cat <<EOF
 ascurix: worktree '$label' ready on $ip
   backend  -> http://${ip}:3000
   office   -> http://${ip}:3001
   desktop  -> http://${ip}:1420 (window title: "Ascurix (${branch})")
-  postgres -> ${ip}:5432 (container postgres-${label})
+  postgres -> ${ip}:5432 (container postgres-${label}, schema pushed, no data copied)
 
 Run 'pnpm dev' from $root to start everything.
 EOF
+}
+
+# Runs drizzle-kit push for both apps against THIS worktree's fresh,
+# empty database -- no data is copied from any other instance, just
+# schema. drizzle-kit only auto-loads a plain `.env` file, never
+# `.env.local` (checked its bundled dotenv logic directly), so passing
+# DATABASE_URL/OFFICE_DATABASE_URL explicitly here is required, not
+# redundant -- without it this would silently push against whatever
+# `.env` resolves to instead of this worktree's isolated database.
+push_schemas() {
+  local root="$1" backend_db_url office_db_url
+  backend_db_url="$(env_var_value "$root/apps/backend/.env.local" "DATABASE_URL")"
+  office_db_url="$(env_var_value "$root/apps/office/.env.local" "OFFICE_DATABASE_URL")"
+  (cd "$root" && DATABASE_URL="$backend_db_url" pnpm --filter backend db:push)
+  (cd "$root" && OFFICE_DATABASE_URL="$office_db_url" pnpm --filter office db:push)
 }
 
 cmd_status() {
@@ -86,8 +105,10 @@ ascurix local init
     Set up this worktree: allocate a loopback IP, write backend/office/
     desktop .env.local, generate the desktop devUrl + postgres overrides
     (the desktop window is also titled "Ascurix (<branch>)" instead of
-    plain "Ascurix", so you can tell instances apart), and start this
-    worktree's postgres container.
+    plain "Ascurix", so you can tell instances apart), start this
+    worktree's postgres container, wait for it to accept connections,
+    and push the backend/office schema to it -- a fresh, empty database,
+    not a copy of any other instance's data.
 
 ascurix local init --ip 127.0.0.42
     Same, but pin a specific IP instead of the deterministic default
