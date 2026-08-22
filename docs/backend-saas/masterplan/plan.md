@@ -3,8 +3,12 @@
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
 **Status:** Decomposition approved; [PR-0](https://github.com/tsemach/doron-desktop/pull/196)
-(this document) open, awaiting review; [PR-1](https://github.com/tsemach/doron-desktop/pull/197)
-(Phase 1 design, stacked on PR-0) open, awaiting review.
+(this document) and [PR-1](https://github.com/tsemach/doron-desktop/pull/197)
+(Phase 1 design) open; Phase 1's design was reviewed in conversation
+(ownership/visibility model + schema walked through, including a concrete
+manager-visibility query trace) — schema implementation itself is still a
+follow-up PR, not yet started. Phase 2 design starting now (PR-2, stacked
+on PR-1).
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
