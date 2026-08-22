@@ -48,7 +48,7 @@ export default function NewMeetingDialog({ cases, onClose, onCreated }: NewMeeti
       <form
         onSubmit={handleCreate}
         onClick={(e) => e.stopPropagation()}
-        className="w-96 rounded-xl border border-border bg-card p-5 flex flex-col gap-3 shadow-lg"
+        className="w-[32rem] rounded-xl border border-border bg-card p-5 flex flex-col gap-3 shadow-lg"
       >
         <h3 className="text-sm font-semibold">New Meeting</h3>
         <input
