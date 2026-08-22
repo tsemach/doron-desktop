@@ -139,7 +139,7 @@ export const documents = pgTable("documents", (t) => ({
   id: t.uuid("id").primaryKey().defaultRandom(),
   caseId: t.uuid("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }), // mandatory — deliberate deviation from desktop, which has no case_id on documents at all
   fileName: t.text("file_name").notNull(),
-  filePath: t.text("file_path").notNull(), // browser-local path from Phase 4's picker; not portable across devices, by design (master plan Core Decision 2)
+  relativePath: t.text("relative_path").notNull(), // "/"-joined path relative to the case's connected root folder (e.g. "contracts/nda.pdf") — NOT an absolute OS path. Corrected in Phase 4's design: the File System Access API never exposes one (FileSystemHandle has only .name, by spec, for privacy). Used only to re-locate a file within the client-side-persisted directory handle (see Phase 4) — never a way to open the file server-side.
   addedByUserId: t.text("added_by_user_id").notNull().references(() => users.id), // provenance only, not used for visibility
   createdAt: t.timestamp("created_at").defaultNow().notNull(),
 }));
