@@ -432,9 +432,5 @@
   "dashboard_billing_finance": "Billing & Finance",
   "dashboard_outstanding": "Outstanding",
   "dashboard_collected_this_month": "Collected this month",
-  "dashboard_of": "of",
-  "notifications_title": "Notifications",
-  "notifications_dismiss": "Dismiss notification",
-  "notification_button_label": "Notification",
-  "notifications_unread_suffix": ", {count} unread"
+  "dashboard_of": "of"
 }
