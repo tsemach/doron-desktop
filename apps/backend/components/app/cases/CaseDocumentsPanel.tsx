@@ -5,7 +5,7 @@ import { Button } from "@workspace/ui";
 import { useLanguage } from "../../../context/LanguageContext";
 import type { DocumentRow } from "../../../lib/documents/crud";
 import { ensureReadPermission, getDirectoryHandle, getFileHandle, resolveFileHandle, saveDirectoryHandle } from "../../../lib/documents/localHandles";
-import { scanFolderForCase } from "../../../lib/documents/scanning";
+import { scanFolder as scanFolderShared } from "../../../lib/documents/scanning";
 
 type CaseDocumentsPanelProps = {
   caseId: string;
@@ -53,7 +53,7 @@ export default function CaseDocumentsPanel({ caseId, initialDocuments }: CaseDoc
     setError(null);
     try {
       const known = new Set(documents.map((d) => d.relativePath));
-      for await (const document of scanFolderForCase(caseId, handle, known)) {
+      for await (const document of scanFolderShared(handle, known, caseId)) {
         setDocuments((prev) => [...prev, document]);
       }
     } finally {

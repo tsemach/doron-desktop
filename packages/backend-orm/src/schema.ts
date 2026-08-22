@@ -491,14 +491,19 @@ export const tasks = pgTable("tasks", {
 // File System Access API never exposes an absolute path, by spec.
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
-  caseId: uuid("case_id")
-    .notNull()
-    .references(() => cases.id, { onDelete: "cascade" }), // mandatory -- deliberate deviation from desktop, which has no case_id on documents at all
+  // Nullable -- ASC-179's original Phase 4 design made this mandatory as a
+  // deliberate deviation from desktop (which has no case_id on documents
+  // at all); revisited to match desktop's case-less document model for
+  // the global Scan & Index entry point. Case-scoped documents (added via
+  // a case's own Documents tab) still set this; documents registered
+  // globally leave it null, and fall back to addedByUserId for
+  // visibility (see getVisibleDocumentById).
+  caseId: uuid("case_id").references(() => cases.id, { onDelete: "cascade" }),
   fileName: text("file_name").notNull(),
   relativePath: text("relative_path").notNull(),
   addedByUserId: text("added_by_user_id")
     .notNull()
-    .references(() => users.id), // provenance only, not used for visibility
+    .references(() => users.id), // visibility anchor when caseId is null; provenance only otherwise
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

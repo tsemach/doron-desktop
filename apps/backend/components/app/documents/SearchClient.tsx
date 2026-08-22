@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { Button } from "@workspace/ui";
 import type { SearchResult } from "../../../lib/search/crud";
+import { ensureReadPermission, getFileHandle } from "../../../lib/documents/localHandles";
 
 const POPULAR_SEARCHES = ["contract terms", "settlement agreement", "NDA", "invoice"];
 
@@ -14,6 +15,22 @@ export default function SearchClient({ initialQuery }: { initialQuery?: string }
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searched, setSearched] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  async function handleOpenCaselessResult(documentId: string) {
+    setOpenError(null);
+    const fileHandle = await getFileHandle(documentId).catch(() => undefined);
+    if (!fileHandle || !(await ensureReadPermission(fileHandle).catch(() => false))) {
+      setOpenError("Couldn't open the file — reconnect it from Scan & Index.");
+      return;
+    }
+    try {
+      const file = await fileHandle.getFile();
+      window.open(URL.createObjectURL(file), "_blank");
+    } catch {
+      setOpenError("Couldn't open the file — it may have moved or been renamed.");
+    }
+  }
 
   async function runSearch(q: string) {
     if (!q.trim()) return;
@@ -92,20 +109,35 @@ export default function SearchClient({ initialQuery }: { initialQuery?: string }
       ) : results.length === 0 ? (
         <p className="text-center text-sm text-muted-foreground py-10">No results found.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {results.map((r, i) => (
-            <li key={`${r.documentId}-${i}`}>
-              <Link
-                href={`/app/cases/${r.caseId}`}
-                className="block rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted transition-colors"
-              >
-                <p className="text-sm font-medium text-foreground">{r.fileName}</p>
-                <p className="text-xs text-muted-foreground mb-1">{r.caseName}</p>
-                <p className="text-xs text-muted-foreground line-clamp-2">{r.chunkText}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          {openError && <p className="text-center text-sm text-destructive">{openError}</p>}
+          <ul className="flex flex-col gap-2">
+            {results.map((r, i) =>
+              r.caseId ? (
+                <li key={`${r.documentId}-${i}`}>
+                  <Link
+                    href={`/app/cases/${r.caseId}`}
+                    className="block rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted transition-colors"
+                  >
+                    <p className="text-sm font-medium text-foreground">{r.fileName}</p>
+                    <p className="text-xs text-muted-foreground mb-1">{r.caseName}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{r.chunkText}</p>
+                  </Link>
+                </li>
+              ) : (
+                <li key={`${r.documentId}-${i}`}>
+                  <button
+                    onClick={() => handleOpenCaselessResult(r.documentId)}
+                    className="block w-full text-left rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted transition-colors"
+                  >
+                    <p className="text-sm font-medium text-foreground">{r.fileName}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{r.chunkText}</p>
+                  </button>
+                </li>
+              )
+            )}
+          </ul>
+        </>
       )}
     </div>
   );

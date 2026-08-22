@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "../../database";
 import { cases, documentChunks, documents } from "../../database/schema";
 import { getVisibleMemberUserIds, type Actor } from "../permissions";
@@ -6,8 +6,8 @@ import { getVisibleMemberUserIds, type Actor } from "../permissions";
 export interface SearchResult {
   documentId: string;
   fileName: string;
-  caseId: string;
-  caseName: string;
+  caseId: string | null;
+  caseName: string | null;
   chunkText: string;
   rank: number;
 }
@@ -39,11 +39,16 @@ export async function searchDocuments(actor: Actor, query: string, limit = 20): 
     })
     .from(documentChunks)
     .innerJoin(documents, eq(documents.id, documentChunks.documentId))
-    .innerJoin(cases, eq(cases.id, documents.caseId))
+    // Left, not inner -- a caseless document (documents.caseId null) has
+    // no case row to join, and must still be searchable/visible via its
+    // own addedByUserId (see getVisibleDocumentById's same split).
+    .leftJoin(cases, eq(cases.id, documents.caseId))
     .where(
       and(
-        inArray(cases.userId, visibleUserIds),
-        isNull(cases.deletedAt),
+        or(
+          and(inArray(cases.userId, visibleUserIds), isNull(cases.deletedAt)),
+          and(isNull(documents.caseId), inArray(documents.addedByUserId, visibleUserIds))
+        ),
         sql`to_tsvector('english', ${documentChunks.text}) @@ ${tsQuery}`
       )
     )
