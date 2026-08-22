@@ -13,16 +13,24 @@ implementation off `master` directly instead of off Phase 1's):
   substrate.
 - Impl-2 (Phase 2): [#205](https://github.com/tsemach/doron-desktop/pull/205),
   branch `tsemachmizrachi/asc-182-phase-2-shared-ui-implementation`,
-  **stacked on Impl-1's branch** (base retargeted from `master`) —
-  desktop-as-consumer spike, theme token fix, Button canonicalization.
-  Found and fixed a real gap not in the original design: desktop's
-  `globals.css` was missing an `@source` directive, so Button's Tailwind
-  classes were silently absent from the compiled CSS despite its JS
-  bundling fine.
+  **stacked on Impl-1's branch** — desktop-as-consumer spike, theme token
+  fix, Button canonicalization. Found and fixed a real gap not in the
+  original design: desktop's `globals.css` was missing an `@source`
+  directive, so Button's Tailwind classes were silently absent from the
+  compiled CSS despite its JS bundling fine.
+- Impl-3 (Phase 3, part 1 of several): [#206](https://github.com/tsemach/doron-desktop/pull/206),
+  branch `tsemachmizrachi/asc-183-phase-3-cases-implementation`,
+  **stacked on Impl-2's branch** — Cases CRUD (backend + pages) and the
+  nav update only. Phase 3's full scope (Tasks tab, Templates, Calendar)
+  is deliberately split into further stacked PRs, matching how ASC-91
+  split into 9 PRs rather than one giant one. Resolved the mutation-
+  permission question Phase 1 left open: visibility grants edit rights,
+  delete is owner-only, matching `contacts`' precedent.
 
-Both verified: clean typechecks, passing test suites, successful
-production builds (individually and via the root turbo pipeline). Neither
-merged yet. Phases 3-7 are still design-only.
+All three verified: clean typechecks, passing test suites (backend's 140
+still pass), successful production builds. None merged yet. Phase 3's
+remaining pieces (Tasks tab, Templates, Calendar) and Phases 4-7 are still
+unimplemented (design-only or not-yet-started).
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
