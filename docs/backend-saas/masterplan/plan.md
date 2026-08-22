@@ -3,7 +3,8 @@
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
 **Status:** Decomposition approved; [PR-0](https://github.com/tsemach/doron-desktop/pull/196)
-(this document) open, awaiting review; Phase 1 design not yet started.
+(this document) open, awaiting review; [PR-1](https://github.com/tsemach/doron-desktop/pull/197)
+(Phase 1 design, stacked on PR-0) open, awaiting review.
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
@@ -24,7 +25,7 @@ down, with PR-0 merging into `master` last.
 | # | Linear issue | Branch | Carries | Depends on |
 |---|---|---|---|---|
 | PR-0 | ASC-179 | `tsemachmizrachi/asc-179-add-fully-backend-support-saas-pr-0` | This master plan doc (`docs/backend-saas/masterplan/plan.md`) | `master` |
-| PR-1 | [ASC-181](https://linear.app/amicusx/issue/ASC-181) | `tsemachmizrachi/asc-181-phase-1-tenant-scoped-data-foundation` | Phase 1 | PR-0 |
+| PR-1 | [ASC-181](https://linear.app/amicusx/issue/ASC-181) | `tsemachmizrachi/asc-181-phase-1-tenant-scoped-data-foundation` | Phase 1 design ([doc](../phase-1-data-foundation/design.md), decision-only — matches PR-3/PR-5's scoping; schema implementation is a follow-up PR) | PR-0 |
 | PR-2 | [ASC-182](https://linear.app/amicusx/issue/ASC-182) | `tsemachmizrachi/asc-182-phase-2-shared-ui-foundation-packagesui-theme-button-desktop` | Phase 2 | PR-1 |
 | PR-3 | [ASC-183](https://linear.app/amicusx/issue/ASC-183) | `tsemachmizrachi/asc-183-phase-3-core-backend-pages-cases-tasks-calendar-templates` | Phase 3 | PR-2 |
 | PR-4 | [ASC-184](https://linear.app/amicusx/issue/ASC-184) | `tsemachmizrachi/asc-184-phase-4-local-document-access-browser-file-system-access-api` | Phase 4 | PR-3 |
