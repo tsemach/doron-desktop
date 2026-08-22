@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@workspace/ui";
 import { useLanguage } from "../../../context/LanguageContext";
 import type { CaseRow } from "../../../lib/cases/crud";
@@ -79,12 +78,13 @@ export default function CaseDetailClient({
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
-      <Link href="/app/cases" className="text-sm text-muted-foreground hover:text-foreground">
-        {t("cases_back_to_list")}
-      </Link>
+    <div className="flex flex-col border border-border rounded-xl bg-card overflow-hidden shadow-xs flex-1 min-w-0">
+      <div className="bg-muted px-4 py-3 border-b border-border">
+        <h2 className="font-semibold text-sm text-foreground">{caseRow.name}</h2>
+        {caseRow.subject && <p className="text-xs text-muted-foreground">{caseRow.subject}</p>}
+      </div>
 
-      <div className="mt-4 flex gap-1 border-b border-border">
+      <div className="flex gap-1 border-b border-border px-2">
         {(["overview", "tasks", "meetings", "documents"] as const).map((tab) => (
           <button
             key={tab}
@@ -106,66 +106,61 @@ export default function CaseDetailClient({
         ))}
       </div>
 
-      {activeTab === "overview" ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">{t("cases_name_placeholder")}</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">{t("cases_subject_placeholder")}</label>
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">{t("cases_status_label")}</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm capitalize"
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="p-4 overflow-y-auto flex-1">
+        {activeTab === "overview" ? (
+          <div className="flex flex-col gap-3 max-w-md">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">{t("cases_name_placeholder")}</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">{t("cases_subject_placeholder")}</label>
+              <input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">{t("cases_status_label")}</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm capitalize"
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <div className="flex items-center justify-between pt-2">
-            <Button onClick={handleSave} disabled={saving}>
-              {t("cases_save_button")}
-            </Button>
-            {isOwner && (
-              <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-                {t("cases_delete_button")}
+            <div className="flex items-center justify-between pt-2">
+              <Button onClick={handleSave} disabled={saving}>
+                {t("cases_save_button")}
               </Button>
-            )}
+              {isOwner && (
+                <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                  {t("cases_delete_button")}
+                </Button>
+              )}
+            </div>
           </div>
-
-        </div>
-      ) : activeTab === "tasks" ? (
-        <div className="mt-4 rounded-lg border border-border bg-card p-5">
+        ) : activeTab === "tasks" ? (
           <CaseTasksPanel caseId={caseRow.id} initialTasks={initialTasks} />
-        </div>
-      ) : activeTab === "meetings" ? (
-        <div className="mt-4 rounded-lg border border-border bg-card p-5">
+        ) : activeTab === "meetings" ? (
           <CaseMeetingsPanel caseId={caseRow.id} initialMeetings={initialMeetings} />
-        </div>
-      ) : (
-        <div className="mt-4 rounded-lg border border-border bg-card p-5">
+        ) : (
           <CaseDocumentsPanel caseId={caseRow.id} initialDocuments={initialDocuments} />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

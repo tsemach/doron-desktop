@@ -1,10 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "../../../../auth";
-import { getVisibleCaseById } from "../../../../lib/cases/crud";
-import { listTasksForCase } from "../../../../lib/tasks/crud";
+import { getVisibleCaseById, listVisibleCases } from "../../../../lib/cases/crud";
+import { listTasksForCase, listCaseIdsWithOverdueTask } from "../../../../lib/tasks/crud";
 import { listMeetingsForCase } from "../../../../lib/calendar/crud";
 import { listDocumentsForCase } from "../../../../lib/documents/crud";
 import type { Actor } from "../../../../lib/permissions";
+import CasesSidebar from "@/components/app/cases/CasesSidebar";
+import CasesHeader from "@/components/app/cases/CasesHeader";
+import CasesListPanel from "@/components/app/cases/CasesListPanel";
 import CaseDetailClient from "@/components/app/cases/CaseDetailClient";
 
 export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,18 +28,24 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
-  const [tasks, meetings, documents] = await Promise.all([
+  const [allCases, overdueCaseIds, tasks, meetings, documents] = await Promise.all([
+    listVisibleCases(actor),
+    listCaseIdsWithOverdueTask(actor),
     listTasksForCase(actor, id),
     listMeetingsForCase(actor, id),
     listDocumentsForCase(actor, id),
   ]);
+
   return (
-    <CaseDetailClient
-      initialCase={caseRow}
-      isOwner={caseRow.userId === actor.id}
-      initialTasks={tasks}
-      initialMeetings={meetings}
-      initialDocuments={documents}
-    />
+    <div className="flex w-full">
+      <CasesSidebar />
+      <div className="flex-1 p-6">
+        <CasesHeader totalCount={allCases.length} />
+        <div className="flex gap-4">
+          <CasesListPanel cases={allCases} overdueCaseIds={Array.from(overdueCaseIds)} selectedCaseId={id} />
+          <CaseDetailClient initialCase={caseRow} isOwner={caseRow.userId === actor.id} initialTasks={tasks} initialMeetings={meetings} initialDocuments={documents} />
+        </div>
+      </div>
+    </div>
   );
 }

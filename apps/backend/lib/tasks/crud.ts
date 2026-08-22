@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { db } from "../../database";
 import { cases, tasks } from "../../database/schema";
 import { getVisibleCaseById } from "../cases/crud";
@@ -180,4 +180,88 @@ export async function listImportantTasks(actor: Actor, limit = 5): Promise<Impor
       dueAt: r.dueDate.toISOString(),
       urgency: computeUrgency(r.dueDate, now),
     }));
+}
+
+export interface OpenTaskGroup {
+  caseId: string;
+  caseName: string;
+  tasks: TaskRow[];
+}
+
+// Backs Home's Overview "Open Tasks" panel (mirrors desktop's
+// AppHomeOverview). All non-terminal tasks, grouped by case.
+export async function listOpenTasksGroupedByCase(actor: Actor): Promise<OpenTaskGroup[]> {
+  const visibleUserIds = await getVisibleMemberUserIds(actor);
+  const rows = await db
+    .select({ task: tasks, caseId: cases.id, caseName: cases.name })
+    .from(tasks)
+    .innerJoin(cases, eq(cases.id, tasks.caseId))
+    .where(
+      and(inArray(cases.userId, visibleUserIds), isNull(cases.deletedAt), ne(tasks.status, "Done"), ne(tasks.status, "Cancel"))
+    )
+    .orderBy(asc(tasks.sortOrder));
+
+  const groups = new Map<string, OpenTaskGroup>();
+  for (const row of rows) {
+    if (!groups.has(row.caseId)) {
+      groups.set(row.caseId, { caseId: row.caseId, caseName: row.caseName, tasks: [] });
+    }
+    groups.get(row.caseId)!.tasks.push(row.task);
+  }
+  return Array.from(groups.values());
+}
+
+export interface FollowUpTask extends TaskRow {
+  caseName: string;
+}
+
+// Backs Home's Overview "Follow-ups" panel -- the subset of open tasks
+// that actually have a due date (most tasks don't), sorted soonest-first.
+export async function listFollowUpTasks(actor: Actor): Promise<FollowUpTask[]> {
+  const visibleUserIds = await getVisibleMemberUserIds(actor);
+  const rows = await db
+    .select({ task: tasks, caseName: cases.name })
+    .from(tasks)
+    .innerJoin(cases, eq(cases.id, tasks.caseId))
+    .where(
+      and(
+        inArray(cases.userId, visibleUserIds),
+        isNull(cases.deletedAt),
+        ne(tasks.status, "Done"),
+        ne(tasks.status, "Cancel"),
+        isNotNull(tasks.dueDate)
+      )
+    )
+    .orderBy(asc(tasks.dueDate));
+
+  return rows.map((r) => ({ ...r.task, caseName: r.caseName }));
+}
+
+// Backs the Cases list's "Follow Up" filter tab (mirrors desktop's
+// OpenCasesTopBar) -- which cases have at least one overdue, non-terminal
+// task with a due date.
+export async function listCaseIdsWithOverdueTask(actor: Actor): Promise<Set<string>> {
+  const visibleUserIds = await getVisibleMemberUserIds(actor);
+  const rows = await db
+    .select({ caseId: cases.id, dueDate: tasks.dueDate })
+    .from(tasks)
+    .innerJoin(cases, eq(cases.id, tasks.caseId))
+    .where(
+      and(
+        inArray(cases.userId, visibleUserIds),
+        isNull(cases.deletedAt),
+        ne(tasks.status, "Done"),
+        ne(tasks.status, "Cancel"),
+        isNotNull(tasks.dueDate)
+      )
+    );
+
+  const now = new Date();
+  const result = new Set<string>();
+  for (const row of rows) {
+    if (row.dueDate && row.dueDate < now) {
+      result.add(row.caseId);
+    }
+  }
+  return result;
 }

@@ -1,47 +1,71 @@
+import { Briefcase, CalendarDays, FileText } from "lucide-react";
 import { auth } from "../../auth";
-import { mockBillingSummary, mockCases, mockEmailArrivals, mockStatTiles } from "../../lib/dashboard/mockData";
-import { listImportantTasks } from "../../lib/tasks/crud";
+import { listVisibleCases } from "../../lib/cases/crud";
+import { listOpenTasksGroupedByCase, listFollowUpTasks } from "../../lib/tasks/crud";
+import { listTodaysMeetings } from "../../lib/calendar/crud";
+import { listPendingEmailAlerts } from "../../lib/email/crud";
 import type { Actor } from "../../lib/permissions";
-import OpenCasesPanel from "@/components/app/dashboard/OpenCasesPanel";
-import StatTilesGrid from "@/components/app/dashboard/StatTilesGrid";
-import ImportantTasksCard from "@/components/app/dashboard/ImportantTasksCard";
-import EmailsArrivedCard from "@/components/app/dashboard/EmailsArrivedCard";
-import BillingFinanceCard from "@/components/app/dashboard/BillingFinanceCard";
 import { translations, type Language } from "../../locales/translations";
+import HomeNavTile from "@/components/app/home/HomeNavTile";
+import RecentCasesPanel from "@/components/app/home/RecentCasesPanel";
+import DocumentsPanel from "@/components/app/home/DocumentsPanel";
+import TodaysMeetingsPanel from "@/components/app/home/TodaysMeetingsPanel";
+import OverviewPanel from "@/components/app/home/OverviewPanel";
 
+// Mirrors desktop's AppHome.tsx structure: welcome banner, 3 rows of
+// [nav tile + panel] (Cases/Recent Cases, Documents/search, Calendar/
+// Today's Meetings), Overview column on the right. Desktop's Home has no
+// stat-tiles row and no Emails/Billing cards -- those aren't part of its
+// actual design, confirmed by reading the real component, not assumed
+// from an earlier backend-only mockup.
 export default async function AppHomePage() {
   const session = await auth();
   const userName = session?.user?.name || session?.user?.email || "there";
-  // Server Component -- see app/app/layout.tsx's comment on why this reads
-  // the dictionary directly instead of useLanguage().
   const locale: Language = (session?.user as { locale?: string } | undefined)?.locale === "he" ? "he" : "en";
   const t = translations[locale];
 
-  // ImportantTasksCard is real now (queries the tasks table); the other
-  // three cards (OpenCasesPanel/EmailsArrivedCard/BillingFinanceCard)
-  // stay on mock data until their own backends exist (documents/email
-  // ingestion/billing are later phases).
-  const importantTasks = session?.user?.id
-    ? await listImportantTasks({
+  const actor: Actor | null = session?.user?.id
+    ? {
         id: session.user.id,
         role: ((session.user as { role?: string }).role as Actor["role"]) ?? "flat",
         firmId: (session.user as { firmId?: string | null }).firmId ?? null,
-      })
-    : [];
+      }
+    : null;
+
+  const [cases, openTaskGroups, followUps, todaysMeetings, pendingEmailAlerts] = actor
+    ? await Promise.all([
+        listVisibleCases(actor),
+        listOpenTasksGroupedByCase(actor),
+        listFollowUpTasks(actor),
+        listTodaysMeetings(actor),
+        listPendingEmailAlerts(actor),
+      ])
+    : [[], [], [], [], []];
 
   return (
-    <div className="px-6 pt-2 pb-10">
-      <h1 className="text-2xl font-bold text-foreground">
+    <div className="min-h-screen flex flex-col px-10 py-10">
+      <h1 className="text-2xl font-bold text-foreground text-center">
         {t.dashboard_welcome} {userName}
       </h1>
 
-      <div className="mt-6 flex flex-col">
-        <StatTilesGrid tiles={mockStatTiles} />
-        <div className="mt-10 grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,24rem)_repeat(3,minmax(0,300px))]">
-          <OpenCasesPanel cases={mockCases} />
-          <ImportantTasksCard tasks={importantTasks} />
-          <EmailsArrivedCard emails={mockEmailArrivals} />
-          <BillingFinanceCard billing={mockBillingSummary} />
+      <div className="flex-1 flex items-start justify-center mt-20">
+        <div className="max-w-7xl flex gap-12">
+          <div className="flex flex-col gap-10">
+            <div className="flex items-start gap-8">
+              <HomeNavTile href="/app/cases" icon={Briefcase} label="Cases" />
+              <RecentCasesPanel cases={cases} />
+            </div>
+            <div className="flex items-start gap-8">
+              <HomeNavTile href="/app/documents" icon={FileText} label="Documents" />
+              <DocumentsPanel />
+            </div>
+            <div className="flex items-start gap-8">
+              <HomeNavTile href="/app/calendar" icon={CalendarDays} label="Calendar" />
+              <TodaysMeetingsPanel meetings={todaysMeetings} />
+            </div>
+          </div>
+
+          <OverviewPanel openTaskGroups={openTaskGroups} followUps={followUps} pendingEmailAlerts={pendingEmailAlerts} />
         </div>
       </div>
     </div>

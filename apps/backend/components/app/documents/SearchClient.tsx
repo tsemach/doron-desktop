@@ -1,25 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { Button } from "@workspace/ui";
-import { useLanguage } from "../../../context/LanguageContext";
 import type { SearchResult } from "../../../lib/search/crud";
 
-export default function SearchClient() {
-  const { t } = useLanguage();
-  const [query, setQuery] = useState("");
+const POPULAR_SEARCHES = ["contract terms", "settlement agreement", "NDA", "invoice"];
+
+// Matches desktop's SmartSearch page: SearchBar panel + idle/results state.
+export default function SearchClient({ initialQuery }: { initialQuery?: string }) {
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searched, setSearched] = useState(false);
   const [searching, setSearching] = useState(false);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!query.trim()) return;
-
+  async function runSearch(q: string) {
+    if (!q.trim()) return;
     setSearching(true);
     try {
-      const res = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/v1/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       setResults(res.ok ? (data.results as SearchResult[]) : []);
       setSearched(true);
@@ -28,30 +28,77 @@ export default function SearchClient() {
     }
   }
 
-  return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
-      <h1 className="text-xl font-bold text-foreground mb-2">{t("nav_documents")}</h1>
-      <p className="text-xs text-muted-foreground mb-6">{t("search_note")}</p>
+  // Auto-runs once when arriving with a pre-filled query (e.g. from Home's
+  // search box), mirroring desktop's navigate-with-state-then-search flow.
+  useEffect(() => {
+    if (initialQuery?.trim()) {
+      runSearch(initialQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("search_placeholder")}
-          className="flex-1 h-9 rounded-md border border-border bg-background px-3 text-sm"
-        />
-        <Button type="submit" disabled={searching}>
-          {t("search_button")}
-        </Button>
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    runSearch(query);
+  }
+
+  function handleSuggestionClick(suggestion: string) {
+    setQuery(suggestion);
+    runSearch(suggestion);
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto py-6 space-y-6">
+      <form onSubmit={handleSubmit} className="rounded-xl border border-border bg-card shadow-sm p-4">
+        <div className="flex items-center gap-2">
+          <Search className="size-4 text-muted-foreground shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search documents using natural language (Hebrew / English)…"
+            className="flex-1 bg-transparent text-sm outline-none"
+          />
+          <Button type="submit" disabled={searching}>
+            Search
+          </Button>
+        </div>
       </form>
 
-      {searched && results.length === 0 && <p className="text-sm text-muted-foreground">{t("search_no_results")}</p>}
-
-      {results.length > 0 && (
+      {!searched ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+          <span className="flex size-16 items-center justify-center rounded-full bg-muted/50">
+            <Search className="size-6 text-muted-foreground" />
+          </span>
+          <h2 className="text-sm font-bold text-foreground">Ready to Search</h2>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Enter semantic descriptions or keywords to look through your indexed documents. Only .txt files are indexed for search in
+            this version.
+          </p>
+          <div className="mt-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Popular Searches</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {POPULAR_SEARCHES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleSuggestionClick(s)}
+                  className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted"
+                >
+                  &quot;{s}&quot;
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : results.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-10">No results found.</p>
+      ) : (
         <ul className="flex flex-col gap-2">
           {results.map((r, i) => (
             <li key={`${r.documentId}-${i}`}>
-              <Link href={`/app/cases/${r.caseId}`} className="block rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted transition-colors">
+              <Link
+                href={`/app/cases/${r.caseId}`}
+                className="block rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted transition-colors"
+              >
                 <p className="text-sm font-medium text-foreground">{r.fileName}</p>
                 <p className="text-xs text-muted-foreground mb-1">{r.caseName}</p>
                 <p className="text-xs text-muted-foreground line-clamp-2">{r.chunkText}</p>
