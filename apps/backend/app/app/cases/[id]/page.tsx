@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "../../../../auth";
 import { getVisibleCaseById } from "../../../../lib/cases/crud";
+import { listTasksForCase } from "../../../../lib/tasks/crud";
 import type { Actor } from "../../../../lib/permissions";
 import CaseDetailClient from "@/components/app/cases/CaseDetailClient";
 
@@ -22,5 +23,6 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
-  return <CaseDetailClient initialCase={caseRow} isOwner={caseRow.userId === actor.id} />;
+  const tasks = await listTasksForCase(actor, id);
+  return <CaseDetailClient initialCase={caseRow} isOwner={caseRow.userId === actor.id} initialTasks={tasks} />;
 }
