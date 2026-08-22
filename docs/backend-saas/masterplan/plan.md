@@ -44,16 +44,23 @@ tree. Phase 6 is logically independent of Phases 2-5 (per its own
 dependency note below), but the branch stack is sequential regardless, so
 it's built and reviewed in that same top-down order.
 
-**Process rules** (matching `docs/task-management/plan.md`'s established
-convention):
-1. **Approval gate**: after each branch's PR is pushed, stop and wait for
-   explicit approval before starting the next branch. No chaining ahead.
+**Process rules**:
+1. **Approval gate (revised 2026-08-22):** originally "stop after every PR
+   and wait for approval," matching `docs/task-management/plan.md`'s
+   convention. Superseded by explicit instruction — proceed through
+   Phases 3-7 autonomously, creating each design-doc PR without waiting
+   for review in between. Stop only for a genuine conflict, or a decision
+   with no confidently-correct answer (surface it and ask, rather than
+   guessing) — not merely "this phase has an open question," if research
+   can resolve it with a well-reasoned recommendation.
 2. **Merge order (top-down)**: PR-7 merges into PR-6/PR-5 (whichever it
    stacked on), cascading down through PR-1, and finally PR-0 merges into
    `master` last. Each PR's GitHub base is its stack predecessor.
-3. Before starting a phase's branch, its own brainstorm → design doc →
-   implementation plan cycle happens first (per the top of this doc) — the
-   branch is opened once that phase's design is approved, not before.
+3. Before starting a phase's branch, its own design work happens first
+   (per the top of this doc) — the branch is opened once that phase's
+   design is written, not before. Each design-doc PR is decision-only,
+   matching PR-3/PR-5's (ASC-105) scoping — schema/code implementation is
+   always a follow-up PR, not bundled into the design PR.
 
 **If resuming this work after a restart**: run `git branch --show-current`
 and `git stack` (see the `git-stack` skill) to see which branch is checked
