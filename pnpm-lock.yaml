@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      ascurix:
+        specifier: workspace:*
+        version: link:packages/ascurix
       turbo:
         specifier: ^2.0.12
         version: 2.9.18
@@ -49,13 +52,13 @@ importers:
         version: 15.5.19(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       next-auth:
         specifier: 5.0.0-beta.31
-        version: 5.0.0-beta.31(next@15.5.19(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+        version: 5.0.0-beta.31(next@15.5.19(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       pg:
         specifier: ^8.21.0
         version: 8.21.0
       posthog-js:
         specifier: ^1.407.2
-        version: 1.407.2(preact-render-to-string@6.5.11)
+        version: 1.407.2(preact-render-to-string@6.5.11(preact@10.24.3))
       posthog-node:
         specifier: ^5.46.1
         version: 5.46.1
@@ -264,7 +267,7 @@ importers:
         version: 15.5.19(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       next-auth:
         specifier: 5.0.0-beta.31
-        version: 5.0.0-beta.31(next@15.5.19(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+        version: 5.0.0-beta.31(next@15.5.19(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       pg:
         specifier: ^8.21.0
         version: 8.21.0
@@ -318,6 +321,8 @@ importers:
         specifier: ^5.3.3
         version: 5.6.3
 
+  packages/ascurix: {}
+
   packages/backend-orm:
     dependencies:
       drizzle-orm:
@@ -332,7 +337,7 @@ importers:
         version: 8.20.0
       next-auth:
         specifier: 5.0.0-beta.31
-        version: 5.0.0-beta.31(next@15.5.19(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+        version: 5.0.0-beta.31(next@15.5.19(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       typescript:
         specifier: ^5.3.3
         version: 5.6.3
@@ -8368,7 +8373,7 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next-auth@5.0.0-beta.31(next@15.5.19(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
+  next-auth@5.0.0-beta.31(next@15.5.19(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
     dependencies:
       '@auth/core': 0.41.2
       next: 15.5.19(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -8602,6 +8607,20 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
+  posthog-js@1.407.2(preact-render-to-string@6.5.11(preact@10.24.3)):
+    dependencies:
+      '@posthog/browser-common': 0.2.1
+      '@posthog/core': 1.45.1
+      '@posthog/types': 1.398.0
+      core-js: 3.49.0
+      dompurify: 3.4.12
+      fflate: 0.4.9
+      preact: 10.29.7(preact-render-to-string@6.5.11(preact@10.24.3))
+      query-selector-shadow-dom: 1.0.1
+      web-vitals: 5.3.0
+    transitivePeerDependencies:
+      - preact-render-to-string
+
   posthog-js@1.407.2(preact-render-to-string@6.5.11):
     dependencies:
       '@posthog/browser-common': 0.2.1
@@ -8632,6 +8651,10 @@ snapshots:
     optional: true
 
   preact@10.24.3: {}
+
+  preact@10.29.7(preact-render-to-string@6.5.11(preact@10.24.3)):
+    optionalDependencies:
+      preact-render-to-string: 6.5.11(preact@10.24.3)
 
   preact@10.29.7(preact-render-to-string@6.5.11):
     optionalDependencies:

@@ -15,6 +15,7 @@
     "release:bump": "node scripts/bump-version.js"
   },
   "devDependencies": {
+    "ascurix": "workspace:*",
     "turbo": "^2.0.12"
   }
 }
