@@ -2,15 +2,20 @@
 
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
-**Status:** Decomposition approved. Design-doc PRs open for Phase 1
-([PR-1](https://github.com/tsemach/doron-desktop/pull/197), reviewed in
-conversation — ownership/visibility model + schema walked through,
-including a concrete manager-visibility query trace) and Phase 2
-([PR-2](https://github.com/tsemach/doron-desktop/pull/198), adopts PR-5
-(ASC-105) as-is, re-verified against current code — no drift found). Base
-plan doc itself is [PR-0](https://github.com/tsemach/doron-desktop/pull/196).
-Schema/UI implementation for Phases 1-2 are still follow-up PRs, not yet
-started. Phase 3 design not yet started.
+**Status:** Full design-doc stack complete, PR-0 through PR-7 all open
+(#196-#203) — every phase now has a written design. Per explicit
+instruction (2026-08-22), Phases 3-7 were designed and branched
+autonomously without a per-PR approval pause; Phase 1's design was
+reviewed in conversation before that point (ownership/visibility model +
+schema walked through, including a concrete manager-visibility query
+trace). One correction surfaced and applied retroactively: Phase 4's
+design caught that Phase 1's original `documents.filePath` column
+couldn't actually be populated (the File System Access API never exposes
+an absolute path) — fixed in PR-1, propagated down the stack via rebase.
+**No code has been written anywhere in this stack** — every PR is a
+decision doc only, matching PR-3/PR-5's (ASC-105) scoping; schema/route/
+component implementation for every phase is still a follow-up PR, not yet
+started for any of them.
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
@@ -33,11 +38,20 @@ down, with PR-0 merging into `master` last.
 | PR-0 | ASC-179 | `tsemachmizrachi/asc-179-add-fully-backend-support-saas-pr-0` | This master plan doc (`docs/backend-saas/masterplan/plan.md`) | `master` |
 | PR-1 | [ASC-181](https://linear.app/amicusx/issue/ASC-181) | `tsemachmizrachi/asc-181-phase-1-tenant-scoped-data-foundation` | Phase 1 design ([doc](../phase-1-data-foundation/design.md), decision-only — matches PR-3/PR-5's scoping; schema implementation is a follow-up PR) | PR-0 |
 | PR-2 | [ASC-182](https://linear.app/amicusx/issue/ASC-182) | `tsemachmizrachi/asc-182-phase-2-shared-ui-foundation-packagesui-theme-button-desktop` | Phase 2 design ([doc](../phase-2-shared-ui/design.md), decision-only — adopts PR-5 as-is; implementation is a follow-up PR) | PR-1 |
-| PR-3 | [ASC-183](https://linear.app/amicusx/issue/ASC-183) | `tsemachmizrachi/asc-183-phase-3-core-backend-pages-cases-tasks-calendar-templates` | Phase 3 | PR-2 |
-| PR-4 | [ASC-184](https://linear.app/amicusx/issue/ASC-184) | `tsemachmizrachi/asc-184-phase-4-local-document-access-browser-file-system-access-api` | Phase 4 | PR-3 |
-| PR-5 | [ASC-185](https://linear.app/amicusx/issue/ASC-185) | `tsemachmizrachi/asc-185-phase-5-search-and-indexing-server-side-persisted-index` | Phase 5 | PR-4 |
-| PR-6 | [ASC-186](https://linear.app/amicusx/issue/ASC-186) | `tsemachmizrachi/asc-186-phase-6-email-ingestion-and-classification-parity` | Phase 6 | PR-5 |
-| PR-7 | [ASC-187](https://linear.app/amicusx/issue/ASC-187) | `tsemachmizrachi/asc-187-phase-7-multi-tenancyrbac-hardening-pass` | Phase 7 | PR-6 |
+| PR-3 | [ASC-183](https://linear.app/amicusx/issue/ASC-183) | `tsemachmizrachi/asc-183-phase-3-core-backend-pages-cases-tasks-calendar-templates` | Phase 3 design ([doc](../phase-3-core-pages/design.md), decision-only) | PR-2 |
+| PR-4 | [ASC-184](https://linear.app/amicusx/issue/ASC-184) | `tsemachmizrachi/asc-184-phase-4-local-document-access-browser-file-system-access-api` | Phase 4 design ([doc](../phase-4-local-documents/design.md), decision-only) | PR-3 |
+| PR-5 | [ASC-185](https://linear.app/amicusx/issue/ASC-185) | `tsemachmizrachi/asc-185-phase-5-search-and-indexing-server-side-persisted-index` | Phase 5 design ([doc](../phase-5-search-indexing/design.md), decision-only) | PR-4 |
+| PR-6 | [ASC-186](https://linear.app/amicusx/issue/ASC-186) | `tsemachmizrachi/asc-186-phase-6-email-ingestion-and-classification-parity` | Phase 6 design ([doc](../phase-6-email-ingestion/design.md), decision-only) | PR-5 |
+| PR-7 | [ASC-187](https://linear.app/amicusx/issue/ASC-187) | `tsemachmizrachi/asc-187-phase-7-multi-tenancyrbac-hardening-pass` | Phase 7 design ([doc](../phase-7-tenancy-hardening/design.md), decision-only) | PR-6 |
+
+**PR links**: [PR-0 #196](https://github.com/tsemach/doron-desktop/pull/196) ·
+[PR-1 #197](https://github.com/tsemach/doron-desktop/pull/197) ·
+[PR-2 #198](https://github.com/tsemach/doron-desktop/pull/198) ·
+[PR-3 #199](https://github.com/tsemach/doron-desktop/pull/199) ·
+[PR-4 #200](https://github.com/tsemach/doron-desktop/pull/200) ·
+[PR-5 #201](https://github.com/tsemach/doron-desktop/pull/201) ·
+[PR-6 #202](https://github.com/tsemach/doron-desktop/pull/202) ·
+[PR-7 #203](https://github.com/tsemach/doron-desktop/pull/203)
 
 A single strict linear stack (PR-0 → PR-1 → ... → PR-7) — not a branching
 tree. Phase 6 is logically independent of Phases 2-5 (per its own
