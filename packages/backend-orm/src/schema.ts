@@ -563,3 +563,56 @@ export const meetings = pgTable("meetings", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// ASC-186 (Phase 6) -- schema only. OAuth connect/callback routes and the
+// Vercel Cron polling loop are NOT implemented in this pass: they need a
+// real Google/Microsoft OAuth app's credentials to build and verify
+// against, unavailable in this environment -- the same honest scope cut
+// already made for Calendar (docs/backend-saas/phase-6-email-ingestion/
+// design.md), applied even more conservatively here since email has no
+// meaningful "local-only" fallback the way a manually-created meeting did.
+
+// One connected inbox per user, mirrors googleCalendarAccounts exactly.
+export const emailAccounts = pgTable("email_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider", { enum: ["google", "microsoft"] }).notNull(),
+  emailAddress: text("email_address").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  tokenExpiresAt: timestamp("token_expires_at", { mode: "date" }).notNull(),
+  lastPolledAt: timestamp("last_polled_at", { mode: "date" }),
+  connectedAt: timestamp("connected_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Matched to a case -- transitive visibility through cases, same pattern
+// as tasks/documents.
+export const caseEmails = pgTable("case_emails", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  caseId: uuid("case_id")
+    .notNull()
+    .references(() => cases.id, { onDelete: "cascade" }),
+  providerMessageId: text("provider_message_id").notNull(),
+  subject: text("subject"),
+  fromAddress: text("from_address"),
+  snippet: text("snippet"),
+  receivedAt: timestamp("received_at", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Not yet matched to a case -- anchored to userId directly, same pattern
+// as non-case-linked meetings.
+export const pendingEmailAlerts = pgTable("pending_email_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  providerMessageId: text("provider_message_id").notNull(),
+  subject: text("subject"),
+  fromAddress: text("from_address"),
+  receivedAt: timestamp("received_at", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
