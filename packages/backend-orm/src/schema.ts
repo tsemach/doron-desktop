@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, primaryKey, uuid, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, primaryKey, uuid, uniqueIndex, check, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -334,4 +334,212 @@ export const contactShares = pgTable(
   },
   (t) => [primaryKey({ columns: [t.contactId, t.sharedWithUserId] })]
 );
+
+// ASC-181 (Phase 1 of ASC-179) -- an independently-populated SaaS case
+// data model, not a mirror/sync of desktop's local SQLite (see
+// docs/backend-saas/masterplan/plan.md, Core Decision 1, and
+// docs/backend-saas/phase-1-data-foundation/design.md for the full
+// ownership/visibility rationale). No firmId column here deliberately --
+// firm membership is derived fresh via join to users at query time, same
+// anti-staleness convention contacts uses above.
+export const cases = pgTable("cases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  subject: text("subject"),
+  // Loose text, no CHECK -- deliberately mirrors desktop's cases.status
+  // column (store/mod.rs), which also has no CHECK constraint.
+  status: text("status").default("open").notNull(),
+  // Soft delete, matching users.deletedAt's convention above.
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Firm-owned (or personal for flat users) -- unlike cases above, not
+// derived from a user relationship, so a template survives a user leaving
+// the firm rather than disappearing with them. Exactly one of firmId/
+// userId is set, DB-enforced (Phase 7's hardening checklist named this
+// requirement explicitly -- not left as an app-layer-only invariant).
+export const caseTemplates = pgTable(
+  "case_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    firmId: text("firm_id").references(() => firms.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    name: text("name").notNull(),
+    fields: jsonb("fields"), // mirrors desktop's case_templates.fields JSON column
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    check(
+      "case_templates_firm_xor_user",
+      sql`(${t.firmId} is not null and ${t.userId} is null) or (${t.firmId} is null and ${t.userId} is not null)`
+    ),
+  ]
+);
+
+// Desktop's doc_templates concept (placeholder-fillable document templates
+// used when generating a case's documents) -- named caseDocTemplates, NOT
+// docTemplates, to avoid colliding with the pre-existing documentTemplates
+// table above, which is an unrelated, already-in-flight office migration
+// (see CLAUDE.md) and must not be reused or extended here. Same firm-xor-
+// user ownership shape as caseTemplates above.
+export const caseDocTemplates = pgTable(
+  "case_doc_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    firmId: text("firm_id").references(() => firms.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    fileName: text("file_name").notNull(),
+    title: text("title").notNull(),
+    fieldsFound: jsonb("fields_found"), // mirrors desktop's doc_templates.fields_found
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    check(
+      "case_doc_templates_firm_xor_user",
+      sql`(${t.firmId} is not null and ${t.userId} is null) or (${t.firmId} is null and ${t.userId} is not null)`
+    ),
+  ]
+);
+
+// Same firm-xor-user ownership shape as caseTemplates/caseDocTemplates above.
+export const taskTemplates = pgTable(
+  "task_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    firmId: text("firm_id").references(() => firms.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    check(
+      "task_templates_firm_xor_user",
+      sql`(${t.firmId} is not null and ${t.userId} is null) or (${t.firmId} is null and ${t.userId} is not null)`
+    ),
+  ]
+);
+
+// Owned child of taskTemplates, not independently shared -- visibility
+// inherits from the parent template, matching desktop's task_template_items
+// (a child of task_templates via task_template_id, store/mod.rs).
+export const taskTemplateItems = pgTable("task_template_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taskTemplateId: uuid("task_template_id")
+    .notNull()
+    .references(() => taskTemplates.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  estimateValue: real("estimate_value").notNull(),
+  estimateUnit: text("estimate_unit", { enum: ["day", "hour"] }).notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+});
+
+// Join table, mirrors desktop's case_template_docs (store/mod.rs).
+export const caseTemplateDocs = pgTable(
+  "case_template_docs",
+  {
+    caseTemplateId: uuid("case_template_id")
+      .notNull()
+      .references(() => caseTemplates.id, { onDelete: "cascade" }),
+    caseDocTemplateId: uuid("case_doc_template_id")
+      .notNull()
+      .references(() => caseDocTemplates.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.caseTemplateId, t.caseDocTemplateId] })]
+);
+
+// Tasks/documents/case-linked meetings inherit visibility transitively
+// through their parent case's userId -- no independent ownership column on
+// this table (see docs/backend-saas/phase-1-data-foundation/design.md).
+export const tasks = pgTable("tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  caseId: uuid("case_id")
+    .notNull()
+    .references(() => cases.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status", { enum: ["Waiting", "In progress", "Cancel", "Done"] })
+    .default("Waiting")
+    .notNull(),
+  // Nullable together at the app layer -- an ad-hoc task may have no estimate.
+  estimateValue: real("estimate_value"),
+  estimateUnit: text("estimate_unit", { enum: ["day", "hour"] }),
+  dueDate: timestamp("due_date", { mode: "date" }),
+  taskTemplateItemId: uuid("task_template_item_id").references(() => taskTemplateItems.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Phase 5's search-index target -- minimal for now; Phase 5 adds a
+// documentChunks table FK'd to this one. relativePath (not an absolute
+// path) per docs/backend-saas/phase-4-local-documents/design.md -- the
+// File System Access API never exposes an absolute path, by spec.
+export const documents = pgTable("documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  caseId: uuid("case_id")
+    .notNull()
+    .references(() => cases.id, { onDelete: "cascade" }), // mandatory -- deliberate deviation from desktop, which has no case_id on documents at all
+  fileName: text("file_name").notNull(),
+  relativePath: text("relative_path").notNull(),
+  addedByUserId: text("added_by_user_id")
+    .notNull()
+    .references(() => users.id), // provenance only, not used for visibility
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Personal OAuth grant -- one connected account per user, never shared
+// even with a manager (see docs/backend-saas/phase-3-core-pages/design.md).
+export const googleCalendarAccounts = pgTable("google_calendar_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  googleEmail: text("google_email").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  tokenExpiresAt: timestamp("token_expires_at", { mode: "date" }).notNull(),
+  syncToken: text("sync_token"),
+  connectedAt: timestamp("connected_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Not-case-linked meetings anchor visibility to userId directly (the
+// connecting account's owner); case-linked ones inherit transitively via
+// caseId -> cases.userId, same as tasks/documents above.
+export const meetings = pgTable("meetings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  googleEventId: text("google_event_id").unique().notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  caseId: uuid("case_id").references(() => cases.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  location: text("location"),
+  startTime: timestamp("start_time", { mode: "date" }).notNull(),
+  endTime: timestamp("end_time", { mode: "date" }).notNull(),
+  status: text("status", { enum: ["confirmed", "tentative", "cancelled"] })
+    .default("confirmed")
+    .notNull(),
+  caseLinkSource: text("case_link_source", { enum: ["none", "phrase_match", "manual"] })
+    .default("none")
+    .notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
 
