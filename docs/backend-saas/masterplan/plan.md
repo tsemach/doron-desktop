@@ -2,8 +2,8 @@
 
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
-**Status:** Decomposition approved; PR-0 (this document) in progress; Phase 1
-design not yet started.
+**Status:** Decomposition approved; [PR-0](https://github.com/tsemach/doron-desktop/pull/196)
+(this document) open, awaiting review; Phase 1 design not yet started.
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
