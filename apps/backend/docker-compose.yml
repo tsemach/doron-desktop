@@ -7,7 +7,13 @@
 name: ascurix-backend
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector/pgvector:pg16, not plain postgres:16-alpine -- Phase 5's
+    # document_chunks table needs the pgvector extension, which the plain
+    # Alpine image doesn't ship (confirmed locally: `CREATE EXTENSION
+    # vector` fails with "type vector does not exist" against
+    # postgres:16-alpine). This is a drop-in Postgres 16 image with
+    # pgvector pre-built, otherwise identical.
+    image: pgvector/pgvector:pg16
     container_name: ascurix-postgres
     restart: always
     environment:
