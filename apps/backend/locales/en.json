@@ -384,6 +384,13 @@
   "tasks_empty_state": "No tasks yet.",
   "tasks_delete_button": "Delete task",
 
+  "templates_title": "Manage templates",
+  "templates_name_placeholder": "Template name",
+  "templates_create_button": "Create template",
+  "templates_create_error": "Couldn't create the template. Please try again.",
+  "templates_empty_state": "No templates yet.",
+  "templates_delete_button": "Delete",
+
   "dashboard_welcome": "Welcome",
   "personal_workspace": "Personal workspace",
   "dashboard_open_activities": "Open Activities",
