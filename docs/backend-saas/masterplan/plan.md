@@ -2,20 +2,17 @@
 
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
-**Status:** Full design-doc stack complete, PR-0 through PR-7 all open
-(#196-#203) — every phase now has a written design. Per explicit
-instruction (2026-08-22), Phases 3-7 were designed and branched
-autonomously without a per-PR approval pause; Phase 1's design was
-reviewed in conversation before that point (ownership/visibility model +
-schema walked through, including a concrete manager-visibility query
-trace). One correction surfaced and applied retroactively: Phase 4's
-design caught that Phase 1's original `documents.filePath` column
-couldn't actually be populated (the File System Access API never exposes
-an absolute path) — fixed in PR-1, propagated down the stack via rebase.
-**No code has been written anywhere in this stack** — every PR is a
-decision doc only, matching PR-3/PR-5's (ASC-105) scoping; schema/route/
-component implementation for every phase is still a follow-up PR, not yet
-started for any of them.
+**Status:** Design-doc stack (PR-0 through PR-7, #196-#203) merged to
+`master` 2026-08-22. **Phase 1 implementation has started**:
+[#204](https://github.com/tsemach/doron-desktop/pull/204) adds the actual
+`packages/backend-orm/src/schema.ts` tables + Drizzle migration + the
+`lib/cases/crud.ts` read-visibility substrate, against
+[PR-1's design](../phase-1-data-foundation/design.md). Verified: `tsc
+--noEmit` clean, full backend test suite (140 tests) passes, production
+build succeeds. Two corrections applied against the design doc's
+illustrative code during implementation (enum style, a table-naming
+collision avoided) — see #204's description for detail. Phases 2-7 are
+still design-only; no implementation started for them yet.
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
