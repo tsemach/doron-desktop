@@ -52,7 +52,7 @@ export default function CaseDocumentsPanel({ caseId, initialDocuments }: CaseDoc
     setError(null);
     try {
       const known = new Set(documents.map((d) => d.relativePath));
-      for await (const { relativePath } of walkDirectory(handle)) {
+      for await (const { relativePath, fileHandle } of walkDirectory(handle)) {
         if (known.has(relativePath)) continue;
         const fileName = relativePath.split("/").pop() ?? relativePath;
         const res = await fetch(`/api/v1/cases/${caseId}/documents`, {
@@ -64,6 +64,20 @@ export default function CaseDocumentsPanel({ caseId, initialDocuments }: CaseDoc
           const data = await res.json();
           setDocuments((prev) => [...prev, data.document as DocumentRow]);
           known.add(relativePath);
+
+          // Only .txt is indexed for search in this pass -- PDF/Word
+          // extraction (pdfjs-dist/mammoth) is a real, larger fast-follow
+          // (see docs/backend-saas/phase-5-search-indexing/design.md);
+          // the document is still registered and openable either way,
+          // just not searchable yet.
+          if (fileName.toLowerCase().endsWith(".txt")) {
+            const text = await fileHandle.getFile().then((f) => f.text());
+            await fetch(`/api/v1/documents/${data.document.id}/index`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text }),
+            }).catch(() => {}); // indexing failure doesn't block the scan -- the document is already registered and usable
+          }
         }
       }
     } finally {

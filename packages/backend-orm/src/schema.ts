@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, timestamp, primaryKey, uuid, uniqueIndex, check, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, primaryKey, uuid, uniqueIndex, check, jsonb, vector } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -499,6 +499,26 @@ export const documents = pgTable("documents", {
   addedByUserId: text("added_by_user_id")
     .notNull()
     .references(() => users.id), // provenance only, not used for visibility
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ASC-185 (Phase 5) -- extracted text/embedding chunks, FK'd to documents.
+// No userId/firmId here -- visibility is transitive through documents ->
+// cases -> cases.userId, same pattern as every other case-rooted table.
+// Dimension 1536 matches OpenAI's text-embedding-3-small (a chosen
+// default, not a hard requirement -- revisit if the implementation
+// settles on a different Gateway embedding model). Requires the pgvector
+// extension enabled on the Postgres instance (see
+// docs/backend-saas/phase-5-search-indexing/design.md's open risks --
+// not assumed already on).
+export const documentChunks = pgTable("document_chunks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  chunkIndex: integer("chunk_index").notNull(),
+  text: text("text").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
