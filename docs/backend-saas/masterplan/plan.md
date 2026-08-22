@@ -2,13 +2,15 @@
 
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
-**Status:** Decomposition approved; [PR-0](https://github.com/tsemach/doron-desktop/pull/196)
-(this document) and [PR-1](https://github.com/tsemach/doron-desktop/pull/197)
-(Phase 1 design) open; Phase 1's design was reviewed in conversation
-(ownership/visibility model + schema walked through, including a concrete
-manager-visibility query trace) — schema implementation itself is still a
-follow-up PR, not yet started. Phase 2 design starting now (PR-2, stacked
-on PR-1).
+**Status:** Decomposition approved. Design-doc PRs open for Phase 1
+([PR-1](https://github.com/tsemach/doron-desktop/pull/197), reviewed in
+conversation — ownership/visibility model + schema walked through,
+including a concrete manager-visibility query trace) and Phase 2
+([PR-2](https://github.com/tsemach/doron-desktop/pull/198), adopts PR-5
+(ASC-105) as-is, re-verified against current code — no drift found). Base
+plan doc itself is [PR-0](https://github.com/tsemach/doron-desktop/pull/196).
+Schema/UI implementation for Phases 1-2 are still follow-up PRs, not yet
+started. Phase 3 design not yet started.
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
@@ -30,7 +32,7 @@ down, with PR-0 merging into `master` last.
 |---|---|---|---|---|
 | PR-0 | ASC-179 | `tsemachmizrachi/asc-179-add-fully-backend-support-saas-pr-0` | This master plan doc (`docs/backend-saas/masterplan/plan.md`) | `master` |
 | PR-1 | [ASC-181](https://linear.app/amicusx/issue/ASC-181) | `tsemachmizrachi/asc-181-phase-1-tenant-scoped-data-foundation` | Phase 1 design ([doc](../phase-1-data-foundation/design.md), decision-only — matches PR-3/PR-5's scoping; schema implementation is a follow-up PR) | PR-0 |
-| PR-2 | [ASC-182](https://linear.app/amicusx/issue/ASC-182) | `tsemachmizrachi/asc-182-phase-2-shared-ui-foundation-packagesui-theme-button-desktop` | Phase 2 | PR-1 |
+| PR-2 | [ASC-182](https://linear.app/amicusx/issue/ASC-182) | `tsemachmizrachi/asc-182-phase-2-shared-ui-foundation-packagesui-theme-button-desktop` | Phase 2 design ([doc](../phase-2-shared-ui/design.md), decision-only — adopts PR-5 as-is; implementation is a follow-up PR) | PR-1 |
 | PR-3 | [ASC-183](https://linear.app/amicusx/issue/ASC-183) | `tsemachmizrachi/asc-183-phase-3-core-backend-pages-cases-tasks-calendar-templates` | Phase 3 | PR-2 |
 | PR-4 | [ASC-184](https://linear.app/amicusx/issue/ASC-184) | `tsemachmizrachi/asc-184-phase-4-local-document-access-browser-file-system-access-api` | Phase 4 | PR-3 |
 | PR-5 | [ASC-185](https://linear.app/amicusx/issue/ASC-185) | `tsemachmizrachi/asc-185-phase-5-search-and-indexing-server-side-persisted-index` | Phase 5 | PR-4 |
