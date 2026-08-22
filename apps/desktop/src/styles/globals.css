@@ -12,6 +12,16 @@
 @import "@fontsource-variable/heebo";
 @import "./pages/index.css";
 
+/* Tailwind's automatic content scanning only walks this app's own
+   directory -- it never reaches packages/ui/src (a sibling package, only
+   linked in via node_modules), so utility classes used only inside shared
+   components like Button would otherwise never be generated. Confirmed
+   necessary (not assumed) via the Phase 2 spike: without this, Button's
+   JS bundled fine but its Tailwind classes (e.g. group/button) were
+   silently absent from the compiled CSS -- same reason apps/backend and
+   apps/office already carry this directive. */
+@source "../../../../packages/ui/src";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Hebrew-only faces — one per selectable font, declared with a Hebrew unicode-range
