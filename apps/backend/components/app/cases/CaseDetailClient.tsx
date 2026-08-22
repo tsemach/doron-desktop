@@ -8,24 +8,29 @@ import { useLanguage } from "../../../context/LanguageContext";
 import type { CaseRow } from "../../../lib/cases/crud";
 import type { TaskRow } from "../../../lib/tasks/crud";
 import type { MeetingRow } from "../../../lib/calendar/crud";
+import type { DocumentRow } from "../../../lib/documents/crud";
 import CaseTasksPanel from "./CaseTasksPanel";
 import CaseMeetingsPanel from "./CaseMeetingsPanel";
-
-// The Documents tab (per docs/backend-saas/phase-3-core-pages/design.md's
-// case-detail tab set) is still a follow-up implementation PR (Phase 4)
-// -- it needs the browser File System Access API work that phase owns.
+import CaseDocumentsPanel from "./CaseDocumentsPanel";
 
 const STATUS_OPTIONS = ["open", "waiting", "closed"];
-type Tab = "overview" | "tasks" | "meetings";
+type Tab = "overview" | "tasks" | "meetings" | "documents";
 
 type CaseDetailClientProps = {
   initialCase: CaseRow;
   isOwner: boolean;
   initialTasks: TaskRow[];
   initialMeetings: MeetingRow[];
+  initialDocuments: DocumentRow[];
 };
 
-export default function CaseDetailClient({ initialCase, isOwner, initialTasks, initialMeetings }: CaseDetailClientProps) {
+export default function CaseDetailClient({
+  initialCase,
+  isOwner,
+  initialTasks,
+  initialMeetings,
+  initialDocuments,
+}: CaseDetailClientProps) {
   const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -80,7 +85,7 @@ export default function CaseDetailClient({ initialCase, isOwner, initialTasks, i
       </Link>
 
       <div className="mt-4 flex gap-1 border-b border-border">
-        {(["overview", "tasks", "meetings"] as const).map((tab) => (
+        {(["overview", "tasks", "meetings", "documents"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -88,7 +93,15 @@ export default function CaseDetailClient({ initialCase, isOwner, initialTasks, i
               activeTab === tab ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t(tab === "overview" ? "cases_tab_overview" : tab === "tasks" ? "cases_tab_tasks" : "cases_tab_meetings")}
+            {t(
+              tab === "overview"
+                ? "cases_tab_overview"
+                : tab === "tasks"
+                  ? "cases_tab_tasks"
+                  : tab === "meetings"
+                    ? "cases_tab_meetings"
+                    : "cases_tab_documents"
+            )}
           </button>
         ))}
       </div>
@@ -139,15 +152,18 @@ export default function CaseDetailClient({ initialCase, isOwner, initialTasks, i
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground pt-1">{t("cases_tabs_coming_soon")}</p>
         </div>
       ) : activeTab === "tasks" ? (
         <div className="mt-4 rounded-lg border border-border bg-card p-5">
           <CaseTasksPanel caseId={caseRow.id} initialTasks={initialTasks} />
         </div>
-      ) : (
+      ) : activeTab === "meetings" ? (
         <div className="mt-4 rounded-lg border border-border bg-card p-5">
           <CaseMeetingsPanel caseId={caseRow.id} initialMeetings={initialMeetings} />
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-border bg-card p-5">
+          <CaseDocumentsPanel caseId={caseRow.id} initialDocuments={initialDocuments} />
         </div>
       )}
     </div>
