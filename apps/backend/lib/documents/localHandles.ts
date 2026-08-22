@@ -7,7 +7,11 @@
 
 const DB_NAME = "ascurix-documents";
 const STORE_NAME = "directory-handles";
-const DB_VERSION = 1;
+// Keyed by documentId -- persists a single file's handle for documents
+// registered via the Scan & Index page's "Index Single Document" flow,
+// which has no connected directory root to re-resolve the file from.
+const FILE_STORE_NAME = "file-handles";
+const DB_VERSION = 2;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -15,6 +19,9 @@ function openDb(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME)) {
         request.result.createObjectStore(STORE_NAME);
+      }
+      if (!request.result.objectStoreNames.contains(FILE_STORE_NAME)) {
+        request.result.createObjectStore(FILE_STORE_NAME);
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -55,11 +62,33 @@ export async function removeDirectoryHandle(caseId: string): Promise<void> {
 // Re-confirms (or requests) read permission on an already-persisted
 // handle. Per the design doc: the browser may still require a user
 // gesture to re-confirm permission -- not silently permanent forever,
-// a real browser security policy, not a design choice.
-export async function ensureReadPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+// a real browser security policy, not a design choice. Takes the base
+// FileSystemHandle type -- the permission methods are shared by
+// directory and file handles alike.
+export async function ensureReadPermission(handle: FileSystemHandle): Promise<boolean> {
   const options = { mode: "read" as const };
   if ((await handle.queryPermission(options)) === "granted") return true;
   return (await handle.requestPermission(options)) === "granted";
+}
+
+export async function saveFileHandle(documentId: string, handle: FileSystemFileHandle): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE_NAME, "readwrite");
+    tx.objectStore(FILE_STORE_NAME).put(handle, documentId);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getFileHandle(documentId: string): Promise<FileSystemFileHandle | undefined> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE_NAME, "readonly");
+    const request = tx.objectStore(FILE_STORE_NAME).get(documentId);
+    request.onsuccess = () => resolve(request.result as FileSystemFileHandle | undefined);
+    request.onerror = () => reject(request.error);
+  });
 }
 
 // Recursively walks a directory handle, yielding [relativePath, fileHandle]
