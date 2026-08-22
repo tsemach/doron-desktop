@@ -410,6 +410,11 @@
   "documents_empty_state": "No documents yet. Connect a local folder to get started.",
   "documents_remove_button": "Remove",
 
+  "search_note": "Search across every case's indexed documents. Only .txt files are indexed for search in this version — PDF/Word indexing is coming soon.",
+  "search_placeholder": "Search documents…",
+  "search_button": "Search",
+  "search_no_results": "No results found.",
+
   "dashboard_welcome": "Welcome",
   "personal_workspace": "Personal workspace",
   "dashboard_open_activities": "Open Activities",

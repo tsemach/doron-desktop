@@ -410,6 +410,11 @@
   "documents_empty_state": "אין עדיין מסמכים. חברו תיקייה מקומית כדי להתחיל.",
   "documents_remove_button": "הסר",
 
+  "search_note": "חיפוש בכל המסמכים המאונדקסים בכל התיקים. בגרסה זו רק קבצי .txt מאונדקסים לחיפוש — אינדוקס PDF/Word בקרוב.",
+  "search_placeholder": "חיפוש מסמכים…",
+  "search_button": "חיפוש",
+  "search_no_results": "לא נמצאו תוצאות.",
+
   "dashboard_welcome": "ברוכים הבאים",
   "personal_workspace": "סביבת עבודה אישית",
   "dashboard_open_activities": "פעילויות פתוחות",
