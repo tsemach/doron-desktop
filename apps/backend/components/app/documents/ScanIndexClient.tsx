@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Folder, FileText } from "lucide-react";
 import { useLanguage } from "../../../context/LanguageContext";
 import {
@@ -25,8 +25,14 @@ export default function ScanIndexClient({ cases }: ScanIndexClientProps) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Matches CaseDocumentsPanel's SSR-safe pattern: computed after mount,
+  // not inline during render, so server and first-client-render markup
+  // agree (avoids a hydration mismatch on the window-only check below).
+  const [supported, setSupported] = useState<boolean | null>(null);
 
-  const supported = typeof window !== "undefined" && "showDirectoryPicker" in window;
+  useEffect(() => {
+    setSupported("showDirectoryPicker" in window);
+  }, []);
 
   async function handleIndexFolder() {
     if (!caseId) {
@@ -80,7 +86,7 @@ export default function ScanIndexClient({ cases }: ScanIndexClientProps) {
     }
   }
 
-  if (!supported) {
+  if (supported === false) {
     return (
       <div className="flex-1 flex items-center justify-center px-6">
         <p className="max-w-md text-center text-sm text-muted-foreground">{t("documents_unsupported_browser")}</p>
