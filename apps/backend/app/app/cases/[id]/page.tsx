@@ -3,6 +3,7 @@ import { auth } from "../../../../auth";
 import { getVisibleCaseById } from "../../../../lib/cases/crud";
 import { listTasksForCase } from "../../../../lib/tasks/crud";
 import { listMeetingsForCase } from "../../../../lib/calendar/crud";
+import { listDocumentsForCase } from "../../../../lib/documents/crud";
 import type { Actor } from "../../../../lib/permissions";
 import CaseDetailClient from "@/components/app/cases/CaseDetailClient";
 
@@ -24,8 +25,18 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
-  const [tasks, meetings] = await Promise.all([listTasksForCase(actor, id), listMeetingsForCase(actor, id)]);
+  const [tasks, meetings, documents] = await Promise.all([
+    listTasksForCase(actor, id),
+    listMeetingsForCase(actor, id),
+    listDocumentsForCase(actor, id),
+  ]);
   return (
-    <CaseDetailClient initialCase={caseRow} isOwner={caseRow.userId === actor.id} initialTasks={tasks} initialMeetings={meetings} />
+    <CaseDetailClient
+      initialCase={caseRow}
+      isOwner={caseRow.userId === actor.id}
+      initialTasks={tasks}
+      initialMeetings={meetings}
+      initialDocuments={documents}
+    />
   );
 }
