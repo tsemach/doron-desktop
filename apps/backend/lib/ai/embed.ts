@@ -16,7 +16,9 @@ const EMBEDDING_CENTS_PER_MILLION_TOKENS = 2; // OpenAI's list price at time of 
 
 export type EmbedResult = { vector: number[] } | { error: string; status: number };
 
-export async function embedText(userId: string, tier: "free" | "pro", text: string): Promise<EmbedResult> {
+type EmbedPurpose = "doc_indexing" | "query_analysis";
+
+export async function embedText(userId: string, tier: "free" | "pro", text: string, purpose: EmbedPurpose = "doc_indexing"): Promise<EmbedResult> {
   const quota = await checkQuota(userId, tier);
   if (!quota.ok) {
     return { error: "You've used your monthly AI allowance for this billing period.", status: 402 };
@@ -30,7 +32,7 @@ export async function embedText(userId: string, tier: "free" | "pro", text: stri
     await recordUsage(userId, costCents);
     await recordAiRequest({
       userId,
-      purpose: "doc_indexing",
+      purpose,
       model: EMBEDDING_MODEL,
       prompt: text,
       inputTokens,
@@ -40,7 +42,7 @@ export async function embedText(userId: string, tier: "free" | "pro", text: stri
 
     return { vector: result.embedding };
   } catch (err) {
-    await recordAiRequest({ userId, purpose: "doc_indexing", model: EMBEDDING_MODEL, prompt: text, errorCode: "provider_error" });
+    await recordAiRequest({ userId, purpose, model: EMBEDDING_MODEL, prompt: text, errorCode: "provider_error" });
     return { error: err instanceof Error ? err.message : "Embedding failed", status: 502 };
   }
 }
