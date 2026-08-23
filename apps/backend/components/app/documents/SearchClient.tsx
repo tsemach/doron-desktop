@@ -88,8 +88,8 @@ export default function SearchClient({ initialQuery }: { initialQuery?: string }
           </span>
           <h2 className="text-sm font-bold text-foreground">Ready to Search</h2>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Enter semantic descriptions or keywords to look through your indexed documents. Only .txt files are indexed for search in
-            this version.
+            Enter semantic descriptions or keywords to look through your indexed documents. Only .txt, .docx, and .pdf files are
+            indexed for search in this version.
           </p>
           <div className="mt-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Popular Searches</p>

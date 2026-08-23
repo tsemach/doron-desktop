@@ -279,5 +279,9 @@ function describeEvent(event: GlobalScanEvent): LogEntry {
   if (event.type === "failed") {
     return { fileName: event.fileName, message: "failed to register", ok: false };
   }
-  return { fileName: event.fileName, message: event.searchable ? "indexed for search" : "registered (not searchable — only .txt is indexed)", ok: true };
+  return {
+    fileName: event.fileName,
+    message: event.searchable ? "indexed for search" : "registered (not searchable — only .txt/.docx/.pdf are indexed)",
+    ok: true,
+  };
 }

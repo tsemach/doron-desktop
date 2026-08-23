@@ -1,14 +1,31 @@
 // Client-side only. Shared by CaseDocumentsPanel (a case's Documents tab)
 // and ScanIndexClient (the global, caseless Scan & Index page) -- both
-// register locally-picked files and index .txt content the same way, so
-// the request/response shape lives here once instead of twice. A caseId
-// registers the document against that case (/api/v1/cases/[id]/documents,
-// CaseDocumentsPanel's flow); omitting it registers a caseless document
-// (/api/v1/documents, ScanIndexClient's flow) -- see documents.caseId in
-// packages/backend-orm/src/schema.ts for the visibility split this backs.
+// register locally-picked files and index extractable content the same
+// way, so the request/response shape lives here once instead of twice. A
+// caseId registers the document against that case
+// (/api/v1/cases/[id]/documents, CaseDocumentsPanel's flow); omitting it
+// registers a caseless document (/api/v1/documents, ScanIndexClient's
+// flow) -- see documents.caseId in packages/backend-orm/src/schema.ts for
+// the visibility split this backs.
 
 import type { DocumentRow } from "./crud";
+import { extractText, isExtractableFile } from "./extractText";
 import { saveFileHandle, walkDirectory } from "./localHandles";
+
+// txt/docx/pdf are indexed for search (see extractText.ts); doc/xls/xlsx
+// are still registered and openable, just not searchable yet -- no
+// client-side extractor for them.
+async function indexIfExtractable(documentId: string, fileName: string, fileHandle: FileSystemFileHandle): Promise<boolean> {
+  if (!isExtractableFile(fileName)) return false;
+  const text = await extractText(fileName, await fileHandle.getFile());
+  if (!text) return false;
+  await fetch(`/api/v1/documents/${documentId}/index`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  }).catch(() => {}); // indexing failure doesn't block the scan -- the document is already registered and usable
+  return true;
+}
 
 async function registerAndIndex(fileName: string, relativePath: string, fileHandle: FileSystemFileHandle, caseId?: string): Promise<DocumentRow | null> {
   const url = caseId ? `/api/v1/cases/${caseId}/documents` : "/api/v1/documents";
@@ -27,18 +44,7 @@ async function registerAndIndex(fileName: string, relativePath: string, fileHand
   // (CaseDocumentsPanel.handleOpen already tries this handle first).
   await saveFileHandle(document.id, fileHandle).catch(() => {});
 
-  // Only .txt is indexed for search in this pass -- PDF/Word extraction
-  // (pdfjs-dist/mammoth) is a real, larger fast-follow (see
-  // docs/backend-saas/phase-5-search-indexing/design.md); the document is
-  // still registered and openable either way, just not searchable yet.
-  if (fileName.toLowerCase().endsWith(".txt")) {
-    const text = await fileHandle.getFile().then((f) => f.text());
-    await fetch(`/api/v1/documents/${document.id}/index`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    }).catch(() => {}); // indexing failure doesn't block the scan -- the document is already registered and usable
-  }
+  await indexIfExtractable(document.id, fileName, fileHandle);
 
   return document;
 }
@@ -119,15 +125,7 @@ export async function* processGlobalScan(
 
     await saveFileHandle(documentId, fileHandle).catch(() => {});
 
-    const searchable = fileName.toLowerCase().endsWith(".txt");
-    if (searchable) {
-      const text = await fileHandle.getFile().then((f) => f.text());
-      await fetch(`/api/v1/documents/${documentId}/index`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      }).catch(() => {});
-    }
+    const searchable = await indexIfExtractable(documentId, fileName, fileHandle);
 
     yield { type: "done", relativePath, fileName, searchable };
   }
