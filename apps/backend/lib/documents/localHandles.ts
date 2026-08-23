@@ -91,18 +91,42 @@ export async function getFileHandle(documentId: string): Promise<FileSystemFileH
   });
 }
 
+// Directories a recursive scan has no business descending into -- build
+// output/dependency trees, VCS internals, caches. Pruned by name, not
+// walked at all (not just filtered after the fact), so a folder that
+// happens to contain a huge node_modules doesn't get walked in full just
+// to discard its contents.
+const SKIPPED_DIRECTORY_NAMES = new Set(["node_modules", ".git", ".next", ".cache", "dist", "build", ".vscode", ".idea", "__pycache__", ".venv"]);
+
+// Matches the "Index Entire Folder" card's own stated scope ("scans a
+// directory for PDF, DOCX, TXT, and Excel sheets") -- without this, an
+// unfiltered walk pulls in every source/config file a folder happens to
+// contain (observed: a folder with a stray node_modules produced
+// thousands of .js/.json/.md registrations with no relation to
+// documents at all).
+const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "txt", "xls", "xlsx", "csv"]);
+
+function hasAllowedExtension(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase();
+  return ext !== undefined && ALLOWED_EXTENSIONS.has(ext);
+}
+
 // Recursively walks a directory handle, yielding [relativePath, fileHandle]
-// pairs. relativePath is "/"-joined from the connected root, matching
-// documents.relativePath's meaning exactly.
+// pairs for files matching ALLOWED_EXTENSIONS, skipping hidden entries and
+// SKIPPED_DIRECTORY_NAMES entirely. relativePath is "/"-joined from the
+// connected root, matching documents.relativePath's meaning exactly.
 export async function* walkDirectory(
   dirHandle: FileSystemDirectoryHandle,
   prefix = ""
 ): AsyncGenerator<{ relativePath: string; fileHandle: FileSystemFileHandle }> {
   for await (const [name, handle] of dirHandle.entries()) {
+    if (name.startsWith(".")) continue;
     const relativePath = prefix ? `${prefix}/${name}` : name;
     if (handle.kind === "file") {
-      yield { relativePath, fileHandle: handle };
-    } else {
+      if (hasAllowedExtension(name)) {
+        yield { relativePath, fileHandle: handle };
+      }
+    } else if (!SKIPPED_DIRECTORY_NAMES.has(name)) {
       yield* walkDirectory(handle, relativePath);
     }
   }
