@@ -49,7 +49,7 @@ export async function registerDocument(actor: Actor, caseId: string, fields: Reg
   return { document: row };
 }
 
-async function getVisibleDocumentById(actor: Actor, id: string): Promise<DocumentRow | undefined> {
+export async function getVisibleDocumentById(actor: Actor, id: string): Promise<DocumentRow | undefined> {
   const [row] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
   if (!row) return undefined;
 
