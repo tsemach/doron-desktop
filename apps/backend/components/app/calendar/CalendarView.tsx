@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RefreshCw, X } from "lucide-react";
 import { Button } from "@workspace/ui";
 import type { MeetingRow } from "../../../lib/calendar/crud";
 import MeetingDialog from "./MeetingDialog";
@@ -12,6 +12,7 @@ const HOUR_COLUMN_WIDTH = 56; // px, time-labels gutter
 const HEADER_HEIGHT = 56; // px, sticky day-header row
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MAX_VISIBLE_PER_DAY = 3; // matches desktop's MonthGrid.tsx
+const DEFAULT_SCROLL_HOUR = 8; // matches desktop's TimeGrid.tsx -- most meetings fall in working hours
 
 type View = "day" | "week" | "month";
 
@@ -115,6 +116,7 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
   const [loading, setLoading] = useState(false);
   const [newMeetingOpen, setNewMeetingOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<MeetingRow | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const { start, end } = useMemo(() => rangeForView(anchor, view), [anchor, view]);
   const days = useMemo(() => {
@@ -133,6 +135,19 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // Matches desktop's TimeGrid.tsx: default-scrolls the day/week grid to
+    // working hours (most meetings fall there) whenever day/week becomes
+    // the active view -- not on every meetings refresh, so a user's
+    // manual scroll position isn't yanked back mid-session. Desktop gets
+    // this for free since WeekGrid/DayGrid are separate components that
+    // remount on every view switch; here it's the same view, so the
+    // effect is keyed on `view` instead of running once on mount.
+    if (view !== "month" && scrollRef.current) {
+      scrollRef.current.scrollTop = HEADER_HEIGHT + DEFAULT_SCROLL_HOUR * HOUR_HEIGHT;
+    }
+  }, [view]);
 
   useEffect(() => {
     fetchRange();
@@ -247,7 +262,7 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
           </div>
         </div>
       ) : (
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollRef} className="flex-1 overflow-auto">
         <div className="flex" style={{ minWidth: HOUR_COLUMN_WIDTH + days.length * 110 }}>
           <div style={{ width: HOUR_COLUMN_WIDTH }} className="shrink-0">
             <div style={{ height: HEADER_HEIGHT }} />
@@ -303,31 +318,30 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
                       >
                         <div
                           onClick={() => setEditingMeeting(meeting)}
-                          className="h-full rounded border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 px-1.5 py-1 overflow-hidden group cursor-pointer"
+                          className="relative h-full rounded border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 px-1.5 py-1 overflow-hidden group cursor-pointer"
                         >
-                          <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 truncate">{meeting.title}</p>
-                          <div className="flex items-center gap-1">
-                            {meeting.caseId && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/app/cases/${meeting.caseId}`);
-                                }}
-                                className="rounded-full border border-gray-400 bg-gray-300 hover:bg-gray-400 px-1.5 py-0.5 text-[9px] text-black"
-                              >
-                                Go to case
-                              </button>
-                            )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(meeting.id);
+                            }}
+                            title="Delete meeting"
+                            className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-200 text-rose-800 opacity-0 shadow-sm transition-opacity hover:bg-rose-300 group-hover:opacity-100 dark:bg-rose-800 dark:text-rose-100 dark:hover:bg-rose-700"
+                          >
+                            <X className="h-3 w-3" strokeWidth={2.5} />
+                          </button>
+                          <p className="pr-4 text-[11px] font-semibold text-rose-700 dark:text-rose-300 truncate">{meeting.title}</p>
+                          {meeting.caseId && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDelete(meeting.id);
+                                router.push(`/app/cases/${meeting.caseId}`);
                               }}
-                              className="text-[9px] text-rose-600/60 hover:text-rose-600 opacity-0 group-hover:opacity-100"
+                              className="rounded-full border border-gray-400 bg-gray-300 hover:bg-gray-400 px-1.5 py-0.5 text-[9px] text-black"
                             >
-                              ✕
+                              Go to case
                             </button>
-                          </div>
+                          )}
                         </div>
                       </div>
                     );
