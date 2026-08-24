@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@workspace/ui": "workspace:*",
     "@fontsource-variable/assistant": "^5.3.0",
     "@fontsource-variable/frank-ruhl-libre": "^5.3.0",
     "@fontsource-variable/heebo": "^5.3.0",

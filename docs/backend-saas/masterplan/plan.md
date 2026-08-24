@@ -3,16 +3,26 @@
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
 **Status:** Design-doc stack (PR-0 through PR-7, #196-#203) merged to
-`master` 2026-08-22. **Phase 1 implementation has started**:
-[#204](https://github.com/tsemach/doron-desktop/pull/204) adds the actual
-`packages/backend-orm/src/schema.ts` tables + Drizzle migration + the
-`lib/cases/crud.ts` read-visibility substrate, against
-[PR-1's design](../phase-1-data-foundation/design.md). Verified: `tsc
---noEmit` clean, full backend test suite (140 tests) passes, production
-build succeeds. Two corrections applied against the design doc's
-illustrative code during implementation (enum style, a table-naming
-collision avoided) — see #204's description for detail. Phases 2-7 are
-still design-only; no implementation started for them yet.
+`master` 2026-08-22. **Implementation has started, as its own stack**
+(same top-down-merge convention as the design stack — corrected
+2026-08-22 after initially, incorrectly, branching Phase 2's
+implementation off `master` directly instead of off Phase 1's):
+- Impl-1 (Phase 1): [#204](https://github.com/tsemach/doron-desktop/pull/204),
+  branch `tsemachmizrachi/asc-181-phase-1-schema-implementation`, based on
+  `master` — schema + migration + `lib/cases/crud.ts`'s read-visibility
+  substrate.
+- Impl-2 (Phase 2): [#205](https://github.com/tsemach/doron-desktop/pull/205),
+  branch `tsemachmizrachi/asc-182-phase-2-shared-ui-implementation`,
+  **stacked on Impl-1's branch** (base retargeted from `master`) —
+  desktop-as-consumer spike, theme token fix, Button canonicalization.
+  Found and fixed a real gap not in the original design: desktop's
+  `globals.css` was missing an `@source` directive, so Button's Tailwind
+  classes were silently absent from the compiled CSS despite its JS
+  bundling fine.
+
+Both verified: clean typechecks, passing test suites, successful
+production builds (individually and via the root turbo pipeline). Neither
+merged yet. Phases 3-7 are still design-only.
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
