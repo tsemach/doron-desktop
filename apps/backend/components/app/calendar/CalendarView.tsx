@@ -251,11 +251,29 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
         <div className="flex" style={{ minWidth: HOUR_COLUMN_WIDTH + days.length * 110 }}>
           <div style={{ width: HOUR_COLUMN_WIDTH }} className="shrink-0">
             <div style={{ height: HEADER_HEIGHT }} />
-            {HOURS.map((h) => (
-              <div key={h} style={{ height: HOUR_HEIGHT }} className="text-[10px] text-muted-foreground text-right pr-1 -mt-2">
-                {String(h).padStart(2, "0")}:00
-              </div>
-            ))}
+            {/* Absolutely positioned at top: h * HOUR_HEIGHT, matching the
+                hour gridlines and meeting blocks in each day column below
+                exactly -- previously each label was a normal-flow block
+                with a negative margin-top nudging it up onto its gridline;
+                that margin reduced every row's effective flow height by
+                the same amount, so the drift compounded across all 24
+                stacked labels (~8px/row here) until, by evening hours, the
+                labels no longer lined up with their real gridlines at all
+                -- what looked like "16:30 rendering at 20:00" was this
+                drift, not a timezone bug (the block's own top: px was
+                already correct). Absolute positioning can't drift like
+                that: each label's position is computed independently. */}
+            <div style={{ height: HOUR_HEIGHT * 24 }} className="relative">
+              {HOURS.map((h) => (
+                <div
+                  key={h}
+                  style={{ top: h * HOUR_HEIGHT }}
+                  className="absolute inset-x-0 -translate-y-1/2 text-[10px] text-muted-foreground text-right pr-1"
+                >
+                  {String(h).padStart(2, "0")}:00
+                </div>
+              ))}
+            </div>
           </div>
           {days.map((day, i) => {
             const isToday = day.toDateString() === new Date().toDateString();
