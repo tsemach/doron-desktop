@@ -1,7 +1,7 @@
 use clap::Args;
 use std::path::{Path, PathBuf};
 
-use crate::provider::resolve_eval_provider;
+use tauri_app_lib::llm::llm_provider::{get_active_provider, ProviderConfig};
 
 use super::dataset::{load_fixtures, print_report, run_fixture_suite, summarize, EmailEvalFixture};
 
@@ -117,28 +117,20 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         );
     }
 
-    // There is no local AI anymore, and (unlike document eval's indexing/
-    // query-analysis) email classification has no heuristic-only fallback
-    // to run instead -- run_fixture_suite's classification step always
-    // needs a real LLM call. Fail clearly rather than silently resolving
-    // to a provider that was never invoked or a dead llama-server sidecar.
-    if !args.inject_only && args.provider.to_lowercase() == "local" {
-        return Err(
-            "provider=local is no longer supported for email eval (there is no local AI anymore). Use --provider online (reuses the desktop app's signed-in session) or --inject-only for a no-LLM run."
-                .to_string(),
-        );
-    }
-
-    let provider = if args.inject_only {
-        resolve_eval_provider("mock", &args.model, None, "email_classification")?
-    } else {
-        resolve_eval_provider(
-            &args.provider,
-            &args.model,
-            args.api_key.clone(),
-            "email_classification",
-        )?
-    };
+    let provider = get_active_provider(ProviderConfig {
+        provider_type: if args.inject_only {
+            "mock".to_string()
+        } else {
+            args.provider.clone()
+        },
+        api_key: args.api_key.unwrap_or_default(),
+        model: args.model.clone(),
+        base_url: if args.inject_only {
+            None
+        } else {
+            Some(args.base_url.clone())
+        },
+    });
 
     let outcomes = run_fixture_suite(&provider, &fixtures, args.inject_only).await?;
     let summary = summarize(&fixtures, &outcomes);

@@ -1,6 +1,5 @@
 mod document;
 mod email;
-mod provider;
 mod sidecar;
 
 use clap::Parser;
