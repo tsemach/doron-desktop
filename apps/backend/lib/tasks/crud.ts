@@ -119,11 +119,32 @@ export interface ImportantTask {
   urgency: TaskUrgency;
 }
 
-function computeUrgency(dueDate: Date, now: Date): TaskUrgency {
-  if (dueDate < now) return "overdue";
+// Same-calendar-day is checked BEFORE the overdue comparison, not after --
+// found during Phase 7's audit: tasks are created via a date-only <input
+// type="date">, parsed as UTC midnight of that day (CaseTasksPanel.tsx).
+// Checking "dueDate < now" first would have called almost every same-day
+// task "overdue" for the rest of the day, swallowing the due-today bucket
+// entirely.
+//
+// Uses getUTC*() (not local getFullYear()/getMonth()/getDate()) --
+// verified necessary, not assumed: this repo's own test/deploy
+// environment runs in Asia/Jerusalem (UTC+3), and a first version using
+// local-timezone day comparison actually failed its own test (a
+// same-UTC-day pair straddled a local midnight and landed on different
+// local calendar days). Comparing in UTC matches how dueDate was parsed
+// in the first place, removing the mismatch instead of working around it
+// in test data. Still imperfect for a *user* not in UTC (a task "due
+// today" in their local timezone might disagree with UTC's calendar day
+// near their own midnight) -- that's the deeper, still-open nuance
+// Calendar's own design doc already flagged; this fix only guarantees
+// server-side consistency, not user-local correctness.
+export function computeUrgency(dueDate: Date, now: Date): TaskUrgency {
   const sameDay =
-    dueDate.getFullYear() === now.getFullYear() && dueDate.getMonth() === now.getMonth() && dueDate.getDate() === now.getDate();
-  return sameDay ? "due-today" : "upcoming";
+    dueDate.getUTCFullYear() === now.getUTCFullYear() &&
+    dueDate.getUTCMonth() === now.getUTCMonth() &&
+    dueDate.getUTCDate() === now.getUTCDate();
+  if (sameDay) return "due-today";
+  return dueDate < now ? "overdue" : "upcoming";
 }
 
 // Backs Home's ImportantTasksCard -- a glance/read-only surface (Phase 3's

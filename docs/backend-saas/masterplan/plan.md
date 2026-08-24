@@ -2,35 +2,57 @@
 
 **Linear issue:** [ASC-179](https://linear.app/amicusx/issue/ASC-179/add-fully-backend-support-saas) — "Add fully backend support (SaaS)"
 **Date:** 2026-08-22
-**Status:** Design-doc stack (PR-0 through PR-7, #196-#203) merged to
-`master` 2026-08-22. **Implementation has started, as its own stack**
-(same top-down-merge convention as the design stack — corrected
-2026-08-22 after initially, incorrectly, branching Phase 2's
-implementation off `master` directly instead of off Phase 1's):
-- Impl-1 (Phase 1): [#204](https://github.com/tsemach/doron-desktop/pull/204),
-  branch `tsemachmizrachi/asc-181-phase-1-schema-implementation`, based on
-  `master` — schema + migration + `lib/cases/crud.ts`'s read-visibility
-  substrate.
-- Impl-2 (Phase 2): [#205](https://github.com/tsemach/doron-desktop/pull/205),
-  branch `tsemachmizrachi/asc-182-phase-2-shared-ui-implementation`,
-  **stacked on Impl-1's branch** — desktop-as-consumer spike, theme token
-  fix, Button canonicalization. Found and fixed a real gap not in the
-  original design: desktop's `globals.css` was missing an `@source`
-  directive, so Button's Tailwind classes were silently absent from the
-  compiled CSS despite its JS bundling fine.
-- Impl-3 (Phase 3, part 1 of several): [#206](https://github.com/tsemach/doron-desktop/pull/206),
-  branch `tsemachmizrachi/asc-183-phase-3-cases-implementation`,
-  **stacked on Impl-2's branch** — Cases CRUD (backend + pages) and the
-  nav update only. Phase 3's full scope (Tasks tab, Templates, Calendar)
-  is deliberately split into further stacked PRs, matching how ASC-91
-  split into 9 PRs rather than one giant one. Resolved the mutation-
-  permission question Phase 1 left open: visibility grants edit rights,
-  delete is owner-only, matching `contacts`' precedent.
+**Status (2026-08-22): full implementation stack complete, 10 PRs, none
+merged yet.** Design-doc stack (PR-0 through PR-7, #196-#203) merged to
+`master` earlier the same day; every phase's implementation then built as
+its own further stack on top, same top-down-merge convention (corrected
+after initially, incorrectly, branching Phase 2's implementation off
+`master` directly instead of off Phase 1's — see git history for that
+fix). Each PR's base is its stack predecessor:
 
-All three verified: clean typechecks, passing test suites (backend's 140
-still pass), successful production builds. None merged yet. Phase 3's
-remaining pieces (Tasks tab, Templates, Calendar) and Phases 4-7 are still
-unimplemented (design-only or not-yet-started).
+| Impl PR | Phase | Branch | Base |
+|---|---|---|---|
+| [#204](https://github.com/tsemach/doron-desktop/pull/204) | 1 — schema | `tsemachmizrachi/asc-181-phase-1-schema-implementation` | `master` |
+| [#205](https://github.com/tsemach/doron-desktop/pull/205) | 2 — shared UI | `tsemachmizrachi/asc-182-phase-2-shared-ui-implementation` | #204 |
+| [#206](https://github.com/tsemach/doron-desktop/pull/206) | 3 (1/4) — Cases | `tsemachmizrachi/asc-183-phase-3-cases-implementation` | #205 |
+| [#207](https://github.com/tsemach/doron-desktop/pull/207) | 3 (2/4) — Tasks | `tsemachmizrachi/asc-183-phase-3-tasks-implementation` | #206 |
+| [#208](https://github.com/tsemach/doron-desktop/pull/208) | 3 (3/4) — Templates | `tsemachmizrachi/asc-183-phase-3-templates-implementation` | #207 |
+| [#209](https://github.com/tsemach/doron-desktop/pull/209) | 3 (4/4) — Calendar | `tsemachmizrachi/asc-183-phase-3-calendar-implementation` | #208 |
+| [#210](https://github.com/tsemach/doron-desktop/pull/210) | 4 — local documents | `tsemachmizrachi/asc-184-phase-4-implementation` | #209 |
+| [#211](https://github.com/tsemach/doron-desktop/pull/211) | 5 — search & indexing | `tsemachmizrachi/asc-185-phase-5-implementation` | #210 |
+| [#212](https://github.com/tsemach/doron-desktop/pull/212) | 6 — email schema/matching | `tsemachmizrachi/asc-186-phase-6-implementation` | #211 |
+| [#213](https://github.com/tsemach/doron-desktop/pull/213) | 7 — hardening pass | `tsemachmizrachi/asc-187-phase-7-implementation` | #212 |
+
+Phase 3 was split into 4 PRs rather than one, matching how ASC-91 split
+into 9 — each part independently verified rather than one large diff.
+
+**Deliberate, explicitly-flagged scope cuts** (not silent gaps): Calendar
+(#209) and email ingestion (#212) both stop short of real OAuth
+connect/callback flows and (for email) the Vercel Cron polling loop —
+both need real Google/Microsoft OAuth app credentials to build and verify
+against, unavailable in this environment. Calendar ships local,
+manually-created meetings; email ships schema + the case-matching/
+classification logic only, with zero OAuth code (not even structurally —
+unlike Calendar, email has no meaningful local-only fallback). Phase 4's
+browser-API work (File System Access API) and Phase 5's AI Gateway calls
+are structurally complete and typecheck/build cleanly, but their runtime
+behavior (real picker dialogs, real embedding calls) can't be exercised
+headlessly either — flagged per-PR, not implied to be fully tested.
+
+**Every PR verified**: clean `tsc --noEmit`, full backend test suite
+passing (grew from 140 to 155 tests across the stack — new tests for
+Phase 6's case-matching and Phase 7's task-urgency bucketing), successful
+production build. **Two real bugs found and fixed along the way**, not
+part of any checklist: `matchCaseByPhrase` used JS `&&` instead of
+Drizzle's `and()`, silently dropping a soft-delete filter (Phase 6); and
+`computeUrgency`'s day-boundary comparison used local-timezone getters,
+which failed its own test on this environment's `Asia/Jerusalem` server
+timezone and was re-fixed to compare in UTC (Phase 7) — see
+[`phase-7-tenancy-hardening/findings.md`](../phase-7-tenancy-hardening/findings.md)
+for the full audit.
+
+Nothing in this stack is merged yet — that's the natural next step,
+top-down per the process rules below, once reviewed.
 
 This document is a **decomposition**, not a design — it records the scope, order,
 and dependency graph of the sub-projects ASC-179 breaks into, and the
