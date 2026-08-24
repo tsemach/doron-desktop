@@ -6,22 +6,26 @@ import Link from "next/link";
 import { Button } from "@workspace/ui";
 import { useLanguage } from "../../../context/LanguageContext";
 import type { CaseRow } from "../../../lib/cases/crud";
+import type { TaskRow } from "../../../lib/tasks/crud";
+import CaseTasksPanel from "./CaseTasksPanel";
 
-// Overview only for now -- Tasks/Meetings/Documents tabs (per
-// docs/backend-saas/phase-3-core-pages/design.md's case-detail tab set)
-// are follow-up implementation PRs, each needing their own CRUD backend
-// that doesn't exist yet.
+// Meetings/Documents tabs (per docs/backend-saas/phase-3-core-pages/
+// design.md's case-detail tab set) are still follow-up implementation
+// PRs, each needing their own CRUD backend that doesn't exist yet.
 
 const STATUS_OPTIONS = ["open", "waiting", "closed"];
+type Tab = "overview" | "tasks";
 
 type CaseDetailClientProps = {
   initialCase: CaseRow;
   isOwner: boolean;
+  initialTasks: TaskRow[];
 };
 
-export default function CaseDetailClient({ initialCase, isOwner }: CaseDetailClientProps) {
+export default function CaseDetailClient({ initialCase, isOwner, initialTasks }: CaseDetailClientProps) {
   const { t } = useLanguage();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [caseRow, setCaseRow] = useState(initialCase);
   const [name, setName] = useState(initialCase.name);
   const [subject, setSubject] = useState(initialCase.subject ?? "");
@@ -72,53 +76,73 @@ export default function CaseDetailClient({ initialCase, isOwner }: CaseDetailCli
         {t("cases_back_to_list")}
       </Link>
 
-      <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">{t("cases_name_placeholder")}</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">{t("cases_subject_placeholder")}</label>
-          <input
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">{t("cases_status_label")}</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm capitalize"
+      <div className="mt-4 flex gap-1 border-b border-border">
+        {(["overview", "tasks"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
+              activeTab === tab ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
           >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        <div className="flex items-center justify-between pt-2">
-          <Button onClick={handleSave} disabled={saving}>
-            {t("cases_save_button")}
-          </Button>
-          {isOwner && (
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {t("cases_delete_button")}
-            </Button>
-          )}
-        </div>
+            {t(tab === "overview" ? "cases_tab_overview" : "cases_tab_tasks")}
+          </button>
+        ))}
       </div>
 
-      <p className="mt-4 text-xs text-muted-foreground">{t("cases_tabs_coming_soon")}</p>
+      {activeTab === "overview" ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">{t("cases_name_placeholder")}</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">{t("cases_subject_placeholder")}</label>
+            <input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">{t("cases_status_label")}</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="mt-1 w-full h-8 rounded-md border border-border bg-background px-2.5 text-sm capitalize"
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <div className="flex items-center justify-between pt-2">
+            <Button onClick={handleSave} disabled={saving}>
+              {t("cases_save_button")}
+            </Button>
+            {isOwner && (
+              <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                {t("cases_delete_button")}
+              </Button>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground pt-1">{t("cases_tabs_coming_soon")}</p>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-border bg-card p-5">
+          <CaseTasksPanel caseId={caseRow.id} initialTasks={initialTasks} />
+        </div>
+      )}
     </div>
   );
 }
