@@ -45,7 +45,12 @@ export default function CasesListClient({ initialCases }: CasesListClientProps) 
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <h1 className="text-xl font-bold text-foreground mb-6">{t("nav_cases")}</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-foreground">{t("nav_cases")}</h1>
+        <Link href="/app/cases/templates" className="text-sm text-muted-foreground hover:text-foreground">
+          {t("templates_title")}
+        </Link>
+      </div>
 
       <form onSubmit={handleCreate} className="flex flex-col gap-2 mb-8 rounded-lg border border-border bg-card p-4">
         <div className="flex gap-2">
