@@ -116,6 +116,46 @@ async function getVisibleMeetingById(actor: Actor, id: string): Promise<MeetingR
   return row;
 }
 
+export interface UpdateMeetingFields {
+  title?: string;
+  location?: string;
+  startTime?: string; // ISO datetime
+  endTime?: string; // ISO datetime
+  caseId?: string | null;
+}
+
+export type UpdateMeetingResult = { meeting: MeetingRow } | { error: string; status: number };
+
+// Backs the edit dialog opened by clicking an existing meeting -- only
+// the fields the client actually sends are touched, everything else on
+// the row is left as-is.
+export async function updateMeeting(actor: Actor, id: string, fields: UpdateMeetingFields): Promise<UpdateMeetingResult> {
+  const existing = await getVisibleMeetingById(actor, id);
+  if (!existing) {
+    return { error: "Not found", status: 404 };
+  }
+  if (fields.caseId) {
+    const visibleCase = await getVisibleCaseById(actor, fields.caseId);
+    if (!visibleCase) {
+      return { error: "Case not found", status: 404 };
+    }
+  }
+
+  const updates: Partial<typeof meetings.$inferInsert> = { updatedAt: new Date() };
+  if (fields.title !== undefined) {
+    const title = fields.title.trim();
+    if (!title) return { error: "Title is required", status: 400 };
+    updates.title = title;
+  }
+  if (fields.location !== undefined) updates.location = fields.location.trim() || null;
+  if (fields.startTime !== undefined) updates.startTime = new Date(fields.startTime);
+  if (fields.endTime !== undefined) updates.endTime = new Date(fields.endTime);
+  if (fields.caseId !== undefined) updates.caseId = fields.caseId || null;
+
+  const [row] = await db.update(meetings).set(updates).where(eq(meetings.id, id)).returning();
+  return { meeting: row };
+}
+
 export type DeleteMeetingResult = { success: true } | { error: string; status: number };
 
 export async function deleteMeeting(actor: Actor, id: string): Promise<DeleteMeetingResult> {
