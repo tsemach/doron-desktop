@@ -501,6 +501,13 @@ export const documents = pgTable("documents", {
   caseId: uuid("case_id").references(() => cases.id, { onDelete: "cascade" }),
   fileName: text("file_name").notNull(),
   relativePath: text("relative_path").notNull(),
+  // The picked directory's own name (e.g. "tmp"), from the global Scan &
+  // Index page's folder scan -- not persisted for a case's Documents tab
+  // scan or for a single picked file, both of which have no connected
+  // directory root. Combined with relativePath for a fuller (still not
+  // absolute -- the File System Access API never exposes one) path shown
+  // in Smart Search results.
+  rootFolderName: text("root_folder_name"),
   addedByUserId: text("added_by_user_id")
     .notNull()
     .references(() => users.id), // visibility anchor when caseId is null; provenance only otherwise

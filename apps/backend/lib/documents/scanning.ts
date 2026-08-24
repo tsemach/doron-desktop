@@ -97,7 +97,11 @@ export type GlobalScanEvent =
 export async function* processGlobalScan(
   files: { relativePath: string; fileHandle: FileSystemFileHandle }[],
   existingByPath: Map<string, string>,
-  force: boolean
+  force: boolean,
+  // The picked directory's own name -- applied to every file from this
+  // scan, so Smart Search can later show more than just relativePath.
+  // Undefined for "Index Single Document" (no connected root to name).
+  rootFolderName?: string
 ): AsyncGenerator<GlobalScanEvent> {
   for (const { relativePath, fileHandle } of files) {
     const fileName = relativePath.split("/").pop() ?? relativePath;
@@ -113,7 +117,7 @@ export async function* processGlobalScan(
       const res = await fetch("/api/v1/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName, relativePath }),
+        body: JSON.stringify({ fileName, relativePath, rootFolderName }),
       });
       if (!res.ok) {
         yield { type: "failed", relativePath, fileName };

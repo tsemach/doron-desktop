@@ -7,10 +7,18 @@ import { embedText } from "../ai/embed";
 export interface SearchResult {
   documentId: string;
   fileName: string;
+  relativePath: string;
+  // The Scan & Index page's picked directory name, when the document
+  // came from a folder scan -- null for a case-scoped document, a single
+  // picked file, or anything indexed before this column existed.
+  rootFolderName: string | null;
   caseId: string | null;
   caseName: string | null;
   chunkText: string;
   rank: number;
+  // 0-1 cosine similarity, shown as a "Match: X%" badge -- null on the
+  // FTS-only fallback path (no query embedding, so nothing to compare).
+  similarity: number | null;
 }
 
 function visibilityCondition(visibleUserIds: string[]): SQL {
@@ -27,10 +35,12 @@ function visibilityCondition(visibleUserIds: string[]): SQL {
 async function searchByFtsOnly(visibleUserIds: string[], tsQuery: SQL, limit: number): Promise<SearchResult[]> {
   const rank = sql<number>`ts_rank(to_tsvector('english', ${documentChunks.text}), ${tsQuery})`;
 
-  return db
+  const rows = await db
     .select({
       documentId: documents.id,
       fileName: documents.fileName,
+      relativePath: documents.relativePath,
+      rootFolderName: documents.rootFolderName,
       caseId: cases.id,
       caseName: cases.name,
       chunkText: documentChunks.text,
@@ -42,6 +52,8 @@ async function searchByFtsOnly(visibleUserIds: string[], tsQuery: SQL, limit: nu
     .where(and(visibilityCondition(visibleUserIds), sql`to_tsvector('english', ${documentChunks.text}) @@ ${tsQuery}`))
     .orderBy(desc(rank))
     .limit(limit);
+
+  return rows.map((row) => ({ ...row, similarity: null }));
 }
 
 // A cosine-similarity floor below which a vector-only match (no FTS
@@ -88,10 +100,13 @@ export async function searchDocuments(actor: Actor, query: string, tier: "free" 
     .select({
       documentId: documents.id,
       fileName: documents.fileName,
+      relativePath: documents.relativePath,
+      rootFolderName: documents.rootFolderName,
       caseId: cases.id,
       caseName: cases.name,
       chunkText: documentChunks.text,
       rank: combined,
+      similarity,
     })
     .from(documentChunks)
     .innerJoin(documents, eq(documents.id, documentChunks.documentId))

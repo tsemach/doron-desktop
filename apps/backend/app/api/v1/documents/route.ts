@@ -21,12 +21,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: authorization.error }, { status: authorization.status });
   }
 
-  const body = (await request.json().catch(() => null)) as { fileName?: string; relativePath?: string } | null;
+  const body = (await request.json().catch(() => null)) as { fileName?: string; relativePath?: string; rootFolderName?: string } | null;
   if (!body?.fileName || !body.relativePath) {
     return NextResponse.json({ error: "fileName and relativePath are required" }, { status: 400 });
   }
 
-  const result = await registerGlobalDocument(authorization.actor, { fileName: body.fileName, relativePath: body.relativePath });
+  const result = await registerGlobalDocument(authorization.actor, {
+    fileName: body.fileName,
+    relativePath: body.relativePath,
+    rootFolderName: body.rootFolderName,
+  });
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

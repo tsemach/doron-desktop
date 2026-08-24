@@ -69,6 +69,10 @@ export async function listVisibleGlobalDocuments(actor: Actor): Promise<Document
 export interface RegisterGlobalDocumentFields {
   fileName: string;
   relativePath: string;
+  // The picked directory's own name, from a folder scan -- undefined for
+  // a single picked file (no connected root to name). See the
+  // rootFolderName column comment in packages/backend-orm/src/schema.ts.
+  rootFolderName?: string;
 }
 
 export type RegisterGlobalDocumentResult = { document: DocumentRow } | { error: string; status: number };
@@ -82,10 +86,11 @@ export async function registerGlobalDocument(actor: Actor, fields: RegisterGloba
   if (!fileName || !relativePath) {
     return { error: "fileName and relativePath are required", status: 400 };
   }
+  const rootFolderName = fields.rootFolderName?.trim() || null;
 
   const [row] = await db
     .insert(documents)
-    .values({ caseId: null, fileName, relativePath, addedByUserId: actor.id })
+    .values({ caseId: null, fileName, relativePath, rootFolderName, addedByUserId: actor.id })
     .returning();
 
   return { document: row };

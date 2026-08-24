@@ -111,7 +111,7 @@ export default function ScanIndexClient() {
     }
 
     let processed = startFrom;
-    for await (const event of processGlobalScan(collected.slice(startFrom), existingByPath, force)) {
+    for await (const event of processGlobalScan(collected.slice(startFrom), existingByPath, force, dirHandle.name)) {
       if (stopRef.current) break;
       setCurrentFileName(displayName(event));
       processed += 1;

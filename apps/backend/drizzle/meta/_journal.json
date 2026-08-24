@@ -85,6 +85,13 @@
       "when": 1787435082918,
       "tag": "0011_slow_lifeguard",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787570618756,
+      "tag": "0012_lucky_whirlwind",
+      "breakpoints": true
     }
   ]
 }

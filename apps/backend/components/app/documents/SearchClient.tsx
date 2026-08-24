@@ -2,12 +2,108 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Check, Copy, Search } from "lucide-react";
 import { Button } from "@workspace/ui";
 import type { SearchResult } from "../../../lib/search/crud";
 import { ensureReadPermission, getFileHandle } from "../../../lib/documents/localHandles";
+import FileTypeIcon from "./FileTypeIcon";
+
+// rootFolderName is only set for documents from a Scan & Index folder
+// scan (see the column comment in packages/backend-orm/src/schema.ts);
+// still not a true absolute path -- the browser never exposes anything
+// above the picked folder -- but fuller context than relativePath alone.
+function fullPath(result: SearchResult): string {
+  return result.rootFolderName ? `${result.rootFolderName}/${result.relativePath}` : result.relativePath;
+}
 
 const POPULAR_SEARCHES = ["contract terms", "settlement agreement", "NDA", "invoice"];
+
+// Extensions a browser tab can actually render on its own (pdf inline,
+// txt as plain text) -- window.open gives a real "view" experience for
+// these. Everything else (docx/doc/xlsx/xls/csv) a browser can't
+// display, so window.open on a blob URL just triggers a download with a
+// blob-derived name; a real <a download> with the true file name is a
+// better result for the same outcome.
+const BROWSER_VIEWABLE_EXTENSIONS = new Set(["pdf", "txt"]);
+
+function fileExtension(fileName: string): string {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function confidenceClass(pct: number): string {
+  if (pct >= 85) return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50";
+  if (pct >= 70) return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50";
+  return "bg-muted text-muted-foreground border-border";
+}
+
+function MatchBadge({ similarity }: { similarity: number | null }) {
+  if (similarity === null) return null;
+  const pct = Math.round(similarity * 100);
+  return (
+    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${confidenceClass(pct)}`}>
+      Match: {pct}%
+    </span>
+  );
+}
+
+// The card body it sits in is itself a Link or a button (open the file /
+// go to the case) -- stopPropagation+preventDefault so clicking the icon
+// copies the path instead of triggering that outer action.
+function CopyPathButton({ path }: { path: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard access denied/unavailable -- silently no-op, nothing
+      // else useful to do from here.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      title="Copy full path"
+      className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+// Shared by both result branches below. `titleElement` is the
+// clickable filename (a Link for a case result, a button for a caseless
+// one) -- kept as a sibling of CopyPathButton, not an ancestor, since
+// nesting a button/Link inside another interactive element is invalid
+// HTML (the whole card used to be the Link/button; that's why the copy
+// icon couldn't just be dropped in before). Mirrors desktop's
+// DocumentResultItem: icon, name + match badge, full path, content
+// preview. No doc-type/language badges or entity chips -- those come
+// from a metadata-extraction pass the backend doesn't have.
+function ResultCardBody({ result, caseName, titleElement }: { result: SearchResult; caseName?: string | null; titleElement: React.ReactNode }) {
+  return (
+    <>
+      <FileTypeIcon ext={fileExtension(result.fileName)} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {titleElement}
+            <CopyPathButton path={fullPath(result)} />
+          </div>
+          <MatchBadge similarity={result.similarity} />
+        </div>
+        <p className="text-xs text-muted-foreground truncate">{caseName ?? fullPath(result)}</p>
+        <p className="mt-2 rounded-md bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground line-clamp-2">{result.chunkText}</p>
+      </div>
+    </>
+  );
+}
 
 // Matches desktop's SmartSearch page: SearchBar panel + idle/results state.
 export default function SearchClient({ initialQuery }: { initialQuery?: string }) {
@@ -17,7 +113,13 @@ export default function SearchClient({ initialQuery }: { initialQuery?: string }
   const [searching, setSearching] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
 
-  async function handleOpenCaselessResult(documentId: string) {
+  // A browser page can't launch the OS's default app for a file the way
+  // desktop's invoke("open_path") does -- that's a native OS call only a
+  // real backend process can make, not something JS running in a page is
+  // ever allowed to do. This is the closest a browser gets: a type it can
+  // render (pdf/txt) opens in a new tab; everything else downloads under
+  // its real name, for the user to open from Downloads themselves.
+  async function handleOpenCaselessResult(documentId: string, fileName: string) {
     setOpenError(null);
     const fileHandle = await getFileHandle(documentId).catch(() => undefined);
     if (!fileHandle || !(await ensureReadPermission(fileHandle).catch(() => false))) {
@@ -26,7 +128,16 @@ export default function SearchClient({ initialQuery }: { initialQuery?: string }
     }
     try {
       const file = await fileHandle.getFile();
-      window.open(URL.createObjectURL(file), "_blank");
+      const url = URL.createObjectURL(file);
+      if (BROWSER_VIEWABLE_EXTENSIONS.has(fileExtension(fileName))) {
+        window.open(url, "_blank");
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch {
       setOpenError("Couldn't open the file — it may have moved or been renamed.");
     }
@@ -111,31 +222,35 @@ export default function SearchClient({ initialQuery }: { initialQuery?: string }
       ) : (
         <>
           {openError && <p className="text-center text-sm text-destructive">{openError}</p>}
-          <ul className="flex flex-col gap-2">
-            {results.map((r, i) =>
-              r.caseId ? (
-                <li key={`${r.documentId}-${i}`}>
-                  <Link
-                    href={`/app/cases/${r.caseId}`}
-                    className="block rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted transition-colors"
-                  >
-                    <p className="text-sm font-medium text-foreground">{r.fileName}</p>
-                    <p className="text-xs text-muted-foreground mb-1">{r.caseName}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{r.chunkText}</p>
-                  </Link>
-                </li>
-              ) : (
-                <li key={`${r.documentId}-${i}`}>
-                  <button
-                    onClick={() => handleOpenCaselessResult(r.documentId)}
-                    className="block w-full text-left rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted transition-colors"
-                  >
-                    <p className="text-sm font-medium text-foreground">{r.fileName}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{r.chunkText}</p>
-                  </button>
-                </li>
-              )
-            )}
+          <ul className="flex flex-col gap-3">
+            {results.map((r, i) => (
+              <li key={`${r.documentId}-${i}`} className="flex gap-3 rounded-xl border border-border bg-card p-4">
+                {r.caseId ? (
+                  <ResultCardBody
+                    result={r}
+                    caseName={r.caseName}
+                    titleElement={
+                      <Link href={`/app/cases/${r.caseId}`} className="min-w-0 flex-1 text-sm font-semibold text-foreground truncate hover:underline">
+                        {r.fileName}
+                      </Link>
+                    }
+                  />
+                ) : (
+                  <ResultCardBody
+                    result={r}
+                    titleElement={
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCaselessResult(r.documentId, r.fileName)}
+                        className="min-w-0 flex-1 text-left text-sm font-semibold text-foreground truncate hover:underline"
+                      >
+                        {r.fileName}
+                      </button>
+                    }
+                  />
+                )}
+              </li>
+            ))}
           </ul>
         </>
       )}
