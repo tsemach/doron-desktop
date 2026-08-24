@@ -205,8 +205,8 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
       </div>
 
       {view === "month" ? (
-        <div className="flex-1 overflow-auto p-3">
-          <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden border border-border">
+        <div className="flex-1 flex flex-col overflow-hidden p-3">
+          <div className="grid grid-cols-7 gap-px bg-border rounded-t-md overflow-hidden border border-b-0 border-border shrink-0">
             {days.slice(0, 7).map((day) => (
               <div
                 key={day.toLocaleDateString(undefined, { weekday: "short" })}
@@ -215,13 +215,18 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
                 {day.toLocaleDateString(undefined, { weekday: "short" })}
               </div>
             ))}
+          </div>
+          <div
+            className="flex-1 grid grid-cols-7 gap-px bg-border rounded-b-md overflow-hidden border border-t-0 border-border"
+            style={{ gridTemplateRows: `repeat(${days.length / 7}, 1fr)` }}
+          >
             {days.map((day) => {
               const isToday = day.toDateString() === new Date().toDateString();
               const inMonth = day.getMonth() === anchor.getMonth();
               const dayMeetings = meetingsOnDay(day);
               const overflow = dayMeetings.length - MAX_VISIBLE_PER_DAY;
               return (
-                <div key={day.toISOString()} className={`bg-background min-h-24 p-1.5 space-y-1 ${inMonth ? "" : "opacity-40"}`}>
+                <div key={day.toISOString()} className={`bg-background h-full overflow-hidden p-1.5 space-y-1 ${inMonth ? "" : "opacity-40"}`}>
                   <p className={`text-[11px] font-semibold ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day.getDate()}</p>
                   {dayMeetings.slice(0, MAX_VISIBLE_PER_DAY).map((meeting) => (
                     <button
