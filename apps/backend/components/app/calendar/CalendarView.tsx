@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@workspace/ui";
 import type { MeetingRow } from "../../../lib/calendar/crud";
-import NewMeetingDialog from "./NewMeetingDialog";
+import MeetingDialog from "./MeetingDialog";
 
 const HOUR_HEIGHT = 48; // px per hour, matches desktop's TimeGrid
 const HOUR_COLUMN_WIDTH = 56; // px, time-labels gutter
@@ -114,6 +114,7 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
   const [meetings, setMeetings] = useState(initialMeetings);
   const [loading, setLoading] = useState(false);
   const [newMeetingOpen, setNewMeetingOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState<MeetingRow | null>(null);
 
   const { start, end } = useMemo(() => rangeForView(anchor, view), [anchor, view]);
   const days = useMemo(() => {
@@ -232,7 +233,7 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
                     <button
                       key={meeting.id}
                       type="button"
-                      onClick={() => meeting.caseId && router.push(`/app/cases/${meeting.caseId}`)}
+                      onClick={() => setEditingMeeting(meeting)}
                       className="w-full text-left rounded bg-rose-100 dark:bg-rose-950/40 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:text-rose-300 truncate"
                       title={meeting.title}
                     >
@@ -282,7 +283,10 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
                         style={{ top, height, left: `${column * widthPct}%`, width: `${widthPct}%` }}
                         className="absolute px-0.5"
                       >
-                        <div className="h-full rounded border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 px-1.5 py-1 overflow-hidden group">
+                        <div
+                          onClick={() => setEditingMeeting(meeting)}
+                          className="h-full rounded border border-rose-200/60 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 px-1.5 py-1 overflow-hidden group cursor-pointer"
+                        >
                           <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 truncate">{meeting.title}</p>
                           <div className="flex items-center gap-1">
                             {meeting.caseId && (
@@ -319,12 +323,26 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
       )}
 
       {newMeetingOpen && (
-        <NewMeetingDialog
+        <MeetingDialog
+          mode="create"
           cases={cases}
           onClose={() => setNewMeetingOpen(false)}
-          onCreated={(meeting) => {
+          onSaved={(meeting) => {
             setMeetings((prev) => [...prev, meeting]);
             setNewMeetingOpen(false);
+          }}
+        />
+      )}
+
+      {editingMeeting && (
+        <MeetingDialog
+          mode="edit"
+          meeting={editingMeeting}
+          cases={cases}
+          onClose={() => setEditingMeeting(null)}
+          onSaved={(meeting) => {
+            setMeetings((prev) => prev.map((m) => (m.id === meeting.id ? meeting : m)));
+            setEditingMeeting(null);
           }}
         />
       )}

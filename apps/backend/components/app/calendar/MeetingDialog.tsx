@@ -4,40 +4,67 @@ import { useState } from "react";
 import { Button } from "@workspace/ui";
 import type { MeetingRow } from "../../../lib/calendar/crud";
 
-type NewMeetingDialogProps = {
+type MeetingDialogProps = {
+  mode: "create" | "edit";
+  meeting?: MeetingRow;
   cases: { id: string; name: string }[];
   onClose: () => void;
-  onCreated: (meeting: MeetingRow) => void;
+  onSaved: (meeting: MeetingRow) => void;
 };
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+// <input type="datetime-local"> wants "YYYY-MM-DDTHH:mm" in local time --
+// built from the Date object's own local getters, matching what the
+// browser's picker itself would produce.
+function toLocalInputValue(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 // Uses the browser's native <input type="datetime-local"> picker --
 // confirmed fine as-is, no custom date-picker component needed.
-export default function NewMeetingDialog({ cases, onClose, onCreated }: NewMeetingDialogProps) {
-  const [title, setTitle] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [caseId, setCaseId] = useState("");
+export default function MeetingDialog({ mode, meeting, cases, onClose, onSaved }: MeetingDialogProps) {
+  const [title, setTitle] = useState(meeting?.title ?? "");
+  const [startTime, setStartTime] = useState(meeting ? toLocalInputValue(new Date(meeting.startTime)) : "");
+  const [endTime, setEndTime] = useState(meeting ? toLocalInputValue(new Date(meeting.endTime)) : "");
+  const [caseId, setCaseId] = useState(meeting?.caseId ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !startTime || !endTime) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/calendar", {
-        method: "POST",
+      const url = mode === "edit" && meeting ? `/api/v1/calendar/${meeting.id}` : "/api/v1/calendar";
+      const res = await fetch(url, {
+        method: mode === "edit" ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, startTime, endTime, caseId: caseId || undefined }),
+        // datetime-local's value is a naive local-time string with no
+        // timezone info -- new Date() here parses it using the browser's
+        // own timezone (correct: that's the user's real intent), then
+        // .toISOString() sends an unambiguous UTC instant. Sending the
+        // naive string straight through (the previous bug) let the
+        // server -- whatever timezone it happens to run in -- reinterpret
+        // "16:30" as ITS OWN local time instead of the browser's,
+        // silently shifting the stored time whenever the two differ.
+        body: JSON.stringify({
+          title,
+          startTime: new Date(startTime).toISOString(),
+          endTime: new Date(endTime).toISOString(),
+          caseId: caseId || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Couldn't create the meeting.");
+        setError(data.error ?? "Couldn't save the meeting.");
         return;
       }
-      onCreated(data.meeting as MeetingRow);
+      onSaved(data.meeting as MeetingRow);
     } finally {
       setSubmitting(false);
     }
@@ -46,11 +73,11 @@ export default function NewMeetingDialog({ cases, onClose, onCreated }: NewMeeti
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <form
-        onSubmit={handleCreate}
+        onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
         className="w-[32rem] rounded-xl border border-border bg-card p-5 flex flex-col gap-3 shadow-lg"
       >
-        <h3 className="text-sm font-semibold">New Meeting</h3>
+        <h3 className="text-sm font-semibold">{mode === "create" ? "New Meeting" : "Edit Meeting"}</h3>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -75,7 +102,7 @@ export default function NewMeetingDialog({ cases, onClose, onCreated }: NewMeeti
             required
           />
         </div>
-        <select value={caseId} onChange={(e) => setCaseId(e.target.value)} className="h-9 rounded-md border border-border bg-background px-3 text-sm">
+        <select value={caseId ?? ""} onChange={(e) => setCaseId(e.target.value)} className="h-9 rounded-md border border-border bg-background px-3 text-sm">
           <option value="">No case link</option>
           {cases.map((c) => (
             <option key={c.id} value={c.id}>
@@ -89,7 +116,7 @@ export default function NewMeetingDialog({ cases, onClose, onCreated }: NewMeeti
             Cancel
           </Button>
           <Button type="submit" disabled={submitting}>
-            Create
+            {mode === "create" ? "Create" : "Save"}
           </Button>
         </div>
       </form>
