@@ -2,15 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Briefcase,
-  CalendarClock,
-  CreditCard,
-  FileText,
-  LayoutDashboard,
-  ListChecks,
-  type LucideIcon,
-} from "lucide-react";
+import { Briefcase, CalendarClock, CreditCard, FileText, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import type { TranslationKey } from "../../locales/translations";
 
@@ -23,7 +15,6 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { labelKey: "nav_home", href: "/app", icon: LayoutDashboard },
   { labelKey: "nav_cases", href: "/app/cases", icon: Briefcase },
-  { labelKey: "nav_tasks", href: "/app/tasks", icon: ListChecks },
   { labelKey: "nav_calendar", href: "/app/calendar", icon: CalendarClock },
   { labelKey: "nav_billing", href: "/app/billing", icon: CreditCard },
   { labelKey: "nav_documents", href: "/app/documents", icon: FileText },
