@@ -3,9 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "../../auth";
 import { db } from "../../database";
 import { firms } from "../../database/schema";
-import { mockNotifications } from "../../lib/dashboard/mockData";
 import AppTopBar from "@/components/app/AppTopBar";
-import NotificationBell from "@/components/app/dashboard/NotificationBell";
 import { translations, type Language } from "../../locales/translations";
 
 export default async function AppLayout({
@@ -42,7 +40,6 @@ export default async function AppLayout({
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-white via-slate-50 to-indigo-50 text-slate-900 font-sans">
       <AppTopBar userName={userName} tier={tier} workspaceLabel={workspaceLabel} />
       <main className="flex-grow w-full">{children}</main>
-      <NotificationBell notifications={mockNotifications} />
     </div>
   );
 }

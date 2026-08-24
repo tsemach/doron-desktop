@@ -3,11 +3,12 @@ import { auth } from "../../../auth";
 import { listUpcomingMeetings } from "../../../lib/calendar/crud";
 import { listVisibleCases } from "../../../lib/cases/crud";
 import type { Actor } from "../../../lib/permissions";
-import CalendarClient from "@/components/app/calendar/CalendarClient";
+import CalendarHeader from "@/components/app/calendar/CalendarHeader";
+import CalendarView from "@/components/app/calendar/CalendarView";
 
-// Local meetings only in this pass -- Google Calendar OAuth connection and
-// two-way sync are a deferred follow-up needing real Google Cloud
-// credentials to build and verify against (see lib/calendar/crud.ts).
+// Mirrors desktop's Calendar.tsx: header + toolbar + week/day/month grid
+// with positioned meeting blocks. Local meetings only in this pass --
+// see lib/calendar/crud.ts for the Google OAuth scope cut.
 export default async function CalendarPage() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -21,5 +22,13 @@ export default async function CalendarPage() {
   };
 
   const [meetings, cases] = await Promise.all([listUpcomingMeetings(actor), listVisibleCases(actor)]);
-  return <CalendarClient initialMeetings={meetings} cases={cases.map((c) => ({ id: c.id, name: c.name }))} />;
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <CalendarHeader />
+      <div className="flex-1 min-h-0">
+        <CalendarView initialMeetings={meetings} cases={cases.map((c) => ({ id: c.id, name: c.name }))} />
+      </div>
+    </div>
+  );
 }

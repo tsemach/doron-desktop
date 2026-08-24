@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "../../database";
 import { meetings } from "../../database/schema";
 import { getVisibleCaseById } from "../cases/crud";
@@ -27,6 +27,32 @@ export async function listUpcomingMeetings(actor: Actor): Promise<MeetingRow[]> 
     .select()
     .from(meetings)
     .where(and(inArray(meetings.userId, visibleUserIds), gte(meetings.startTime, new Date())))
+    .orderBy(asc(meetings.startTime));
+}
+
+// Backs the Calendar page's grid -- an arbitrary [start, end) range,
+// mirrors desktop's list_meetings_for_range command.
+export async function listMeetingsForRange(actor: Actor, start: Date, end: Date): Promise<MeetingRow[]> {
+  const visibleUserIds = await getVisibleMemberUserIds(actor);
+  return db
+    .select()
+    .from(meetings)
+    .where(and(inArray(meetings.userId, visibleUserIds), gte(meetings.startTime, start), lt(meetings.startTime, end)))
+    .orderBy(asc(meetings.startTime));
+}
+
+// Backs Home's "Today's Meetings" panel (mirrors desktop's AppHomeTodaysMeetings).
+export async function listTodaysMeetings(actor: Actor): Promise<MeetingRow[]> {
+  const visibleUserIds = await getVisibleMemberUserIds(actor);
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const startOfTomorrow = new Date(startOfDay);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+  return db
+    .select()
+    .from(meetings)
+    .where(and(inArray(meetings.userId, visibleUserIds), gte(meetings.startTime, startOfDay), lt(meetings.startTime, startOfTomorrow)))
     .orderBy(asc(meetings.startTime));
 }
 

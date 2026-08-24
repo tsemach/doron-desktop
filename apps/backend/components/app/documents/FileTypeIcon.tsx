@@ -1,0 +1,39 @@
+// Ported from desktop's components/ui/FileTypeIcon.tsx -- same
+// extension -> color/symbol/label mapping, kept in sync deliberately
+// rather than sharing a package, since desktop's version lives in a
+// separate Tauri app with its own build.
+interface FileTypeIconProps {
+  ext: string;
+}
+
+export default function FileTypeIcon({ ext }: FileTypeIconProps) {
+  const normalized = ext.toLowerCase().replace(".", "");
+  let bgColor = "bg-slate-100 text-slate-600 dark:bg-slate-900/30 dark:text-slate-400 border-slate-200 dark:border-slate-800";
+  let symbol = "📄";
+  let label = "FILE";
+
+  if (normalized === "pdf") {
+    bgColor = "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400 border-red-200 dark:border-red-900/50";
+    symbol = "📕";
+    label = "PDF";
+  } else if (["docx", "doc"].includes(normalized)) {
+    bgColor = "bg-zinc-50 text-zinc-700 dark:bg-zinc-900/30 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800/50";
+    symbol = "📓";
+    label = "DOCX";
+  } else if (["xlsx", "xls", "csv"].includes(normalized)) {
+    bgColor = "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50";
+    symbol = "📗";
+    label = "XLSX";
+  } else if (normalized === "txt") {
+    bgColor = "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/50";
+    symbol = "📝";
+    label = "TXT";
+  }
+
+  return (
+    <div className={`shrink-0 rounded-lg border ${bgColor} flex flex-col items-center justify-center font-bold shadow-xs select-none w-10 h-10 text-[10px]`}>
+      <span className="text-base leading-none">{symbol}</span>
+      <span className="uppercase tracking-wider font-semibold text-[7px] mt-0.5">{label}</span>
+    </div>
+  );
+}

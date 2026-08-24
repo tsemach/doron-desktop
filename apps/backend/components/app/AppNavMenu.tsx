@@ -16,8 +16,8 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: "nav_home", href: "/app", icon: LayoutDashboard },
   { labelKey: "nav_cases", href: "/app/cases", icon: Briefcase },
   { labelKey: "nav_calendar", href: "/app/calendar", icon: CalendarClock },
-  { labelKey: "nav_billing", href: "/app/billing", icon: CreditCard },
   { labelKey: "nav_documents", href: "/app/documents", icon: FileText },
+  { labelKey: "nav_billing", href: "/app/billing", icon: CreditCard },
 ];
 
 export default function AppNavMenu() {

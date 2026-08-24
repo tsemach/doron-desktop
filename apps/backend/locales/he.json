@@ -432,9 +432,5 @@
   "dashboard_billing_finance": "חיוב וכספים",
   "dashboard_outstanding": "יתרה לתשלום",
   "dashboard_collected_this_month": "נגבה החודש",
-  "dashboard_of": "מתוך",
-  "notifications_title": "התראות",
-  "notifications_dismiss": "בטל התראה",
-  "notification_button_label": "התראות",
-  "notifications_unread_suffix": ", {count} שלא נקראו"
+  "dashboard_of": "מתוך"
 }
