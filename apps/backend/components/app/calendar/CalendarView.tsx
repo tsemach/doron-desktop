@@ -11,6 +11,7 @@ const HOUR_HEIGHT = 48; // px per hour, matches desktop's TimeGrid
 const HOUR_COLUMN_WIDTH = 56; // px, time-labels gutter
 const HEADER_HEIGHT = 56; // px, sticky day-header row
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MAX_VISIBLE_PER_DAY = 3; // matches desktop's MonthGrid.tsx
 
 type View = "day" | "week" | "month";
 
@@ -19,6 +20,24 @@ function startOfWeek(date: Date): Date {
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - d.getDay());
   return d;
+}
+
+// Full set of days a month's grid actually displays -- from the start of
+// the week containing the 1st, through the end of the week containing
+// the last day of the month, so leading/trailing days from adjacent
+// months (shown greyed-out, like desktop's MonthGrid.tsx) are included.
+function monthGridDays(anchor: Date): Date[] {
+  const firstOfMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const lastOfMonth = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+  const gridStart = startOfWeek(firstOfMonth);
+  const gridEnd = startOfWeek(lastOfMonth);
+  gridEnd.setDate(gridEnd.getDate() + 6);
+
+  const days: Date[] = [];
+  for (let d = new Date(gridStart); d <= gridEnd; d.setDate(d.getDate() + 1)) {
+    days.push(new Date(d));
+  }
+  return days;
 }
 
 function rangeForView(anchor: Date, view: View): { start: Date; end: Date } {
@@ -35,8 +54,13 @@ function rangeForView(anchor: Date, view: View): { start: Date; end: Date } {
     end.setDate(end.getDate() + 7);
     return { start, end };
   }
-  const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1);
+  // month: the fetch range covers the whole displayed grid (including
+  // adjacent-month padding days), not just the calendar month itself --
+  // otherwise meetings on those padding days would never show up.
+  const grid = monthGridDays(anchor);
+  const start = grid[0];
+  const end = new Date(grid[grid.length - 1]);
+  end.setDate(end.getDate() + 1);
   return { start, end };
 }
 
@@ -95,9 +119,8 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
   const days = useMemo(() => {
     if (view === "day") return [start];
     if (view === "week") return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
-    // month: just show the grid header as the 1st week for simplicity of this pass
-    return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
-  }, [start, view]);
+    return monthGridDays(anchor);
+  }, [start, view, anchor]);
 
   async function fetchRange() {
     setLoading(true);
@@ -128,15 +151,21 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
     if (res.ok) setMeetings((prev) => prev.filter((m) => m.id !== id));
   }
 
-  const meetingsByDay = days.map((day) => {
+  function meetingsOnDay(day: Date): MeetingRow[] {
     const dayEnd = new Date(day);
     dayEnd.setDate(dayEnd.getDate() + 1);
-    const dayMeetings = meetings.filter((m) => {
-      const t = new Date(m.startTime);
-      return t >= day && t < dayEnd;
-    });
-    return layoutDay(dayMeetings);
-  });
+    return meetings
+      .filter((m) => {
+        const t = new Date(m.startTime);
+        return t >= day && t < dayEnd;
+      })
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }
+
+  // Month view lists meetings as simple title pills (no overlap-column
+  // time layout, unlike day/week's hourly grid) -- layoutDay only runs
+  // for the views that actually need it.
+  const meetingsByDay = view === "month" ? [] : days.map((day) => layoutDay(meetingsOnDay(day)));
 
   return (
     <div className="flex flex-col h-full">
@@ -175,6 +204,43 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
         </div>
       </div>
 
+      {view === "month" ? (
+        <div className="flex-1 overflow-auto p-3">
+          <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden border border-border">
+            {days.slice(0, 7).map((day) => (
+              <div
+                key={day.toLocaleDateString(undefined, { weekday: "short" })}
+                className="bg-muted/40 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-center"
+              >
+                {day.toLocaleDateString(undefined, { weekday: "short" })}
+              </div>
+            ))}
+            {days.map((day) => {
+              const isToday = day.toDateString() === new Date().toDateString();
+              const inMonth = day.getMonth() === anchor.getMonth();
+              const dayMeetings = meetingsOnDay(day);
+              const overflow = dayMeetings.length - MAX_VISIBLE_PER_DAY;
+              return (
+                <div key={day.toISOString()} className={`bg-background min-h-24 p-1.5 space-y-1 ${inMonth ? "" : "opacity-40"}`}>
+                  <p className={`text-[11px] font-semibold ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day.getDate()}</p>
+                  {dayMeetings.slice(0, MAX_VISIBLE_PER_DAY).map((meeting) => (
+                    <button
+                      key={meeting.id}
+                      type="button"
+                      onClick={() => meeting.caseId && router.push(`/app/cases/${meeting.caseId}`)}
+                      className="w-full text-left rounded bg-rose-100 dark:bg-rose-950/40 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:text-rose-300 truncate"
+                      title={meeting.title}
+                    >
+                      {meeting.title}
+                    </button>
+                  ))}
+                  {overflow > 0 && <p className="text-[10px] text-muted-foreground px-1.5">+{overflow} more</p>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 overflow-auto">
         <div className="flex" style={{ minWidth: HOUR_COLUMN_WIDTH + days.length * 110 }}>
           <div style={{ width: HOUR_COLUMN_WIDTH }} className="shrink-0">
@@ -245,6 +311,7 @@ export default function CalendarView({ initialMeetings, cases }: CalendarViewPro
           })}
         </div>
       </div>
+      )}
 
       {newMeetingOpen && (
         <NewMeetingDialog
