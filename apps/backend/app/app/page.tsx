@@ -43,13 +43,13 @@ export default async function AppHomePage() {
     : [[], [], [], [], []];
 
   return (
-    <div className="min-h-screen flex flex-col px-10 py-10">
+    <div className="min-h-screen flex flex-col px-10 py-5">
       <h1 className="text-2xl font-bold text-foreground text-center">
         {t.dashboard_welcome} {userName}
       </h1>
 
-      <div className="flex-1 flex items-start justify-center mt-20">
-        <div className="max-w-7xl flex gap-12">
+      <div className="flex-1 flex items-start justify-center mt-14">
+        <div className="max-w-7xl flex gap-30">
           <div className="flex flex-col gap-10">
             <div className="flex items-start gap-8">
               <HomeNavTile href="/app/cases" icon={Briefcase} label="Cases" />

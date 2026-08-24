@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Folder, FileText, Loader2, RotateCw } from "lucide-react";
+import Link from "next/link";
+import { Folder, FileText, Loader2 } from "lucide-react";
 import { useLanguage } from "../../../context/LanguageContext";
-import { ensureReadPermission, saveFileHandle } from "../../../lib/documents/localHandles";
+import {
+  clearScanSession,
+  ensureReadPermission,
+  getScanSession,
+  saveFileHandle,
+  saveScanSession,
+  type ScanSessionRecord,
+} from "../../../lib/documents/localHandles";
 import { collectFiles, processGlobalScan, registerSingleFile, type GlobalScanEvent } from "../../../lib/documents/scanning";
 import type { DocumentRow } from "../../../lib/documents/crud";
 
-type LogEntry = { fileName: string; message: string; ok: boolean };
+// "skipped"/"failed" are distinguished (not both folded into a single
+// `ok: false`) so ScanFooter's Indexed/Skipped/Failed counts -- mirroring
+// desktop's ScanFooter.tsx -- can be computed straight from the log.
+type LogStatus = "indexed" | "skipped" | "failed";
+type LogEntry = { fileName: string; message: string; status: LogStatus };
 type Stage = "idle" | "confirm" | "progress";
 
 // Mirrors desktop's DocsManagementScan.tsx: a case-less global index, no
@@ -27,9 +39,20 @@ export default function ScanIndexClient() {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [running, setRunning] = useState(false);
   const stopRef = useRef(false);
+  // Set only by Cancel (discard entirely), never by Stop (pause/resumable)
+  // -- lets runScan's post-loop cleanup tell the two apart, since both set
+  // stopRef to break the loop. Without this, a Cancel clicked mid-run
+  // raced against the in-flight loop noticing stopRef and re-persisting
+  // the very session Cancel had just cleared.
+  const discardRef = useRef(false);
 
   const [singleFileStatus, setSingleFileStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // A previously-stopped scan, persisted in IndexedDB (survives navigating
+  // away and back) -- powers the idle screen's "Indexing is already in
+  // progress..." banner, matching desktop's ScanOpenBanner.
+  const [pendingSession, setPendingSession] = useState<ScanSessionRecord | null>(null);
 
   // Matches CaseDocumentsPanel's SSR-safe pattern: computed after mount,
   // not inline during render, so server and first-client-render markup
@@ -38,6 +61,9 @@ export default function ScanIndexClient() {
 
   useEffect(() => {
     setSupported("showDirectoryPicker" in window);
+    getScanSession()
+      .then((session) => setPendingSession(session ?? null))
+      .catch(() => {});
   }, []);
 
   async function handlePickFolder() {
@@ -59,17 +85,20 @@ export default function ScanIndexClient() {
     setStage("idle");
   }
 
-  async function handleStartIndexing() {
-    if (!pickedHandle) return;
-    setError(null);
-    setLog([]);
-    setProcessedCount(0);
-    setCurrentFileName(null);
+  // Shared by a fresh start, Restart, Continue, and a reopened stopped
+  // session -- runs the scan over `collected` starting at file index
+  // `startFrom`. On a natural stop (user pressed Stop before reaching the
+  // end), persists a ScanSessionRecord so the "in progress" banner and
+  // Restart/Continue/Cancel controls survive a navigation away; on a full
+  // completion, clears any persisted session.
+  async function runScan(
+    collected: { relativePath: string; fileHandle: FileSystemFileHandle }[],
+    startFrom: number,
+    force: boolean,
+    dirHandle: FileSystemDirectoryHandle
+  ) {
     stopRef.current = false;
-
-    const collected = await collectFiles(pickedHandle);
-    setFiles(collected);
-    setStage("progress");
+    discardRef.current = false;
     setRunning(true);
 
     const existingByPath = new Map<string, string>();
@@ -81,26 +110,117 @@ export default function ScanIndexClient() {
       }
     }
 
-    for await (const event of processGlobalScan(collected, existingByPath, forceReindex)) {
+    let processed = startFrom;
+    for await (const event of processGlobalScan(collected.slice(startFrom), existingByPath, force)) {
       if (stopRef.current) break;
-      setCurrentFileName(event.fileName);
-      setProcessedCount((n) => n + 1);
+      setCurrentFileName(displayName(event));
+      processed += 1;
+      setProcessedCount(processed);
       setLog((prev) => [...prev, describeEvent(event)]);
     }
 
     setCurrentFileName(null);
     setRunning(false);
+
+    if (discardRef.current) {
+      // Cancel already cleared state and the persisted session -- don't
+      // let this stale continuation resurrect it.
+      return;
+    }
+
+    if (stopRef.current && processed < collected.length) {
+      const session: ScanSessionRecord = {
+        dirHandle,
+        dirName: dirHandle.name,
+        forceReindex: force,
+        totalFiles: collected.length,
+        startIndex: processed,
+        updatedAt: Date.now(),
+      };
+      await saveScanSession(session).catch(() => {});
+      setPendingSession(session);
+    } else {
+      await clearScanSession().catch(() => {});
+      setPendingSession(null);
+    }
+  }
+
+  async function handleStartIndexing() {
+    if (!pickedHandle) return;
+    setError(null);
+    setLog([]);
+    setProcessedCount(0);
+    setCurrentFileName(null);
+
+    const collected = await collectFiles(pickedHandle);
+    setFiles(collected);
+    setStage("progress");
+
+    await runScan(collected, 0, forceReindex, pickedHandle);
+  }
+
+  async function handleRestart() {
+    if (!pickedHandle) return;
+    setError(null);
+    setLog([]);
+    setProcessedCount(0);
+    setCurrentFileName(null);
+    await runScan(files, 0, forceReindex, pickedHandle);
+  }
+
+  async function handleContinue() {
+    if (!pickedHandle) return;
+    setError(null);
+    setCurrentFileName(null);
+    await runScan(files, processedCount, forceReindex, pickedHandle);
   }
 
   function handleStop() {
     stopRef.current = true;
   }
 
-  function handleCloseProgress() {
+  function handleDiscardProgress() {
     stopRef.current = true;
+    discardRef.current = true;
+    clearScanSession().catch(() => {});
+    setPendingSession(null);
     setStage("idle");
     setPickedHandle(null);
     setFiles([]);
+    setProcessedCount(0);
+    setLog([]);
+  }
+
+  // Matches desktop's ScanFooter "Index Another File/Folder": a plain UI
+  // reset back to the picker, not a cancellation -- if the just-finished
+  // run stopped early, its persisted session (pendingSession) is left
+  // alone, so the "in progress" banner still offers to resume it later.
+  function handleIndexAnother() {
+    setStage("idle");
+    setPickedHandle(null);
+    setFiles([]);
+    setProcessedCount(0);
+    setLog([]);
+    setCurrentFileName(null);
+  }
+
+  async function handleOpenSession() {
+    if (!pendingSession) return;
+    setError(null);
+    const granted = await ensureReadPermission(pendingSession.dirHandle);
+    if (!granted) {
+      setError(t("documents_connect_error"));
+      return;
+    }
+    const collected = await collectFiles(pendingSession.dirHandle);
+    setPickedHandle(pendingSession.dirHandle);
+    setForceReindex(pendingSession.forceReindex);
+    setFiles(collected);
+    setProcessedCount(Math.min(pendingSession.startIndex, collected.length));
+    setLog([]);
+    setCurrentFileName(null);
+    setRunning(false);
+    setStage("progress");
   }
 
   async function handleIndexSingleFile() {
@@ -122,6 +242,8 @@ export default function ScanIndexClient() {
       }
     }
   }
+
+  const stoppedEarly = !running && files.length > 0 && processedCount < files.length;
 
   if (supported === false) {
     return (
@@ -169,6 +291,21 @@ export default function ScanIndexClient() {
             </button>
             {singleFileStatus && <p className="text-xs text-muted-foreground">{singleFileStatus}</p>}
           </div>
+
+          {pendingSession && (
+            <div className="sm:col-span-2 flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 dark:border-blue-900 dark:bg-blue-950/40">
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
+                <Loader2 className="h-3.5 w-3.5 animate-pulse shrink-0" />
+                Indexing is already in progress...
+              </div>
+              <button
+                onClick={handleOpenSession}
+                className="h-7 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0"
+              >
+                Open
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -210,14 +347,34 @@ export default function ScanIndexClient() {
               <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                 Files: {processedCount} / {files.length}
               </span>
-              {running ? (
-                <button onClick={handleStop} className="h-8 px-3 rounded-md border border-destructive/40 text-destructive text-xs font-medium hover:bg-destructive/10">
-                  Stop
+              {running && (
+                <>
+                  <button onClick={handleStop} className="h-8 px-3 rounded-md border border-destructive/40 text-destructive text-xs font-medium hover:bg-destructive/10">
+                    Stop
+                  </button>
+                  <button onClick={handleDiscardProgress} className="h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-muted">
+                    Cancel
+                  </button>
+                </>
+              )}
+              {!running && stoppedEarly && (
+                <>
+                  <button onClick={handleRestart} className="h-8 px-3 rounded-md border border-blue-200 text-blue-700 text-xs font-semibold hover:bg-blue-50/50">
+                    Restart
+                  </button>
+                  <button onClick={handleContinue} className="h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+                    Continue
+                  </button>
+                  <button onClick={handleDiscardProgress} className="h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-muted">
+                    Cancel
+                  </button>
+                </>
+              )}
+              {!running && !stoppedEarly && (
+                <button onClick={handleDiscardProgress} className="h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-muted">
+                  Close
                 </button>
-              ) : null}
-              <button onClick={handleCloseProgress} className="h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-muted">
-                {running ? "Cancel" : "Close"}
-              </button>
+              )}
             </div>
           </div>
 
@@ -251,19 +408,41 @@ export default function ScanIndexClient() {
             {log.length === 0 && <p className="text-xs text-muted-foreground px-1 py-1">No files processed yet.</p>}
             {[...log].reverse().map((entry, i) => (
               <div key={i} className="text-xs px-1 py-0.5">
-                <span className={entry.ok ? "text-emerald-600" : "text-muted-foreground"}>{entry.ok ? "✓" : "–"}</span>{" "}
+                <span className={entry.status === "indexed" ? "text-emerald-600" : entry.status === "failed" ? "text-destructive" : "text-muted-foreground"}>
+                  {entry.status === "indexed" ? "✓" : entry.status === "failed" ? "✗" : "–"}
+                </span>{" "}
                 <span className="font-medium text-foreground">{entry.fileName}</span>{" "}
                 <span className="text-muted-foreground">{entry.message}</span>
               </div>
             ))}
           </div>
+        </div>
+      )}
 
-          {!running && files.length > 0 && (
-            <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
-              <RotateCw className="h-3 w-3" />
-              {stopRef.current && processedCount < files.length ? "Stopped." : "Done."}
-            </p>
-          )}
+      {stage === "progress" && pickedHandle && !running && log.length > 0 && (
+        <div className="max-w-2xl mx-auto -mt-px rounded-b-xl border border-t-0 border-border bg-muted/20 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-5 text-xs">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="font-semibold text-foreground">{log.filter((e) => e.status === "indexed").length} Indexed</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/50" />
+              <span className="font-semibold text-foreground">{log.filter((e) => e.status === "skipped").length} Skipped</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
+              <span className="font-semibold text-destructive">{log.filter((e) => e.status === "failed").length} Failed</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/app/documents" className="h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-muted inline-flex items-center">
+              Go to Smart Search
+            </Link>
+            <button onClick={handleIndexAnother} className="h-8 px-3 rounded-md bg-foreground text-background text-xs font-semibold hover:opacity-90">
+              Index Another File/Folder
+            </button>
+          </div>
         </div>
       )}
 
@@ -272,16 +451,26 @@ export default function ScanIndexClient() {
   );
 }
 
+// Shows just the immediate parent directory, not the full relative path
+// -- "case-1/file-1.docx", not "clients/2024/case-1/file-1.docx" -- since
+// browsers already don't expose the folder's absolute path, and the full
+// chain is more noise than context in a scrolling log.
+function displayName(event: GlobalScanEvent): string {
+  const segments = event.relativePath.split("/");
+  return segments.length > 1 ? segments.slice(-2).join("/") : event.fileName;
+}
+
 function describeEvent(event: GlobalScanEvent): LogEntry {
+  const fileName = displayName(event);
   if (event.type === "skipped") {
-    return { fileName: event.fileName, message: "already indexed — skipped", ok: false };
+    return { fileName, message: "already indexed — skipped", status: "skipped" };
   }
   if (event.type === "failed") {
-    return { fileName: event.fileName, message: "failed to register", ok: false };
+    return { fileName, message: "failed to register", status: "failed" };
   }
   return {
-    fileName: event.fileName,
+    fileName,
     message: event.searchable ? "indexed for search" : "registered (not searchable — only .txt/.docx/.pdf are indexed)",
-    ok: true,
+    status: "indexed",
   };
 }

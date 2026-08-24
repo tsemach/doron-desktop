@@ -11,7 +11,13 @@ const STORE_NAME = "directory-handles";
 // registered via the Scan & Index page's "Index Single Document" flow,
 // which has no connected directory root to re-resolve the file from.
 const FILE_STORE_NAME = "file-handles";
-const DB_VERSION = 2;
+// Single record under SESSION_KEY -- there's only ever one global folder
+// scan running at a time. Lets the Scan & Index page's progress panel
+// survive a navigation away and back, matching desktop's persisted
+// indexing-session concept (DIRECTORY SYNC's Restart/Continue banner).
+const SESSION_STORE_NAME = "scan-session";
+const SESSION_KEY = "active";
+const DB_VERSION = 3;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -23,9 +29,53 @@ function openDb(): Promise<IDBDatabase> {
       if (!request.result.objectStoreNames.contains(FILE_STORE_NAME)) {
         request.result.createObjectStore(FILE_STORE_NAME);
       }
+      if (!request.result.objectStoreNames.contains(SESSION_STORE_NAME)) {
+        request.result.createObjectStore(SESSION_STORE_NAME);
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  });
+}
+
+export interface ScanSessionRecord {
+  dirHandle: FileSystemDirectoryHandle;
+  dirName: string;
+  forceReindex: boolean;
+  totalFiles: number;
+  // How many files were processed when the scan was stopped -- Restart
+  // re-runs from 0, Continue resumes from here.
+  startIndex: number;
+  updatedAt: number;
+}
+
+export async function saveScanSession(session: ScanSessionRecord): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(SESSION_STORE_NAME, "readwrite");
+    tx.objectStore(SESSION_STORE_NAME).put(session, SESSION_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getScanSession(): Promise<ScanSessionRecord | undefined> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SESSION_STORE_NAME, "readonly");
+    const request = tx.objectStore(SESSION_STORE_NAME).get(SESSION_KEY);
+    request.onsuccess = () => resolve(request.result as ScanSessionRecord | undefined);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function clearScanSession(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(SESSION_STORE_NAME, "readwrite");
+    tx.objectStore(SESSION_STORE_NAME).delete(SESSION_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
