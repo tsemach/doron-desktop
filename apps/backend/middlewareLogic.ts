@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isFeatureEnabled } from "./lib/featureGating";
 
 // Paths that require a session -- redirected to /login when isLoggedIn is
 // false. Matches the pre-existing /checkout and /profile behavior, plus the
@@ -15,7 +16,7 @@ export function resolveMiddlewareResponse(nextUrl: URL, isLoggedIn: boolean): Ne
   const { pathname } = nextUrl;
 
   if (pathname === "/") {
-    return isLoggedIn
+    return isLoggedIn && isFeatureEnabled("app")
       ? NextResponse.redirect(new URL(`/app${nextUrl.search}`, nextUrl))
       : NextResponse.rewrite(new URL(`/home${nextUrl.search}`, nextUrl));
   }

@@ -4,6 +4,8 @@ import { auth } from "../../auth";
 import { db } from "../../database";
 import { firms } from "../../database/schema";
 import AppTopBar from "@/components/app/AppTopBar";
+import ComingSoon from "@/components/app/ComingSoon";
+import { isFeatureEnabled } from "../../lib/featureGating";
 import { translations, type Language } from "../../locales/translations";
 
 export default async function AppLayout({
@@ -39,7 +41,9 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-white via-slate-50 to-indigo-50 text-slate-900 font-sans">
       <AppTopBar userName={userName} tier={tier} workspaceLabel={workspaceLabel} />
-      <main className="flex-grow w-full">{children}</main>
+      <main className="flex-grow w-full">
+        {isFeatureEnabled("app") ? children : <ComingSoon featureKey="nav_home" />}
+      </main>
     </div>
   );
 }
