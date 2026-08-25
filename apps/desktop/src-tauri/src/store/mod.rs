@@ -184,6 +184,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     conn.execute_batch(CALENDAR_SCHEMA).map_err(|e| format!("[calendar schema] {e}"))?;
 
+    conn.execute_batch(NOTIFICATIONS_SCHEMA).map_err(|e| format!("[notifications schema] {e}"))?;
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -1102,6 +1104,35 @@ const CALENDAR_SCHEMA: &str = "
     );
     CREATE INDEX IF NOT EXISTS idx_meetings_case_id    ON meetings(case_id);
     CREATE INDEX IF NOT EXISTS idx_meetings_start_time ON meetings(start_time);
+";
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+// ASC-123. A generic notification any producer module can raise via
+// notifications::create — category is free-form so a new producer needs no
+// schema migration. notification_settings is a small per-category row
+// table (not a single-row JSON blob), matching how ai_configurations
+// already stores config as discrete typed columns.
+const NOTIFICATIONS_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS notifications (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        category       TEXT    NOT NULL,
+        title          TEXT    NOT NULL,
+        body           TEXT    NOT NULL,
+        click_target   TEXT,
+        status         TEXT    NOT NULL DEFAULT 'unread'
+                                CHECK (status IN ('unread','read','closed','deleted')),
+        created_at     TEXT    NOT NULL,
+        snooze_until   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_status       ON notifications(status);
+    CREATE INDEX IF NOT EXISTS idx_notifications_category     ON notifications(category);
+    CREATE INDEX IF NOT EXISTS idx_notifications_snooze_until ON notifications(snooze_until);
+
+    CREATE TABLE IF NOT EXISTS notification_settings (
+        category         TEXT    PRIMARY KEY,
+        in_app_enabled   INTEGER NOT NULL DEFAULT 1,
+        os_toast_enabled INTEGER NOT NULL DEFAULT 0
+    );
 ";
 
 #[derive(Serialize, Debug, Clone)]
