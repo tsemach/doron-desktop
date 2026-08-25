@@ -34,6 +34,7 @@ cmd_init() {
   ensure_database "postgres-${label}" "ascurix-backend"
   ensure_database "postgres-${label}" "ascurix-office"
   push_schemas "$root"
+  seed_multienv_user "$root"
 
   cat <<EOF
 ascurix: worktree '$label' ready on $ip
@@ -41,6 +42,7 @@ ascurix: worktree '$label' ready on $ip
   office   -> http://${ip}:3001
   desktop  -> http://${ip}:1420 (window title: "Ascurix (${branch})")
   postgres -> ${ip}:5432 (container postgres-${label}, schema pushed, no data copied)
+  login    -> ${MULTIENV_SEED_EMAIL} / ${MULTIENV_SEED_PASSWORD} (role: ${MULTIENV_SEED_ROLE})
 
 Run 'pnpm dev' from $root to start everything.
 EOF
@@ -59,6 +61,27 @@ push_schemas() {
   office_db_url="$(env_var_value "$root/apps/office/.env.local" "OFFICE_DATABASE_URL")"
   (cd "$root" && DATABASE_URL="$backend_db_url" pnpm --filter backend db:push)
   (cd "$root" && OFFICE_DATABASE_URL="$office_db_url" pnpm --filter office db:push)
+}
+
+MULTIENV_SEED_EMAIL="user@multi.env"
+MULTIENV_SEED_PASSWORD="123456"
+MULTIENV_SEED_ROLE="manager"
+
+# A freshly created worktree's database has schema but zero rows (push_schemas
+# above only pushes schema, never copies data) -- there is no user to log in
+# with until one is created by hand. Seeds exactly one manager-role login per
+# worktree so a new multi-env instance is immediately usable, reusing
+# apps/backend/scripts/seed-admin.mjs's existing idempotent-by-email insert
+# logic (parameterized via SEED_* env vars) rather than duplicating it.
+seed_multienv_user() {
+  local root="$1" backend_db_url
+  backend_db_url="$(env_var_value "$root/apps/backend/.env.local" "DATABASE_URL")"
+  (
+    cd "$root" && DATABASE_URL="$backend_db_url" \
+      SEED_EMAIL="$MULTIENV_SEED_EMAIL" SEED_PASSWORD="$MULTIENV_SEED_PASSWORD" \
+      SEED_NAME="Multi-Env User" SEED_ROLE="$MULTIENV_SEED_ROLE" \
+      pnpm --filter backend db:seed
+  )
 }
 
 cmd_status() {
