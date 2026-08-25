@@ -94,3 +94,35 @@ fn update_notification_settings_persists_and_creates_row_if_missing() {
     let row = store::get_notification_settings_for_category(&conn, "email_arrived").unwrap();
     assert!(row.os_toast_enabled);
 }
+
+use tauri_app_lib::notifications::task_scanner::tasks_entering_window;
+use tauri_app_lib::store::TaskRow;
+
+fn sample_task(id: i64, due_date: Option<&str>) -> TaskRow {
+    TaskRow {
+        id,
+        case_id: 1,
+        title: "T".to_string(),
+        description: None,
+        status: "Waiting".to_string(),
+        estimate_value: None,
+        estimate_unit: None,
+        due_date: due_date.map(|s| s.to_string()),
+        task_template_item_id: None,
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        updated_at: None,
+        sort_order: 0,
+    }
+}
+
+#[test]
+fn tasks_entering_window_includes_today_and_overdue_excludes_future_and_none() {
+    let tasks = vec![
+        sample_task(1, Some("2026-08-25")), // due today
+        sample_task(2, Some("2026-08-20")), // overdue
+        sample_task(3, Some("2026-09-01")), // future -- excluded
+        sample_task(4, None),               // no due date -- excluded
+    ];
+    let due = tasks_entering_window(&tasks, "2026-08-25");
+    assert_eq!(due.iter().map(|t| t.id).collect::<Vec<_>>(), vec![1, 2]);
+}

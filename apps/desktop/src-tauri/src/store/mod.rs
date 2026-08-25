@@ -1567,6 +1567,15 @@ pub fn list_tasks_for_case(conn: &Connection, case_id: i64) -> Result<Vec<TaskRo
     Ok(rows)
 }
 
+pub fn list_tasks_with_due_date(conn: &Connection) -> Result<Vec<TaskRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, updated_at, sort_order
+         FROM tasks WHERE due_date IS NOT NULL"
+    )?;
+    let rows = stmt.query_map([], task_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 pub fn create_task(
     conn: &Connection,
     case_id: i64,
