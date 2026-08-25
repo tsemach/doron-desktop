@@ -4,9 +4,37 @@ pub mod oauth;
 pub mod reminder;
 pub mod sync;
 
+use serde::Deserialize;
 use tauri::AppHandle;
 
 use oauth::GoogleCalendarStatus;
+
+/// Wire shape for an attendee coming from the frontend -- camelCase to match
+/// every other Tauri command param (`caseId`, etc.). No `response_status`:
+/// Ascurix never sets RSVP state, only Google does (docs/calendar/
+/// adding-people-to-meeting.md §5).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttendeeInputDto {
+    pub email: String,
+    pub display_name: Option<String>,
+}
+
+/// Stores whatever Google's insert/patch response says about attendees
+/// (including `responseStatus`) rather than trusting the request payload --
+/// Google is authoritative for RSVP state (§5/§6 of the design doc), so this
+/// is shared by both create_meeting and update_meeting.
+fn attendees_from_google_event(event: &google_events::GoogleEvent) -> Vec<crate::store::AttendeeInput<'_>> {
+    event
+        .attendees
+        .iter()
+        .map(|a| crate::store::AttendeeInput {
+            email: &a.email,
+            display_name: a.display_name.as_deref(),
+            response_status: a.response_status.as_deref().unwrap_or("needsAction"),
+        })
+        .collect()
+}
 
 /// Runs the full OAuth connect flow (opens the browser, catches the loopback
 /// redirect, exchanges the code, persists the account) and resolves once
@@ -47,6 +75,7 @@ pub async fn create_meeting(
     start_time: String,
     end_time: String,
     case_id: Option<i64>,
+    attendees: Vec<AttendeeInputDto>,
 ) -> Result<crate::store::MeetingRow, String> {
     let conn = crate::store::open_db(&app)?;
     let (resolved_case_id, case_link_source) = match case_id {
@@ -61,6 +90,8 @@ pub async fn create_meeting(
 
     let access_token = oauth::get_valid_access_token(&app).await?;
     let client = reqwest::Client::new();
+    let google_attendees: Vec<google_events::AttendeeInput> =
+        attendees.iter().map(|a| google_events::AttendeeInput { email: &a.email, display_name: a.display_name.as_deref() }).collect();
     let google_event = google_events::insert_event(
         &client,
         &access_token,
@@ -70,11 +101,12 @@ pub async fn create_meeting(
             location: location.as_deref(),
             start_time: &start_time,
             end_time: &end_time,
+            attendees: &google_attendees,
         },
     )
     .await?;
 
-    crate::store::upsert_meeting(
+    let meeting = crate::store::upsert_meeting(
         &conn,
         crate::store::UpsertMeetingInput {
             google_event_id: &google_event.id,
@@ -88,7 +120,10 @@ pub async fn create_meeting(
             status: "confirmed",
         },
     )
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    crate::store::replace_meeting_attendees(&conn, meeting.id, &attendees_from_google_event(&google_event)).map_err(|e| e.to_string())?;
+    crate::store::get_meeting(&conn, meeting.id).map_err(|e| e.to_string())?.ok_or_else(|| "Meeting not found after create".to_string())
 }
 
 /// Shared by create_meeting/update_meeting: only rewrites `description` when
@@ -122,6 +157,7 @@ pub async fn update_meeting(
     start_time: String,
     end_time: String,
     case_id: Option<i64>,
+    attendees: Vec<AttendeeInputDto>,
 ) -> Result<crate::store::MeetingRow, String> {
     let conn = crate::store::open_db(&app)?;
     let existing = crate::store::get_meeting(&conn, id).map_err(|e| e.to_string())?.ok_or("Meeting not found")?;
@@ -134,7 +170,9 @@ pub async fn update_meeting(
 
     let access_token = oauth::get_valid_access_token(&app).await?;
     let client = reqwest::Client::new();
-    google_events::patch_event(
+    let google_attendees: Vec<google_events::AttendeeInput> =
+        attendees.iter().map(|a| google_events::AttendeeInput { email: &a.email, display_name: a.display_name.as_deref() }).collect();
+    let google_event = google_events::patch_event(
         &client,
         &access_token,
         &existing.google_event_id,
@@ -144,12 +182,15 @@ pub async fn update_meeting(
             location: location.as_deref(),
             start_time: &start_time,
             end_time: &end_time,
+            attendees: &google_attendees,
         },
     )
     .await?;
 
     crate::store::update_meeting_row(&conn, id, &title, description.as_deref(), location.as_deref(), &start_time, &end_time, resolved_case_id, &case_link_source)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    crate::store::replace_meeting_attendees(&conn, id, &attendees_from_google_event(&google_event)).map_err(|e| e.to_string())?;
+    crate::store::get_meeting(&conn, id).map_err(|e| e.to_string())?.ok_or_else(|| "Meeting not found after update".to_string())
 }
 
 #[tauri::command]

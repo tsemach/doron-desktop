@@ -1102,6 +1102,17 @@ const CALENDAR_SCHEMA: &str = "
     );
     CREATE INDEX IF NOT EXISTS idx_meetings_case_id    ON meetings(case_id);
     CREATE INDEX IF NOT EXISTS idx_meetings_start_time ON meetings(start_time);
+    CREATE TABLE IF NOT EXISTS meeting_attendees (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        meeting_id       INTEGER NOT NULL,
+        email            TEXT    NOT NULL,
+        display_name     TEXT,
+        response_status  TEXT    NOT NULL DEFAULT 'needsAction'
+                                  CHECK (response_status IN ('needsAction','accepted','declined','tentative')),
+        created_at       TEXT    NOT NULL,
+        FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_meeting_attendees_meeting_id ON meeting_attendees(meeting_id);
 ";
 
 #[derive(Serialize, Debug, Clone)]
@@ -1118,6 +1129,21 @@ pub struct MeetingRow {
     pub case_link_source: String,
     pub created_at: String,
     pub updated_at: Option<String>,
+    pub attendees: Vec<AttendeeRow>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct AttendeeRow {
+    pub id: i64,
+    pub email: String,
+    pub display_name: Option<String>,
+    pub response_status: String,
+}
+
+pub struct AttendeeInput<'a> {
+    pub email: &'a str,
+    pub display_name: Option<&'a str>,
+    pub response_status: &'a str,
 }
 
 const MEETING_COLUMNS: &str = "id, google_event_id, case_id, title, description, location, start_time, end_time, status, case_link_source, created_at, updated_at";
@@ -1136,13 +1162,47 @@ fn meeting_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<MeetingRow> {
         case_link_source: row.get(9)?,
         created_at: row.get(10)?,
         updated_at: row.get(11)?,
+        attendees: Vec::new(),
     })
+}
+
+fn list_attendees_for_meeting(conn: &Connection, meeting_id: i64) -> Result<Vec<AttendeeRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare("SELECT id, email, display_name, response_status FROM meeting_attendees WHERE meeting_id = ?1 ORDER BY id ASC")?;
+    let rows = stmt
+        .query_map(params![meeting_id], |row| {
+            Ok(AttendeeRow { id: row.get(0)?, email: row.get(1)?, display_name: row.get(2)?, response_status: row.get(3)? })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn with_attendees(conn: &Connection, mut meeting: MeetingRow) -> Result<MeetingRow, rusqlite::Error> {
+    meeting.attendees = list_attendees_for_meeting(conn, meeting.id)?;
+    Ok(meeting)
+}
+
+/// Replaces a meeting's full attendee set in one go (delete + re-insert)
+/// rather than diffing add/remove/rsvp-changed individually -- attendee
+/// lists are small, and both the manual create/update path and the sync
+/// poller (which has no concept of a "diff" against Google, only a full
+/// list per event) can share this one function (docs/calendar/
+/// adding-people-to-meeting.md §3).
+pub fn replace_meeting_attendees(conn: &Connection, meeting_id: i64, attendees: &[AttendeeInput]) -> Result<(), rusqlite::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute("DELETE FROM meeting_attendees WHERE meeting_id = ?1", params![meeting_id])?;
+    for attendee in attendees {
+        conn.execute(
+            "INSERT INTO meeting_attendees (meeting_id, email, display_name, response_status, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![meeting_id, attendee.email, attendee.display_name, attendee.response_status, now],
+        )?;
+    }
+    Ok(())
 }
 
 pub fn get_meeting(conn: &Connection, id: i64) -> Result<Option<MeetingRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(&format!("SELECT {MEETING_COLUMNS} FROM meetings WHERE id = ?1"))?;
     match stmt.query_row(params![id], meeting_row_from_sql) {
-        Ok(row) => Ok(Some(row)),
+        Ok(row) => Ok(Some(with_attendees(conn, row)?)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(e) => Err(e),
     }
@@ -1151,7 +1211,7 @@ pub fn get_meeting(conn: &Connection, id: i64) -> Result<Option<MeetingRow>, rus
 pub fn get_meeting_by_google_event_id(conn: &Connection, google_event_id: &str) -> Result<Option<MeetingRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(&format!("SELECT {MEETING_COLUMNS} FROM meetings WHERE google_event_id = ?1"))?;
     match stmt.query_row(params![google_event_id], meeting_row_from_sql) {
-        Ok(row) => Ok(Some(row)),
+        Ok(row) => Ok(Some(with_attendees(conn, row)?)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(e) => Err(e),
     }
@@ -1165,13 +1225,13 @@ pub fn list_meetings_for_range(conn: &Connection, range_start: &str, range_end: 
         "SELECT {MEETING_COLUMNS} FROM meetings WHERE start_time < ?2 AND end_time > ?1 ORDER BY start_time ASC"
     ))?;
     let rows = stmt.query_map(params![range_start, range_end], meeting_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
-    Ok(rows)
+    rows.into_iter().map(|row| with_attendees(conn, row)).collect()
 }
 
 pub fn list_meetings_for_case(conn: &Connection, case_id: i64) -> Result<Vec<MeetingRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(&format!("SELECT {MEETING_COLUMNS} FROM meetings WHERE case_id = ?1 ORDER BY start_time ASC"))?;
     let rows = stmt.query_map(params![case_id], meeting_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
-    Ok(rows)
+    rows.into_iter().map(|row| with_attendees(conn, row)).collect()
 }
 
 /// "Today" in UTC, matching how every other timestamp in this table is

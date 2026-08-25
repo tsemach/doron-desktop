@@ -1,3 +1,13 @@
+// Mirrors the Rust `AttendeeRow` struct's wire shape as-is (snake_case).
+// response_status is read-only from Ascurix's side -- only Google ever sets
+// it (docs/calendar/adding-people-to-meeting.md §5/§6).
+export interface Attendee {
+  id: number;
+  email: string;
+  display_name: string | null;
+  response_status: "needsAction" | "accepted" | "declined" | "tentative";
+}
+
 // Mirrors the Rust `MeetingRow` struct's wire shape as-is (snake_case), same
 // convention as `Task`/`CaseTemplate` -- used directly from invoke() results
 // without a remapping step.
@@ -14,6 +24,7 @@ export interface Meeting {
   case_link_source: "none" | "phrase_match" | "manual";
   created_at: string;
   updated_at: string | null;
+  attendees: Attendee[];
 }
 
 export type CalendarViewMode = "day" | "week" | "month";

@@ -105,7 +105,7 @@ fn apply_synced_event(conn: &rusqlite::Connection, event: &google_events::Google
         _ => case_link::resolve_case_link(conn, description.as_deref())?,
     };
 
-    store::upsert_meeting(
+    let meeting = store::upsert_meeting(
         conn,
         store::UpsertMeetingInput {
             google_event_id: &event.id,
@@ -120,5 +120,87 @@ fn apply_synced_event(conn: &rusqlite::Connection, event: &google_events::Google
         },
     )
     .map_err(|e| e.to_string())?;
+
+    // Every synced event (not just newly-created ones) runs through here, so
+    // this is the one place that needs to exist for an attendee added
+    // directly in Google Calendar to reach the local mirror -- no separate
+    // code path for "attendees changed" (docs/calendar/
+    // adding-people-to-meeting.md §6).
+    let attendees: Vec<store::AttendeeInput> = event
+        .attendees
+        .iter()
+        .map(|a| store::AttendeeInput {
+            email: &a.email,
+            display_name: a.display_name.as_deref(),
+            response_status: a.response_status.as_deref().unwrap_or("needsAction"),
+        })
+        .collect();
+    store::replace_meeting_attendees(conn, meeting.id, &attendees).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_db(name: &str) -> rusqlite::Connection {
+        let db_path = std::env::temp_dir().join(name);
+        if db_path.exists() {
+            let _ = std::fs::remove_file(&db_path);
+        }
+        store::open_db_by_path(&db_path).expect("should open full-schema test db")
+    }
+
+    fn confirmed_event(id: &str, attendees: Vec<google_events::GoogleEventAttendee>) -> google_events::GoogleEvent {
+        google_events::GoogleEvent {
+            id: id.to_string(),
+            status: "confirmed".to_string(),
+            summary: Some("Kickoff".to_string()),
+            description: None,
+            location: None,
+            start: Some(google_events::GoogleEventDateTime { date_time: Some("2026-01-01T10:00:00Z".to_string()), date: None }),
+            end: Some(google_events::GoogleEventDateTime { date_time: Some("2026-01-01T11:00:00Z".to_string()), date: None }),
+            attendees,
+        }
+    }
+
+    #[test]
+    fn syncing_an_event_mirrors_its_attendees_locally() {
+        let conn = test_db("sync_attendees_mirror_test.db");
+        let event = confirmed_event(
+            "evt-1",
+            vec![google_events::GoogleEventAttendee {
+                email: "a@example.com".to_string(),
+                display_name: Some("Alice".to_string()),
+                response_status: Some("accepted".to_string()),
+            }],
+        );
+
+        apply_synced_event(&conn, &event).expect("apply_synced_event should succeed");
+
+        let meeting = store::get_meeting_by_google_event_id(&conn, "evt-1").expect("query should succeed").expect("meeting should exist");
+        assert_eq!(meeting.attendees.len(), 1);
+        assert_eq!(meeting.attendees[0].email, "a@example.com");
+        assert_eq!(meeting.attendees[0].response_status, "accepted");
+    }
+
+    #[test]
+    fn resyncing_an_event_replaces_the_attendee_list_to_match_google() {
+        let conn = test_db("sync_attendees_replace_test.db");
+        let first = confirmed_event(
+            "evt-2",
+            vec![google_events::GoogleEventAttendee { email: "old@example.com".to_string(), display_name: None, response_status: None }],
+        );
+        apply_synced_event(&conn, &first).expect("first sync should succeed");
+
+        let second = confirmed_event(
+            "evt-2",
+            vec![google_events::GoogleEventAttendee { email: "new@example.com".to_string(), display_name: None, response_status: None }],
+        );
+        apply_synced_event(&conn, &second).expect("second sync should succeed");
+
+        let meeting = store::get_meeting_by_google_event_id(&conn, "evt-2").expect("query should succeed").expect("meeting should exist");
+        assert_eq!(meeting.attendees.len(), 1);
+        assert_eq!(meeting.attendees[0].email, "new@example.com");
+    }
 }
