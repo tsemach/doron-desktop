@@ -1135,6 +1135,94 @@ const NOTIFICATIONS_SCHEMA: &str = "
     );
 ";
 
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct NotificationRow {
+    pub id: i64,
+    pub category: String,
+    pub title: String,
+    pub body: String,
+    pub click_target: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    pub snooze_until: Option<String>,
+}
+
+fn notification_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<NotificationRow> {
+    Ok(NotificationRow {
+        id: row.get(0)?,
+        category: row.get(1)?,
+        title: row.get(2)?,
+        body: row.get(3)?,
+        click_target: row.get(4)?,
+        status: row.get(5)?,
+        created_at: row.get(6)?,
+        snooze_until: row.get(7)?,
+    })
+}
+
+const NOTIFICATION_COLUMNS: &str = "id, category, title, body, click_target, status, created_at, snooze_until";
+
+pub fn insert_notification(
+    conn: &Connection,
+    category: &str,
+    title: &str,
+    body: &str,
+    click_target: Option<&str>,
+) -> Result<i64, rusqlite::Error> {
+    let created_at = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO notifications (category, title, body, click_target, status, created_at)
+         VALUES (?1, ?2, ?3, ?4, 'unread', ?5)",
+        params![category, title, body, click_target, created_at],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn get_notification(conn: &Connection, id: i64) -> Result<NotificationRow, rusqlite::Error> {
+    conn.query_row(
+        &format!("SELECT {NOTIFICATION_COLUMNS} FROM notifications WHERE id = ?1"),
+        params![id],
+        notification_row_from_sql,
+    )
+}
+
+/// `status_filter: None` returns the default "active" view (unread + read,
+/// excluding anything currently snoozed into the future) -- a snoozed row
+/// simply reappears through this same query once its snooze_until passes,
+/// no separate "un-snooze" step needed. `Some(status)` bypasses the
+/// active/snooze logic entirely (used for the "closed" filter view).
+pub fn list_notifications(conn: &Connection, status_filter: Option<&str>) -> Result<Vec<NotificationRow>, rusqlite::Error> {
+    match status_filter {
+        Some(status) => {
+            let sql = format!("SELECT {NOTIFICATION_COLUMNS} FROM notifications WHERE status = ?1 ORDER BY created_at DESC");
+            let mut stmt = conn.prepare(&sql)?;
+            let rows = stmt.query_map(params![status], notification_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        }
+        None => {
+            let now = chrono::Utc::now().to_rfc3339();
+            let sql = format!(
+                "SELECT {NOTIFICATION_COLUMNS} FROM notifications
+                 WHERE status IN ('unread','read') AND (snooze_until IS NULL OR snooze_until <= ?1)
+                 ORDER BY created_at DESC"
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let rows = stmt.query_map(params![now], notification_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        }
+    }
+}
+
+pub fn update_notification_status(conn: &Connection, id: i64, status: &str) -> Result<(), rusqlite::Error> {
+    conn.execute("UPDATE notifications SET status = ?1 WHERE id = ?2", params![status, id])?;
+    Ok(())
+}
+
+pub fn snooze_notification(conn: &Connection, id: i64, until: &str) -> Result<(), rusqlite::Error> {
+    conn.execute("UPDATE notifications SET snooze_until = ?1 WHERE id = ?2", params![until, id])?;
+    Ok(())
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct MeetingRow {
     pub id: i64,
