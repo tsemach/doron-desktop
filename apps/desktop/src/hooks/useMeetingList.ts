@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Meeting } from "@/lib/calendar/types";
 
+export interface AttendeeFormValue {
+  email: string;
+  displayName?: string;
+}
+
 export interface MeetingFormValues {
   title: string;
   description: string;
@@ -9,6 +14,7 @@ export interface MeetingFormValues {
   startTime: string; // ISO
   endTime: string; // ISO
   caseId: number | null;
+  attendees: AttendeeFormValue[];
 }
 
 /// Shared list/mutation state for any Meeting view -- the range-based grid
@@ -53,6 +59,7 @@ export function useMeetingList(fetchMeetings: () => Promise<Meeting[]>, dependen
         startTime: values.startTime,
         endTime: values.endTime,
         caseId: values.caseId,
+        attendees: values.attendees,
       });
       await reload();
     },
@@ -69,6 +76,7 @@ export function useMeetingList(fetchMeetings: () => Promise<Meeting[]>, dependen
         startTime: values.startTime,
         endTime: values.endTime,
         caseId: values.caseId,
+        attendees: values.attendees,
       });
       await reload();
     },

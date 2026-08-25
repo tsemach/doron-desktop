@@ -12,6 +12,15 @@ pub struct EventInput<'a> {
     pub location: Option<&'a str>,
     pub start_time: &'a str,
     pub end_time: &'a str,
+    pub attendees: &'a [AttendeeInput<'a>],
+}
+
+/// Google-API-shaped attendee to send on insert/patch -- deliberately not
+/// `store::AttendeeInput` (which also carries `response_status`): Google is
+/// authoritative for RSVP state, Ascurix never writes it.
+pub struct AttendeeInput<'a> {
+    pub email: &'a str,
+    pub display_name: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -23,6 +32,17 @@ pub struct GoogleEvent {
     pub location: Option<String>,
     pub start: Option<GoogleEventDateTime>,
     pub end: Option<GoogleEventDateTime>,
+    #[serde(default)]
+    pub attendees: Vec<GoogleEventAttendee>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GoogleEventAttendee {
+    pub email: String,
+    #[serde(rename = "displayName")]
+    pub display_name: Option<String>,
+    #[serde(rename = "responseStatus")]
+    pub response_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -100,6 +120,11 @@ pub async fn insert_event(client: &reqwest::Client, access_token: &str, input: &
     let response = client
         .post(CALENDAR_API_BASE)
         .bearer_auth(access_token)
+        // Without this, Google's default (sendUpdates=none) creates/patches
+        // the event but never emails newly-added attendees -- silently
+        // defeating "adding people to a meeting" (docs/calendar/
+        // adding-people-to-meeting.md §4).
+        .query(&[("sendUpdates", "all")])
         .json(&event_body(input))
         .send()
         .await
@@ -119,6 +144,7 @@ pub async fn patch_event(
     let response = client
         .patch(format!("{CALENDAR_API_BASE}/{google_event_id}"))
         .bearer_auth(access_token)
+        .query(&[("sendUpdates", "all")])
         .json(&event_body(input))
         .send()
         .await
@@ -145,13 +171,22 @@ pub async fn delete_event(client: &reqwest::Client, access_token: &str, google_e
 }
 
 fn event_body(input: &EventInput<'_>) -> serde_json::Value {
-    serde_json::json!({
+    let mut body = serde_json::json!({
         "summary": input.title,
         "description": input.description,
         "location": input.location,
         "start": { "dateTime": input.start_time },
         "end": { "dateTime": input.end_time },
-    })
+    });
+    if !input.attendees.is_empty() {
+        let attendees: Vec<serde_json::Value> = input
+            .attendees
+            .iter()
+            .map(|a| serde_json::json!({ "email": a.email, "displayName": a.display_name }))
+            .collect();
+        body["attendees"] = serde_json::Value::Array(attendees);
+    }
+    body
 }
 
 #[derive(Debug, Deserialize)]
@@ -169,5 +204,43 @@ async fn google_error_message(response: reqwest::Response) -> String {
     match response.json::<GoogleApiErrorEnvelope>().await {
         Ok(body) => body.error.message,
         Err(_) => format!("Google Calendar request failed ({status})"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_input<'a>(attendees: &'a [AttendeeInput<'a>]) -> EventInput<'a> {
+        EventInput {
+            title: "Kickoff",
+            description: None,
+            location: None,
+            start_time: "2026-01-01T10:00:00+00:00",
+            end_time: "2026-01-01T11:00:00+00:00",
+            attendees,
+        }
+    }
+
+    #[test]
+    fn event_body_omits_attendees_when_empty() {
+        let body = event_body(&base_input(&[]));
+        assert!(body.get("attendees").is_none());
+    }
+
+    #[test]
+    fn event_body_includes_attendees_with_email_and_display_name() {
+        let attendees = [
+            AttendeeInput { email: "a@example.com", display_name: Some("Alice") },
+            AttendeeInput { email: "b@example.com", display_name: None },
+        ];
+        let body = event_body(&base_input(&attendees));
+
+        let attendees_json = body.get("attendees").expect("attendees should be present").as_array().expect("attendees should be an array");
+        assert_eq!(attendees_json.len(), 2);
+        assert_eq!(attendees_json[0]["email"], "a@example.com");
+        assert_eq!(attendees_json[0]["displayName"], "Alice");
+        assert_eq!(attendees_json[1]["email"], "b@example.com");
+        assert!(attendees_json[1].get("displayName").is_none() || attendees_json[1]["displayName"].is_null());
     }
 }

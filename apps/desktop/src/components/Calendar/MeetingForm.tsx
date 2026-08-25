@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Meeting } from "@/lib/calendar/types";
-import { MeetingFormValues } from "@/hooks/useMeetingList";
+import { AttendeeFormValue, MeetingFormValues } from "@/hooks/useMeetingList";
 import { useLanguage } from "../../context/LanguageContext";
+import AttendeePickerDialog from "./AttendeePickerDialog";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface CaseOption {
   id: number;
@@ -62,6 +66,32 @@ export default function MeetingForm({ mode, initialMeeting, initialCaseId, onSav
   const [titleError, setTitleError] = useState<string | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const [attendees, setAttendees] = useState<AttendeeFormValue[]>(
+    () => initialMeeting?.attendees.map((a) => ({ email: a.email, displayName: a.display_name ?? undefined })) ?? []
+  );
+  const [attendeeEmailInput, setAttendeeEmailInput] = useState("");
+  const [attendeeError, setAttendeeError] = useState<string | null>(null);
+  const [showAttendeePicker, setShowAttendeePicker] = useState(false);
+
+  function addAttendee(attendee: AttendeeFormValue) {
+    setAttendees((prev) => (prev.some((a) => a.email.toLowerCase() === attendee.email.toLowerCase()) ? prev : [...prev, attendee]));
+  }
+
+  function handleAddAttendeeByEmail() {
+    const email = attendeeEmailInput.trim();
+    if (!EMAIL_PATTERN.test(email)) {
+      setAttendeeError(t("calendar_attendees_invalid_email"));
+      return;
+    }
+    addAttendee({ email });
+    setAttendeeEmailInput("");
+    setAttendeeError(null);
+  }
+
+  function removeAttendee(email: string) {
+    setAttendees((prev) => prev.filter((a) => a.email !== email));
+  }
 
   function syncEndToStart(date: string, time: string) {
     const start = combine(date, time);
@@ -127,6 +157,7 @@ export default function MeetingForm({ mode, initialMeeting, initialCaseId, onSav
         startTime: start.toISOString(),
         endTime: end.toISOString(),
         caseId,
+        attendees,
       });
     } finally {
       setSubmitting(false);
@@ -214,6 +245,56 @@ export default function MeetingForm({ mode, initialMeeting, initialCaseId, onSav
         </div>
 
         <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("calendar_field_attendees")}</label>
+          {attendees.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("calendar_attendees_none")}</p>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {attendees.map((a) => (
+                <li key={a.email} className="flex items-center gap-1.5 rounded-full border border-border bg-muted/40 pl-2.5 pr-1.5 py-1 text-xs">
+                  <span className="truncate max-w-[12rem]">{a.displayName || a.email}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttendee(a.email)}
+                    aria-label={t("calendar_attendees_remove")}
+                    disabled={submitting}
+                    className="rounded-full p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-1.5">
+            <input
+              type="email"
+              value={attendeeEmailInput}
+              onChange={(e) => {
+                setAttendeeEmailInput(e.target.value);
+                setAttendeeError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddAttendeeByEmail();
+                }
+              }}
+              placeholder={t("calendar_attendees_add_by_email_placeholder")}
+              className="flex-1 min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              disabled={submitting}
+            />
+            <Button type="button" variant="outline" size="sm" onClick={handleAddAttendeeByEmail} disabled={submitting || !attendeeEmailInput.trim()}>
+              {t("calendar_attendees_add_by_email_button")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowAttendeePicker(true)} disabled={submitting}>
+              {t("calendar_attendees_add_from_contacts")}
+            </Button>
+          </div>
+          {attendeeError && <p className="text-xs text-destructive">{attendeeError}</p>}
+        </div>
+
+        <div className="space-y-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("calendar_field_case")}</label>
           <select
             value={caseId ?? ""}
@@ -252,6 +333,17 @@ export default function MeetingForm({ mode, initialMeeting, initialCaseId, onSav
           </Button>
         </div>
       </form>
+
+      {showAttendeePicker && (
+        <AttendeePickerDialog
+          existingEmails={new Set(attendees.map((a) => a.email.toLowerCase()))}
+          onAdd={(picked) => {
+            picked.forEach(addAttendee);
+            setShowAttendeePicker(false);
+          }}
+          onCancel={() => setShowAttendeePicker(false)}
+        />
+      )}
     </div>
   );
 }
