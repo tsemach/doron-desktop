@@ -23,6 +23,7 @@ pub mod search;
 pub mod fuzzy;
 pub mod org;
 pub mod contact;
+pub mod notifications;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -308,7 +309,13 @@ pub fn run() {
             calendar::delete_meeting,
             calendar::list_meetings_for_range,
             calendar::list_meetings_for_case,
-            calendar::list_todays_meetings
+            calendar::list_todays_meetings,
+            // notifications (ASC-123)
+            notifications::list_notifications,
+            notifications::update_notification_status,
+            notifications::snooze_notification,
+            notifications::get_notification_settings,
+            notifications::update_notification_settings
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
