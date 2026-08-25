@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "if [ -f .env.local ]; then set -a; . ./.env.local; set +a; fi; next dev --port ${PORT:-3001} ${HOST:+-H $HOST}",
-    "start:dev": "if [ -f .env.local ]; then set -a; . ./.env.local; set +a; fi; next dev --port ${PORT:-3001} ${HOST:+-H $HOST}",
+    "dev": "./scripts/start-dev.sh",
+    "start:dev": "./scripts/start-dev.sh",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
