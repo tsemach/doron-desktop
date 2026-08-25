@@ -67,3 +67,30 @@ fn update_notification_status_changes_status() {
     store::update_notification_status(&conn, id, "closed").unwrap();
     assert_eq!(store::get_notification(&conn, id).unwrap().status, "closed");
 }
+
+#[test]
+fn ensure_settings_row_is_idempotent_with_correct_per_category_defaults() {
+    let conn = setup_test_db("ensure_settings");
+    store::ensure_notification_settings_row(&conn, "task_due").unwrap();
+    store::ensure_notification_settings_row(&conn, "task_due").unwrap(); // second call must not error or duplicate
+
+    let all = store::list_notification_settings(&conn).unwrap();
+    assert_eq!(all.iter().filter(|r| r.category == "task_due").count(), 1);
+
+    let task_row = store::get_notification_settings_for_category(&conn, "task_due").unwrap();
+    assert!(task_row.in_app_enabled);
+    assert!(task_row.os_toast_enabled, "task_due should default OS toast on");
+
+    store::ensure_notification_settings_row(&conn, "email_arrived").unwrap();
+    let email_row = store::get_notification_settings_for_category(&conn, "email_arrived").unwrap();
+    assert!(email_row.in_app_enabled);
+    assert!(!email_row.os_toast_enabled, "email_arrived should default OS toast off");
+}
+
+#[test]
+fn update_notification_settings_persists_and_creates_row_if_missing() {
+    let conn = setup_test_db("update_settings");
+    store::update_notification_settings(&conn, "email_arrived", true, true).unwrap();
+    let row = store::get_notification_settings_for_category(&conn, "email_arrived").unwrap();
+    assert!(row.os_toast_enabled);
+}

@@ -1223,6 +1223,60 @@ pub fn snooze_notification(conn: &Connection, id: i64, until: &str) -> Result<()
     Ok(())
 }
 
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct NotificationSettingsRow {
+    pub category: String,
+    pub in_app_enabled: bool,
+    pub os_toast_enabled: bool,
+}
+
+fn notification_settings_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<NotificationSettingsRow> {
+    Ok(NotificationSettingsRow {
+        category: row.get(0)?,
+        in_app_enabled: row.get::<_, i64>(1)? != 0,
+        os_toast_enabled: row.get::<_, i64>(2)? != 0,
+    })
+}
+
+/// task_due defaults its OS toast on -- it's conceptually closest to the
+/// existing meeting-reminder OS notification. Every other category
+/// defaults in-app-only.
+fn default_os_toast_enabled(category: &str) -> bool {
+    category == "task_due"
+}
+
+pub fn ensure_notification_settings_row(conn: &Connection, category: &str) -> Result<(), rusqlite::Error> {
+    let os_toast_default: i64 = if default_os_toast_enabled(category) { 1 } else { 0 };
+    conn.execute(
+        "INSERT OR IGNORE INTO notification_settings (category, in_app_enabled, os_toast_enabled) VALUES (?1, 1, ?2)",
+        params![category, os_toast_default],
+    )?;
+    Ok(())
+}
+
+pub fn get_notification_settings_for_category(conn: &Connection, category: &str) -> Result<NotificationSettingsRow, rusqlite::Error> {
+    conn.query_row(
+        "SELECT category, in_app_enabled, os_toast_enabled FROM notification_settings WHERE category = ?1",
+        params![category],
+        notification_settings_row_from_sql,
+    )
+}
+
+pub fn list_notification_settings(conn: &Connection) -> Result<Vec<NotificationSettingsRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare("SELECT category, in_app_enabled, os_toast_enabled FROM notification_settings ORDER BY category")?;
+    let rows = stmt.query_map([], notification_settings_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub fn update_notification_settings(conn: &Connection, category: &str, in_app_enabled: bool, os_toast_enabled: bool) -> Result<(), rusqlite::Error> {
+    ensure_notification_settings_row(conn, category)?;
+    conn.execute(
+        "UPDATE notification_settings SET in_app_enabled = ?1, os_toast_enabled = ?2 WHERE category = ?3",
+        params![in_app_enabled as i64, os_toast_enabled as i64, category],
+    )?;
+    Ok(())
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct MeetingRow {
     pub id: i64,
