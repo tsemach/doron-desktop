@@ -23,6 +23,7 @@ pub mod search;
 pub mod fuzzy;
 pub mod org;
 pub mod contact;
+pub mod notifications;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -90,6 +91,12 @@ pub fn run() {
             let handle_calendar_reminder = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 crate::calendar::reminder::remind_upcoming_meetings_background(handle_calendar_reminder).await;
+            });
+            // Independent loop from every other poller -- a slow/failing call
+            // elsewhere must never delay task-due notifications.
+            let handle_task_scanner = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::notifications::task_scanner::scan_due_tasks_background(handle_task_scanner).await;
             });
             // Spawn local AI sidecar on startup if configured
             let handle_sidecar = app.handle().clone();
@@ -308,7 +315,13 @@ pub fn run() {
             calendar::delete_meeting,
             calendar::list_meetings_for_range,
             calendar::list_meetings_for_case,
-            calendar::list_todays_meetings
+            calendar::list_todays_meetings,
+            // notifications (ASC-123)
+            notifications::list_notifications,
+            notifications::update_notification_status,
+            notifications::snooze_notification,
+            notifications::get_notification_settings,
+            notifications::update_notification_settings
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -21,6 +21,7 @@ import SettingAiProviderHelp from "./SettingAiProviderHelp";
 import SettingVoiceEngineHelp from "./SettingVoiceEngineHelp";
 import SettingAiHealthCheckResult from "./SettingAiHealthCheckResult";
 import SettingUsersRoles from "./SettingUsersRoles";
+import SettingNotifications from "./SettingNotifications";
 import SettingBack from "./SettingBack";
 import SettingMenuTab, { TabType } from "./SettingMenuTab";
 
@@ -464,6 +465,8 @@ export default function Settings() {
         );
       case "users_roles":
         return <SettingUsersRoles />;
+      case "notifications":
+        return <SettingNotifications />;
       case "update":
         return (
           <SettingSoftwareUpdate

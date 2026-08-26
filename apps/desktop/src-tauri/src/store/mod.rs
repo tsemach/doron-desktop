@@ -184,6 +184,8 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     conn.execute_batch(CALENDAR_SCHEMA).map_err(|e| format!("[calendar schema] {e}"))?;
 
+    conn.execute_batch(NOTIFICATIONS_SCHEMA).map_err(|e| format!("[notifications schema] {e}"))?;
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS document_annotations (
             file_path   TEXT PRIMARY KEY,
@@ -1115,6 +1117,183 @@ const CALENDAR_SCHEMA: &str = "
     CREATE INDEX IF NOT EXISTS idx_meeting_attendees_meeting_id ON meeting_attendees(meeting_id);
 ";
 
+// ── Notifications ─────────────────────────────────────────────────────────────
+// ASC-123. A generic notification any producer module can raise via
+// notifications::create — category is free-form so a new producer needs no
+// schema migration. notification_settings is a small per-category row
+// table (not a single-row JSON blob), matching how ai_configurations
+// already stores config as discrete typed columns.
+const NOTIFICATIONS_SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS notifications (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        category       TEXT    NOT NULL,
+        title          TEXT    NOT NULL,
+        body           TEXT    NOT NULL,
+        click_target   TEXT,
+        status         TEXT    NOT NULL DEFAULT 'unread'
+                                CHECK (status IN ('unread','read','closed','deleted')),
+        created_at     TEXT    NOT NULL,
+        snooze_until   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_status       ON notifications(status);
+    CREATE INDEX IF NOT EXISTS idx_notifications_category     ON notifications(category);
+    CREATE INDEX IF NOT EXISTS idx_notifications_snooze_until ON notifications(snooze_until);
+
+    CREATE TABLE IF NOT EXISTS notification_settings (
+        category         TEXT    PRIMARY KEY,
+        in_app_enabled   INTEGER NOT NULL DEFAULT 1,
+        os_toast_enabled INTEGER NOT NULL DEFAULT 0
+    );
+";
+
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct NotificationRow {
+    pub id: i64,
+    pub category: String,
+    pub title: String,
+    pub body: String,
+    pub click_target: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    pub snooze_until: Option<String>,
+}
+
+fn notification_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<NotificationRow> {
+    Ok(NotificationRow {
+        id: row.get(0)?,
+        category: row.get(1)?,
+        title: row.get(2)?,
+        body: row.get(3)?,
+        click_target: row.get(4)?,
+        status: row.get(5)?,
+        created_at: row.get(6)?,
+        snooze_until: row.get(7)?,
+    })
+}
+
+const NOTIFICATION_COLUMNS: &str = "id, category, title, body, click_target, status, created_at, snooze_until";
+
+pub fn insert_notification(
+    conn: &Connection,
+    category: &str,
+    title: &str,
+    body: &str,
+    click_target: Option<&str>,
+) -> Result<i64, rusqlite::Error> {
+    let created_at = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO notifications (category, title, body, click_target, status, created_at)
+         VALUES (?1, ?2, ?3, ?4, 'unread', ?5)",
+        params![category, title, body, click_target, created_at],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn get_notification(conn: &Connection, id: i64) -> Result<NotificationRow, rusqlite::Error> {
+    conn.query_row(
+        &format!("SELECT {NOTIFICATION_COLUMNS} FROM notifications WHERE id = ?1"),
+        params![id],
+        notification_row_from_sql,
+    )
+}
+
+/// `status_filter: None` returns the default "active" view (unread + read,
+/// excluding anything currently snoozed into the future) -- a snoozed row
+/// simply reappears through this same query once its snooze_until passes,
+/// no separate "un-snooze" step needed. `Some(status)` bypasses the
+/// active/snooze logic entirely (used for the "closed" filter view).
+pub fn list_notifications(conn: &Connection, status_filter: Option<&str>) -> Result<Vec<NotificationRow>, rusqlite::Error> {
+    match status_filter {
+        Some(status) => {
+            let sql = format!("SELECT {NOTIFICATION_COLUMNS} FROM notifications WHERE status = ?1 ORDER BY created_at DESC");
+            let mut stmt = conn.prepare(&sql)?;
+            let rows = stmt.query_map(params![status], notification_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        }
+        None => {
+            let now = chrono::Utc::now().to_rfc3339();
+            // A category whose in-app delivery is off must stay out of the bell
+            // entirely, not just skip the live push event at creation time.
+            let sql = format!(
+                "SELECT {NOTIFICATION_COLUMNS} FROM notifications
+                 WHERE status IN ('unread','read') AND (snooze_until IS NULL OR snooze_until <= ?1)
+                   AND NOT EXISTS (
+                     SELECT 1 FROM notification_settings ns
+                     WHERE ns.category = notifications.category AND ns.in_app_enabled = 0
+                   )
+                 ORDER BY created_at DESC"
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let rows = stmt.query_map(params![now], notification_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        }
+    }
+}
+
+pub fn update_notification_status(conn: &Connection, id: i64, status: &str) -> Result<(), rusqlite::Error> {
+    conn.execute("UPDATE notifications SET status = ?1 WHERE id = ?2", params![status, id])?;
+    Ok(())
+}
+
+pub fn snooze_notification(conn: &Connection, id: i64, until: &str) -> Result<(), rusqlite::Error> {
+    conn.execute("UPDATE notifications SET snooze_until = ?1 WHERE id = ?2", params![until, id])?;
+    Ok(())
+}
+
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct NotificationSettingsRow {
+    pub category: String,
+    pub in_app_enabled: bool,
+    pub os_toast_enabled: bool,
+}
+
+fn notification_settings_row_from_sql(row: &rusqlite::Row) -> rusqlite::Result<NotificationSettingsRow> {
+    Ok(NotificationSettingsRow {
+        category: row.get(0)?,
+        in_app_enabled: row.get::<_, i64>(1)? != 0,
+        os_toast_enabled: row.get::<_, i64>(2)? != 0,
+    })
+}
+
+/// task_due defaults its OS toast on -- it's conceptually closest to the
+/// existing meeting-reminder OS notification. Every other category
+/// defaults in-app-only.
+fn default_os_toast_enabled(category: &str) -> bool {
+    category == "task_due"
+}
+
+pub fn ensure_notification_settings_row(conn: &Connection, category: &str) -> Result<(), rusqlite::Error> {
+    let os_toast_default: i64 = if default_os_toast_enabled(category) { 1 } else { 0 };
+    conn.execute(
+        "INSERT OR IGNORE INTO notification_settings (category, in_app_enabled, os_toast_enabled) VALUES (?1, 1, ?2)",
+        params![category, os_toast_default],
+    )?;
+    Ok(())
+}
+
+pub fn get_notification_settings_for_category(conn: &Connection, category: &str) -> Result<NotificationSettingsRow, rusqlite::Error> {
+    conn.query_row(
+        "SELECT category, in_app_enabled, os_toast_enabled FROM notification_settings WHERE category = ?1",
+        params![category],
+        notification_settings_row_from_sql,
+    )
+}
+
+pub fn list_notification_settings(conn: &Connection) -> Result<Vec<NotificationSettingsRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare("SELECT category, in_app_enabled, os_toast_enabled FROM notification_settings ORDER BY category")?;
+    let rows = stmt.query_map([], notification_settings_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub fn update_notification_settings(conn: &Connection, category: &str, in_app_enabled: bool, os_toast_enabled: bool) -> Result<(), rusqlite::Error> {
+    ensure_notification_settings_row(conn, category)?;
+    conn.execute(
+        "UPDATE notification_settings SET in_app_enabled = ?1, os_toast_enabled = ?2 WHERE category = ?3",
+        params![in_app_enabled as i64, os_toast_enabled as i64, category],
+    )?;
+    Ok(())
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct MeetingRow {
     pub id: i64,
@@ -1451,6 +1630,17 @@ pub fn list_tasks_for_case(conn: &Connection, case_id: i64) -> Result<Vec<TaskRo
          FROM tasks WHERE case_id = ?1 ORDER BY sort_order ASC, id ASC"
     )?;
     let rows = stmt.query_map(params![case_id], task_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// `since` is an inclusive "YYYY-MM-DD" lower bound on due_date, keeping the
+/// caller's scan window bounded instead of reaching back over all history.
+pub fn list_tasks_with_due_date(conn: &Connection, since: &str) -> Result<Vec<TaskRow>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT id, case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, updated_at, sort_order
+         FROM tasks WHERE due_date IS NOT NULL AND due_date >= ?1"
+    )?;
+    let rows = stmt.query_map(params![since], task_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 

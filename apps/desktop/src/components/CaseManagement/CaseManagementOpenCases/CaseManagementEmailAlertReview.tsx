@@ -153,20 +153,6 @@ export default function CaseManagementEmailAlertReview() {
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      {/* Floating Notification Trigger */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-xl flex items-center gap-2 cursor-pointer transition-all hover:scale-105 duration-200 animate-bounce"
-        >
-          <span className="text-lg">✉</span>
-          <span className="text-xs font-bold bg-white text-blue-600 rounded-full px-2 py-0.5">
-            {alerts.length}
-          </span>
-          <span className="text-xs font-semibold">{t("incoming_emails") || "Incoming Emails"}</span>
-        </button>
-      )}
-
       {/* Slide-out Review Center Panel */}
       {isOpen && (
         <div className="bg-white dark:bg-zinc-900 border border-border rounded-2xl w-96 shadow-2xl max-h-[500px] flex flex-col overflow-hidden animate-fade-in">
