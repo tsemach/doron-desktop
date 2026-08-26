@@ -262,7 +262,13 @@ pub fn list_tags(
 /// Distinct existing values for a given tag name (e.g. every company name already
 /// used), so a "pick existing or create new" UI can offer suggestions.
 #[tauri::command]
-pub fn list_tag_values(app: AppHandle, name: String) -> Result<Vec<String>, String> {
+pub async fn list_tag_values(app: AppHandle, name: String) -> Result<Vec<String>, String> {
+    // Scans the entire `tags` table for this name across every case/document in
+    // the database (unbounded) -- run on the blocking pool.
+    crate::blocking::run_blocking(move || list_tag_values_blocking(app, name)).await
+}
+
+fn list_tag_values_blocking(app: AppHandle, name: String) -> Result<Vec<String>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
         .prepare("SELECT DISTINCT value FROM tags WHERE name = ?1 AND value IS NOT NULL ORDER BY value")
@@ -274,7 +280,13 @@ pub fn list_tag_values(app: AppHandle, name: String) -> Result<Vec<String>, Stri
 }
 
 #[tauri::command]
-pub fn list_all_tag_names(app: AppHandle, tag_type: Option<String>) -> Result<Vec<String>, String> {
+pub async fn list_all_tag_names(app: AppHandle, tag_type: Option<String>) -> Result<Vec<String>, String> {
+    // `SELECT DISTINCT name FROM tags` (optionally filtered by type) scans the
+    // whole table, unscoped to any single case/document -- run on the blocking pool.
+    crate::blocking::run_blocking(move || list_all_tag_names_blocking(app, tag_type)).await
+}
+
+fn list_all_tag_names_blocking(app: AppHandle, tag_type: Option<String>) -> Result<Vec<String>, String> {
     let conn = store::open_db(&app)?;
     let names = match tag_type {
         Some(t) => {
