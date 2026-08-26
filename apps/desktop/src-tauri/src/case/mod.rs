@@ -141,6 +141,64 @@ pub async fn create_new_case(
     // `None` instead of erroring -- required so the existing frontend caller, which does not
     // yet send this key, keeps working unchanged until a later PR wires it up.
     let contact_emails = contact_emails.unwrap_or_default();
+
+    // The case row, its fields/tasks, and any template documents are all synchronous
+    // DB/filesystem/ZIP work -- run on the blocking pool so it doesn't stall every
+    // other in-flight command while it runs. Only the best-effort contact-linking
+    // loop below (which awaits its own async command) stays on the async side.
+    let mut result = crate::blocking::run_blocking({
+        let app = app.clone();
+        move || {
+            create_new_case_blocking(
+                app,
+                subject,
+                name,
+                folder,
+                case_template_id,
+                task_template_id,
+                tasks,
+                field_values,
+            )
+        }
+    }).await?;
+
+    // Create/link a contact for each supplied client email (design.md §4.4). Case creation
+    // itself has already succeeded above and must never roll back over this -- each failure
+    // (create or link) is collected as a warning instead of propagated with `?`. Empty/
+    // whitespace-only entries are skipped silently: the frontend caller is expected to have
+    // already trimmed/filtered, but this is a public command surface, so defend here too.
+    for email in &contact_emails {
+        let email = email.trim();
+        if email.is_empty() {
+            continue;
+        }
+        match crate::contact::create_contact(app.clone(), None, email.to_string(), None, None, None, None).await {
+            Ok(contact) => {
+                if let Err(e) =
+                    crate::contact::add_contact_to_case(app.clone(), result.case.id, contact.id, "case_creation".to_string())
+                {
+                    result.contact_warnings.push(format!("Could not add contact for {email}: {e}"));
+                }
+            }
+            Err(e) => {
+                result.contact_warnings.push(format!("Could not add contact for {email}: {e}"));
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+fn create_new_case_blocking(
+    app: AppHandle,
+    subject: String,
+    name: String,
+    folder: String,
+    case_template_id: Option<i64>,
+    task_template_id: Option<i64>,
+    tasks: Option<Vec<store::NewTaskInput>>,
+    field_values: std::collections::HashMap<String, String>,
+) -> Result<CreateCaseResult, String> {
     // 1. Open DB first and verify that this folder path is not already in use by another active case
     let conn = store::open_db(&app)?;
     let folder_exists: bool = conn.query_row(
@@ -295,31 +353,6 @@ pub async fn create_new_case(
         }
     }
 
-    // Create/link a contact for each supplied client email (design.md §4.4). Case creation
-    // itself has already succeeded above and must never roll back over this -- each failure
-    // (create or link) is collected as a warning instead of propagated with `?`. Empty/
-    // whitespace-only entries are skipped silently: the frontend caller is expected to have
-    // already trimmed/filtered, but this is a public command surface, so defend here too.
-    let mut contact_warnings = Vec::new();
-    for email in &contact_emails {
-        let email = email.trim();
-        if email.is_empty() {
-            continue;
-        }
-        match crate::contact::create_contact(app.clone(), None, email.to_string(), None, None, None, None).await {
-            Ok(contact) => {
-                if let Err(e) =
-                    crate::contact::add_contact_to_case(app.clone(), id, contact.id, "case_creation".to_string())
-                {
-                    contact_warnings.push(format!("Could not add contact for {email}: {e}"));
-                }
-            }
-            Err(e) => {
-                contact_warnings.push(format!("Could not add contact for {email}: {e}"));
-            }
-        }
-    }
-
     Ok(CreateCaseResult {
         case: Case {
             id,
@@ -332,7 +365,7 @@ pub async fn create_new_case(
             notes: None,
             tags: vec![case_id_tag],
         },
-        contact_warnings,
+        contact_warnings: Vec::new(),
     })
 }
 
