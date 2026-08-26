@@ -32,10 +32,25 @@ pub async fn query_search_documents_core(
         llm::analyze_query_heuristically(query)
     };
 
-    let local_results = {
-        let conn = store::open_db_by_path(db_path)?;
-        queries::query_smart_execute(&conn, &analysis, query, tags, notes_contains, limit * 2)
-    };
+    // Re-opening the DB re-runs schema/DDL checks, and query_smart_execute is a
+    // synchronous SQLite scan -- both run on the blocking pool so a search on
+    // every keystroke doesn't stall every other in-flight command while it runs.
+    let db_path_owned = db_path.to_path_buf();
+    let query_owned = query.to_string();
+    let tags_owned = tags.map(|t| t.to_vec());
+    let notes_owned = notes_contains.map(|s| s.to_string());
+
+    let local_results = crate::blocking::run_blocking(move || {
+        let conn = store::open_db_by_path(&db_path_owned)?;
+        Ok(queries::query_smart_execute(
+            &conn,
+            &analysis,
+            &query_owned,
+            tags_owned.as_deref(),
+            notes_owned.as_deref(),
+            limit * 2,
+        ))
+    }).await?;
 
     if options.use_llm_rerank && !USE_FTS_ONLY {
         llm::query_llm_rerank_candidates(query, local_results, provider).await
