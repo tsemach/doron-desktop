@@ -9,8 +9,12 @@ export default function NotificationBell() {
   const unreadCount = useAtomValue(unreadCountAtom);
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
+  function refresh() {
     loadNotifications().catch((err) => console.error("[NotificationBell] Failed to load notifications:", err));
+  }
+
+  useEffect(() => {
+    refresh();
     const unlisten = listen<Notification>("notification-created", (event) => {
       upsertNotification(event.payload);
     });
@@ -24,7 +28,12 @@ export default function NotificationBell() {
       {!isOpen && (
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            // Re-fetch on open so a snooze that elapsed during this session
+            // resurfaces without needing an app restart.
+            refresh();
+            setIsOpen(true);
+          }}
           className="relative bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-4 shadow-xl transition-all hover:scale-105 duration-200 cursor-pointer"
           aria-label="Notifications"
         >

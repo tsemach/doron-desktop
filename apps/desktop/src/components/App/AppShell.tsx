@@ -15,8 +15,10 @@ export default function AppShell({ children }: AppShellProps) {
   return (
     <div className="relative h-screen">
       <UpdateBanner />
-      {showBell && <NotificationBell />}
       {children}
+      {/* Rendered after children so the bell paints above other fixed
+          bottom-right panels (e.g. the email alert review) at the same z-50. */}
+      {showBell && <NotificationBell />}
     </div>
   );
 }

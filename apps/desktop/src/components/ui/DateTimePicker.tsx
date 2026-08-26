@@ -31,7 +31,9 @@ export default function DateTimePicker({ value, onChange, minDate, placeholder }
   const [timeStr, setTimeStr] = useState(toTimeInputValue(base));
 
   const candidate = combine(dateStr, timeStr);
-  const isInvalid = minDate ? candidate < minDate : false;
+  // A cleared date/time input yields an Invalid Date, whose comparisons are all
+  // false -- check it explicitly or Confirm stays enabled and emits NaN.
+  const isInvalid = Number.isNaN(candidate.getTime()) || (minDate ? candidate < minDate : false);
 
   function confirm() {
     if (isInvalid) return;

@@ -1201,9 +1201,15 @@ pub fn list_notifications(conn: &Connection, status_filter: Option<&str>) -> Res
         }
         None => {
             let now = chrono::Utc::now().to_rfc3339();
+            // A category whose in-app delivery is off must stay out of the bell
+            // entirely, not just skip the live push event at creation time.
             let sql = format!(
                 "SELECT {NOTIFICATION_COLUMNS} FROM notifications
                  WHERE status IN ('unread','read') AND (snooze_until IS NULL OR snooze_until <= ?1)
+                   AND NOT EXISTS (
+                     SELECT 1 FROM notification_settings ns
+                     WHERE ns.category = notifications.category AND ns.in_app_enabled = 0
+                   )
                  ORDER BY created_at DESC"
             );
             let mut stmt = conn.prepare(&sql)?;
@@ -1567,12 +1573,14 @@ pub fn list_tasks_for_case(conn: &Connection, case_id: i64) -> Result<Vec<TaskRo
     Ok(rows)
 }
 
-pub fn list_tasks_with_due_date(conn: &Connection) -> Result<Vec<TaskRow>, rusqlite::Error> {
+/// `since` is an inclusive "YYYY-MM-DD" lower bound on due_date, keeping the
+/// caller's scan window bounded instead of reaching back over all history.
+pub fn list_tasks_with_due_date(conn: &Connection, since: &str) -> Result<Vec<TaskRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(
         "SELECT id, case_id, title, description, status, estimate_value, estimate_unit, due_date, task_template_item_id, created_at, updated_at, sort_order
-         FROM tasks WHERE due_date IS NOT NULL"
+         FROM tasks WHERE due_date IS NOT NULL AND due_date >= ?1"
     )?;
-    let rows = stmt.query_map([], task_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
+    let rows = stmt.query_map(params![since], task_row_from_sql)?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 

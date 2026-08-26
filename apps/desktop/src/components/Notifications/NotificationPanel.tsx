@@ -98,7 +98,17 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
     updateNotificationStatus(n.id, "read").catch((err) => console.error(err));
     const target = parseClickTarget(n.click_target);
     if (target?.route) navigate(target.route);
-    if (target?.windowEvent) window.dispatchEvent(new CustomEvent(target.windowEvent));
+    if (target?.windowEvent) {
+      const windowEvent = target.windowEvent;
+      // After a navigate() the target route's listeners haven't mounted yet, so
+      // a synchronous dispatch would be lost -- defer it, as
+      // AppHomeRecentCases.tsx does for its own navigate-then-dispatch.
+      if (target.route) {
+        setTimeout(() => window.dispatchEvent(new CustomEvent(windowEvent)), 100);
+      } else {
+        window.dispatchEvent(new CustomEvent(windowEvent));
+      }
+    }
     onClose();
   }
 

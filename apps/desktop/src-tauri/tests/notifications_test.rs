@@ -98,13 +98,13 @@ fn update_notification_settings_persists_and_creates_row_if_missing() {
 use tauri_app_lib::notifications::task_scanner::tasks_entering_window;
 use tauri_app_lib::store::TaskRow;
 
-fn sample_task(id: i64, due_date: Option<&str>) -> TaskRow {
+fn sample_task(id: i64, due_date: Option<&str>, status: &str) -> TaskRow {
     TaskRow {
         id,
         case_id: 1,
         title: "T".to_string(),
         description: None,
-        status: "Waiting".to_string(),
+        status: status.to_string(),
         estimate_value: None,
         estimate_unit: None,
         due_date: due_date.map(|s| s.to_string()),
@@ -118,11 +118,41 @@ fn sample_task(id: i64, due_date: Option<&str>) -> TaskRow {
 #[test]
 fn tasks_entering_window_includes_today_and_overdue_excludes_future_and_none() {
     let tasks = vec![
-        sample_task(1, Some("2026-08-25")), // due today
-        sample_task(2, Some("2026-08-20")), // overdue
-        sample_task(3, Some("2026-09-01")), // future -- excluded
-        sample_task(4, None),               // no due date -- excluded
+        sample_task(1, Some("2026-08-25"), "Waiting"), // due today
+        sample_task(2, Some("2026-08-20"), "Waiting"), // overdue
+        sample_task(3, Some("2026-09-01"), "Waiting"), // future -- excluded
+        sample_task(4, None, "Waiting"),               // no due date -- excluded
     ];
     let due = tasks_entering_window(&tasks, "2026-08-25");
     assert_eq!(due.iter().map(|t| t.id).collect::<Vec<_>>(), vec![1, 2]);
+}
+
+#[test]
+fn tasks_entering_window_excludes_done_and_cancelled_tasks() {
+    let tasks = vec![
+        sample_task(1, Some("2026-08-20"), "Waiting"),
+        sample_task(2, Some("2026-08-20"), "Done"),
+        sample_task(3, Some("2026-08-20"), "Cancel"),
+        sample_task(4, Some("2026-08-25"), "Done"),
+        sample_task(5, Some("2026-08-25"), "In Progress"),
+    ];
+    let due = tasks_entering_window(&tasks, "2026-08-25");
+    assert_eq!(
+        due.iter().map(|t| t.id).collect::<Vec<_>>(),
+        vec![1, 5],
+        "resolved tasks must not re-notify even when their due date has passed"
+    );
+}
+
+#[test]
+fn list_notifications_excludes_categories_with_in_app_disabled() {
+    let conn = setup_test_db("in_app_disabled");
+    let id = store::insert_notification(&conn, "email_arrived", "E", "e", None).unwrap();
+    store::update_notification_settings(&conn, "email_arrived", false, false).unwrap();
+
+    let active_ids: Vec<i64> = store::list_notifications(&conn, None).unwrap().iter().map(|r| r.id).collect();
+    assert!(!active_ids.contains(&id), "in-app-disabled category should not appear in the bell");
+
+    let unread_ids: Vec<i64> = store::list_notifications(&conn, Some("unread")).unwrap().iter().map(|r| r.id).collect();
+    assert!(unread_ids.contains(&id), "an explicit status filter must still return the row");
 }
