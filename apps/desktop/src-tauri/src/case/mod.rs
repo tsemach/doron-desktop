@@ -402,7 +402,13 @@ pub struct CaseFile {
 }
 
 #[tauri::command]
-pub fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFile>, String> {
+pub async fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFile>, String> {
+    // Directory scan + per-file DB lookups -- run on the blocking pool so a case
+    // with many files doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || list_case_files_blocking(app, folder_path)).await
+}
+
+fn list_case_files_blocking(app: AppHandle, folder_path: String) -> Result<Vec<CaseFile>, String> {
     let path = Path::new(&folder_path);
     if !path.exists() {
         return Err("Directory does not exist".to_string());
@@ -581,7 +587,18 @@ pub fn delete_document_annotations(app: AppHandle, file_path: String) -> Result<
 }
 
 #[tauri::command]
-pub fn add_file_to_case(
+pub async fn add_file_to_case(
+    app: AppHandle,
+    case_folder: String,
+    source_path: String,
+) -> Result<String, String> {
+    // Filesystem copy + version-backup I/O -- run on the blocking pool. The trailing
+    // index_case_file_in_background call is itself a synchronous fire-and-forget
+    // spawn (see this task's note above) so it's safe to leave inside this closure too.
+    crate::blocking::run_blocking(move || add_file_to_case_blocking(app, case_folder, source_path)).await
+}
+
+fn add_file_to_case_blocking(
     app: AppHandle,
     case_folder: String,
     source_path: String,
@@ -663,7 +680,15 @@ pub fn get_case_fields(
 }
 
 #[tauri::command]
-pub fn save_case_fields(
+pub async fn save_case_fields(
+    app: AppHandle,
+    case_id: i64,
+    fields: std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    crate::blocking::run_blocking(move || save_case_fields_blocking(app, case_id, fields)).await
+}
+
+fn save_case_fields_blocking(
     app: AppHandle,
     case_id: i64,
     fields: std::collections::HashMap<String, String>,
@@ -681,7 +706,17 @@ pub fn save_case_fields(
 }
 
 #[tauri::command]
-pub fn remove_file_from_case(
+pub async fn remove_file_from_case(
+    app: AppHandle,
+    case_id: i64,
+    file_name: String,
+) -> Result<(), String> {
+    // Multiple sequential SQL statements + filesystem deletes + a second folder scan --
+    // run on the blocking pool so it doesn't stall every other in-flight command.
+    crate::blocking::run_blocking(move || remove_file_from_case_blocking(app, case_id, file_name)).await
+}
+
+fn remove_file_from_case_blocking(
     app: AppHandle,
     case_id: i64,
     file_name: String,
@@ -799,8 +834,11 @@ pub fn remove_file_from_case(
 }
 
 #[tauri::command]
-pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
-    std::fs::read(&path).map_err(|e| format!("Failed to read file from disk: {e}"))
+pub async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    // Reads whole documents (PDFs/DOCX can be multi-MB) -- run on the blocking pool.
+    crate::blocking::run_blocking(move || {
+        std::fs::read(&path).map_err(|e| format!("Failed to read file from disk: {e}"))
+    }).await
 }
 
 #[tauri::command]
