@@ -777,6 +777,19 @@ pub async fn save_case_document_fields(
     file_name: String,
     fields: std::collections::HashMap<String, String>,
 ) -> Result<(), String> {
+    // Entirely synchronous SQLite + filesystem + ZIP work -- run on the blocking
+    // pool so it doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || {
+        save_case_document_fields_blocking(app, case_id, file_name, fields)
+    }).await
+}
+
+fn save_case_document_fields_blocking(
+    app: AppHandle,
+    case_id: i64,
+    file_name: String,
+    fields: std::collections::HashMap<String, String>,
+) -> Result<(), String> {
     use tauri::Emitter;
 
     // 1. Open DB first
