@@ -2,6 +2,7 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 pub mod store;
+pub mod blocking;
 pub mod auth;
 pub mod calendar;
 pub mod extractor;
