@@ -238,8 +238,13 @@ async fn index_file_core_impl(
         .map(|s| s.to_lowercase())
         .unwrap_or_default();
 
-    // Extract text from the file
-    let extracted = extractor::extract(file_path).map_err(|e| format!("extraction failed: {e}"))?;
+    // Extract text from the file. Runs on the blocking pool -- PDF/DOCX
+    // parsing is CPU-bound and would otherwise stall the async worker pool
+    // for every other in-flight command while it runs.
+    let file_path_owned = file_path.to_path_buf();
+    let extracted = crate::blocking::run_blocking(move || {
+        extractor::extract(&file_path_owned).map_err(|e| format!("extraction failed: {e}"))
+    }).await?;
     if extracted.text.trim().is_empty() {
         let msg = if ext == "pdf" {
             "no text extracted (PDF may be scanned/image-only)"
@@ -352,9 +357,15 @@ async fn index_file_core_impl(
     if options.run_vector_embeddings && !crate::query::USE_FTS_ONLY {
         let chunks = crate::embeddings::chunk_text(&extracted.text, 1000, 200);
         if !chunks.is_empty() {
-            let embeddings = crate::embeddings::get_passage_embeddings(&chunks)
-                .map_err(|e| format!("Failed generating passage embeddings: {e}"))?;
-            
+            // ONNX inference is CPU-bound -- same blocking-pool reasoning as the
+            // extraction call above. chunks is moved in and handed back out
+            // alongside the embeddings so the zip loop below can still use it.
+            let (chunks, embeddings) = crate::blocking::run_blocking(move || {
+                let embeddings = crate::embeddings::get_passage_embeddings(&chunks)
+                    .map_err(|e| format!("Failed generating passage embeddings: {e}"))?;
+                Ok((chunks, embeddings))
+            }).await?;
+
             let conn = store::open_db_by_path(db_path).map_err(|e| e.to_string())?;
             // Clear any prior chunks
             let _ = store::delete_document_chunks(&conn, doc_id);

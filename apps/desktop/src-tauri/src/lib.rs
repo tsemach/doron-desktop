@@ -2,6 +2,7 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 pub mod store;
+pub mod blocking;
 pub mod auth;
 pub mod calendar;
 pub mod extractor;
@@ -64,15 +65,22 @@ pub fn run() {
                 window.maximize().ok();
                 window.show().ok();
             }
-            // Pre-warm the embedding model in a background thread on startup
-            tauri::async_runtime::spawn(async {
+            // Pre-warm the embedding model in a background thread on startup.
+            // spawn_blocking (not spawn): get_embedding_model() is a synchronous,
+            // CPU/IO-heavy ONNX model load with no .await inside it to yield on. As a
+            // regular async task it would pin one of the runtime's few async worker
+            // threads for the whole load and stall every other in-flight command
+            // (search, background pollers, etc.) until it finished.
+            tauri::async_runtime::spawn_blocking(|| {
                 let _ = crate::embeddings::get_embedding_model();
             });
             // Build the case-matcher indexes once on an existing profile. Off the
             // DB-open path because it rescans every document; retries next launch on
-            // failure since the marker is only set on success.
+            // failure since the marker is only set on success. spawn_blocking for the
+            // same reason as above -- this is a synchronous full-document rescan with
+            // no yield points.
             let handle_backfill = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
+            tauri::async_runtime::spawn_blocking(move || {
                 crate::case::matcher_backfill::run_backfill_on_startup(&handle_backfill);
             });
             // Start background email polling worker
