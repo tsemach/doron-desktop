@@ -66,9 +66,11 @@ pub fn delete_task(app: AppHandle, id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn reorder_tasks(app: AppHandle, task_ids: Vec<i64>) -> Result<(), String> {
-    let conn = store::open_db(&app)?;
-    store::reorder_tasks(&conn, &task_ids).map_err(|e| e.to_string())
+pub async fn reorder_tasks(app: AppHandle, task_ids: Vec<i64>) -> Result<(), String> {
+    crate::blocking::run_blocking(move || {
+        let conn = store::open_db(&app)?;
+        store::reorder_tasks(&conn, &task_ids).map_err(|e| e.to_string())
+    }).await
 }
 
 #[tauri::command]
