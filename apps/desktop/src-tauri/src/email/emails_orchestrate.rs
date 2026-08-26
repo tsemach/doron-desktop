@@ -318,6 +318,20 @@ pub fn apply_pipeline_outcome(
         .map_err(|e| format!("Database insert error: {e}"))?;
 
         let _ = app.emit("new-email-alert", ());
+
+        let _ = crate::notifications::create(
+            app,
+            crate::notifications::NewNotification {
+                category: "email_arrived".to_string(),
+                title: "New email awaiting review".to_string(),
+                body: format!("{} — {}", email.sender, email.subject),
+                click_target: Some(serde_json::json!({
+                    "route": "/case-management",
+                    "windowEvent": "open-email-alert-review"
+                })),
+            },
+        );
+
         return Ok(());
     }
 
