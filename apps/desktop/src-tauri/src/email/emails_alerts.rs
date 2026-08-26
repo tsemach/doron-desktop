@@ -156,7 +156,16 @@ fn refresh_alert_suggestions(conn: &rusqlite::Connection) -> Result<usize, Strin
 }
 
 #[tauri::command]
-pub fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, String> {
+pub async fn list_pending_email_alerts(app: AppHandle) -> Result<Vec<PendingAlert>, String> {
+    // Entirely synchronous SQLite + filesystem work (a cleanup pass over staged
+    // attachment folders, a suggestion-refresh pass, then the listing query) --
+    // run on the blocking pool so it doesn't stall every other in-flight command
+    // while it runs. This command is polled by the notification bell, so it runs
+    // far more often than a typical one-shot command.
+    crate::blocking::run_blocking(move || list_pending_email_alerts_blocking(app)).await
+}
+
+fn list_pending_email_alerts_blocking(app: AppHandle) -> Result<Vec<PendingAlert>, String> {
     println!("[Rust Backend] list_pending_email_alerts called!");
     let conn = store::open_db(&app)?;
 
@@ -419,7 +428,13 @@ pub async fn confirm_email_alert(app: AppHandle, alert_id: i64, case_id: i64) ->
 }
 
 #[tauri::command]
-pub fn delete_email_alert(app: AppHandle, alert_id: i64) -> Result<(), String> {
+pub async fn delete_email_alert(app: AppHandle, alert_id: i64) -> Result<(), String> {
+    // Entirely synchronous SQLite + filesystem work -- run on the blocking pool so it
+    // doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || delete_email_alert_blocking(app, alert_id)).await
+}
+
+fn delete_email_alert_blocking(app: AppHandle, alert_id: i64) -> Result<(), String> {
     let conn = store::open_db(&app)?;
     
     // Get message_id for folder cleanup

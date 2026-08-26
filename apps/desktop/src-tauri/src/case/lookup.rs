@@ -97,6 +97,14 @@ fn load_active_cases(app: &AppHandle) -> Result<Vec<Case>, String> {
     Ok(list)
 }
 
+/// Runs `load_active_cases` on the blocking pool. Shared by every command
+/// that needs the full active-case list -- `list_cases` (case/mod.rs),
+/// `resolve_cases_for_paths`, and `search_cases` (below) -- so there is one
+/// query to maintain, not three near-duplicates.
+pub(super) async fn load_active_cases_async(app: AppHandle) -> Result<Vec<Case>, String> {
+    crate::blocking::run_blocking(move || load_active_cases(&app)).await
+}
+
 fn resolve_case_for_parent<'a>(
     parent: &str,
     cases: &'a [Case],
@@ -116,11 +124,11 @@ fn resolve_case_for_parent<'a>(
 }
 
 #[tauri::command]
-pub fn resolve_cases_for_paths(
+pub async fn resolve_cases_for_paths(
     app: AppHandle,
     paths: Vec<String>,
 ) -> Result<Vec<CasePathResolution>, String> {
-    let cases = load_active_cases(&app)?;
+    let cases = load_active_cases_async(app).await?;
 
     let mut out = Vec::with_capacity(paths.len());
     for path in paths {
@@ -166,7 +174,7 @@ fn case_matches_filters(case: &Case, tags: Option<&[TagFilter]>, notes_contains:
 }
 
 #[tauri::command]
-pub fn search_cases(
+pub async fn search_cases(
     app: AppHandle,
     tags: Option<Vec<TagFilter>>,
     notes_contains: Option<String>,
@@ -174,7 +182,8 @@ pub fn search_cases(
     let tags_ref = tags.as_deref();
     let notes_ref = notes_contains.as_deref();
 
-    let mut matched: Vec<CaseSearchRow> = load_active_cases(&app)?
+    let mut matched: Vec<CaseSearchRow> = load_active_cases_async(app)
+        .await?
         .into_iter()
         .filter(|c| case_matches_filters(c, tags_ref, notes_ref))
         .map(|c| CaseSearchRow {

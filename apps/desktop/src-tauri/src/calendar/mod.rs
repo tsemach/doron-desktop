@@ -206,19 +206,25 @@ pub async fn delete_meeting(app: AppHandle, id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn list_meetings_for_range(app: AppHandle, start: String, end: String) -> Result<Vec<crate::store::MeetingRow>, String> {
-    let conn = crate::store::open_db(&app)?;
-    crate::store::list_meetings_for_range(&conn, &start, &end).map_err(|e| e.to_string())
+pub async fn list_meetings_for_range(app: AppHandle, start: String, end: String) -> Result<Vec<crate::store::MeetingRow>, String> {
+    crate::blocking::run_blocking(move || {
+        let conn = crate::store::open_db(&app)?;
+        crate::store::list_meetings_for_range(&conn, &start, &end).map_err(|e| e.to_string())
+    }).await
 }
 
 #[tauri::command]
-pub fn list_meetings_for_case(app: AppHandle, case_id: i64) -> Result<Vec<crate::store::MeetingRow>, String> {
-    let conn = crate::store::open_db(&app)?;
-    crate::store::list_meetings_for_case(&conn, case_id).map_err(|e| e.to_string())
+pub async fn list_meetings_for_case(app: AppHandle, case_id: i64) -> Result<Vec<crate::store::MeetingRow>, String> {
+    crate::blocking::run_blocking(move || {
+        let conn = crate::store::open_db(&app)?;
+        crate::store::list_meetings_for_case(&conn, case_id).map_err(|e| e.to_string())
+    }).await
 }
 
 #[tauri::command]
-pub fn list_todays_meetings(app: AppHandle) -> Result<Vec<crate::store::MeetingRow>, String> {
-    let conn = crate::store::open_db(&app)?;
-    crate::store::list_todays_meetings(&conn).map_err(|e| e.to_string())
+pub async fn list_todays_meetings(app: AppHandle) -> Result<Vec<crate::store::MeetingRow>, String> {
+    crate::blocking::run_blocking(move || {
+        let conn = crate::store::open_db(&app)?;
+        crate::store::list_todays_meetings(&conn).map_err(|e| e.to_string())
+    }).await
 }

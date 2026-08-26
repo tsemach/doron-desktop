@@ -33,7 +33,15 @@ pub fn get_case_annotations(app: AppHandle, case_id: i64) -> Result<Option<CaseA
 }
 
 #[tauri::command]
-pub fn set_case_annotations(
+pub async fn set_case_annotations(
+    app: AppHandle,
+    case_id: i64,
+    notes: Option<String>,
+) -> Result<CaseAnnotations, String> {
+    crate::blocking::run_blocking(move || set_case_annotations_blocking(app, case_id, notes)).await
+}
+
+fn set_case_annotations_blocking(
     app: AppHandle,
     case_id: i64,
     notes: Option<String>,

@@ -3,7 +3,19 @@ use std::path::Path;
 use crate::{extractor, store};
 
 #[tauri::command]
-pub fn get_template_field_context(
+pub async fn get_template_field_context(
+    app: AppHandle,
+    template_id: i64,
+    field_name: String,
+) -> Result<String, String> {
+    // Entirely synchronous DB + CPU-bound extraction work -- run on the blocking
+    // pool so it doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || {
+        get_template_field_context_blocking(app, template_id, field_name)
+    }).await
+}
+
+fn get_template_field_context_blocking(
     app: AppHandle,
     template_id: i64,
     field_name: String,

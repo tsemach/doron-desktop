@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::store;
-use crate::tags::{list_all_tags_for_scope_type, list_tags_for_document_fuzzy, upsert_tag_internal, Tag, TagScope, TagType};
+use crate::tags::{list_tags_for_document_fuzzy, upsert_tag_internal, Tag, TagScope, TagType};
 
 pub mod annotations;
 pub mod case_text_index;
@@ -61,48 +61,13 @@ pub struct CreateCaseResult {
 }
 
 #[tauri::command]
-pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
-    let conn = store::open_db(&app)?;
-    let mut stmt = conn
-        .prepare("
-            SELECT c.id, c.subject, c.status, c.name, c.created_at, c.updated_at, c.folder, ca.notes
-            FROM cases c
-            LEFT JOIN case_annotations ca ON c.id = ca.case_id
-            WHERE c.deleted = 0 OR c.deleted IS NULL
-            ORDER BY c.id DESC
-        ")
-        .map_err(|e| e.to_string())?;
-
-    let rows = stmt.query_map([], |row| {
-        Ok(Case {
-            id: row.get(0)?,
-            subject: row.get(1)?,
-            status: row.get(2)?,
-            name: row.get(3)?,
-            created_at: row.get(4)?,
-            updated_at: row.get(5)?,
-            folder: row.get(6)?,
-            notes: row.get(7)?,
-            tags: Vec::new(),
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let mut list = Vec::new();
-    for r in rows {
-        list.push(r.map_err(|e| e.to_string())?);
-    }
-
-    // Bulk-attach tags (one query for all cases instead of one per case).
-    let all_case_tags = list_all_tags_for_scope_type(&app, "case")?;
-    for case in list.iter_mut() {
-        let case_id_str = case.id.to_string();
-        case.tags = all_case_tags
-            .iter()
-            .filter(|t| t.scope_value.as_deref() == Some(case_id_str.as_str()))
-            .cloned()
-            .collect();
-    }
-
+pub async fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
+    // Delegates to the same query `resolve_cases_for_paths`/`search_cases` use
+    // (case/lookup.rs) instead of maintaining a second near-identical one.
+    // That shared query has no ORDER BY (its other callers don't need one);
+    // sort here to preserve this command's original `ORDER BY c.id DESC`.
+    let mut list = lookup::load_active_cases_async(app).await?;
+    list.sort_by(|a, b| b.id.cmp(&a.id));
     Ok(list)
 }
 
@@ -402,7 +367,13 @@ pub struct CaseFile {
 }
 
 #[tauri::command]
-pub fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFile>, String> {
+pub async fn list_case_files(app: AppHandle, folder_path: String) -> Result<Vec<CaseFile>, String> {
+    // Directory scan + per-file DB lookups -- run on the blocking pool so a case
+    // with many files doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || list_case_files_blocking(app, folder_path)).await
+}
+
+fn list_case_files_blocking(app: AppHandle, folder_path: String) -> Result<Vec<CaseFile>, String> {
     let path = Path::new(&folder_path);
     if !path.exists() {
         return Err("Directory does not exist".to_string());
@@ -581,7 +552,18 @@ pub fn delete_document_annotations(app: AppHandle, file_path: String) -> Result<
 }
 
 #[tauri::command]
-pub fn add_file_to_case(
+pub async fn add_file_to_case(
+    app: AppHandle,
+    case_folder: String,
+    source_path: String,
+) -> Result<String, String> {
+    // Filesystem copy + version-backup I/O -- run on the blocking pool. The trailing
+    // index_case_file_in_background call is itself a synchronous fire-and-forget
+    // spawn (see this task's note above) so it's safe to leave inside this closure too.
+    crate::blocking::run_blocking(move || add_file_to_case_blocking(app, case_folder, source_path)).await
+}
+
+fn add_file_to_case_blocking(
     app: AppHandle,
     case_folder: String,
     source_path: String,
@@ -663,7 +645,15 @@ pub fn get_case_fields(
 }
 
 #[tauri::command]
-pub fn save_case_fields(
+pub async fn save_case_fields(
+    app: AppHandle,
+    case_id: i64,
+    fields: std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    crate::blocking::run_blocking(move || save_case_fields_blocking(app, case_id, fields)).await
+}
+
+fn save_case_fields_blocking(
     app: AppHandle,
     case_id: i64,
     fields: std::collections::HashMap<String, String>,
@@ -681,7 +671,17 @@ pub fn save_case_fields(
 }
 
 #[tauri::command]
-pub fn remove_file_from_case(
+pub async fn remove_file_from_case(
+    app: AppHandle,
+    case_id: i64,
+    file_name: String,
+) -> Result<(), String> {
+    // Multiple sequential SQL statements + filesystem deletes + a second folder scan --
+    // run on the blocking pool so it doesn't stall every other in-flight command.
+    crate::blocking::run_blocking(move || remove_file_from_case_blocking(app, case_id, file_name)).await
+}
+
+fn remove_file_from_case_blocking(
     app: AppHandle,
     case_id: i64,
     file_name: String,
@@ -799,8 +799,11 @@ pub fn remove_file_from_case(
 }
 
 #[tauri::command]
-pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
-    std::fs::read(&path).map_err(|e| format!("Failed to read file from disk: {e}"))
+pub async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    // Reads whole documents (PDFs/DOCX can be multi-MB) -- run on the blocking pool.
+    crate::blocking::run_blocking(move || {
+        std::fs::read(&path).map_err(|e| format!("Failed to read file from disk: {e}"))
+    }).await
 }
 
 #[tauri::command]

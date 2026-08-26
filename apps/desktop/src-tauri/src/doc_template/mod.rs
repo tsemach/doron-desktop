@@ -465,32 +465,46 @@ fn sync_single_template_internal(conn: &rusqlite::Connection, template_id: i64, 
 }
 
 #[tauri::command]
-pub fn sync_template_fields(app: AppHandle, template_id: i64) -> Result<Vec<String>, String> {
+pub async fn sync_template_fields(app: AppHandle, template_id: i64) -> Result<Vec<String>, String> {
+    // Opens a DB connection and calls extractor::extract() via
+    // sync_single_template_internal -- both synchronous, run on the blocking pool.
+    crate::blocking::run_blocking(move || sync_template_fields_blocking(app, template_id)).await
+}
+
+fn sync_template_fields_blocking(app: AppHandle, template_id: i64) -> Result<Vec<String>, String> {
     let conn = store::open_db(&app)?;
-    
+
     let mut stmt = conn
         .prepare("SELECT marked_path FROM doc_templates WHERE id = ?1")
         .map_err(|e| e.to_string())?;
-    
+
     let marked_path_str: String = stmt
         .query_row(rusqlite::params![template_id], |row| row.get(0))
         .map_err(|e| format!("Failed to find template with ID {template_id}: {e}"))?;
-        
+
     sync_single_template_internal(&conn, template_id, &marked_path_str)
 }
 
 #[tauri::command]
-pub fn sync_all_templates_fields(app: AppHandle) -> Result<(), String> {
+pub async fn sync_all_templates_fields(app: AppHandle) -> Result<(), String> {
+    // Loops over every template, calling extractor::extract() once per
+    // template via sync_single_template_internal -- run the whole loop on
+    // the blocking pool so a firm with many templates doesn't stall the
+    // async worker pool for the duration of the full sync.
+    crate::blocking::run_blocking(move || sync_all_templates_fields_blocking(app)).await
+}
+
+fn sync_all_templates_fields_blocking(app: AppHandle) -> Result<(), String> {
     let conn = store::open_db(&app)?;
-    
+
     let mut stmt = conn
         .prepare("SELECT id, file_name, marked_path FROM doc_templates")
         .map_err(|e| e.to_string())?;
-        
+
     let rows = stmt.query_map([], |row| {
         Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
     }).map_err(|e| e.to_string())?;
-    
+
     let mut errors = Vec::new();
     for r in rows {
         if let Ok((id, file_name, marked_path_str)) = r {
@@ -499,11 +513,11 @@ pub fn sync_all_templates_fields(app: AppHandle) -> Result<(), String> {
             }
         }
     }
-    
+
     if !errors.is_empty() {
         return Err(errors.join("; "));
     }
-    
+
     Ok(())
 }
 
@@ -695,9 +709,13 @@ pub async fn fill_document_placeholders(
 }
 
 #[tauri::command]
-pub fn open_path(app: AppHandle, path: String) -> Result<(), String> {
+pub async fn open_path(app: AppHandle, path: String) -> Result<(), String> {
     println!("[open_path] Attempting to open path: {}", path);
-    open_path_impl(&app, &path)
+    // WSL subprocess spawns (wslpath/powershell.exe/wslview) and the opener-plugin
+    // call below are both genuinely blocking (process spawn+wait, or a synchronous
+    // OS "open with default app" call) -- run on the blocking pool so a slow file
+    // association or a stuck subprocess doesn't stall every other in-flight command.
+    crate::blocking::run_blocking(move || open_path_impl(&app, &path)).await
 }
 
 fn open_path_impl(app: &AppHandle, path: &str) -> Result<(), String> {
@@ -773,7 +791,11 @@ fn try_open_via_wsl(path: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn delete_template(app: AppHandle, id: i64) -> Result<(), String> {
+pub async fn delete_template(app: AppHandle, id: i64) -> Result<(), String> {
+    crate::blocking::run_blocking(move || delete_template_blocking(app, id)).await
+}
+
+fn delete_template_blocking(app: AppHandle, id: i64) -> Result<(), String> {
     let conn = store::open_db(&app)?;
 
     let mut stmt = conn
