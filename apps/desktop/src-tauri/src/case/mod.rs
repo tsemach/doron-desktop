@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::store;
-use crate::tags::{list_all_tags_for_scope_type, list_tags_for_document_fuzzy, upsert_tag_internal, Tag, TagScope, TagType};
+use crate::tags::{list_tags_for_document_fuzzy, upsert_tag_internal, Tag, TagScope, TagType};
 
 pub mod annotations;
 pub mod case_text_index;
@@ -61,48 +61,13 @@ pub struct CreateCaseResult {
 }
 
 #[tauri::command]
-pub fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
-    let conn = store::open_db(&app)?;
-    let mut stmt = conn
-        .prepare("
-            SELECT c.id, c.subject, c.status, c.name, c.created_at, c.updated_at, c.folder, ca.notes
-            FROM cases c
-            LEFT JOIN case_annotations ca ON c.id = ca.case_id
-            WHERE c.deleted = 0 OR c.deleted IS NULL
-            ORDER BY c.id DESC
-        ")
-        .map_err(|e| e.to_string())?;
-
-    let rows = stmt.query_map([], |row| {
-        Ok(Case {
-            id: row.get(0)?,
-            subject: row.get(1)?,
-            status: row.get(2)?,
-            name: row.get(3)?,
-            created_at: row.get(4)?,
-            updated_at: row.get(5)?,
-            folder: row.get(6)?,
-            notes: row.get(7)?,
-            tags: Vec::new(),
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let mut list = Vec::new();
-    for r in rows {
-        list.push(r.map_err(|e| e.to_string())?);
-    }
-
-    // Bulk-attach tags (one query for all cases instead of one per case).
-    let all_case_tags = list_all_tags_for_scope_type(&app, "case")?;
-    for case in list.iter_mut() {
-        let case_id_str = case.id.to_string();
-        case.tags = all_case_tags
-            .iter()
-            .filter(|t| t.scope_value.as_deref() == Some(case_id_str.as_str()))
-            .cloned()
-            .collect();
-    }
-
+pub async fn list_cases(app: AppHandle) -> Result<Vec<Case>, String> {
+    // Delegates to the same query `resolve_cases_for_paths`/`search_cases` use
+    // (case/lookup.rs) instead of maintaining a second near-identical one.
+    // That shared query has no ORDER BY (its other callers don't need one);
+    // sort here to preserve this command's original `ORDER BY c.id DESC`.
+    let mut list = lookup::load_active_cases_async(app).await?;
+    list.sort_by(|a, b| b.id.cmp(&a.id));
     Ok(list)
 }
 
