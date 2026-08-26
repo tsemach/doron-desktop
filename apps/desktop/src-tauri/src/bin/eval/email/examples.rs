@@ -110,8 +110,8 @@ pub async fn execute(_args: ExamplesArgs) -> Result<(), String> {
         "run --mode classification --inject-only --corpus-dir tests/email/fixtures",
     );
     example(
-        "Against the local sidecar (start the app, or llama-server on :10086)",
-        "run --mode classification --provider local \\\n      --model \"Phi-4-mini-instruct (3.8B Q4)\" --corpus-dir ./email_eval_corpus",
+        "Against a cloud provider",
+        "run --mode classification --provider claude \\\n      --model claude-3-5-sonnet-20241022 --api-key YOUR_API_KEY --corpus-dir ./email_eval_corpus",
     );
 
     section("Reading the report");
