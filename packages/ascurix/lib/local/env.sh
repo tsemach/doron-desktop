@@ -7,7 +7,6 @@ write_backend_env() {
   local root="$1" ip="$2" file
   file="$root/apps/backend/.env.local"
   set_env_var "$file" "HOST" "$ip"
-  set_env_var "$file" "HOSTNAME" "$ip"
   set_env_var "$file" "PORT" "3000"
   # NextAuth (Auth.js v5) reads AUTH_URL (NEXTAUTH_URL for v4 compat) as its
   # canonical origin for OAuth callback URLs and cookies -- without it, auth
@@ -23,7 +22,6 @@ write_office_env() {
   local root="$1" ip="$2" file
   file="$root/apps/office/.env.local"
   set_env_var "$file" "HOST" "$ip"
-  set_env_var "$file" "HOSTNAME" "$ip"
   set_env_var "$file" "PORT" "3001"
   set_env_var "$file" "AUTH_URL" "http://${ip}:3001"
   set_env_var "$file" "NEXTAUTH_URL" "http://${ip}:3001"
