@@ -10,6 +10,7 @@ import {
   snoozeNotification,
   type Notification,
 } from "@/store/notificationStore";
+import DateTimePicker from "@/components/ui/DateTimePicker";
 
 interface NotificationPanelProps {
   onClose: () => void;
@@ -60,6 +61,17 @@ function SnoozeMenu({ onPick }: { onPick: (until: Date) => void }) {
                 {preset.label}
               </button>
             ))}
+            <div className="px-3 py-1.5">
+              <DateTimePicker
+                value={null}
+                minDate={new Date()}
+                placeholder="Custom…"
+                onChange={(until) => {
+                  setOpen(false);
+                  onPick(until);
+                }}
+              />
+            </div>
           </div>
         </>
       )}
