@@ -7,7 +7,14 @@ use super::emails_settings::get_email_settings_internal;
 use super::emails_ingestion::check_and_ingest_emails;
 
 #[tauri::command]
-pub fn list_case_emails(app: AppHandle, case_id: i64) -> Result<Vec<CaseEmail>, String> {
+pub async fn list_case_emails(app: AppHandle, case_id: i64) -> Result<Vec<CaseEmail>, String> {
+    // A case's full email history (body_text/body_html included) is unbounded and grows
+    // over the case's lifetime -- run on the blocking pool so it doesn't stall every other
+    // in-flight command while it runs.
+    crate::blocking::run_blocking(move || list_case_emails_blocking(app, case_id)).await
+}
+
+fn list_case_emails_blocking(app: AppHandle, case_id: i64) -> Result<Vec<CaseEmail>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
         .prepare("SELECT id, case_id, message_id, sender, recipient, subject, body_text, body_html, direction, received_at, attachments_json FROM case_emails WHERE case_id = ?1 ORDER BY received_at ASC")
@@ -231,7 +238,13 @@ fn clean_line_for_header_check(line: &str) -> String {
 }
 
 #[tauri::command]
-pub fn list_case_attachments(app: AppHandle, case_id: i64) -> Result<Vec<super::types::AttachmentMetadata>, String> {
+pub async fn list_case_attachments(app: AppHandle, case_id: i64) -> Result<Vec<super::types::AttachmentMetadata>, String> {
+    // Same unbounded per-case email scan as list_case_emails above, plus a JSON parse per
+    // row -- run on the blocking pool so it doesn't stall every other in-flight command.
+    crate::blocking::run_blocking(move || list_case_attachments_blocking(app, case_id)).await
+}
+
+fn list_case_attachments_blocking(app: AppHandle, case_id: i64) -> Result<Vec<super::types::AttachmentMetadata>, String> {
     let conn = store::open_db(&app)?;
     let mut stmt = conn
         .prepare("SELECT attachments_json FROM case_emails WHERE case_id = ?1")
@@ -257,7 +270,20 @@ pub fn list_case_attachments(app: AppHandle, case_id: i64) -> Result<Vec<super::
 }
 
 #[tauri::command]
-pub fn remove_attachment(
+pub async fn remove_attachment(
+    app: AppHandle,
+    case_id: i64,
+    staged_path: String,
+    imported_path: Option<String>,
+) -> Result<(), String> {
+    // Filesystem delete + a scan over every email on the case + an update loop -- run on
+    // the blocking pool so it doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || {
+        remove_attachment_blocking(app, case_id, staged_path, imported_path)
+    }).await
+}
+
+fn remove_attachment_blocking(
     app: AppHandle,
     case_id: i64,
     staged_path: String,
