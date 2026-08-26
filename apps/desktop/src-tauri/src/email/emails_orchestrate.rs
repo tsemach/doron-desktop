@@ -146,22 +146,10 @@ fn llm_provider_from_app(app: &AppHandle) -> Option<LlmProvider> {
     }
 
     Some(get_active_provider(ProviderConfig {
-        provider_type: if config.ai_mode == "local" {
-            "local".to_string()
-        } else {
-            config.provider.clone()
-        },
-        api_key: if config.ai_mode == "local" {
-            String::new()
-        } else {
-            config.api_key_enc.clone()
-        },
+        provider_type: config.provider.clone(),
+        api_key: config.api_key_enc.clone(),
         model: config.ai_model.clone(),
-        base_url: if config.ai_mode == "local" {
-            Some("http://localhost:10086/v1".to_string())
-        } else {
-            None
-        },
+        base_url: None,
     }))
 }
 

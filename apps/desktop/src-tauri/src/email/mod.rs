@@ -7,7 +7,6 @@ mod emails_ops;
 mod emails_ingestion;
 mod emails_classify;
 mod emails_classify_deterministic;
-mod emails_classify_llm;
 mod emails_case_api;
 mod emails_orchestrate;
 mod emails_alerts;

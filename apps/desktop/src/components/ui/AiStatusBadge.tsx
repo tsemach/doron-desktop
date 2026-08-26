@@ -2,7 +2,6 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useAtom, useAtomValue, getDefaultStore } from "jotai";
 import { aiConfigAtom, aiConfigStatusAtom, triggerGlobalHealthCheck } from "../../store/aiStore";
-import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 
 export default function AiStatusBadge() {
@@ -32,16 +31,9 @@ export default function AiStatusBadge() {
     }
   };
 
-  const handleStop = async () => {
-    try {
-      if (config?.aiMode === "local") {
-        await invoke("stop_llama_server");
-      }
-      setStatus("failed");
-      setIsOpen(false);
-    } catch (err) {
-      console.error("Failed to stop AI server:", err);
-    }
+  const handleStop = () => {
+    setStatus("failed");
+    setIsOpen(false);
   };
 
   return (

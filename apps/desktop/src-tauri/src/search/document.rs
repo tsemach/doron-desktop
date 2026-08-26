@@ -31,13 +31,12 @@ impl SearchEngine for DocumentSearchEngine {
             } else {
                 let provider =
                     crate::llm::load_active_provider(app, String::new(), model, "query_analysis")?;
-                let is_local = matches!(provider, LlmProvider::Local(_));
                 let is_pro = crate::auth::is_pro_tier(app);
                 (
                     provider,
                     SearchOptions {
-                        use_llm_query_analysis: !is_local && is_pro,
-                        use_llm_rerank: !is_local && is_pro,
+                        use_llm_query_analysis: is_pro,
+                        use_llm_rerank: is_pro,
                     },
                 )
             };

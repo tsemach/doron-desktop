@@ -98,16 +98,6 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 crate::notifications::task_scanner::scan_due_tasks_background(handle_task_scanner).await;
             });
-            // Spawn local AI sidecar on startup if configured
-            let handle_sidecar = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                if let Some(config) = crate::llm::get_ai_settings_internal(&handle_sidecar) {
-                    if config.ai_mode == "local" {
-                        println!("[Rust Backend] Starting local AI sidecar on startup for model: {}", config.ai_model);
-                        let _ = crate::llm::start_llama_server(&handle_sidecar, &config.ai_model);
-                    }
-                }
-            });
             // Resume interrupted indexing sessions after startup
             let handle_indexing = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -264,14 +254,6 @@ pub fn run() {
             llm::get_ai_settings,
             llm::save_ai_settings,
             llm::check_ai_health,
-            llm::check_local_model_status,
-            llm::check_model_downloading,
-            llm::cancel_model_download,
-            llm::install_local_model,
-            llm::delete_local_model,
-            llm::stop_llama_server,
-            llm::stop_whisper_server,
-            llm::transcribe_audio_local,
             llm::transcribe_audio_cloud,
             llm::extract_field_value,
             email::confirm_email_alert,
@@ -325,11 +307,5 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
-                println!("[Rust Backend] Tauri app exiting. Terminating local sidecars...");
-                crate::llm::stop_llama_server();
-                crate::llm::stop_whisper_server();
-            }
-        });
+        .run(|_app_handle, _event| {});
 }

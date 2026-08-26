@@ -1,11 +1,11 @@
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use crate::store;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AiConfig {
-    pub ai_mode: String,       // "local" | "online" | "byom"
+    pub ai_mode: String,       // "online" | "byom" ("local" is a legacy value from pre-existing installs, no longer selectable)
     pub provider: String,      // "gemini" | "openai" | "anthropic" | "other"
     pub ai_model: String,      // e.g. "gpt-4o-mini", "gemini-1.5-flash", etc.
     pub api_key_enc: String,   // Encrypted API key (saved for BYOM)
@@ -13,9 +13,9 @@ pub struct AiConfig {
     // Defaulted so existing callers (e.g. check_ai_health) that don't send this
     // field still deserialize without needing to be updated.
     #[serde(default = "default_voice_engine")]
-    pub voice_engine: String,  // "local" | "cloud"
-    // Which whisper model to use when voice_engine == "local" (see
-    // llm_local_mode::get_model_filename's whisper entries).
+    pub voice_engine: String,  // "cloud" ("local" is a legacy value from pre-existing installs, no longer selectable)
+    // Legacy field from the removed local whisper engine, kept for
+    // backward-compatible deserialization of pre-existing saved settings.
     #[serde(default = "default_voice_model")]
     pub voice_model: String,
     // Cloud provider + API key dedicated to voice input (used for BOTH
@@ -30,7 +30,7 @@ pub struct AiConfig {
 }
 
 fn default_voice_engine() -> String {
-    "local".to_string()
+    "cloud".to_string()
 }
 
 fn default_voice_model() -> String {
@@ -145,14 +145,6 @@ pub fn load_active_provider(
     }
 
     let config = match existing_config {
-        Some(config) if config.ai_mode == "local" => {
-            super::llm_provider::ProviderConfig {
-                provider_type: "local".to_string(),
-                api_key: String::new(),
-                model: config.ai_model,
-                base_url: Some("http://localhost:10086/v1".to_string()),
-            }
-        }
         Some(config) => {
             let api_key = if config.api_key_enc.is_empty() {
                 api_key_fallback
@@ -269,28 +261,6 @@ mod voice_provider_tests {
 /// Tauri command to run the connection test/health check
 #[tauri::command]
 pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String, String> {
-    // For local mode, ensure the background sidecar is started and responsive
-    if config.ai_mode == "local" {
-        let port = start_llama_server(&app, &config.ai_model)?;
-        
-        // Poll /health endpoint up to 120 seconds (240 * 500ms) to give the model time to load into memory
-        let client = reqwest::Client::new();
-        let health_url = format!("http://localhost:{}/health", port);
-        let mut responsive = false;
-        for _ in 0..240 {
-            if client.get(&health_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
-                responsive = true;
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        }
-        
-        if !responsive {
-            return Err("Local model server failed to start or did not become responsive within timeout.".to_string());
-        }
-        return Ok("Connection successful! Local model server is running and healthy.".to_string());
-    }
-
     // Cloud/BYOM health checks are Pro-only ("ai_features" FeatureKey,
     // PLAN.md Phase 3) -- local mode already returned above, ungated.
     if !crate::auth::is_pro_tier(&app) {
@@ -350,83 +320,6 @@ pub async fn check_ai_health(app: AppHandle, config: AiConfig) -> Result<String,
         Err(_) => {
             Err("Connection timed out after 10 seconds. The model might still be loading or warming up in memory.".to_string())
         }
-    }
-}
-
-// ── Local Model Sidecar implementation ───────────────────────────────────────
-
-use std::sync::Mutex;
-use super::llm_local_mode::get_model_filename;
-use super::sidecar::{SidecarManager, get_sidecar_path};
-
-static LLAMA_SIDECAR: SidecarManager = SidecarManager::new();
-pub(crate) static RUNNING_MODEL: Mutex<Option<String>> = Mutex::new(None);
-
-pub fn start_llama_server(app: &AppHandle, model_name: &str) -> Result<u16, String> {
-    let sidecar_path = get_sidecar_path(app, "llama-server")?;
-    let model_file = get_model_filename(model_name)?;
-    let models_dir = app.path().app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
-    let model_path = models_dir.join(model_file);
-    if !model_path.exists() {
-        return Err(format!("Model file not found. Please download it first."));
-    }
-
-    let mut model_guard = RUNNING_MODEL.lock().unwrap();
-
-    if LLAMA_SIDECAR.is_running() && model_guard.as_deref() == Some(model_name) {
-        return Ok(10086);
-    }
-
-    // Prior to spawning, kill any existing/zombie sidecar processes of the same name
-    let sidecar_filename = sidecar_path.file_name().unwrap().to_string_lossy().into_owned();
-    LLAMA_SIDECAR.kill_existing(&sidecar_filename);
-    *model_guard = None;
-
-    // Dynamically detect total logical CPU threads and allocate 50% to the Llama server
-    let system_threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4);
-    let allocated_threads = (system_threads / 2).max(1);
-    println!("Dynamic CPU allocation: using {} out of {} available threads", allocated_threads, system_threads);
-
-    let port = 10086;
-    let template = if model_name.to_lowercase().contains("qwen") {
-        "chatml"
-    } else if model_name.to_lowercase().contains("gemma") {
-        "gemma"
-    } else if model_name.to_lowercase().contains("phi-4") {
-        "phi4"
-    } else {
-        "chatml"
-    };
-
-    let args: Vec<String> = vec![
-        "--model".into(), model_path.to_string_lossy().into_owned(),
-        "--port".into(), port.to_string(),
-        "--threads".into(), allocated_threads.to_string(),
-        "--threads-batch".into(), allocated_threads.to_string(),
-        "-c".into(), "8192".into(),
-        "--host".into(), "127.0.0.1".into(),
-        "--no-cache-prompt".into(),
-        "--chat-template".into(), template.into(),
-    ];
-
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let log_file_path = app_data_dir.join("llama_sidecar.log");
-
-    LLAMA_SIDECAR.spawn(&sidecar_path, &args, &log_file_path)?;
-    *model_guard = Some(model_name.to_string());
-
-    Ok(port)
-}
-
-#[tauri::command]
-pub fn stop_llama_server() {
-    LLAMA_SIDECAR.stop();
-    if let Ok(mut model_guard) = RUNNING_MODEL.lock() {
-        *model_guard = None;
     }
 }
 

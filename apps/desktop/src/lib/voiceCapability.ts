@@ -14,32 +14,24 @@ export interface VoiceCapabilityResult {
  * Given the current AI settings (the raw shape returned by the
  * `get_ai_settings` Tauri command), determines whether voice input is usable
  * right now, and if not, why — for gating a mic button with an explanatory
- * tooltip. The "local" voice engine never needs this check (it doesn't touch
- * any cloud provider at all). "cloud" uses its own dedicated
- * voice_cloud_provider/voice_cloud_api_key settings (independent of the main
- * AI Provider config) for both transcription and field extraction.
+ * tooltip. Voice input always goes through the cloud engine, using its own
+ * dedicated voice_cloud_provider/voice_cloud_api_key settings (independent
+ * of the main AI Provider config) for both transcription and field
+ * extraction.
  *
  * An API key is no longer required: an empty voice_cloud_api_key now means
  * "online" (backend-proxied, resolve_voice_provider on the Rust side --
  * apps/desktop/src-tauri/src/llm/llm_settings.rs), same as the main AI
  * Provider's online mode; a configured key means BYOM (direct provider
- * call), unchanged from before. Cloud voice stays Pro-gated either way —
+ * call), unchanged from before. Cloud voice is Pro-gated either way —
  * matches transcribe_audio_cloud's server-side is_pro_tier check, which
  * fires before provider resolution regardless of whether a key is set.
  */
 export function checkVoiceCapability(
-  settings: { voice_engine?: string; voice_cloud_provider?: string; voice_cloud_api_key?: string } | null
+  settings: { voice_cloud_provider?: string; voice_cloud_api_key?: string } | null
 ): VoiceCapabilityResult {
-  const voiceEngine = settings?.voice_engine || "local";
-  if (voiceEngine === "local") {
-    return { disabled: false, reason: null };
-  }
-
-  // Cloud voice (online or BYOM) is Pro-only (matches transcribe_audio_cloud's
-  // server-side gate, PLAN.md Phase 3) — local voice stays free regardless
-  // of tier.
   if (!isFeatureEnabled("voice_recording")) {
-    return { disabled: true, reason: "Cloud voice input is a Pro feature. Switch to the local voice engine, or upgrade to Pro." };
+    return { disabled: true, reason: "Voice input is a Pro feature. Upgrade to Pro to use it." };
   }
 
   const provider = settings?.voice_cloud_provider || "";

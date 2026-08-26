@@ -29,10 +29,7 @@
     "targets": [
       "nsis"
     ],
-    "externalBin": [
-      "bin/llama-server",
-      "bin/whisper-server"
-    ],
+    "externalBin": [],
     "resources": [],
     "createUpdaterArtifacts": true,
     "icon": [

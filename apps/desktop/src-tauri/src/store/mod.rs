@@ -372,17 +372,19 @@ pub fn open_db_by_path(path: &std::path::Path) -> Result<Connection, String> {
 
     // Ensure 'voice_engine' column exists in 'ai_configurations' — independent of ai_mode,
     // since a user's chat-LLM provider choice doesn't imply the same preference for voice
-    // transcription (e.g. local chat + cloud STT, or vice versa, are both reasonable).
+    // transcription. Legacy column: only 'cloud' is selectable now, "local" is a value
+    // from pre-existing installs predating the removal of the local whisper engine.
     let voice_engine_exists: bool = conn.query_row(
         "SELECT COUNT(1) FROM pragma_table_info('ai_configurations') WHERE name='voice_engine'",
         [],
         |row| row.get(0)
     ).unwrap_or(0) > 0;
     if !voice_engine_exists {
-        let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_engine TEXT NOT NULL DEFAULT 'local';", []);
+        let _ = conn.execute("ALTER TABLE ai_configurations ADD COLUMN voice_engine TEXT NOT NULL DEFAULT 'cloud';", []);
     }
 
-    // Which whisper model to use when voice_engine == 'local'.
+    // Legacy column from the removed local whisper engine, kept for
+    // backward-compatible reads of pre-existing rows.
     let voice_model_exists: bool = conn.query_row(
         "SELECT COUNT(1) FROM pragma_table_info('ai_configurations') WHERE name='voice_model'",
         [],

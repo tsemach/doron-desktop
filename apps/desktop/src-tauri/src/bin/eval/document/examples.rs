@@ -92,20 +92,6 @@ Generate test documents for search indexing.
 
 5. Generate rich synthetic legal documents via OpenAI (GPT-4o):
    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --ai --provider openai --model gpt-4o --api-key YOUR_API_KEY --corpus-dir ./gpt_docs
-
-6. Generate rich synthetic legal documents via Local Microsoft Phi-4:
-   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
-
-7. Generate rich synthetic legal documents via Local Google Gemma E4B:
-   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --ai --provider local --model "Gemma 4 E4B (Q4)" --corpus-dir ./gemma_docs
-
-8. Generate rich synthetic legal documents via Local Google Gemma 12B:
-   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --ai --provider local --model "Gemma 4 12B" --corpus-dir ./gemma12b_docs
-
-9. Generate rich synthetic legal documents via Local Qwen 3B:
-   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --ai --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --corpus-dir ./qwen_docs
-
-Note: Running generation with local models requires your local llama-server to be active on port 10086 (e.g. by running the desktop app in local mode or starting the sidecar).
 ================================================================================
 "#
     );
@@ -140,9 +126,6 @@ Retrieves candidates using hybrid search, then reranks them using an LLM.
 * Run Hybrid with LLM Reranking (using Mock provider for offline testing):
   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
 
-* Run Hybrid with LLM Reranking (using local model e.g. Microsoft Phi-4):
-  $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
-
 * Run Hybrid with LLM Reranking (using online model e.g. Google Gemini):
   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider gemini --model gemini-1.5-pro --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
 
@@ -153,42 +136,7 @@ Retrieves candidates using hybrid search, then reranks them using an LLM.
   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider openai --model gpt-4o --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
 
 --------------------------------------------------------------------------------
-3. LOCAL LLM BENCHMARK RUNS (requires local llama-server on port 10086)
---------------------------------------------------------------------------------
-Configure local llama-server, load model weights, and run retrieval benchmarks.
-
-* Run evaluation using Local Microsoft Phi-4:
-  - Hybrid FTS + Vector only:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
-  - Hybrid FTS + Vector + LLM Reranking:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
-
-* Run evaluation using Local Microsoft Phi-3.5:
-  - Hybrid FTS + Vector only:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-3.5-mini-instruct (3.8B Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
-  - Hybrid FTS + Vector + LLM Reranking:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-3.5-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
-
-* Run evaluation using Local Alibaba Qwen 2.5 (3B):
-  - Hybrid FTS + Vector only:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
-  - Hybrid FTS + Vector + LLM Reranking:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
-
-* Run evaluation using Local Google Gemma 2 (2B E4B):
-  - Hybrid FTS + Vector only:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Gemma 4 E4B (Q4)" --algorithm hybrid --corpus-dir ./evaluation_corpus
-  - Hybrid FTS + Vector + LLM Reranking:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Gemma 4 E4B (Q4)" --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
-
-* Run evaluation using Local Google Gemma 2 (12B):
-  - Hybrid FTS + Vector only:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Gemma 4 12B" --algorithm hybrid --corpus-dir ./evaluation_corpus
-  - Hybrid FTS + Vector + LLM Reranking:
-    $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Gemma 4 12B" --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
-
---------------------------------------------------------------------------------
-4. ONLINE LLM BENCHMARK RUNS (requires API key)
+3. ONLINE LLM BENCHMARK RUNS (requires API key)
 --------------------------------------------------------------------------------
 Run benchmarks using commercial cloud APIs.
 
@@ -219,7 +167,7 @@ Run benchmarks using commercial cloud APIs.
     $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider openai --model gpt-4o-mini --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./evaluation_corpus
 
 --------------------------------------------------------------------------------
-5. CUSTOM AND GENERAL CONFIGURATIONS
+4. CUSTOM AND GENERAL CONFIGURATIONS
 --------------------------------------------------------------------------------
 * Run evaluation using a custom BYOM (Bring Your Own Model) or OpenAI-compatible endpoint:
   $ cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider openai --model my-custom-model --api-key MY_KEY --algorithm hybrid --corpus-dir ./evaluation_corpus
