@@ -695,9 +695,13 @@ pub async fn fill_document_placeholders(
 }
 
 #[tauri::command]
-pub fn open_path(app: AppHandle, path: String) -> Result<(), String> {
+pub async fn open_path(app: AppHandle, path: String) -> Result<(), String> {
     println!("[open_path] Attempting to open path: {}", path);
-    open_path_impl(&app, &path)
+    // WSL subprocess spawns (wslpath/powershell.exe/wslview) and the opener-plugin
+    // call below are both genuinely blocking (process spawn+wait, or a synchronous
+    // OS "open with default app" call) -- run on the blocking pool so a slow file
+    // association or a stuck subprocess doesn't stall every other in-flight command.
+    crate::blocking::run_blocking(move || open_path_impl(&app, &path)).await
 }
 
 fn open_path_impl(app: &AppHandle, path: &str) -> Result<(), String> {
@@ -773,7 +777,11 @@ fn try_open_via_wsl(path: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn delete_template(app: AppHandle, id: i64) -> Result<(), String> {
+pub async fn delete_template(app: AppHandle, id: i64) -> Result<(), String> {
+    crate::blocking::run_blocking(move || delete_template_blocking(app, id)).await
+}
+
+fn delete_template_blocking(app: AppHandle, id: i64) -> Result<(), String> {
     let conn = store::open_db(&app)?;
 
     let mut stmt = conn
