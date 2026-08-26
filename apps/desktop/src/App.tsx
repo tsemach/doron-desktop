@@ -5,13 +5,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Loader2 } from "lucide-react";
 import { LanguageProvider } from "./context/LanguageContext";
 import { FontProvider } from "./context/FontContext";
-import UpdateBanner from "./components/Updater/UpdateBanner";
 import { triggerGlobalHealthCheck } from "./store/aiStore";
 import { initIndexingBridge } from "./hooks/indexingBridge";
 import { useAtomValue } from "jotai";
 import { refreshSession, sessionAtom, sessionStatusAtom } from "./store/authStore";
 import AppMain from "./components/App/AppMain";
 import AppLogin from "./components/App/AppLogin";
+import AppShell from "./components/App/AppShell";
 
 // 0.10 — the sole switch for the register/login cutover. Flipped on
 // 2026-07-21 once 0.1-0.9 were verified working end to end. See PLAN.md
@@ -77,16 +77,17 @@ function App() {
   return (
     <LanguageProvider>
       <FontProvider>
-        <UpdateBanner />
-        {checkingSession ? (
-          <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : gated ? (
-          <AppLogin />
-        ) : (
-          <AppMain />
-        )}
+        <AppShell>
+          {checkingSession ? (
+            <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : gated ? (
+            <AppLogin />
+          ) : (
+            <AppMain />
+          )}
+        </AppShell>
       </FontProvider>
     </LanguageProvider>
   );
