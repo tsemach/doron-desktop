@@ -1,7 +1,7 @@
-import { User, Mail, Server, RefreshCw, Mic, Users } from "lucide-react";
+import { User, Mail, Server, RefreshCw, Mic, Users, Bell } from "lucide-react";
 import SettingMenuTabItem from "./SettingMenuTabItem";
 
-export type TabType = "preferences" | "email" | "ai" | "voice" | "users_roles" | "update";
+export type TabType = "preferences" | "email" | "ai" | "voice" | "users_roles" | "update" | "notifications";
 
 function ProBadge() {
   return (
@@ -85,6 +85,13 @@ export default function SettingMenuTab({
         onClick={() => handleTabChange("users_roles")}
         icon={Users}
         label="Users and Roles"
+      />
+
+      <SettingMenuTabItem
+        isActive={activeTab === "notifications"}
+        onClick={() => handleTabChange("notifications")}
+        icon={Bell}
+        label="Notifications"
       />
 
       <SettingMenuTabItem
