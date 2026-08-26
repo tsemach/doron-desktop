@@ -2,11 +2,12 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Briefcase, CalendarDays, FileText } from "lucide-react";
+import { Briefcase, CalendarDays, FileText, HelpCircle } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAtomValue } from "jotai";
 import { isProcessingAtom } from "../../store/indexStore";
 import { clearSession } from "../../store/authStore";
+import { Button } from "../ui/button";
 import AppHomeRecentCases from "./AppHomeRecentCases";
 import AppHomeDocumentsPanel from "./AppHomeDocumentsPanel";
 import AppHomeTodaysMeetings from "./AppHomeTodaysMeetings";
@@ -63,6 +64,10 @@ export default function AppHome() {
     await openUrl(`${BACKEND_URL}/register/plan?platform=desktop`);
   }
 
+  async function handleHelpCenter() {
+    await openUrl(`${BACKEND_URL}/help`);
+  }
+
   async function handleLogout() {
     // Clears the local session (App.tsx's `gated` check then swaps straight
     // to AppLogin -- no manual navigation needed here).
@@ -74,8 +79,14 @@ export default function AppHome() {
       <div className="absolute top-8 left-1/2 -translate-x-1/2">
         <AppHomeWelcome />
       </div>
-
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 flex items-center gap-3">
+        <Button
+          onClick={handleHelpCenter}
+          className="gap-2 rounded-full bg-black text-white hover:bg-black/90 px-4 cursor-pointer mr-2"
+        >
+          <HelpCircle className="size-4" />
+          <span>Help Center</span>
+        </Button>
         <AppUserMenu
           handleSettings={handleSettings}
           handleUpgrade={handleUpgrade}
@@ -137,7 +148,7 @@ export default function AppHome() {
               <button
                 type="button"
                 onClick={handleSettings}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 flex items-center gap-1.5 cursor-pointer"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2.5 py-1 flex items-center gap-1.5 cursor-pointer"
               >
                 {t("settings_footer")}
               </button>

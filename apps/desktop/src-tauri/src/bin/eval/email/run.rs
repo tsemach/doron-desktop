@@ -11,21 +11,21 @@ pub struct RunArgs {
     #[arg(long, default_value = "./email_eval_corpus")]
     pub corpus_dir: String,
 
-    /// LLM provider (local, claude, gemini, openai). Ignored with --inject-only.
-    #[arg(long, default_value = "local")]
+    /// LLM provider (mock, claude, gemini, openai). Ignored with --inject-only.
+    #[arg(long, default_value = "mock")]
     pub provider: String,
 
     /// LLM model name
-    #[arg(long, default_value = "Phi-4-mini-instruct (3.8B Q4)")]
+    #[arg(long, default_value = "claude-3-5-sonnet-20241022")]
     pub model: String,
 
     /// API key for online providers
     #[arg(long)]
     pub api_key: Option<String>,
 
-    /// Base URL for local llama-server sidecar
-    #[arg(long, default_value = "http://127.0.0.1:10086/v1")]
-    pub base_url: String,
+    /// Base URL override for the LLM provider (e.g. an OpenAI-compatible endpoint)
+    #[arg(long)]
+    pub base_url: Option<String>,
 
     /// Skip LLM; use injected classifications from fixtures (CI / matcher regression)
     #[arg(long)]
@@ -125,11 +125,7 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         },
         api_key: args.api_key.unwrap_or_default(),
         model: args.model.clone(),
-        base_url: if args.inject_only {
-            None
-        } else {
-            Some(args.base_url.clone())
-        },
+        base_url: args.base_url.clone(),
     });
 
     let outcomes = run_fixture_suite(&provider, &fixtures, args.inject_only).await?;

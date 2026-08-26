@@ -2,11 +2,11 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tauri::AppHandle;
 use super::llm_provider::LlmProvider;
 
-/// Only Gemini and OpenAI support audio input — Claude, the local text
-/// model, and mock all return an explicit "unsupported" error rather than
-/// silently failing or producing a garbled result. Split out from the
-/// `#[tauri::command]` wrapper (which needs an `AppHandle` to resolve the
-/// provider) so this dispatch logic is unit-testable on its own.
+/// Only Gemini and OpenAI support audio input — Claude and mock both return
+/// an explicit "unsupported" error rather than silently failing or
+/// producing a garbled result. Split out from the `#[tauri::command]`
+/// wrapper (which needs an `AppHandle` to resolve the provider) so this
+/// dispatch logic is unit-testable on its own.
 async fn transcribe_via_provider(provider: LlmProvider, audio_bytes: Vec<u8>, language: Option<String>) -> Result<String, String> {
     match provider {
         LlmProvider::Gemini(p) => {
@@ -15,10 +15,7 @@ async fn transcribe_via_provider(provider: LlmProvider, audio_bytes: Vec<u8>, la
         }
         LlmProvider::OpenAi(p) => p.transcribe(audio_bytes, language.as_deref()).await,
         LlmProvider::Claude(_) => Err(
-            "Voice input isn't supported for Claude. Switch your AI provider to Gemini or OpenAI, or use the local voice engine instead.".to_string(),
-        ),
-        LlmProvider::Local(_) => Err(
-            "Voice input isn't supported for the local text-chat model. Switch your AI provider to Gemini or OpenAI, or use the local voice engine instead.".to_string(),
+            "Voice input isn't supported for Claude. Switch your AI provider to Gemini or OpenAI.".to_string(),
         ),
         LlmProvider::Mock(_) => Err("Voice input isn't supported in mock mode.".to_string()),
         // Every voice caller (VoiceFieldFiller.tsx, SettingVoiceEngine.tsx's
@@ -46,8 +43,7 @@ pub async fn transcribe_audio_cloud(
     provider: Option<String>,
 ) -> Result<String, String> {
     // Cloud voice transcription is Pro-only ("voice_recording" FeatureKey,
-    // PLAN.md Phase 3) -- the local whisper engine (transcribe_audio_local)
-    // is a separate command and stays completely ungated.
+    // PLAN.md Phase 3).
     if !crate::auth::is_pro_tier(&app) {
         return Err("Voice transcription (cloud) is a Pro feature.".to_string());
     }
@@ -61,7 +57,7 @@ pub async fn transcribe_audio_cloud(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::llm::llm_provider::{BackendOnlineProvider, ClaudeProvider, MockProvider, LocalProvider};
+    use crate::llm::llm_provider::{BackendOnlineProvider, ClaudeProvider, MockProvider};
 
     #[tokio::test]
     async fn test_claude_returns_explicit_unsupported_error() {
@@ -80,19 +76,6 @@ mod tests {
         let provider = LlmProvider::Mock(MockProvider);
         let result = transcribe_via_provider(provider, vec![1, 2, 3], None).await;
         assert_eq!(result, Err("Voice input isn't supported in mock mode.".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_local_returns_explicit_unsupported_error() {
-        let provider = LlmProvider::Local(LocalProvider {
-            api_key: String::new(),
-            model: "phi-4".to_string(),
-            base_url: Some("http://localhost:10086/v1".to_string()),
-        });
-        let result = transcribe_via_provider(provider, vec![1, 2, 3], None).await;
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.contains("local text-chat model"));
     }
 
     #[tokio::test]

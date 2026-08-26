@@ -1,16 +1,10 @@
 pub mod llm_provider;
 pub mod llm_settings;
-pub mod llm_local_mode;
-pub mod sidecar;
-pub mod whisper_local;
 pub mod cloud_transcribe;
 pub mod field_extraction;
 pub mod backend_stream;
 
 pub use llm_settings::*;
-pub use llm_local_mode::*;
-pub use sidecar::get_sidecar_path;
-pub use whisper_local::*;
 pub use cloud_transcribe::*;
 pub use field_extraction::*;
 use serde::{Deserialize, Serialize};
@@ -24,29 +18,6 @@ Required JSON fields:
   "doc_type": { "type_name": probability_float, ... } (e.g. {"contract": 0.8, "letter": 0.2}) where type_name must be one of: "contract", "report", "invoice", "memo", "specification", "presentation", "spreadsheet", "letter", "policy", "manual", "will", "other". Include up to 3 highest matching types, and probabilities must sum to approximately 1.0.
   "title": "the document title or best inferred title",
   "summary": "2-3 sentence summary of what this document is about, written in the same language as the document",
-  "authors": ["list of author names if found, else empty list"],
-  "date": "YYYY-MM-DD if a clear document date exists, else null",
-  "topics": ["up to 6 key topics or subject areas"],
-  "entities": ["notable companies, people, products, or places mentioned"],
-  "language": "ISO 639-1 code e.g. en, he, fr",
-  "keywords": ["up to 10 important keywords for search"],
-  "confidence": a float 0.0-1.0 reflecting how confident you are in the extraction
-}
-
-Document text (may be truncated):
----
-{text}
----"#;
-
-const EXTRACTION_PROMPT_LOCAL: &str = r#"You are a document analyst. Read the document text below and extract metadata as a single JSON object. Be concise and precise. Use null for any field you cannot determine.
-
-IMPORTANT: Your response must be ONLY valid JSON. Do not include any explanatory text, markdown formatting, or code blocks. Start your response directly with { and end with }.
-
-Required JSON fields:
-{
-  "doc_type": "one of: contract, report, invoice, memo, specification, presentation, spreadsheet, letter, policy, manual, will, other",
-  "title": "the document title or best inferred title (written in the same language as the document, e.g. Hebrew)",
-  "summary": "2-3 sentence summary of what this document is about (written in the same language as the document, e.g. Hebrew)",
   "authors": ["list of author names if found, else empty list"],
   "date": "YYYY-MM-DD if a clear document date exists, else null",
   "topics": ["up to 6 key topics or subject areas"],
@@ -149,17 +120,7 @@ pub async fn call_provider(provider: &llm_provider::LlmProvider, text: &str) -> 
         text.to_string()
     };
     
-    let is_local = match provider {
-        llm_provider::LlmProvider::Local(_) => true,
-        _ => false,
-    };
-    let prompt_template = if is_local {
-        EXTRACTION_PROMPT_LOCAL
-    } else {
-        EXTRACTION_PROMPT
-    };
-
-    let prompt = prompt_template.replace("{text}", &truncated);
+    let prompt = EXTRACTION_PROMPT.replace("{text}", &truncated);
     let raw = provider.call_structured(&prompt, None, Some(0.0)).await?;
     let json_str = clean_json(&raw);
     serde_json::from_str::<DocumentMetadata>(&json_str)

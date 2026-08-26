@@ -21,7 +21,7 @@ pub struct RunArgs {
     #[arg(long, default_value = "evaluation_index.db")]
     pub db_name: String,
 
-    /// LLM provider type (e.g., mock, claude, gemini, openai, local, byom)
+    /// LLM provider type (e.g., mock, claude, gemini, openai, byom)
     #[arg(long, default_value = "mock")]
     pub provider: String,
 
@@ -137,128 +137,16 @@ fn scan_corpus_files(corpus_path: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
-async fn setup_local_sidecar(provider: &str, model: &str) -> Result<crate::sidecar::SidecarGuard, String> {
-    let mut sidecar_guard = crate::sidecar::SidecarGuard { child: None };
-
-    if provider.to_lowercase() == "local" {
-        println!("Initializing local model sidecar for evaluation...");
-
-        // Kill any existing running local server to release the port
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = std::process::Command::new("pkill")
-                .arg("-f")
-                .arg("llama-server")
-                .status();
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-        #[cfg(target_os = "windows")]
-        {
-            let _ = std::process::Command::new("taskkill")
-                .args(&["/F", "/IM", "llama-server.exe"])
-                .status();
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-
-        let sidecar_path = crate::sidecar::get_cli_sidecar_path()?;
-        let model_file = tauri_app_lib::llm::get_model_filename(model)?;
-        let model_path = store::cli_app_data_dir().join("models").join(model_file);
-
-        if !model_path.exists() {
-            return Err(format!(
-                "Local model not found at {:?}. Please download it via the desktop application settings first.",
-                model_path
-            ));
-        }
-
-        let port = 10086;
-        let mut cmd = std::process::Command::new(&sidecar_path);
-        cmd.arg("--model")
-            .arg(&model_path)
-            .arg("--port")
-            .arg(port.to_string())
-            .arg("--threads")
-            .arg("4")
-            .arg("-c")
-            .arg("8192")
-            .arg("--host")
-            .arg("127.0.0.1")
-            .arg("--no-cache-prompt");
-
-        let template = if model.to_lowercase().contains("qwen") {
-            "chatml"
-        } else if model.to_lowercase().contains("gemma") {
-            "gemma"
-        } else if model.to_lowercase().contains("phi-4") {
-            "phi4"
-        } else {
-            "chatml"
-        };
-        cmd.arg("--chat-template").arg(template);
-
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let app_data_dir = store::cli_app_data_dir();
-        let log_file_path = app_data_dir.join("llama_sidecar.log");
-        let log_file = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&log_file_path)
-            .map_err(|e| format!("Failed to create log file {:?}: {}", log_file_path, e))?;
-
-        cmd.stdout(log_file.try_clone().map_err(|e| e.to_string())?);
-        cmd.stderr(log_file);
-
-        println!("Spawning local sidecar (logs redirected to {:?})", log_file_path);
-        let child = cmd
-            .spawn()
-            .map_err(|e| format!("Failed to spawn local sidecar: {}", e))?;
-        sidecar_guard.child = Some(child);
-
-        // Poll /health endpoint up to 120 seconds (240 * 500ms) to allow the model to load into memory
-        let client = reqwest::Client::new();
-        let health_url = format!("http://localhost:{}/health", port);
-        let mut responsive = false;
-        for _ in 0..240 {
-            if client
-                .get(&health_url)
-                .send()
-                .await
-                .map(|r| r.status().is_success())
-                .unwrap_or(false)
-            {
-                responsive = true;
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        }
-
-        if !responsive {
-            return Err("Local sidecar failed to become responsive within timeout.".to_string());
-        }
-        println!("Local model sidecar is active and ready.");
-    }
-
-    Ok(sidecar_guard)
-}
-
 async fn index_documents(
     db_path: &Path,
     provider: &tauri_app_lib::llm::llm_provider::LlmProvider,
     files: &[PathBuf],
     algorithm: &str,
-    is_local: bool,
 ) -> Result<(usize, usize, f64), String> {
     // Configure indexing tracks based on target algorithm
     let run_llm_metadata = match algorithm {
         "vector" => false,
-        _ => !is_local,
+        _ => true,
     };
     let run_vector_embeddings = match algorithm {
         "fts" => false,
@@ -599,27 +487,19 @@ pub async fn execute(args: RunArgs) -> Result<(), String> {
         .clone()
         .unwrap_or_else(|| "claude-sonnet-4-6".to_string());
 
-    let _sidecar_guard = setup_local_sidecar(&args.provider, &model).await?;
-
     let api_key = args.api_key.clone().unwrap_or_default();
     let provider = get_active_provider(ProviderConfig {
         provider_type: args.provider.clone(),
         api_key,
         model: model.clone(),
-        base_url: if args.provider.to_lowercase() == "local" {
-            Some("http://localhost:10086/v1".to_string())
-        } else {
-            None
-        },
+        base_url: None,
     });
 
-    let is_local = args.provider.to_lowercase() == "local";
     let (_indexed_count, _failed_count, avg_indexing_ms) = index_documents(
         &db_path,
         &provider,
         &files,
         &args.algorithm,
-        is_local,
     )
     .await?;
 

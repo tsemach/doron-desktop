@@ -1,7 +1,6 @@
 use tauri::AppHandle;
 use serde::{Deserialize, Serialize};
 use super::clean_json;
-use super::llm_provider::LlmProvider;
 
 const FIELD_EXTRACTION_PROMPT: &str = r#"You are a form-filling assistant. The user spoke a short phrase describing what field to fill and its value. Given the list of available field names below, determine which field they meant and what value to fill it with.
 
@@ -55,8 +54,8 @@ fn parse_and_validate(raw: &str, available_fields: &[String]) -> Result<FieldExt
 /// empty, BYOM (direct) otherwise; otherwise falls back to the normal
 /// active-provider resolution, which is engine-independent since plain text
 /// extraction works the same regardless of which LLM provider is configured
-/// (including Claude and the local text model, which don't support audio
-/// input but are perfectly fine for this text-only step).
+/// (including Claude, which doesn't support audio input but is perfectly
+/// fine for this text-only step).
 #[tauri::command]
 pub async fn extract_field_value(
     app: AppHandle,
@@ -71,10 +70,9 @@ pub async fn extract_field_value(
         None => super::load_active_provider(&app, api_key, model, "field_extraction")?,
     };
 
-    // Free tier only for local-provider extraction ("ai_features"
-    // FeatureKey, PLAN.md Phase 3) -- local AI stays completely ungated.
-    let is_local = matches!(resolved_provider, LlmProvider::Local(_));
-    if !is_local && !crate::auth::is_pro_tier(&app) {
+    // Field extraction via an AI provider is Pro-only ("ai_features"
+    // FeatureKey, PLAN.md Phase 3).
+    if !crate::auth::is_pro_tier(&app) {
         return Err("Field extraction via a cloud AI provider is a Pro feature.".to_string());
     }
 

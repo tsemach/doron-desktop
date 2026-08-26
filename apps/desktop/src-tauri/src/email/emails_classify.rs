@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use crate::llm::llm_provider::LlmProvider;
 
 use super::emails_classify_deterministic::{extract_email_signals, merge_search_terms};
-use super::emails_classify_llm::call_email_structured;
 
 pub use super::emails_classify_deterministic::EmailExtractedSignals;
 
@@ -51,7 +50,7 @@ pub async fn classify_email_llm(
          Read this email and return the JSON object.",
         signals.to_prompt_json()
     );
-    let raw = call_email_structured(provider, &prompt, Some(CLASSIFY_SYSTEM_PROMPT)).await?;
+    let raw = provider.call_structured(&prompt, Some(CLASSIFY_SYSTEM_PROMPT), Some(0.7)).await?;
     let mut classification = parse_classification_json(&raw)?;
     classification.search_terms =
         merge_search_terms(deterministic_terms, classification.search_terms);

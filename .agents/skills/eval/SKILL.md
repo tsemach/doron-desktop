@@ -30,11 +30,6 @@ Generates synthetic documents (mock or AI-generated) in a target directory to bu
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --corpus-dir ./my_test_docs
   ```
-* **AI Generation via Local Model (Phi-4/Qwen/Gemma):**
-  Requires local model sidecar (`llama-server`) active on port 10086:
-  ```bash
-  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --ai --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --corpus-dir ./phi4_docs
-  ```
 * **AI Generation via Claude (Online):**
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document generate --ai --provider claude --model claude-3-5-sonnet-20241022 --api-key YOUR_API_KEY --corpus-dir ./ai_docs
@@ -64,30 +59,12 @@ Indexes the generated corpus, autodetects `evaluation_dataset.json` in the corpu
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider mock --algorithm hybrid-rerank --corpus-dir ./my_test_docs
   ```
-* **Local Phi-4 Model (Hybrid + Reranking):**
-  ```bash
-  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
-  ```
 * **Online Gemini Model (Hybrid + Reranking):**
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider gemini --model gemini-1.5-pro --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./my_test_docs
   ```
 
-### 2.3 Local LLM Configurations (Requires local llama-server on port 10086)
-* **Local Microsoft Phi-4:**
-  ```bash
-  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Phi-4-mini-instruct (3.8B Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
-  ```
-* **Local Alibaba Qwen-2.5 (3B):**
-  ```bash
-  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Qwen-2.5-3B-Instruct (Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
-  ```
-* **Local Google Gemma 2 (2B E4B):**
-  ```bash
-  cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider local --model "Gemma 4 E4B (Q4)" --algorithm hybrid-rerank --corpus-dir ./my_test_docs
-  ```
-
-### 2.4 Online LLM Configurations (Requires API key)
+### 2.3 Online LLM Configurations (Requires API key)
 * **Google Gemini 2.0 Flash:**
   ```bash
   cargo run --bin eval --manifest-path apps/desktop/src-tauri/Cargo.toml document run --provider gemini --model gemini-2.0-flash --api-key YOUR_API_KEY --algorithm hybrid-rerank --corpus-dir ./my_test_docs
@@ -147,5 +124,3 @@ The evaluation tool operates with two SQLite database files:
   You can execute CLI subcommands directly without specifying double dashes:
   * **Correct**: `cargo run --bin eval document show 1`
   * **Unnecessary**: `cargo run --bin eval -- document show 1`
-* **Local Model Warmup Latency:**
-  Starting local models on CPU can take 20–40 seconds for memory mapping and model warmup. Let the background process finish warming up before attempting connections.
