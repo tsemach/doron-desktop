@@ -1,5 +1,7 @@
 # Sync Tauri Command Audit
 
+*Line numbers below are as of commit `81f31be` (master, immediately after PR #229 merged) — the branch that implements this audit's 34 FIX items shifts most of them; treat this file as a point-in-time record, not a live index.*
+
 ## Summary
 - Total plain `pub fn` commands audited: 83
 - FIX: 34
