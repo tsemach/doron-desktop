@@ -11,7 +11,7 @@ if [ -f .env.local ]; then
   set +a
 fi
 
-HOST="${HOST:-${HOSTNAME:-127.0.0.1}}"
+HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-3001}"
 
 exec next dev --port "$PORT" -H "$HOST"
