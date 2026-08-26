@@ -372,7 +372,17 @@ pub fn stop_case_watcher(_app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn list_document_versions(
+pub async fn list_document_versions(
+    app: AppHandle,
+    file_path: String,
+) -> Result<Vec<DocumentVersion>, String> {
+    // Opens a DB connection, scans document_versions for this file, and MD5-hashes
+    // the current on-disk file -- all synchronous. Run on the blocking pool so it
+    // doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || list_document_versions_blocking(app, file_path)).await
+}
+
+fn list_document_versions_blocking(
     app: AppHandle,
     file_path: String,
 ) -> Result<Vec<DocumentVersion>, String> {
@@ -418,7 +428,17 @@ pub fn list_document_versions(
 }
 
 #[tauri::command]
-pub fn restore_document_version(
+pub async fn restore_document_version(
+    app: AppHandle,
+    version_id: i64,
+) -> Result<(), String> {
+    // DB lookup + backup (itself DB + MD5 hashing) + file copy -- all synchronous.
+    // Run on the blocking pool so it doesn't stall every other in-flight command
+    // while it runs.
+    crate::blocking::run_blocking(move || restore_document_version_blocking(app, version_id)).await
+}
+
+fn restore_document_version_blocking(
     app: AppHandle,
     version_id: i64,
 ) -> Result<(), String> {
@@ -454,7 +474,16 @@ pub fn restore_document_version(
 }
 
 #[tauri::command]
-pub fn delete_document_version(
+pub async fn delete_document_version(
+    app: AppHandle,
+    version_id: i64,
+) -> Result<(), String> {
+    // DB lookup + filesystem delete + DB delete -- all synchronous. Run on the
+    // blocking pool so it doesn't stall every other in-flight command while it runs.
+    crate::blocking::run_blocking(move || delete_document_version_blocking(app, version_id)).await
+}
+
+fn delete_document_version_blocking(
     app: AppHandle,
     version_id: i64,
 ) -> Result<(), String> {
