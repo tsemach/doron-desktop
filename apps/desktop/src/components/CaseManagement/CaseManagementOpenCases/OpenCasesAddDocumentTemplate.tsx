@@ -247,7 +247,7 @@ export default function OpenCasesAddDocumentTemplate({
                 value={selectedTemplateId}
                 onChange={handleDropdownChange}
                 disabled={loadingTemplates || isProcessingTemplate || isSubmitting}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all h-[38px]"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all h-[38px] appearance-none cursor-pointer"
               >
                 {loadingTemplates ? (
                   <option>Loading templates...</option>
