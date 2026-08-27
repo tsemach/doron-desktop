@@ -136,18 +136,26 @@ export default function CaseManagementOpenCasesDetails() {
     };
   }, [selectedCase?.id, selectedCase?.folder]);
 
-  // Listen for file change notifications to reload case documents
+  // Listen for file change notifications to reload case documents. This fires on
+  // every auto-version backup (e.g. Word closing a locked file), which happens far
+  // more often than an explicit user action here. Skipped entirely while a document
+  // is open on the right (Preview / Version History / Fields, regardless of which
+  // tab) -- that panel already refreshes its own data independently (see
+  // OpenCasesDocumentHistory's own case-files-changed listener), and the list on
+  // the left hasn't structurally changed just because the active file was
+  // auto-versioned, so there's nothing here worth re-rendering for.
   useEffect(() => {
     if (!selectedCase?.folder) return;
 
     const unlistenPromise = listen("case-files-changed", () => {
-      loadDocuments(selectedCase.folder!);
+      if (selectedDocument) return;
+      loadDocuments(selectedCase.folder!, true);
     });
 
     return () => {
       unlistenPromise.then((f) => f());
     };
-  }, [selectedCase?.folder]);
+  }, [selectedCase?.folder, selectedDocument]);
 
   async function loadAttachments(cId: number) {
     try {
@@ -260,8 +268,8 @@ export default function CaseManagementOpenCasesDetails() {
     }
   }
 
-  async function loadDocuments(folderPath: string) {
-    setDocsLoading(true);
+  async function loadDocuments(folderPath: string, silent = false) {
+    if (!silent) setDocsLoading(true);
     setDocsError(null);
     try {
       const files = await invoke<CaseFile[]>("list_case_files", { folderPath });
@@ -276,7 +284,7 @@ export default function CaseManagementOpenCasesDetails() {
       console.error(err);
       setDocsError(String(err));
     } finally {
-      setDocsLoading(false);
+      if (!silent) setDocsLoading(false);
     }
   }
 
