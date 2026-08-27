@@ -354,7 +354,7 @@ export default function OpenCasesDocumentFields({
         </div>
 
         {/* Scrollable Fields Grid */}
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        <div className="flex-1 min-h-0 overflow-y-auto p-1">
           {filteredFields.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground bg-muted/10 h-full flex items-center justify-center">
               {fields.length === 0

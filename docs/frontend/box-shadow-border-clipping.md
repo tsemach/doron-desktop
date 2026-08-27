@@ -78,6 +78,9 @@ missing, this is very likely why.
   card, ASC-163): `max-h-56 overflow-y-auto space-y-1.5` → `max-h-56 overflow-y-auto space-y-1.5 p-1`.
   Its `MeetingBox` children have `rounded-md border`, same shape as the Open Tasks card two
   blocks below it that already had this fix — missed when the card was first added.
+- `apps/desktop/src/components/CaseManagement/CaseManagementOpenCases/OpenCasesDocumentFields.tsx`
+  (~line 357, the "Document Fields" grid on the case document detail panel): `overflow-y-auto pr-1`
+  → `overflow-y-auto p-1`. Its `CaseManagementCaseCreateField` children have `rounded-md border`.
 
 ## Issue 2: native `<select>` corners ignore `rounded-*` (all four corners look square)
 
@@ -133,7 +136,6 @@ Any `<select>` with a `rounded-*` class but no `appearance-none` nearby is a can
 - `apps/desktop/src/components/CaseManagement/CaseManagementAddOrganizationModal.tsx:59`
 - `apps/desktop/src/components/CaseManagement/CaseManagementOpenCases/OpenCasesCaseAnnotationsTagsEditor.tsx:89`
   (the "type" tag's case-type `<select>`)
-- `apps/desktop/src/components/CaseManagement/CaseManagementOpenCases/OpenCasesAddDocumentTemplate.tsx:250`
 
 ### Known fixed instances
 
@@ -143,3 +145,5 @@ Any `<select>` with a `rounded-*` class but no `appearance-none` nearby is a can
   select, ASC-163) — built without `appearance-none` in the first pass, caught during
   manual testing (all four corners square, not just one edge — the tell for this issue
   vs. issue 1).
+- `apps/desktop/src/components/CaseManagement/CaseManagementOpenCases/OpenCasesAddDocumentTemplate.tsx`
+  (~line 250, the "Select Template" select in the "Add Document to Case" modal).
