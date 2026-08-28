@@ -5,6 +5,7 @@ import TaskManagement from "../TaskManagement/TaskManagement";
 import Calendar from "../Calendar/Calendar";
 import Settings from "../Settings/Settings";
 import AppHome from "./AppHome";
+import AppHelpCenter from "./AppHelpCenter";
 
 export default function AppMain() {
   return (
@@ -15,6 +16,7 @@ export default function AppMain() {
       <Route path="/task-management/*" element={<TaskManagement />} />
       <Route path="/calendar/*" element={<Calendar />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/help-center" element={<AppHelpCenter />} />
       <Route path="*" element={<AppHome />} />
     </Routes>
   );
