@@ -133,7 +133,6 @@ Any `<select>` with a `rounded-*` class but no `appearance-none` nearby is a can
 
 ### Known unfixed instances (found via the grep above, not yet fixed)
 
-- `apps/desktop/src/components/CaseManagement/CaseManagementAddOrganizationModal.tsx:59`
 - `apps/desktop/src/components/CaseManagement/CaseManagementOpenCases/OpenCasesCaseAnnotationsTagsEditor.tsx:89`
   (the "type" tag's case-type `<select>`)
 
@@ -147,3 +146,5 @@ Any `<select>` with a `rounded-*` class but no `appearance-none` nearby is a can
   vs. issue 1).
 - `apps/desktop/src/components/CaseManagement/CaseManagementOpenCases/OpenCasesAddDocumentTemplate.tsx`
   (~line 250, the "Select Template" select in the "Add Document to Case" modal).
+- `apps/desktop/src/components/CaseManagement/CaseManagementAddOrganizationModal.tsx`
+  (~line 59, the "Billing Method" select in the "Add New Organization" modal, ASC-192).

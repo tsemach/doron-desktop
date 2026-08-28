@@ -56,7 +56,7 @@ export default function CaseManagementAddOrganizationModal({
             <select
               value={billingMethod}
               onChange={(e) => setBillingMethod(e.target.value)}
-              className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+              className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring text-foreground appearance-none cursor-pointer"
             >
               {BILLING_METHODS.map((m) => (
                 <option key={m} value={m}>
