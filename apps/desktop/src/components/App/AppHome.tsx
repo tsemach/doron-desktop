@@ -64,8 +64,8 @@ export default function AppHome() {
     await openUrl(`${BACKEND_URL}/register/plan?platform=desktop`);
   }
 
-  async function handleHelpCenter() {
-    await openUrl(`${BACKEND_URL}/help`);
+  function handleHelpCenter() {
+    navigate("/help-center");
   }
 
   async function handleLogout() {
@@ -85,7 +85,7 @@ export default function AppHome() {
           className="gap-2 rounded-full bg-black text-white hover:bg-black/90 px-4 cursor-pointer mr-2"
         >
           <HelpCircle className="size-4" />
-          <span>Help Center</span>
+          <span>{t("help_center")}</span>
         </Button>
         <AppUserMenu
           handleSettings={handleSettings}
